@@ -19,5 +19,6 @@ include(
     "helix-addon-chat",
     "helix-addon-economy",
     "helix-addon-moderation",
-    "helix-addon-teamutils"
+    "helix-addon-teamutils",
+    "helix-addon-discord"
 )

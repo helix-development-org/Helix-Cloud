@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.6.0 — 2026-07-19
+
+### Discord-Bot-Addon (`helix-addon-discord`)
+- Echter Gateway-Bot auf **Kord**-Basis; die Library ist vollständig ins
+  HXA gebündelt, die Plattform bleibt Discord-frei.
+- Leitet Notification-Bus-Kategorien (Default: `moderation` — Bans,
+  Warns, Kicks) live in den konfigurierten Channel, Farbcodes werden für
+  Discord entfernt.
+- Channel-Commands: `!status`, `!players`, `!help` und `!run <action>
+  [args...]` (nur konfigurierte Admin-User-IDs) — Antworten kommen direkt
+  aus dem Action-Contract.
+- Actions: `discord.status`, `discord.send <text...>`, `discord.reload`;
+  Konfiguration in `discord.json` (wird mit Vorlage angelegt), ohne Token
+  bleibt das Addon idle. Verbindungsfehler crashen die Node nicht,
+  sondern landen als `discord`-Notification im Bus.
+
 ## 0.5.0 — 2026-07-19
 
 ### Moderations-Notifications für das Team

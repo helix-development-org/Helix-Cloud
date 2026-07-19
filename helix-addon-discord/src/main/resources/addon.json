@@ -1,0 +1,7 @@
+{
+  "id": "helix.discord",
+  "name": "Helix Discord Bot",
+  "version": "1.0.0",
+  "main": "org.helix.addons.discord.DiscordBotAddon",
+  "description": "Kord-based Discord bot: moderation notifications to a channel and !status/!players/!run commands."
+}

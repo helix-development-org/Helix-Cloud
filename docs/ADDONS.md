@@ -167,6 +167,14 @@ Referenz-Implementierungen in diesem Repo:
   Join/Leave-Notifications fürs Team, `team.notify` für CLI/Dashboard und
   Live-Weiterleitung aller `moderation`-Notifications (Bans, Warns, Kicks)
   an das Team. Teammitglied = Permission `helix.team.member`.
+- `helix-addon-discord` — Discord-Bot auf Kord-Basis (Gateway, im HXA
+  gebündelt). Leitet `moderation`-Notifications in einen Discord-Channel
+  weiter und beantwortet dort `!status`, `!players`, `!help` und
+  `!run <action>` (nur für konfigurierte Admin-User-IDs). Konfiguration in
+  `Helix/addons/data/helix.discord/discord.json` (`botToken`, `channelId`,
+  `commandPrefix`, `notificationCategories`, `adminUserIds`), danach
+  `discord.reload`. Weitere Actions: `discord.status`, `discord.send`.
+  Benötigte Bot-Intents im Discord Developer Portal: *Message Content*.
 
 ## Lifecycle
 
