@@ -168,11 +168,25 @@ class WorkspacePreparer(
                         appendLine("motd=${task.name}")
                     },
                 )
+                // Legacy proxy forwarding requires bungeecord mode, otherwise
+                // paper rejects players coming through velocity.
+                writeIfMissing(
+                    workspace.resolve("spigot.yml"),
+                    buildString {
+                        appendLine("settings:")
+                        appendLine("  bungeecord: true")
+                    },
+                )
             }
             Environment.VELOCITY -> {
+                // The config must be complete: without config-version and an
+                // explicit (empty) forced-hosts section velocity fills the
+                // gaps with its example defaults, which reference servers
+                // that do not exist and abort the startup.
                 writeIfMissing(
                     workspace.resolve("velocity.toml"),
                     buildString {
+                        appendLine("config-version = \"2.7\"")
                         appendLine("bind = \"0.0.0.0:$port\"")
                         appendLine("motd = \"${task.name}\"")
                         appendLine("show-max-players = ${task.maxPlayers}")
@@ -181,6 +195,8 @@ class WorkspacePreparer(
                         appendLine()
                         appendLine("[servers]")
                         appendLine("try = []")
+                        appendLine()
+                        appendLine("[forced-hosts]")
                     },
                 )
             }

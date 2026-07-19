@@ -43,6 +43,7 @@ class WorkspacePreparerTest {
         assertTrue(workspace.resolve("server.properties").readText().contains("server-port=30001"))
         assertTrue(workspace.resolve("server.properties").readText().contains("max-players=42"))
         assertTrue(workspace.resolve("eula.txt").readText().contains("eula=true"))
+        assertTrue(workspace.resolve("spigot.yml").readText().contains("bungeecord: true"))
         assertTrue(workspace.resolve("wrapper.properties").readText().contains("serverArgs=--nogui"))
     }
 
@@ -58,7 +59,10 @@ class WorkspacePreparerTest {
         val workspace = preparer.prepare(task, "Proxy-1", 25577)
 
         assertTrue(Files.exists(workspace.resolve("plugins/HelixVelocityBridge.jar")))
-        assertTrue(workspace.resolve("velocity.toml").readText().contains("bind = \"0.0.0.0:25577\""))
+        val velocityToml = workspace.resolve("velocity.toml").readText()
+        assertTrue(velocityToml.contains("bind = \"0.0.0.0:25577\""))
+        assertTrue(velocityToml.contains("config-version = \"2.7\""))
+        assertTrue(velocityToml.contains("[forced-hosts]"))
         assertFalse(Files.exists(workspace.resolve("eula.txt")))
     }
 

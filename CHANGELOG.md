@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.6.3 — 2026-07-19
+
+### Fix: Velocity startet nicht („Your configuration is invalid")
+- Die generierte `velocity.toml` ist jetzt vollständig: mit
+  `config-version = "2.7"` und expliziter leerer `[forced-hosts]`-Sektion.
+  Vorher füllte Velocity die fehlenden Teile mit seinen Beispiel-Defaults
+  auf (`lobby.example.com` → nicht existierende Server) und brach den
+  Start ab.
+- Paper-Workspaces erhalten eine `spigot.yml` mit `bungeecord: true`,
+  damit Legacy-Proxy-Forwarding funktioniert und Paper Spieler vom
+  Velocity-Proxy akzeptiert.
+- Verifiziert mit echtem Velocity 3.4.0 im Container: Download über die
+  PaperMC-API, Start ohne Config-Fehler, Bridge verbindet sich und der
+  Service wird `RUNNING`.
+
 ## 0.6.2 — 2026-07-19
 
 ### Fixes: Docker-Crash-Loop
