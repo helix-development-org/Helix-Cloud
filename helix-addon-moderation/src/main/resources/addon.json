@@ -1,0 +1,7 @@
+{
+  "id": "helix.moderation",
+  "name": "Helix Moderation",
+  "version": "1.0.0",
+  "main": "org.helix.addons.moderation.ModerationAddon",
+  "description": "Permission-gated kick, warn, warns, announce and tempban commands with warn history."
+}

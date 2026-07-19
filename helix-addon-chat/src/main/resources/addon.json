@@ -1,0 +1,7 @@
+{
+  "id": "helix.chat",
+  "name": "Helix Pretty Chat",
+  "version": "1.0.0",
+  "main": "org.helix.addons.chat.PrettyChatAddon",
+  "description": "Chat formatting with permission-based prefixes and name colors."
+}

@@ -176,15 +176,7 @@ class BuiltinActions(
         ) { invocation ->
             val player = argument(invocation, 0, "player")
             val reason = invocation.arguments.drop(1).joinToString(" ").ifBlank { null }
-            val proxies = manager.managedServices()
-                .filter { it.task.environment.proxy && it.active() }
-                .map { it.id }
-            if (proxies.isEmpty()) {
-                ActionResult.error("no active proxy to deliver the kick")
-            } else {
-                commandQueue.enqueue(proxies, ProxyCommand.kick(player, reason))
-                ActionResult.ok("kick for $player queued on ${proxies.joinToString()}")
-            }
+            deliver(ProxyCommand.kick(player, reason))
         }
         register(
             registry,
@@ -281,9 +273,11 @@ class BuiltinActions(
     }
 
     private fun deliver(command: ProxyCommand): ActionResult {
-        val proxies = manager.managedServices()
+        val managedProxies = manager.managedServices()
             .filter { it.task.environment.proxy && it.active() }
             .map { it.id }
+        val reportingProxies = playerRegistry.online().map { it.proxyServiceId }.filter { it.isNotBlank() }
+        val proxies = (managedProxies + reportingProxies).distinct()
         return if (proxies.isEmpty()) {
             ActionResult.error("no active proxy to deliver to")
         } else {

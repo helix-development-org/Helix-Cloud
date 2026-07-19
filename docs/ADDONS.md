@@ -82,6 +82,45 @@ context.registerPermissionResolver { request ->
 }
 ```
 
+- `context.hasPermission(player, permission)` — fragt die aggregierten
+  Resolver (z.B. das Permission-Addon) direkt.
+- `context.onlinePlayers()` — alle Spieler im Netzwerk (die Proxies melden
+  Join/Leave an die Node).
+- `context.registerPlayerListener(listener)` — netzwerkweite
+  Join/Leave-Events empfangen.
+- `context.registerDisplayResolver { name -> ... }` — Prefix/Farbe eines
+  Spielers für Chat und Tablist liefern (erster Nicht-null-Treffer gewinnt).
+- `context.publishBridgeValue(key, value)` — globale Werte publizieren,
+  die die Bridges pollen (`tablist.header`, `tablist.footer`,
+  `chat.format`).
+
+## Spieler-Commands
+
+Eine Action mit `playerCommand = true` wird von der Velocity-Bridge
+automatisch als In-Game-Command registriert. Der Handler bekommt den
+Spielernamen als erstes Argument; `permission` gated den Command:
+
+```kotlin
+context.registerAction(
+    ActionDescriptor(
+        name = "kick",                      // → /kick im Spiel
+        description = "Kicks a player.",
+        usage = "kick <player> [reason...]",
+        playerCommand = true,
+        permission = "helix.mod.kick",      // null = jeder darf
+    ),
+) { invocation ->
+    val executor = invocation.arguments.first()   // ausführender Spieler
+    val args = invocation.arguments.drop(1)       // getippte Argumente
+    ...
+}
+```
+
+Antwort-Zeilen (`ActionResult.lines`, `&`-Farbcodes erlaubt) werden dem
+Spieler in den Chat geschrieben. Nachrichten an andere Spieler laufen über
+die generischen Actions `player.message <player> <text...>` und
+`player.broadcast <text...>`.
+
 ## Packen mit Gradle
 
 ```kotlin
@@ -106,6 +145,21 @@ Referenz-Implementierungen in diesem Repo:
   PermissionResolver; damit funktioniert u.a. `helix.maintenance.bypass`
   an der Velocity-Bridge. Actions: `perm.group.*`, `perm.user.*`,
   `perm.check`.
+- `helix-addon-friends` — `/friend add|accept|deny|remove|list|requests`,
+  Join-Benachrichtigungen an Online-Freunde.
+- `helix-addon-tablist` — konfigurierbarer Tablist-Header/-Footer
+  (`tablist.header`, `tablist.footer`, `tablist.show`), Platzhalter
+  `{online}`/`{max}`.
+- `helix-addon-chat` — Chat-Format (`chat.format`) plus permission-basierte
+  Prefix-Regeln (`chat.prefix.add/list/remove`), gerendert von der
+  Paper-Bridge.
+- `helix-addon-economy` — Coins mit `/balance` und `/pay` sowie
+  `eco.give/take/set/get`.
+- `helix-addon-moderation` — permission-gated `/kick`, `/warn`, `/warns`,
+  `/announce`, `/tempban` (delegiert an das Ban-Addon) mit Warn-Historie.
+- `helix-addon-teamutils` — Teamchat `/tc`, `/team` (Online-Teammitglieder),
+  Join/Leave-Notifications fürs Team, `team.notify` für CLI/Dashboard.
+  Teammitglied = Permission `helix.team.member`.
 
 ## Lifecycle
 

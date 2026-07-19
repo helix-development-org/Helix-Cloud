@@ -1,0 +1,7 @@
+{
+  "id": "helix.tablist",
+  "name": "Helix Tablist",
+  "version": "1.0.0",
+  "main": "org.helix.addons.tablist.TablistAddon",
+  "description": "Configurable tab list header and footer, applied network-wide by the paper bridge."
+}

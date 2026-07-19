@@ -13,5 +13,11 @@ include(
     "helix-addon-sdk",
     "helix-addon-example",
     "helix-addon-bans",
-    "helix-addon-permissions"
+    "helix-addon-permissions",
+    "helix-addon-friends",
+    "helix-addon-tablist",
+    "helix-addon-chat",
+    "helix-addon-economy",
+    "helix-addon-moderation",
+    "helix-addon-teamutils"
 )

@@ -59,6 +59,12 @@ alles, was die Konsole kann.
 | POST | `/internal/join-check` | Join-Gate: `{name, uuid?}` → `{allowed, message?}` (wertet alle Addon-Gates aus) |
 | GET | `/internal/commands?proxyServiceId=<id>` | Pending Proxy-Commands (z.B. Kicks), werden beim Abruf konsumiert |
 | POST | `/internal/permission-check` | Permission-Frage: `{name, permission, uuid?}` → `{allowed}` (erteilt, sobald ein Resolver erteilt) |
+| POST | `/internal/player-event` | Join/Leave vom Proxy: `{type, name, uuid?, proxyServiceId}` |
+| GET | `/internal/players` | alle Online-Spieler des Netzwerks |
+| GET | `/internal/player-commands` | Actions mit `playerCommand=true`, die Proxies als Commands registrieren |
+| POST | `/internal/player-command` | Spieler-Command ausführen: `{player, command, arguments}` → ActionResult (Permission wird geprüft) |
+| POST | `/internal/display` | Display-Profil eines Spielers: `{name}` → `{prefix, suffix, color}` |
+| GET | `/internal/bridge-values` | von Addons publizierte globale Werte (Tablist, Chat-Format) |
 
 ## Beispiele
 

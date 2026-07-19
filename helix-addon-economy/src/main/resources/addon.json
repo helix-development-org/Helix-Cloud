@@ -1,0 +1,7 @@
+{
+  "id": "helix.economy",
+  "name": "Helix Economy",
+  "version": "1.0.0",
+  "main": "org.helix.addons.economy.EconomyAddon",
+  "description": "Coin balances with /balance and /pay plus admin actions."
+}

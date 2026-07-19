@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.4.0 — 2026-07-19
+
+### Sechs neue Addons
+- **Friends** — `/friend add|accept|deny|remove|list|requests` mit
+  Auto-Accept bei Gegenanfrage und Join-Benachrichtigungen an Freunde.
+- **Tablist** — konfigurierbarer Header/Footer mit `{online}`/`{max}`,
+  netzwerkweit von der Paper-Bridge angewendet.
+- **Pretty Chat** — Chat-Format mit `{prefix}{color}{name}{message}` und
+  permission-basierten Prefix-Regeln (erste Regel gewinnt).
+- **Economy** — Coins, `/balance`, `/pay` mit Empfänger-Benachrichtigung,
+  `eco.give/take/set/get`, atomare Transfers.
+- **Moderation** — permission-gated `/kick`, `/warn`, `/warns`,
+  `/announce`, `/tempban` (delegiert an das Ban-Addon), Warn-Historie.
+- **Team Utils** — Teamchat `/tc`, `/team`, Team-Join/Leave-Notifications,
+  `team.notify`; Mitgliedschaft über `helix.team.member`.
+
+### Generische Plattform-Mechanismen (addon-agnostisch)
+- **Player-Registry**: Proxies melden Join/Leave; Addons sehen
+  Online-Spieler und registrieren Listener; `player.list` Action.
+- **Spieler-Commands**: Actions mit `playerCommand=true` registriert die
+  Velocity-Bridge dynamisch als In-Game-Commands, optional
+  permission-gated; Ausführung über `POST /internal/player-command`.
+- **Nachrichten**: neue Proxy-Command-Typen `message`/`broadcast` mit den
+  Actions `player.message` und `player.broadcast`; Zustellung an gemanagte
+  und meldende Proxies.
+- **Display-Profile**: Addons liefern Prefix/Farbe pro Spieler
+  (`POST /internal/display`); die Paper-Bridge rendert Chat entsprechend.
+- **Bridge-Values**: Addons publizieren globale Werte
+  (`GET /internal/bridge-values`); die Paper-Bridge wendet
+  Tablist-Header/Footer und Chat-Format an.
+- **SDK**: `RecordingAddonContext` als Test-Hilfe für Addon-Entwickler;
+  `context.hasPermission(...)` für direkte Permission-Fragen.
+
 ## 0.3.0 — 2026-07-19
 
 ### Permission-System (`helix-addon-permissions`)

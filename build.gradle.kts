@@ -9,7 +9,7 @@ plugins {
 
 allprojects {
     group = "org.helix"
-    version = "0.3.0"
+    version = "0.4.0"
 
     repositories {
         mavenCentral()
@@ -63,33 +63,42 @@ tasks.register("verifyKDocAvailability") {
     }
 }
 
+/** Addon modules packaged into the release bundle. */
+val addonModules = listOf(
+    "helix-addon-example",
+    "helix-addon-bans",
+    "helix-addon-permissions",
+    "helix-addon-friends",
+    "helix-addon-tablist",
+    "helix-addon-chat",
+    "helix-addon-economy",
+    "helix-addon-moderation",
+    "helix-addon-teamutils",
+)
+
 tasks.register("releaseBundle") {
     group = "distribution"
-    description = "Collects the release artifacts (Launcher.jar, example addon) with SHA-256 checksums."
-    dependsOn(
-        ":helix-node:jar",
-        ":helix-addon-example:packageHxa",
-        ":helix-addon-bans:packageHxa",
-        ":helix-addon-permissions:packageHxa",
-    )
+    description = "Collects the release artifacts (Launcher.jar, all addon HXAs) with SHA-256 checksums."
+    dependsOn(":helix-node:jar")
+    addonModules.forEach { dependsOn(":$it:packageHxa") }
 
     doLast {
         val releaseDirectory = layout.buildDirectory.dir("release").get().asFile
         releaseDirectory.deleteRecursively()
         releaseDirectory.mkdirs()
-        val artifacts = listOf(
-            project(":helix-node").layout.buildDirectory.file("libs/Launcher.jar").get().asFile
-                to "Launcher.jar",
-            project(":helix-addon-example").layout.buildDirectory
-                .file("distributions/helix-example-$version.hxa").get().asFile
-                to "helix-example-$version.hxa",
-            project(":helix-addon-bans").layout.buildDirectory
-                .file("distributions/helix-bans-$version.hxa").get().asFile
-                to "helix-bans-$version.hxa",
-            project(":helix-addon-permissions").layout.buildDirectory
-                .file("distributions/helix-permissions-$version.hxa").get().asFile
-                to "helix-permissions-$version.hxa",
-        )
+        val artifacts = buildList {
+            add(
+                project(":helix-node").layout.buildDirectory.file("libs/Launcher.jar").get().asFile
+                    to "Launcher.jar",
+            )
+            addonModules.forEach { module ->
+                val hxaName = "helix-${module.removePrefix("helix-addon-")}-$version.hxa"
+                add(
+                    project(":$module").layout.buildDirectory
+                        .file("distributions/$hxaName").get().asFile to hxaName,
+                )
+            }
+        }
         val digest = java.security.MessageDigest.getInstance("SHA-256")
         val checksums = StringBuilder()
         artifacts.forEach { (source, targetName) ->

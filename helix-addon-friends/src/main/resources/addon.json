@@ -1,0 +1,7 @@
+{
+  "id": "helix.friends",
+  "name": "Helix Friends",
+  "version": "1.0.0",
+  "main": "org.helix.addons.friends.FriendsAddon",
+  "description": "Friend requests, friend list with online status and join notifications."
+}
