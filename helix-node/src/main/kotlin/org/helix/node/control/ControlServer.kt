@@ -28,10 +28,13 @@ import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionSource
 import org.helix.api.bridge.HeartbeatReport
 import org.helix.api.proxy.JoinRequest
+import org.helix.api.proxy.PermissionCheckRequest
+import org.helix.api.proxy.PermissionDecision
 import org.helix.api.task.TaskDefinition
 import org.helix.node.addons.AddonManager
 import org.helix.node.config.NodeConfig
 import org.helix.node.gates.JoinGateRegistry
+import org.helix.node.gates.PermissionResolverRegistry
 import org.helix.node.platform.PlatformOverviewService
 import org.helix.node.proxy.ProxyCommandQueue
 import org.helix.node.proxy.ProxyRoutingService
@@ -52,6 +55,7 @@ import org.slf4j.LoggerFactory
  * @property addonManager installed addons.
  * @property joinGates aggregated join gates of all addons.
  * @property commandQueue pending commands for proxy bridges.
+ * @property permissionResolvers aggregated permission resolvers of all addons.
  */
 data class ControlDependencies(
     val token: String,
@@ -63,6 +67,7 @@ data class ControlDependencies(
     val addonManager: AddonManager,
     val joinGates: JoinGateRegistry = JoinGateRegistry(),
     val commandQueue: ProxyCommandQueue = ProxyCommandQueue(),
+    val permissionResolvers: PermissionResolverRegistry = PermissionResolverRegistry(),
 )
 
 /**
@@ -234,6 +239,10 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
     get("/internal/commands") {
         val proxyServiceId = call.request.queryParameters["proxyServiceId"].orEmpty()
         call.respond(dependencies.commandQueue.drain(proxyServiceId))
+    }
+    post("/internal/permission-check") {
+        val request = call.receive<PermissionCheckRequest>()
+        call.respond(PermissionDecision(dependencies.permissionResolvers.evaluate(request)))
     }
 }
 

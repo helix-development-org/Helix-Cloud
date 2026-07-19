@@ -217,6 +217,22 @@ class ControlServerTest {
         val commands: List<org.helix.api.proxy.ProxyCommand> =
             client.get("/api/v1/internal/commands?proxyServiceId=Proxy-1") { bearerAuth("secret") }.body()
         assertEquals("steve", commands.single().player)
+
+        dependencies.permissionResolvers.register("test") { request ->
+            request.name == "steve" && request.permission == "helix.maintenance.bypass"
+        }
+        val granted: org.helix.api.proxy.PermissionDecision = client.post("/api/v1/internal/permission-check") {
+            bearerAuth("secret")
+            contentType(ContentType.Application.Json)
+            setBody(org.helix.api.proxy.PermissionCheckRequest("steve", "helix.maintenance.bypass"))
+        }.body()
+        assertEquals(true, granted.allowed)
+        val deniedPerm: org.helix.api.proxy.PermissionDecision = client.post("/api/v1/internal/permission-check") {
+            bearerAuth("secret")
+            contentType(ContentType.Application.Json)
+            setBody(org.helix.api.proxy.PermissionCheckRequest("alex", "helix.maintenance.bypass"))
+        }.body()
+        assertEquals(false, deniedPerm.allowed)
     }
 
     @Test

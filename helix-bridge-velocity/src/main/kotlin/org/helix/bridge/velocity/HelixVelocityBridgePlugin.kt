@@ -19,6 +19,8 @@ import net.kyori.adventure.text.Component
 import org.helix.api.bridge.HeartbeatReport
 import org.helix.api.proxy.JoinDecision
 import org.helix.api.proxy.JoinRequest
+import org.helix.api.proxy.PermissionCheckRequest
+import org.helix.api.proxy.PermissionDecision
 import org.helix.api.proxy.ProxyCommand
 import org.helix.api.proxy.RoutingSnapshot
 import org.slf4j.Logger
@@ -120,11 +122,23 @@ class HelixVelocityBridgePlugin @Inject constructor(
      */
     @Subscribe
     fun onChooseInitialServer(event: PlayerChooseInitialServerEvent) {
-        if (maintenance.get()) {
+        if (maintenance.get() && !hasPermission(event.player.username, "helix.maintenance.bypass")) {
             event.player.disconnect(Component.text("The network is under maintenance."))
             return
         }
         registry?.fallback()?.let(event::setInitialServer)
+    }
+
+    private fun hasPermission(player: String, permission: String): Boolean {
+        val httpClient = client ?: return false
+        return runCatching {
+            httpClient.postJsonForBody(
+                "/api/v1/internal/permission-check",
+                json.encodeToString(PermissionCheckRequest(name = player, permission = permission)),
+            )?.let { json.decodeFromString<PermissionDecision>(it).allowed } ?: false
+        }.onFailure {
+            logger.warn("Helix permission check failed for {}: {}", player, it.message)
+        }.getOrDefault(false)
     }
 
     /**

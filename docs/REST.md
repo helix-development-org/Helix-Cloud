@@ -58,6 +58,7 @@ alles, was die Konsole kann.
 | GET | `/internal/routing?proxyServiceId=<id>` | Routing-Snapshot mit aufgelösten Backend-Adressen |
 | POST | `/internal/join-check` | Join-Gate: `{name, uuid?}` → `{allowed, message?}` (wertet alle Addon-Gates aus) |
 | GET | `/internal/commands?proxyServiceId=<id>` | Pending Proxy-Commands (z.B. Kicks), werden beim Abruf konsumiert |
+| POST | `/internal/permission-check` | Permission-Frage: `{name, permission, uuid?}` → `{allowed}` (erteilt, sobald ein Resolver erteilt) |
 
 ## Beispiele
 

@@ -34,4 +34,15 @@ interface AddonContext {
      * @param gate evaluated on every join attempt.
      */
     fun registerJoinGate(gate: JoinGate)
+
+    /**
+     * Registers a permission resolver owned by this addon.
+     *
+     * Bridges and other addons ask the node for permissions; the node
+     * grants when any resolver grants. Resolvers are removed when the
+     * addon is disabled.
+     *
+     * @param resolver evaluated on every permission question.
+     */
+    fun registerPermissionResolver(resolver: PermissionResolver)
 }

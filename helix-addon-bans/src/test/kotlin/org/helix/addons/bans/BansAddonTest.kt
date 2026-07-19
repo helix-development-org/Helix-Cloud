@@ -42,6 +42,10 @@ private class FakeContext(override val dataDirectory: Path) : AddonContext {
         gates += gate
     }
 
+    override fun registerPermissionResolver(resolver: org.helix.api.addon.PermissionResolver) {
+        // not used by the bans addon
+    }
+
     fun run(action: String, vararg args: String): ActionResult =
         handlers.getValue(action).execute(ActionInvocation(action, args.toList()))
 }

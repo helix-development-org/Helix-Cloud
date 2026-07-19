@@ -70,6 +70,18 @@ context.registerJoinGate { request ->
 }
 ```
 
+- `context.registerPermissionResolver { request -> ... }` — Permission-
+  Fragen beantworten: Bridges (z.B. Maintenance-Bypass) und andere Addons
+  fragen die Node über `POST /internal/permission-check`; eine Permission
+  gilt als erteilt, sobald ein Resolver sie erteilt. Ohne registrierten
+  Resolver wird jede Frage verneint.
+
+```kotlin
+context.registerPermissionResolver { request ->
+    hasPermission(request.name, request.permission)
+}
+```
+
 ## Packen mit Gradle
 
 ```kotlin
@@ -88,6 +100,12 @@ Referenz-Implementierungen in diesem Repo:
 - `helix-addon-bans` — vollständiges Produkt-Addon: persistente Bans mit
   Ablauf (`7d`, `12h`), Join-Gate, Kick über die generische
   `player.kick`-Action. Die Bridges enthalten null Ban-spezifischen Code.
+- `helix-addon-permissions` — Permission-System: Gruppen mit Gewicht,
+  Vererbung und Default-Flag, persönliche Permissions, Wildcards
+  (`*`, `prefix.*`) und Negation (`-node`). Registriert einen
+  PermissionResolver; damit funktioniert u.a. `helix.maintenance.bypass`
+  an der Velocity-Bridge. Actions: `perm.group.*`, `perm.user.*`,
+  `perm.check`.
 
 ## Lifecycle
 

@@ -12,5 +12,6 @@ include(
     "helix-bridge-velocity",
     "helix-addon-sdk",
     "helix-addon-example",
-    "helix-addon-bans"
+    "helix-addon-bans",
+    "helix-addon-permissions"
 )

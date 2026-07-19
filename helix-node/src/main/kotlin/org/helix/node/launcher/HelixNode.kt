@@ -16,6 +16,7 @@ import org.helix.node.config.NodeConfigLoader
 import org.helix.node.control.ControlDependencies
 import org.helix.node.control.ControlServer
 import org.helix.node.gates.JoinGateRegistry
+import org.helix.node.gates.PermissionResolverRegistry
 import org.helix.node.platform.PlatformOverviewService
 import org.helix.node.proxy.ProxyCommandQueue
 import org.helix.node.proxy.ProxyRoutingService
@@ -80,8 +81,12 @@ class HelixNode(private val dataDirectory: Path) {
     /** Pending commands for proxy bridges. */
     val commandQueue: ProxyCommandQueue = ProxyCommandQueue()
 
+    /** Aggregated permission resolvers of all addons. */
+    val permissionResolvers: PermissionResolverRegistry = PermissionResolverRegistry()
+
     /** Installed addons. */
-    val addonManager: AddonManager = AddonManager(paths.addons, registry, joinGates)
+    val addonManager: AddonManager =
+        AddonManager(paths.addons, registry, joinGates, permissionResolvers)
 
     private val overviewService = PlatformOverviewService(version(), taskStore, manager)
     private val autoScaler = AutoScaler(taskStore, manager)
@@ -100,6 +105,7 @@ class HelixNode(private val dataDirectory: Path) {
             addonManager = addonManager,
             joinGates = joinGates,
             commandQueue = commandQueue,
+            permissionResolvers = permissionResolvers,
         ),
     )
 

@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.0 — 2026-07-19
+
+### Permission-System (`helix-addon-permissions`)
+- Gruppen mit Gewicht (höheres Gewicht gewinnt Konflikte), Vererbung
+  (zyklensicher) und Default-Flag (gilt für Spieler ohne Gruppen);
+  persönliche User-Permissions mit höchster Präzedenz.
+- Wildcards (`*`, `prefix.*`) und Negation (`-node`, schlägt Grants auf
+  gleicher Ebene).
+- Actions: `perm.group.create/delete/list/info/grant/revoke/addparent/
+  removeparent`, `perm.user.info/addgroup/removegroup/grant/revoke`,
+  `perm.check` — Persistenz in `Helix/addons/data/helix.permissions/`.
+
+### Generischer Permission-Mechanismus (addon-agnostisch)
+- `AddonContext.registerPermissionResolver` + Aggregation in der Node
+  (erteilt, sobald ein Resolver erteilt; ohne Resolver alles verneint).
+- Neuer interner Endpunkt `POST /internal/permission-check`.
+- Velocity-Bridge: Spieler mit `helix.maintenance.bypass` dürfen während
+  der Maintenance joinen.
+
 ## 0.2.0 — 2026-07-19
 
 ### Ban-System (`helix-addon-bans`)

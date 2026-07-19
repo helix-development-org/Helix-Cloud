@@ -17,8 +17,10 @@ import org.helix.api.addon.AddonManifest
 import org.helix.api.addon.AddonState
 import org.helix.api.addon.HelixAddon
 import org.helix.api.addon.JoinGate
+import org.helix.api.addon.PermissionResolver
 import org.helix.node.actions.ActionRegistry
 import org.helix.node.gates.JoinGateRegistry
+import org.helix.node.gates.PermissionResolverRegistry
 import org.slf4j.LoggerFactory
 
 /**
@@ -32,11 +34,13 @@ import org.slf4j.LoggerFactory
  * @property directory the `Helix/addons/` directory.
  * @property registry action registry addons register into.
  * @property joinGates join gate registry addons register into.
+ * @property permissionResolvers permission registry addons register into.
  */
 class AddonManager(
     private val directory: Path,
     private val registry: ActionRegistry,
     private val joinGates: JoinGateRegistry = JoinGateRegistry(),
+    private val permissionResolvers: PermissionResolverRegistry = PermissionResolverRegistry(),
 ) {
     private val logger = LoggerFactory.getLogger(AddonManager::class.java)
     private val json = Json { ignoreUnknownKeys = true }
@@ -122,6 +126,7 @@ class AddonManager(
         record.actionNames.forEach(registry::unregister)
         record.actionNames.clear()
         joinGates.unregisterOwner(id)
+        permissionResolvers.unregisterOwner(id)
         runCatching { record.classLoader?.close() }
         record.instance = null
         record.classLoader = null
@@ -165,6 +170,7 @@ class AddonManager(
             record.actionNames.forEach(registry::unregister)
             record.actionNames.clear()
             joinGates.unregisterOwner(record.manifest.id)
+            permissionResolvers.unregisterOwner(record.manifest.id)
             logger.error("Enabling addon {} failed", record.manifest.id, failure)
         }
     }
@@ -203,6 +209,10 @@ class AddonManager(
 
         override fun registerJoinGate(gate: JoinGate) {
             joinGates.register(record.manifest.id, gate)
+        }
+
+        override fun registerPermissionResolver(resolver: PermissionResolver) {
+            permissionResolvers.register(record.manifest.id, resolver)
         }
     }
 }

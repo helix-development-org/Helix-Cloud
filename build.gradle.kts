@@ -9,7 +9,7 @@ plugins {
 
 allprojects {
     group = "org.helix"
-    version = "0.2.0"
+    version = "0.3.0"
 
     repositories {
         mavenCentral()
@@ -66,7 +66,12 @@ tasks.register("verifyKDocAvailability") {
 tasks.register("releaseBundle") {
     group = "distribution"
     description = "Collects the release artifacts (Launcher.jar, example addon) with SHA-256 checksums."
-    dependsOn(":helix-node:jar", ":helix-addon-example:packageHxa", ":helix-addon-bans:packageHxa")
+    dependsOn(
+        ":helix-node:jar",
+        ":helix-addon-example:packageHxa",
+        ":helix-addon-bans:packageHxa",
+        ":helix-addon-permissions:packageHxa",
+    )
 
     doLast {
         val releaseDirectory = layout.buildDirectory.dir("release").get().asFile
@@ -81,6 +86,9 @@ tasks.register("releaseBundle") {
             project(":helix-addon-bans").layout.buildDirectory
                 .file("distributions/helix-bans-$version.hxa").get().asFile
                 to "helix-bans-$version.hxa",
+            project(":helix-addon-permissions").layout.buildDirectory
+                .file("distributions/helix-permissions-$version.hxa").get().asFile
+                to "helix-permissions-$version.hxa",
         )
         val digest = java.security.MessageDigest.getInstance("SHA-256")
         val checksums = StringBuilder()
