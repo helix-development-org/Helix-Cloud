@@ -1,0 +1,7 @@
+{
+  "id": "helixbridge",
+  "name": "HelixVelocityBridge",
+  "version": "1.0.0",
+  "main": "org.helix.bridge.velocity.HelixVelocityBridgePlugin",
+  "authors": ["Helix"]
+}
