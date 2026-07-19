@@ -37,6 +37,7 @@ class PaperMcDownloadResolver(
      *   build exists for the version.
      */
     fun resolve(environment: Environment, version: String): URI {
+        require(version.isNotBlank()) { "cannot resolve a blank $environment version" }
         val project = when (environment) {
             Environment.PAPER -> "paper"
             Environment.VELOCITY -> "velocity"

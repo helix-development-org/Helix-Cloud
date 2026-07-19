@@ -26,6 +26,7 @@ class AutoScaler(
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val logger = LoggerFactory.getLogger(AutoScaler::class.java)
+    private val retryAtEpochMs = mutableMapOf<String, Long>()
 
     /**
      * Runs one scaling pass over all tasks.
@@ -41,14 +42,19 @@ class AutoScaler(
     }
 
     private fun ensureMinimum(task: TaskDefinition) {
+        if (inCooldown(task)) {
+            return
+        }
         while (manager.activeCount(task.name) < task.minServiceCount) {
             val started = runCatching { manager.startService(task.name) }
             if (started.isFailure) {
+                retryAtEpochMs[task.name] = clock() + START_FAILURE_COOLDOWN_MS
                 logger.error(
-                    "Cannot keep minimum of {} for task {}",
+                    "Cannot keep minimum of {} for task {} — retrying in {}s: {}",
                     task.minServiceCount,
                     task.name,
-                    started.exceptionOrNull(),
+                    START_FAILURE_COOLDOWN_MS / 1000,
+                    started.exceptionOrNull()?.message,
                 )
                 return
             }
@@ -56,8 +62,17 @@ class AutoScaler(
         }
     }
 
+    private fun inCooldown(task: TaskDefinition): Boolean {
+        val retryAt = retryAtEpochMs[task.name] ?: return false
+        if (clock() >= retryAt) {
+            retryAtEpochMs.remove(task.name)
+            return false
+        }
+        return true
+    }
+
     private fun scaleUp(task: TaskDefinition) {
-        if (manager.activeCount(task.name) >= task.maxServiceCount) {
+        if (inCooldown(task) || manager.activeCount(task.name) >= task.maxServiceCount) {
             return
         }
         val running = manager.managedServices()
@@ -76,7 +91,10 @@ class AutoScaler(
                     it.id,
                     "%.2f".format(ratio),
                 )
-            }.onFailure { logger.error("Scale-up of task {} failed", task.name, it) }
+            }.onFailure {
+                retryAtEpochMs[task.name] = clock() + START_FAILURE_COOLDOWN_MS
+                logger.error("Scale-up of task {} failed", task.name, it)
+            }
         }
     }
 
@@ -102,5 +120,10 @@ class AutoScaler(
                 logger.info("Stopping idle service {} of task {}", idle.id, task.name)
                 manager.stopService(idle.id)
             }
+    }
+
+    private companion object {
+        /** Millis a task is skipped after a failed service start. */
+        const val START_FAILURE_COOLDOWN_MS = 60_000L
     }
 }

@@ -63,11 +63,16 @@ class TaskStoreTest {
     }
 
     @Test
-    fun `reload rejects mismatching file name`() {
+    fun `reload skips broken task files instead of failing the boot`() {
         val directory = createTempDirectory("tasks")
+        val store = TaskStore(directory)
+        store.save(lobby)
         directory.resolve("Wrong.toml").writeText(TaskTomlCodec.render(lobby))
+        directory.resolve("Broken.toml").writeText("name = \"Broken\"\nenvironment = \"PAPER\"\nversion = \"\"")
 
-        assertFailsWith<IllegalArgumentException> { TaskStore(directory).reload() }
+        val loaded = store.reload()
+
+        assertEquals(listOf("Lobby"), loaded.map { it.name })
     }
 
     @Test

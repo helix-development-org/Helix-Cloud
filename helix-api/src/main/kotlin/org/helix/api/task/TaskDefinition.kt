@@ -53,6 +53,7 @@ data class TaskDefinition(
         require(name.all { it.isLetterOrDigit() || it == '-' || it == '_' }) {
             "task name may only contain letters, digits, '-' and '_': $name"
         }
+        require(version.isNotBlank()) { "task version must not be blank" }
         require(minServiceCount >= 0) { "minServiceCount must be >= 0" }
         require(maxServiceCount >= minServiceCount) {
             "maxServiceCount must be >= minServiceCount"

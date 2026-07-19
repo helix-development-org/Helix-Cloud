@@ -49,6 +49,12 @@ class ApiContractsTest {
         assertFailsWith<IllegalArgumentException> {
             TaskDefinition(name = "Lob by", environment = Environment.PAPER, version = "1.21.11")
         }
+        assertFailsWith<IllegalArgumentException> {
+            TaskDefinition(name = "Lobby", environment = Environment.VELOCITY, version = "")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            TaskDefinition(name = "Lobby", environment = Environment.VELOCITY, version = "   ")
+        }
     }
 
     @Test

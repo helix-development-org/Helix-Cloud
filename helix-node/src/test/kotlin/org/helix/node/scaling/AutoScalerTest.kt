@@ -13,6 +13,7 @@ import org.helix.api.task.AutoScaleSettings
 import org.helix.api.task.TaskDefinition
 import org.helix.node.launcher.NodePaths
 import org.helix.node.services.FakeExecutor
+import org.helix.node.services.ServiceExecutor
 import org.helix.node.services.ServiceManager
 import org.helix.node.services.WorkspacePreparer
 import org.helix.node.tasks.TaskStore
@@ -110,6 +111,44 @@ class AutoScalerTest {
         assertTrue(executor.handles[1].stopCalled)
         executor.handles[1].exit(0)
         assertEquals(1, manager.activeCount("Game"))
+    }
+
+    @Test
+    fun `failed starts back off instead of retrying every tick`() {
+        var attempts = 0
+        taskStore.save(
+            TaskDefinition(
+                name = "Broken",
+                environment = Environment.PAPER,
+                version = "1.21.11",
+                executor = ExecutorType.DOCKER,
+                startPort = 40000,
+            ),
+        )
+        val failingManager = ServiceManager(
+            taskStore = taskStore,
+            workspacePreparer = WorkspacePreparer(
+                paths = paths,
+                internalResources = { java.io.ByteArrayInputStream(byteArrayOf(1)) },
+                serverJar = { _, _ -> fakeJar },
+            ),
+            executors = mapOf(
+                ExecutorType.DOCKER to ServiceExecutor {
+                    attempts++
+                    error("docker unavailable")
+                },
+            ),
+            clock = { now },
+        )
+        val failingScaler = AutoScaler(taskStore, failingManager, clock = { now })
+
+        failingScaler.tick()
+        failingScaler.tick()
+        assertEquals(1, attempts)
+
+        now = 61_000
+        failingScaler.tick()
+        assertEquals(2, attempts)
     }
 
     @Test

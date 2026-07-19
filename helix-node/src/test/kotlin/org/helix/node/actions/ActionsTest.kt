@@ -85,6 +85,14 @@ class ActionsTest {
     }
 
     @Test
+    fun `task create rejects blank version`() {
+        val result = invoke("task.create", "Proxy", "velocity", "")
+
+        assertFalse(result.success)
+        assertTrue(result.lines.first().contains("version must not be blank"))
+    }
+
+    @Test
     fun `duplicate task create is rejected`() {
         invoke("task.create", "Lobby", "paper", "1.21.11")
 

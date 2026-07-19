@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.6.1 — 2026-07-19
+
+### Fixes
+- Tasks mit leerer Version sind nicht mehr möglich: Validierung in
+  `TaskDefinition`, in `task.create` (Fehlermeldung nennt die
+  konfigurierten Versionen) und im Dashboard-Formular (Pflichtfeld,
+  Versions-Default wechselt mit der Plattform).
+- Ein ungültiges Task-File (z.B. leere Version) verhindert nicht mehr den
+  Node-Boot: `TaskStore.reload` skippt es mit Fehler-Log.
+- Auto-Scaler: nach einem fehlgeschlagenen Service-Start gilt pro Task
+  ein 60s-Cooldown statt Retry alle 5 Sekunden (kein Log-Spam mehr);
+  die Fehlermeldung nennt die Ursache kompakt.
+- `PaperMcDownloadResolver` weist leere Versionen mit klarer Meldung ab.
+
 ## 0.6.0 — 2026-07-19
 
 ### Discord-Bot-Addon (`helix-addon-discord`)

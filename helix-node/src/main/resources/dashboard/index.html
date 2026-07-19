@@ -451,7 +451,7 @@ function taskModal() {
         <div class="form-grid">
           <label class="wide">Name<input id="f-name" placeholder="Lobby"></label>
           <label>Platform<select id="f-env"><option>PAPER</option><option>VELOCITY</option></select></label>
-          <label>Version<input id="f-version" placeholder="1.21.11"></label>
+          <label>Version<input id="f-version" value="1.21.11" placeholder="1.21.11"></label>
           <label>Executor<select id="f-exec"><option>PROCESS</option><option>DOCKER</option></select></label>
           <label>Kind<select id="f-static"><option value="false">dynamic (temporary)</option><option value="true">static (persistent)</option></select></label>
           <label>Min services<input id="f-min" type="number" value="1" min="0"></label>
@@ -470,11 +470,17 @@ function taskModal() {
   $("#m-cancel").addEventListener("click", closeModal);
   $("#backdrop").addEventListener("click", e => { if (e.target.id === "backdrop") closeModal(); });
   $("#f-env").addEventListener("change", () => {
-    $("#f-port").value = $("#f-env").value === "VELOCITY" ? 25577 : 25565;
+    const proxy = $("#f-env").value === "VELOCITY";
+    $("#f-port").value = proxy ? 25577 : 25565;
+    $("#f-version").value = proxy ? "3.4.0" : "1.21.11";
   });
   $("#m-create").addEventListener("click", async () => {
+    const name = $("#f-name").value.trim();
+    const version = $("#f-version").value.trim();
+    if (!name) { toast("Name is required"); return; }
+    if (!version) { toast("Version is required"); return; }
     const args = [
-      $("#f-name").value.trim(), $("#f-env").value, $("#f-version").value.trim(),
+      name, $("#f-env").value, version,
       "executor=" + $("#f-exec").value,
       "static=" + $("#f-static").value,
       "min=" + $("#f-min").value, "max=" + $("#f-max").value,

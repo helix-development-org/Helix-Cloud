@@ -240,6 +240,15 @@ class BuiltinActions(
         }
         val environment = runCatching { Environment.valueOf(arguments[1].uppercase()) }.getOrNull()
             ?: return ActionResult.error("unknown environment: ${arguments[1]}")
+        if (arguments[2].isBlank()) {
+            val known = versionCatalog().entries
+                .filter { it.environment == environment }
+                .joinToString { it.version }
+            return ActionResult.error(
+                "version must not be blank" +
+                    if (known.isNotBlank()) " — configured for $environment: $known" else "",
+            )
+        }
         val options = arguments.drop(3).mapNotNull { option ->
             val parts = option.split("=", limit = 2)
             if (parts.size == 2) parts[0].lowercase() to parts[1] else null

@@ -6,6 +6,7 @@ import kotlin.io.path.extension
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.nameWithoutExtension
 import org.helix.api.task.TaskDefinition
+import org.slf4j.LoggerFactory
 
 /**
  * Persistent registry of task definitions below `Helix/tasks/`.
@@ -16,14 +17,16 @@ import org.helix.api.task.TaskDefinition
  * @property directory the `Helix/tasks/` directory.
  */
 class TaskStore(private val directory: Path) {
+    private val logger = LoggerFactory.getLogger(TaskStore::class.java)
     private val tasks = linkedMapOf<String, TaskDefinition>()
 
     /**
      * Reads all task files from disk, replacing the in-memory view.
      *
+     * Invalid task files are logged and skipped so one broken file cannot
+     * prevent the node from booting.
+     *
      * @return the loaded definitions sorted by name.
-     * @throws IllegalArgumentException if a file is invalid or its file name
-     *   does not match the task name inside.
      */
     @Synchronized
     fun reload(): List<TaskDefinition> {
@@ -33,11 +36,19 @@ class TaskStore(private val directory: Path) {
             .filter { it.extension == "toml" }
             .sortedBy { it.nameWithoutExtension }
             .forEach { file ->
-                val task = TaskTomlCodec.parse(Files.readString(file))
-                require(task.name == file.nameWithoutExtension) {
-                    "task file ${file.fileName} declares mismatching name '${task.name}'"
+                runCatching {
+                    val task = TaskTomlCodec.parse(Files.readString(file))
+                    require(task.name == file.nameWithoutExtension) {
+                        "task file ${file.fileName} declares mismatching name '${task.name}'"
+                    }
+                    tasks[task.name] = task
+                }.onFailure { failure ->
+                    logger.error(
+                        "Skipping invalid task file {}: {}",
+                        file.fileName,
+                        failure.message,
+                    )
                 }
-                tasks[task.name] = task
             }
         return all()
     }
