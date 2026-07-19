@@ -1,0 +1,8 @@
+.gradle/
+build/
+*/build/
+.kotlin/
+.idea/
+.DS_Store
+/Helix/
+*.log
