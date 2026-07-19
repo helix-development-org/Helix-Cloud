@@ -3,6 +3,7 @@ import org.gradle.jvm.tasks.Jar
 
 plugins {
     application
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 dependencies {
@@ -10,7 +11,15 @@ dependencies {
     api(rootProject.project("helix-addon-sdk"))
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
     implementation("org.tomlj:tomlj:1.1.1")
+    implementation("io.ktor:ktor-server-core-jvm:3.5.1")
+    implementation("io.ktor:ktor-server-netty-jvm:3.5.1")
+    implementation("io.ktor:ktor-server-auth-jvm:3.5.1")
+    implementation("io.ktor:ktor-server-content-negotiation-jvm:3.5.1")
+    implementation("io.ktor:ktor-server-status-pages-jvm:3.5.1")
+    implementation("io.ktor:ktor-serialization-kotlinx-json-jvm:3.5.1")
     runtimeOnly("org.slf4j:slf4j-simple:2.0.18")
+    testImplementation("io.ktor:ktor-server-test-host-jvm:3.5.1")
+    testImplementation("io.ktor:ktor-client-content-negotiation:3.5.1")
 }
 
 application {
