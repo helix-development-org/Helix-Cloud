@@ -26,15 +26,21 @@ import io.ktor.server.routing.routing
 import kotlinx.serialization.json.Json
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionSource
+import org.helix.api.action.PlayerCommandRequest
 import org.helix.api.bridge.HeartbeatReport
+import org.helix.api.player.PlayerEvent
 import org.helix.api.proxy.JoinRequest
 import org.helix.api.proxy.PermissionCheckRequest
 import org.helix.api.proxy.PermissionDecision
 import org.helix.api.task.TaskDefinition
+import org.helix.node.actions.PlayerCommandService
 import org.helix.node.addons.AddonManager
 import org.helix.node.config.NodeConfig
+import org.helix.node.display.BridgeValueStore
+import org.helix.node.display.DisplayResolverRegistry
 import org.helix.node.gates.JoinGateRegistry
 import org.helix.node.gates.PermissionResolverRegistry
+import org.helix.node.players.PlayerRegistry
 import org.helix.node.platform.PlatformOverviewService
 import org.helix.node.proxy.ProxyCommandQueue
 import org.helix.node.proxy.ProxyRoutingService
@@ -68,7 +74,13 @@ data class ControlDependencies(
     val joinGates: JoinGateRegistry = JoinGateRegistry(),
     val commandQueue: ProxyCommandQueue = ProxyCommandQueue(),
     val permissionResolvers: PermissionResolverRegistry = PermissionResolverRegistry(),
-)
+    val playerRegistry: PlayerRegistry = PlayerRegistry(),
+    val displayResolvers: DisplayResolverRegistry = DisplayResolverRegistry(),
+    val bridgeValues: BridgeValueStore = BridgeValueStore(),
+) {
+    /** Player command execution shared by the internal routes. */
+    val playerCommands: PlayerCommandService = PlayerCommandService(registry, permissionResolvers)
+}
 
 /**
  * Installs the complete control API and the dashboard.
@@ -243,6 +255,31 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
     post("/internal/permission-check") {
         val request = call.receive<PermissionCheckRequest>()
         call.respond(PermissionDecision(dependencies.permissionResolvers.evaluate(request)))
+    }
+    post("/internal/player-event") {
+        val event = call.receive<PlayerEvent>()
+        if (dependencies.playerRegistry.handle(event)) {
+            call.respond(MessageResponse("ok"))
+        } else {
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("unknown event type: ${event.type}"))
+        }
+    }
+    get("/internal/players") {
+        call.respond(dependencies.playerRegistry.online())
+    }
+    get("/internal/player-commands") {
+        call.respond(dependencies.playerCommands.commands())
+    }
+    post("/internal/player-command") {
+        val request = call.receive<PlayerCommandRequest>()
+        call.respond(dependencies.playerCommands.execute(request))
+    }
+    post("/internal/display") {
+        val request = call.receive<JoinRequest>()
+        call.respond(dependencies.displayResolvers.resolve(request.name))
+    }
+    get("/internal/bridge-values") {
+        call.respond(dependencies.bridgeValues.all())
     }
 }
 

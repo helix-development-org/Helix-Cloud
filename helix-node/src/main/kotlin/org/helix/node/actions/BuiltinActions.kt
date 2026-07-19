@@ -10,6 +10,7 @@ import org.helix.api.task.AutoScaleSettings
 import org.helix.api.task.TaskDefinition
 import org.helix.node.launcher.NodePaths
 import org.helix.node.platform.PlatformOverviewService
+import org.helix.node.players.PlayerRegistry
 import org.helix.node.proxy.ProxyCommandQueue
 import org.helix.node.proxy.ProxyRoutingService
 import org.helix.api.proxy.ProxyCommand
@@ -28,6 +29,7 @@ import org.helix.node.versions.VersionCatalog
  * @property versionCatalog loads the current version catalog.
  * @property shutdown initiates node shutdown, wired by the launcher.
  * @property commandQueue pending commands for proxy bridges.
+ * @property playerRegistry online players of the network.
  */
 class BuiltinActions(
     private val paths: NodePaths,
@@ -38,6 +40,7 @@ class BuiltinActions(
     private val versionCatalog: () -> VersionCatalog,
     private val shutdown: () -> Unit,
     private val commandQueue: ProxyCommandQueue = ProxyCommandQueue(),
+    private val playerRegistry: PlayerRegistry = PlayerRegistry(),
 ) {
     /**
      * Registers every built-in action.
@@ -183,6 +186,43 @@ class BuiltinActions(
                 ActionResult.ok("kick for $player queued on ${proxies.joinToString()}")
             }
         }
+        register(
+            registry,
+            "player.message",
+            "Sends a chat message to a player anywhere on the network.",
+            "player.message <player> <text...>",
+        ) { invocation ->
+            val player = argument(invocation, 0, "player")
+            val text = invocation.arguments.drop(1).joinToString(" ")
+            if (text.isBlank()) {
+                ActionResult.error("usage: player.message <player> <text...>")
+            } else {
+                deliver(ProxyCommand.message(player, text))
+            }
+        }
+        register(
+            registry,
+            "player.broadcast",
+            "Broadcasts a chat message to every player on the network.",
+            "player.broadcast <text...>",
+        ) { invocation ->
+            val text = invocation.arguments.joinToString(" ")
+            if (text.isBlank()) {
+                ActionResult.error("usage: player.broadcast <text...>")
+            } else {
+                deliver(ProxyCommand.broadcast(text))
+            }
+        }
+        register(registry, "player.list", "Lists all players online on the network.", "player.list") {
+            val players = playerRegistry.online()
+            if (players.isEmpty()) {
+                ActionResult.ok("no players online")
+            } else {
+                ActionResult.ok(
+                    "${players.size} online: ${players.joinToString { it.name }}",
+                )
+            }
+        }
         register(registry, "versions.list", "Lists configured platform versions.", "versions.list") {
             val entries = versionCatalog().entries
             if (entries.isEmpty()) {
@@ -238,6 +278,18 @@ class BuiltinActions(
             "created task ${task.name} (${task.environment} ${task.version}, executor=${task.executor})",
             "template directory: templates/${task.name}",
         )
+    }
+
+    private fun deliver(command: ProxyCommand): ActionResult {
+        val proxies = manager.managedServices()
+            .filter { it.task.environment.proxy && it.active() }
+            .map { it.id }
+        return if (proxies.isEmpty()) {
+            ActionResult.error("no active proxy to deliver to")
+        } else {
+            commandQueue.enqueue(proxies, command)
+            ActionResult.ok("${command.type} queued on ${proxies.joinToString()}")
+        }
     }
 
     private fun argument(invocation: ActionInvocation, index: Int, label: String): String =

@@ -3,7 +3,9 @@ package org.helix.bridge.velocity
 import com.google.inject.Inject
 import com.velocitypowered.api.event.ResultedEvent
 import com.velocitypowered.api.event.Subscribe
+import com.velocitypowered.api.event.connection.DisconnectEvent
 import com.velocitypowered.api.event.connection.LoginEvent
+import com.velocitypowered.api.event.connection.PostLoginEvent
 import com.velocitypowered.api.event.player.KickedFromServerEvent
 import com.velocitypowered.api.event.player.PlayerChooseInitialServerEvent
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent
@@ -13,10 +15,14 @@ import com.velocitypowered.api.plugin.Plugin
 import com.velocitypowered.api.proxy.ProxyServer
 import com.velocitypowered.api.scheduler.ScheduledTask
 import java.time.Duration
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.serialization.json.Json
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
+import org.helix.api.action.ActionDescriptor
 import org.helix.api.bridge.HeartbeatReport
+import org.helix.api.player.PlayerEvent
 import org.helix.api.proxy.JoinDecision
 import org.helix.api.proxy.JoinRequest
 import org.helix.api.proxy.PermissionCheckRequest
@@ -39,6 +45,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
 ) {
     private val json = Json { ignoreUnknownKeys = true }
     private val maintenance = AtomicBoolean(false)
+    private val registeredPlayerCommands = ConcurrentHashMap.newKeySet<String>()
     private var settings: BridgeSettings? = null
     private var client: NodeHttpClient? = null
     private var registry: BackendRegistry? = null
@@ -79,6 +86,40 @@ class HelixVelocityBridgePlugin @Inject constructor(
     fun onProxyShutdown(event: ProxyShutdownEvent) {
         syncTask?.cancel()
         syncTask = null
+    }
+
+    /**
+     * Reports the join to the node's player registry.
+     *
+     * @param event the post-login event.
+     */
+    @Subscribe
+    fun onPostLogin(event: PostLoginEvent) {
+        reportPlayerEvent("join", event.player.username, event.player.uniqueId.toString())
+    }
+
+    /**
+     * Reports the leave to the node's player registry.
+     *
+     * @param event the disconnect event.
+     */
+    @Subscribe
+    fun onDisconnect(event: DisconnectEvent) {
+        reportPlayerEvent("leave", event.player.username, event.player.uniqueId.toString())
+    }
+
+    private fun reportPlayerEvent(type: String, name: String, uuid: String) {
+        val activeSettings = settings ?: return
+        val httpClient = client ?: return
+        runCatching {
+            val event = PlayerEvent(
+                type = type,
+                name = name,
+                uuid = uuid,
+                proxyServiceId = activeSettings.serviceId,
+            )
+            httpClient.postJson("/api/v1/internal/player-event", json.encodeToString(event))
+        }.onFailure { logger.warn("Helix player event failed: {}", it.message) }
     }
 
     /**
@@ -190,6 +231,63 @@ class HelixVelocityBridgePlugin @Inject constructor(
                 ?: return@runCatching
             json.decodeFromString<List<ProxyCommand>>(body).forEach(::executeCommand)
         }.onFailure { logger.warn("Helix command poll failed: {}", it.message) }
+        runCatching {
+            val body = client.getJson("/api/v1/internal/player-commands") ?: return@runCatching
+            json.decodeFromString<List<ActionDescriptor>>(body)
+                .filter { it.playerCommand }
+                .forEach { descriptor -> registerPlayerCommand(settings, client, descriptor) }
+        }.onFailure { logger.warn("Helix player command sync failed: {}", it.message) }
+    }
+
+    private fun registerPlayerCommand(
+        settings: BridgeSettings,
+        client: NodeHttpClient,
+        descriptor: ActionDescriptor,
+    ) {
+        if (!registeredPlayerCommands.add(descriptor.name)) {
+            return
+        }
+        val manager = proxy.commandManager
+        manager.register(
+            manager.metaBuilder(descriptor.name).plugin(this).build(),
+            com.velocitypowered.api.command.SimpleCommand { invocation ->
+                val player = invocation.source() as? com.velocitypowered.api.proxy.Player
+                    ?: return@SimpleCommand
+                proxy.scheduler.buildTask(
+                    this,
+                    Runnable { executePlayerCommand(client, descriptor, player, invocation.arguments().toList()) },
+                ).schedule()
+            },
+        )
+        logger.info("Registered player command /{} → node action", descriptor.name)
+    }
+
+    private fun executePlayerCommand(
+        client: NodeHttpClient,
+        descriptor: ActionDescriptor,
+        player: com.velocitypowered.api.proxy.Player,
+        arguments: List<String>,
+    ) {
+        val response = runCatching {
+            client.postJsonForBody(
+                "/api/v1/internal/player-command",
+                json.encodeToString(
+                    org.helix.api.action.PlayerCommandRequest(
+                        player = player.username,
+                        command = descriptor.name,
+                        arguments = arguments,
+                    ),
+                ),
+            )
+        }.onFailure { logger.warn("Player command /{} failed: {}", descriptor.name, it.message) }
+            .getOrNull()
+        if (response == null) {
+            player.sendMessage(Component.text("Command is currently unavailable."))
+            return
+        }
+        val result = json.decodeFromString<org.helix.api.action.ActionResult>(response)
+        result.lines.ifEmpty { listOf(if (result.success) "Done." else "Failed.") }
+            .forEach { line -> player.sendMessage(colored(line)) }
     }
 
     private fun executeCommand(command: ProxyCommand) {
@@ -198,7 +296,16 @@ class HelixVelocityBridgePlugin @Inject constructor(
                 player.disconnect(Component.text(command.reason ?: "You were kicked from the network."))
                 logger.info("Kicked {} ({})", command.player, command.reason ?: "no reason")
             }
+            "message" -> proxy.getPlayer(command.player).ifPresent { player ->
+                player.sendMessage(colored(command.reason ?: ""))
+            }
+            "broadcast" -> proxy.allPlayers.forEach { player ->
+                player.sendMessage(colored(command.reason ?: ""))
+            }
             else -> logger.warn("Unknown proxy command type: {}", command.type)
         }
     }
+
+    private fun colored(text: String): Component =
+        LegacyComponentSerializer.legacyAmpersand().deserialize(text)
 }

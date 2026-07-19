@@ -15,9 +15,12 @@ import org.helix.node.config.NodeConfig
 import org.helix.node.config.NodeConfigLoader
 import org.helix.node.control.ControlDependencies
 import org.helix.node.control.ControlServer
+import org.helix.node.display.BridgeValueStore
+import org.helix.node.display.DisplayResolverRegistry
 import org.helix.node.gates.JoinGateRegistry
 import org.helix.node.gates.PermissionResolverRegistry
 import org.helix.node.platform.PlatformOverviewService
+import org.helix.node.players.PlayerRegistry
 import org.helix.node.proxy.ProxyCommandQueue
 import org.helix.node.proxy.ProxyRoutingService
 import org.helix.node.resources.ClasspathInternalResources
@@ -84,9 +87,25 @@ class HelixNode(private val dataDirectory: Path) {
     /** Aggregated permission resolvers of all addons. */
     val permissionResolvers: PermissionResolverRegistry = PermissionResolverRegistry()
 
+    /** Online players and player event fan-out. */
+    val playerRegistry: PlayerRegistry = PlayerRegistry()
+
+    /** Aggregated display resolvers of all addons. */
+    val displayResolvers: DisplayResolverRegistry = DisplayResolverRegistry()
+
+    /** Global values bridges poll, published by addons. */
+    val bridgeValues: BridgeValueStore = BridgeValueStore()
+
     /** Installed addons. */
-    val addonManager: AddonManager =
-        AddonManager(paths.addons, registry, joinGates, permissionResolvers)
+    val addonManager: AddonManager = AddonManager(
+        paths.addons,
+        registry,
+        joinGates,
+        permissionResolvers,
+        playerRegistry,
+        displayResolvers,
+        bridgeValues,
+    )
 
     private val overviewService = PlatformOverviewService(version(), taskStore, manager)
     private val autoScaler = AutoScaler(taskStore, manager)
@@ -106,6 +125,9 @@ class HelixNode(private val dataDirectory: Path) {
             joinGates = joinGates,
             commandQueue = commandQueue,
             permissionResolvers = permissionResolvers,
+            playerRegistry = playerRegistry,
+            displayResolvers = displayResolvers,
+            bridgeValues = bridgeValues,
         ),
     )
 
@@ -125,11 +147,15 @@ class HelixNode(private val dataDirectory: Path) {
             versionCatalog = { VersionCatalog.load(dataDirectory) },
             shutdown = ::shutdown,
             commandQueue = commandQueue,
+            playerRegistry = playerRegistry,
         ).registerAll(registry)
         AddonActions(addonManager).registerAll(registry)
         addonManager.loadAll()
         controlServer.start()
         manager.onServiceTerminated { service: ManagedService ->
+            if (service.task.environment.proxy) {
+                playerRegistry.dropProxy(service.id)
+            }
             if (!stopping.get()) {
                 logger.info("Service {} terminated, rebalancing", service.id)
                 scheduler.execute(autoScaler::tick)

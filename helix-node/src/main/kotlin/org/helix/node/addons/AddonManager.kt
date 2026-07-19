@@ -15,12 +15,19 @@ import org.helix.api.addon.AddonContext
 import org.helix.api.addon.AddonInfo
 import org.helix.api.addon.AddonManifest
 import org.helix.api.addon.AddonState
+import org.helix.api.addon.DisplayResolver
 import org.helix.api.addon.HelixAddon
 import org.helix.api.addon.JoinGate
 import org.helix.api.addon.PermissionResolver
+import org.helix.api.addon.PlayerListener
+import org.helix.api.player.OnlinePlayer
+import org.helix.api.proxy.PermissionCheckRequest
 import org.helix.node.actions.ActionRegistry
+import org.helix.node.display.BridgeValueStore
+import org.helix.node.display.DisplayResolverRegistry
 import org.helix.node.gates.JoinGateRegistry
 import org.helix.node.gates.PermissionResolverRegistry
+import org.helix.node.players.PlayerRegistry
 import org.slf4j.LoggerFactory
 
 /**
@@ -35,12 +42,18 @@ import org.slf4j.LoggerFactory
  * @property registry action registry addons register into.
  * @property joinGates join gate registry addons register into.
  * @property permissionResolvers permission registry addons register into.
+ * @property playerRegistry online players and player event fan-out.
+ * @property displayResolvers display profile registry addons register into.
+ * @property bridgeValues global values bridges poll.
  */
 class AddonManager(
     private val directory: Path,
     private val registry: ActionRegistry,
     private val joinGates: JoinGateRegistry = JoinGateRegistry(),
     private val permissionResolvers: PermissionResolverRegistry = PermissionResolverRegistry(),
+    private val playerRegistry: PlayerRegistry = PlayerRegistry(),
+    private val displayResolvers: DisplayResolverRegistry = DisplayResolverRegistry(),
+    private val bridgeValues: BridgeValueStore = BridgeValueStore(),
 ) {
     private val logger = LoggerFactory.getLogger(AddonManager::class.java)
     private val json = Json { ignoreUnknownKeys = true }
@@ -125,8 +138,7 @@ class AddonManager(
             .onFailure { logger.warn("Addon {} failed during disable", id, it) }
         record.actionNames.forEach(registry::unregister)
         record.actionNames.clear()
-        joinGates.unregisterOwner(id)
-        permissionResolvers.unregisterOwner(id)
+        unregisterEverywhere(id)
         runCatching { record.classLoader?.close() }
         record.instance = null
         record.classLoader = null
@@ -169,8 +181,7 @@ class AddonManager(
             record.state = AddonState.FAILED
             record.actionNames.forEach(registry::unregister)
             record.actionNames.clear()
-            joinGates.unregisterOwner(record.manifest.id)
-            permissionResolvers.unregisterOwner(record.manifest.id)
+            unregisterEverywhere(record.manifest.id)
             logger.error("Enabling addon {} failed", record.manifest.id, failure)
         }
     }
@@ -188,6 +199,14 @@ class AddonManager(
                 Files.copy(stream, target, StandardCopyOption.REPLACE_EXISTING)
             }
         }
+    }
+
+    private fun unregisterEverywhere(id: String) {
+        joinGates.unregisterOwner(id)
+        permissionResolvers.unregisterOwner(id)
+        playerRegistry.unregisterOwner(id)
+        displayResolvers.unregisterOwner(id)
+        bridgeValues.unpublishOwner(id)
     }
 
     private fun extractedJarPath(manifest: AddonManifest): Path =
@@ -213,6 +232,23 @@ class AddonManager(
 
         override fun registerPermissionResolver(resolver: PermissionResolver) {
             permissionResolvers.register(record.manifest.id, resolver)
+        }
+
+        override fun hasPermission(player: String, permission: String): Boolean =
+            permissionResolvers.evaluate(PermissionCheckRequest(player, permission))
+
+        override fun onlinePlayers(): List<OnlinePlayer> = playerRegistry.online()
+
+        override fun registerPlayerListener(listener: PlayerListener) {
+            playerRegistry.register(record.manifest.id, listener)
+        }
+
+        override fun registerDisplayResolver(resolver: DisplayResolver) {
+            displayResolvers.register(record.manifest.id, resolver)
+        }
+
+        override fun publishBridgeValue(key: String, value: String) {
+            bridgeValues.publish(record.manifest.id, key, value)
         }
     }
 }
