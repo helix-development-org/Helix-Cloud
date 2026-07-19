@@ -1,0 +1,34 @@
+package org.helix.node.services
+
+/**
+ * Control handle of a started service, independent of the executor.
+ */
+interface ServiceHandle {
+    /** Whether the underlying process or container is still running. */
+    val alive: Boolean
+
+    /**
+     * Requests a graceful stop.
+     */
+    fun stop()
+
+    /**
+     * Terminates the service immediately.
+     */
+    fun kill()
+
+    /**
+     * Registers a callback invoked once when the service exits.
+     *
+     * @param callback receives the exit code.
+     */
+    fun onExit(callback: (Int) -> Unit)
+
+    /**
+     * Reads the newest log lines of the service.
+     *
+     * @param tail maximum number of lines from the end.
+     * @return the log lines, oldest first.
+     */
+    fun logs(tail: Int): List<String>
+}

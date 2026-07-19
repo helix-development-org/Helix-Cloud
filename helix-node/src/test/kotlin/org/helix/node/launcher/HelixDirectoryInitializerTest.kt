@@ -15,7 +15,7 @@ class HelixDirectoryInitializerTest {
 
         HelixDirectoryInitializer(root).initialize()
 
-        listOf("config", "tasks", "templates", "services", "addons").forEach {
+        listOf("config", "tasks", "templates", "services/static", "services/temp", "cache", "addons").forEach {
             assertTrue(Files.isDirectory(root.resolve(it)), "missing directory: $it")
         }
         assertTrue(root.resolve("config/node.toml").readText().contains("dev-token-change-me"))

@@ -28,7 +28,15 @@ class HelixDirectoryInitializer(private val root: Path) {
 
     private companion object {
         /** Directories created below the data directory root. */
-        val DIRECTORIES = listOf("config", "tasks", "templates", "services", "addons")
+        val DIRECTORIES = listOf(
+            "config",
+            "tasks",
+            "templates",
+            "services/static",
+            "services/temp",
+            "cache",
+            "addons",
+        )
 
         /** Default configuration files written on first start. */
         val DEFAULT_FILES = mapOf(
