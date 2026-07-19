@@ -1,0 +1,7 @@
+{
+  "id": "helix.example",
+  "name": "Helix Example",
+  "version": "1.0.0",
+  "main": "org.helix.addon.example.ExampleAddon",
+  "description": "Reference addon proving the addon/action contract."
+}
