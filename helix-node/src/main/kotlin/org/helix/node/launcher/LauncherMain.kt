@@ -5,8 +5,8 @@ import java.nio.file.Path
 /**
  * Entry point of the single `Launcher.jar` artifact.
  *
- * The launcher prepares the `Helix/` data directory on first start and then
- * boots the node from it.
+ * The launcher prepares the `Helix/` data directory on first start, boots
+ * the node and hands control to the interactive CLI.
  */
 object LauncherMain {
     /**
@@ -17,7 +17,8 @@ object LauncherMain {
     @JvmStatic
     fun main(args: Array<String>) {
         val dataDirectory = HelixDirectoryInitializer(Path.of("Helix")).initialize()
-        println("Helix-Cloud ${LauncherMain::class.java.`package`.implementationVersion ?: "dev"}")
-        println("Data directory ready: ${dataDirectory.toAbsolutePath()}")
+        val node = HelixNode(dataDirectory)
+        node.start()
+        node.runCli()
     }
 }

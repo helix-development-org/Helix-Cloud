@@ -35,6 +35,7 @@ tasks.named<Jar>("jar") {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     manifest {
         attributes["Main-Class"] = application.mainClass.get()
+        attributes["Implementation-Version"] = version
     }
     dependsOn(configurations.runtimeClasspath)
     from({
