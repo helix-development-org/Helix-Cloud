@@ -24,4 +24,14 @@ interface AddonContext {
      * @param handler executed on invocation.
      */
     fun registerAction(descriptor: ActionDescriptor, handler: ActionHandler)
+
+    /**
+     * Registers a join gate owned by this addon.
+     *
+     * Proxy bridges ask the node on every login; the node evaluates all
+     * registered gates. Gates are removed when the addon is disabled.
+     *
+     * @param gate evaluated on every join attempt.
+     */
+    fun registerJoinGate(gate: JoinGate)
 }

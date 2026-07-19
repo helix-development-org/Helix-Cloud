@@ -54,9 +54,21 @@ class MyAddon : AddonBase() {
 Über `context` steht mehr bereit:
 
 - `context.actions.invoke(...)` — jede Platform-Action aufrufen
-  (`service.start`, `proxy.maintenance`, …)
+  (`service.start`, `player.kick`, `proxy.maintenance`, …)
 - `context.dataDirectory` — eigener Persistenz-Ordner
   (`Helix/addons/data/<id>/`)
+- `context.registerJoinGate { request -> ... }` — Join-Versuche prüfen:
+  die Velocity-Bridge fragt bei jedem Login generisch die Node, die Node
+  wertet alle registrierten Gates aus (erste Ablehnung gewinnt, Gates mit
+  Exception werden übersprungen). Gates werden beim Disable automatisch
+  entfernt.
+
+```kotlin
+context.registerJoinGate { request ->
+    if (isBanned(request.name)) JoinDecision.deny("You are banned.")
+    else JoinDecision.allow()
+}
+```
 
 ## Packen mit Gradle
 
@@ -70,7 +82,12 @@ val packageHxa by tasks.registering(Zip::class) {
 }
 ```
 
-Referenz-Implementierung: Modul `helix-addon-example` in diesem Repo.
+Referenz-Implementierungen in diesem Repo:
+
+- `helix-addon-example` — minimales Addon (Actions, Action-Aufrufe)
+- `helix-addon-bans` — vollständiges Produkt-Addon: persistente Bans mit
+  Ablauf (`7d`, `12h`), Join-Gate, Kick über die generische
+  `player.kick`-Action. Die Bridges enthalten null Ban-spezifischen Code.
 
 ## Lifecycle
 

@@ -27,10 +27,13 @@ import kotlinx.serialization.json.Json
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionSource
 import org.helix.api.bridge.HeartbeatReport
+import org.helix.api.proxy.JoinRequest
 import org.helix.api.task.TaskDefinition
 import org.helix.node.addons.AddonManager
 import org.helix.node.config.NodeConfig
+import org.helix.node.gates.JoinGateRegistry
 import org.helix.node.platform.PlatformOverviewService
+import org.helix.node.proxy.ProxyCommandQueue
 import org.helix.node.proxy.ProxyRoutingService
 import org.helix.node.services.ServiceManager
 import org.helix.node.tasks.TaskStore
@@ -47,6 +50,8 @@ import org.slf4j.LoggerFactory
  * @property routing proxy routing state.
  * @property overviewService aggregated platform counters.
  * @property addonManager installed addons.
+ * @property joinGates aggregated join gates of all addons.
+ * @property commandQueue pending commands for proxy bridges.
  */
 data class ControlDependencies(
     val token: String,
@@ -56,6 +61,8 @@ data class ControlDependencies(
     val routing: ProxyRoutingService,
     val overviewService: PlatformOverviewService,
     val addonManager: AddonManager,
+    val joinGates: JoinGateRegistry = JoinGateRegistry(),
+    val commandQueue: ProxyCommandQueue = ProxyCommandQueue(),
 )
 
 /**
@@ -219,6 +226,14 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
     get("/internal/routing") {
         val proxyServiceId = call.request.queryParameters["proxyServiceId"].orEmpty()
         call.respond(dependencies.routing.snapshot(proxyServiceId))
+    }
+    post("/internal/join-check") {
+        val request = call.receive<JoinRequest>()
+        call.respond(dependencies.joinGates.evaluate(request))
+    }
+    get("/internal/commands") {
+        val proxyServiceId = call.request.queryParameters["proxyServiceId"].orEmpty()
+        call.respond(dependencies.commandQueue.drain(proxyServiceId))
     }
 }
 

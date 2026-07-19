@@ -1,7 +1,9 @@
 package org.helix.bridge.velocity
 
 import com.google.inject.Inject
+import com.velocitypowered.api.event.ResultedEvent
 import com.velocitypowered.api.event.Subscribe
+import com.velocitypowered.api.event.connection.LoginEvent
 import com.velocitypowered.api.event.player.KickedFromServerEvent
 import com.velocitypowered.api.event.player.PlayerChooseInitialServerEvent
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent
@@ -15,6 +17,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.serialization.json.Json
 import net.kyori.adventure.text.Component
 import org.helix.api.bridge.HeartbeatReport
+import org.helix.api.proxy.JoinDecision
+import org.helix.api.proxy.JoinRequest
+import org.helix.api.proxy.ProxyCommand
 import org.helix.api.proxy.RoutingSnapshot
 import org.slf4j.Logger
 
@@ -72,6 +77,39 @@ class HelixVelocityBridgePlugin @Inject constructor(
     fun onProxyShutdown(event: ProxyShutdownEvent) {
         syncTask?.cancel()
         syncTask = null
+    }
+
+    /**
+     * Runs the generic Helix join gate before a player joins.
+     *
+     * The node evaluates every registered join-gate (typically provided by
+     * addons such as the ban addon); this plugin only enforces the
+     * aggregated decision and carries no addon-specific logic.
+     *
+     * @param event the login event.
+     */
+    @Subscribe
+    fun onLogin(event: LoginEvent) {
+        val activeSettings = settings ?: return
+        val httpClient = client ?: return
+        val decision = runCatching {
+            val request = JoinRequest(
+                name = event.player.username,
+                uuid = event.player.uniqueId.toString(),
+            )
+            httpClient.postJsonForBody(
+                "/api/v1/internal/join-check",
+                json.encodeToString(request),
+            )?.let { json.decodeFromString<JoinDecision>(it) }
+        }.onFailure {
+            logger.warn("Helix join gate failed for {} ({}): fail-open", event.player.username, it.message)
+        }.getOrNull() ?: return
+        if (!decision.allowed) {
+            event.result = ResultedEvent.ComponentResult.denied(
+                Component.text(decision.message ?: "You may not join this network."),
+            )
+            logger.info("Denied join of {} via {}: {}", event.player.username, activeSettings.serviceId, decision.message)
+        }
     }
 
     /**
@@ -133,5 +171,20 @@ class HelixVelocityBridgePlugin @Inject constructor(
             registry.sync(snapshot)
             maintenance.set(snapshot.maintenance)
         }.onFailure { logger.warn("Helix routing sync failed: {}", it.message) }
+        runCatching {
+            val body = client.getJson("/api/v1/internal/commands?proxyServiceId=${settings.serviceId}")
+                ?: return@runCatching
+            json.decodeFromString<List<ProxyCommand>>(body).forEach(::executeCommand)
+        }.onFailure { logger.warn("Helix command poll failed: {}", it.message) }
+    }
+
+    private fun executeCommand(command: ProxyCommand) {
+        when (command.type) {
+            "kick" -> proxy.getPlayer(command.player).ifPresent { player ->
+                player.disconnect(Component.text(command.reason ?: "You were kicked from the network."))
+                logger.info("Kicked {} ({})", command.player, command.reason ?: "no reason")
+            }
+            else -> logger.warn("Unknown proxy command type: {}", command.type)
+        }
     }
 }

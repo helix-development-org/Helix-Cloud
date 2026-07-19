@@ -10,7 +10,9 @@ import org.helix.api.task.AutoScaleSettings
 import org.helix.api.task.TaskDefinition
 import org.helix.node.launcher.NodePaths
 import org.helix.node.platform.PlatformOverviewService
+import org.helix.node.proxy.ProxyCommandQueue
 import org.helix.node.proxy.ProxyRoutingService
+import org.helix.api.proxy.ProxyCommand
 import org.helix.node.services.ServiceManager
 import org.helix.node.tasks.TaskStore
 import org.helix.node.versions.VersionCatalog
@@ -25,6 +27,7 @@ import org.helix.node.versions.VersionCatalog
  * @property overviewService aggregated platform counters.
  * @property versionCatalog loads the current version catalog.
  * @property shutdown initiates node shutdown, wired by the launcher.
+ * @property commandQueue pending commands for proxy bridges.
  */
 class BuiltinActions(
     private val paths: NodePaths,
@@ -34,6 +37,7 @@ class BuiltinActions(
     private val overviewService: PlatformOverviewService,
     private val versionCatalog: () -> VersionCatalog,
     private val shutdown: () -> Unit,
+    private val commandQueue: ProxyCommandQueue = ProxyCommandQueue(),
 ) {
     /**
      * Registers every built-in action.
@@ -159,6 +163,24 @@ class BuiltinActions(
                     ActionResult.ok("maintenance disabled")
                 }
                 else -> ActionResult.error("usage: proxy.maintenance [on|off]")
+            }
+        }
+        register(
+            registry,
+            "player.kick",
+            "Kicks a player from the network through all active proxies.",
+            "player.kick <player> [reason...]",
+        ) { invocation ->
+            val player = argument(invocation, 0, "player")
+            val reason = invocation.arguments.drop(1).joinToString(" ").ifBlank { null }
+            val proxies = manager.managedServices()
+                .filter { it.task.environment.proxy && it.active() }
+                .map { it.id }
+            if (proxies.isEmpty()) {
+                ActionResult.error("no active proxy to deliver the kick")
+            } else {
+                commandQueue.enqueue(proxies, ProxyCommand.kick(player, reason))
+                ActionResult.ok("kick for $player queued on ${proxies.joinToString()}")
             }
         }
         register(registry, "versions.list", "Lists configured platform versions.", "versions.list") {

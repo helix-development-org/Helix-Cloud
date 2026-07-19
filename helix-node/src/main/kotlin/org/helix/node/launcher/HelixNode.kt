@@ -15,7 +15,9 @@ import org.helix.node.config.NodeConfig
 import org.helix.node.config.NodeConfigLoader
 import org.helix.node.control.ControlDependencies
 import org.helix.node.control.ControlServer
+import org.helix.node.gates.JoinGateRegistry
 import org.helix.node.platform.PlatformOverviewService
+import org.helix.node.proxy.ProxyCommandQueue
 import org.helix.node.proxy.ProxyRoutingService
 import org.helix.node.resources.ClasspathInternalResources
 import org.helix.node.scaling.AutoScaler
@@ -72,8 +74,14 @@ class HelixNode(private val dataDirectory: Path) {
     /** Proxy routing state. */
     val routing: ProxyRoutingService = ProxyRoutingService(manager)
 
+    /** Aggregated join gates of all addons. */
+    val joinGates: JoinGateRegistry = JoinGateRegistry()
+
+    /** Pending commands for proxy bridges. */
+    val commandQueue: ProxyCommandQueue = ProxyCommandQueue()
+
     /** Installed addons. */
-    val addonManager: AddonManager = AddonManager(paths.addons, registry)
+    val addonManager: AddonManager = AddonManager(paths.addons, registry, joinGates)
 
     private val overviewService = PlatformOverviewService(version(), taskStore, manager)
     private val autoScaler = AutoScaler(taskStore, manager)
@@ -90,6 +98,8 @@ class HelixNode(private val dataDirectory: Path) {
             routing = routing,
             overviewService = overviewService,
             addonManager = addonManager,
+            joinGates = joinGates,
+            commandQueue = commandQueue,
         ),
     )
 
@@ -108,6 +118,7 @@ class HelixNode(private val dataDirectory: Path) {
             overviewService = overviewService,
             versionCatalog = { VersionCatalog.load(dataDirectory) },
             shutdown = ::shutdown,
+            commandQueue = commandQueue,
         ).registerAll(registry)
         AddonActions(addonManager).registerAll(registry)
         addonManager.loadAll()

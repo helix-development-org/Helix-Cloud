@@ -189,6 +189,37 @@ class ControlServerTest {
     }
 
     @Test
+    fun `join gate and proxy commands work over rest`() = testApplication {
+        val client = apiClient()
+        dependencies.joinGates.register("test") { request ->
+            if (request.name == "steve") {
+                org.helix.api.proxy.JoinDecision.deny("banned")
+            } else {
+                org.helix.api.proxy.JoinDecision.allow()
+            }
+        }
+
+        val denied: org.helix.api.proxy.JoinDecision = client.post("/api/v1/internal/join-check") {
+            bearerAuth("secret")
+            contentType(ContentType.Application.Json)
+            setBody(org.helix.api.proxy.JoinRequest("steve"))
+        }.body()
+        assertEquals(false, denied.allowed)
+
+        val allowed: org.helix.api.proxy.JoinDecision = client.post("/api/v1/internal/join-check") {
+            bearerAuth("secret")
+            contentType(ContentType.Application.Json)
+            setBody(org.helix.api.proxy.JoinRequest("alex"))
+        }.body()
+        assertEquals(true, allowed.allowed)
+
+        dependencies.commandQueue.enqueue(listOf("Proxy-1"), org.helix.api.proxy.ProxyCommand.kick("steve", "banned"))
+        val commands: List<org.helix.api.proxy.ProxyCommand> =
+            client.get("/api/v1/internal/commands?proxyServiceId=Proxy-1") { bearerAuth("secret") }.body()
+        assertEquals("steve", commands.single().player)
+    }
+
+    @Test
     fun `dashboard is served without authentication`() = testApplication {
         val client = apiClient()
 

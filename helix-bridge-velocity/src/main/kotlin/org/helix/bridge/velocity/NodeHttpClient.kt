@@ -34,6 +34,24 @@ class NodeHttpClient(private val settings: BridgeSettings) {
     }
 
     /**
+     * Posts a JSON body and returns the response body.
+     *
+     * @param path absolute API path.
+     * @param json request body.
+     * @return the body text, or `null` on non-2xx responses.
+     */
+    fun postJsonForBody(path: String, json: String): String? {
+        val request = HttpRequest.newBuilder(URI.create(settings.controlUrl + path))
+            .header("Authorization", "Bearer ${settings.token}")
+            .header("Content-Type", "application/json")
+            .timeout(Duration.ofSeconds(5))
+            .POST(HttpRequest.BodyPublishers.ofString(json))
+            .build()
+        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+        return if (response.statusCode() in 200..299) response.body() else null
+    }
+
+    /**
      * Gets a JSON document from a control API path.
      *
      * @param path absolute API path including query parameters.

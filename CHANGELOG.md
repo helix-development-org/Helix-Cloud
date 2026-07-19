@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.0 — 2026-07-19
+
+### Ban-System (`helix-addon-bans`)
+- Produkt-Addon: Netzwerk-Bans mit Grund und Ablauf (`30m`, `12h`, `7d`,
+  permanent), persistiert in `Helix/addons/data/helix.bans/bans.json`.
+- Actions: `ban.set`, `ban.pardon`, `ban.list`, `ban.check` — über CLI,
+  REST und Dashboard-Konsole nutzbar.
+- Gebannte Spieler werden beim Bannen über die neue generische
+  `player.kick`-Action von allen aktiven Proxies entfernt.
+
+### Generische Plattform-Mechanismen (addon-agnostisch)
+- **Join-Gate**: Addons registrieren Gates über
+  `AddonContext.registerJoinGate`; die Velocity-Bridge fragt bei jedem
+  Login `POST /internal/join-check`, die Node aggregiert alle Gates
+  (Deny-first, fail-open bei Gate-Fehlern, Cleanup beim Disable).
+- **Proxy-Command-Queue**: `GET /internal/commands` liefert pending
+  Commands (z.B. Kicks) pro Proxy; die Velocity-Bridge pollt sie im
+  5-Sekunden-Sync. Neue Built-in-Action `player.kick <player> [reason]`.
+- Die Bridges enthalten weiterhin null addon-spezifischen Code.
+
 ## 0.1.0 — 2026-07-19
 
 Erste stabile Version von Helix-Cloud: ein CloudNet-artiges
