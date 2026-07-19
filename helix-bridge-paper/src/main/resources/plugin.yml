@@ -1,0 +1,6 @@
+name: HelixPaperBridge
+version: 1.0.0
+main: org.helix.bridge.paper.HelixPaperBridgePlugin
+api-version: '1.21'
+description: Paper-side bridge between a backend server and the Helix-Cloud node.
+authors: [Helix]
