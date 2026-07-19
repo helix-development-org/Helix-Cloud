@@ -7,6 +7,8 @@ plugins {
 
 dependencies {
     api(rootProject.project("helix-api"))
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
+    implementation("org.tomlj:tomlj:1.1.1")
     runtimeOnly("org.slf4j:slf4j-simple:2.0.18")
 }
 
