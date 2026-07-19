@@ -70,19 +70,35 @@ Helix/
     Lobby.toml
     Proxy.toml
   templates/
-    Lobby/default/   # Dateien, die in jeden Service kopiert werden
+    Lobby/           # Dateien, die in jeden Lobby-Service kopiert werden
   services/
-    Lobby-1/         # Workspace eines laufenden/statischen Service
+    static/          # persistente Workspaces (staticServices = true)
+    temp/            # Wegwerf-Workspaces, nach Stop gelöscht
+  cache/             # heruntergeladene Server-Jars
   addons/
     helix-example.hxa
 ```
 
+Jeder Service-Workspace enthält `Wrapper.jar`, `wrapper.properties`,
+`server.jar`, die injizierte Bridge unter `plugins/` und die generierte
+Plattform-Config (`server.properties`/`velocity.toml`). Details in
+[CONFIG.md](CONFIG.md).
+
 ## Datenflüsse
 
-1. `Launcher.jar` startet → legt `Helix/` an → bootet die Node.
-2. Node lädt Tasks, startet die konfigurierte Mindestanzahl Services.
-3. Wrapper startet die Server-Jar, installiert die Bridge, meldet sich an
-   der Node an.
-4. Bridge sendet Heartbeats; Velocity-Bridge zieht Routing-Snapshots und
-   registriert Backends dynamisch.
-5. Actions laufen einheitlich über CLI, REST, Bridges und Addons.
+1. `Launcher.jar` startet → legt `Helix/` an → bootet die Node
+   (Control-API + Dashboard, Auto-Scaler, Addons, CLI).
+2. Der Auto-Scaler hält pro Task `minServiceCount` Services am Leben,
+   skaliert bei Slot-Auslastung hoch und stoppt leeren Überschuss.
+3. Der Wrapper startet die Server-Jar im vorbereiteten Workspace; die
+   Bridge liest ihre Verbindung aus `HELIX_*`-Umgebungsvariablen.
+4. Bridges senden Heartbeats (erster Heartbeat ⇒ `RUNNING`); die
+   Velocity-Bridge zieht Routing-Snapshots und registriert Backends
+   dynamisch, wählt Initial-Server/Fallback und erzwingt Maintenance.
+5. Actions laufen einheitlich über CLI, REST, Dashboard und Addons.
+
+## Weitere Referenzen
+
+- [CONFIG.md](CONFIG.md) — alle Konfigurationsdateien und Task-Keys
+- [REST.md](REST.md) — Control-API-Endpunkte
+- [ADDONS.md](ADDONS.md) — Addons entwickeln und paketieren

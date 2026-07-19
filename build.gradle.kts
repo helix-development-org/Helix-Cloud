@@ -63,6 +63,38 @@ tasks.register("verifyKDocAvailability") {
     }
 }
 
+tasks.register("releaseBundle") {
+    group = "distribution"
+    description = "Collects the release artifacts (Launcher.jar, example addon) with SHA-256 checksums."
+    dependsOn(":helix-node:jar", ":helix-addon-example:packageHxa")
+
+    doLast {
+        val releaseDirectory = layout.buildDirectory.dir("release").get().asFile
+        releaseDirectory.deleteRecursively()
+        releaseDirectory.mkdirs()
+        val artifacts = listOf(
+            project(":helix-node").layout.buildDirectory.file("libs/Launcher.jar").get().asFile
+                to "Launcher.jar",
+            project(":helix-addon-example").layout.buildDirectory
+                .file("distributions/helix-example-$version.hxa").get().asFile
+                to "helix-example-$version.hxa",
+        )
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        val checksums = StringBuilder()
+        artifacts.forEach { (source, targetName) ->
+            require(source.isFile) { "release artifact missing: $source" }
+            val target = releaseDirectory.resolve(targetName)
+            source.copyTo(target, overwrite = true)
+            digest.reset()
+            val hash = digest.digest(target.readBytes())
+                .joinToString(separator = "") { byte -> "%02x".format(byte) }
+            checksums.append(hash).append("  ").append(targetName).append('\n')
+        }
+        releaseDirectory.resolve("SHA-256SUMS").writeText(checksums.toString())
+        println("Release bundle written to $releaseDirectory")
+    }
+}
+
 subprojects {
     apply(plugin = "java-library")
     apply(plugin = "org.jetbrains.kotlin.jvm")
