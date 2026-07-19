@@ -62,6 +62,14 @@ class ServiceManager(
     fun find(id: String): ManagedService? = services[id]
 
     /**
+     * Lists all managed services with their live state.
+     *
+     * @return managed services sorted by id.
+     */
+    @Synchronized
+    fun managedServices(): List<ManagedService> = services.values.sortedBy { it.id }
+
+    /**
      * Counts services of a task that still occupy capacity.
      *
      * @param taskName the task name.
