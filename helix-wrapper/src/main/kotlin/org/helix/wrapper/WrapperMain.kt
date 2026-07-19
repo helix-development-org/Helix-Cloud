@@ -1,11 +1,15 @@
 package org.helix.wrapper
 
+import java.nio.file.Path
+import kotlin.system.exitProcess
+
 /**
  * Entry point of the universal service wrapper.
  *
- * The wrapper is extracted from `Launcher.jar` into a service workspace,
- * starts the configured server jar, injects the platform bridge and connects
- * the service to the node.
+ * The wrapper is extracted from `Launcher.jar` into every service workspace.
+ * It reads `wrapper.properties`, starts the configured server jar and exits
+ * with the server's exit code — identically as node child process and as
+ * docker container entrypoint.
  */
 object WrapperMain {
     /**
@@ -15,6 +19,10 @@ object WrapperMain {
      */
     @JvmStatic
     fun main(args: Array<String>) {
-        println("Helix-Cloud wrapper: service execution not implemented yet.")
+        val config = WrapperConfig.load(Path.of("wrapper.properties"))
+        println("[helix-wrapper] starting service ${config.serviceId} (${config.serverJar})")
+        val exitCode = ServerProcessRunner().run(config.command())
+        println("[helix-wrapper] service ${config.serviceId} exited with code $exitCode")
+        exitProcess(exitCode)
     }
 }
