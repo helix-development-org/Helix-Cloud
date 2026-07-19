@@ -71,7 +71,9 @@ class PlayerPlatformTest {
             received = invocation.arguments
             ActionResult.ok("done")
         }
-        actions.register(ActionDescriptor("secret.internal", "internal", "secret.internal"))
+        actions.register(ActionDescriptor("secret.internal", "internal", "secret.internal")) {
+            ActionResult.ok()
+        }
         val service = PlayerCommandService(actions, permissions)
 
         assertEquals(listOf("kick"), service.commands().map { it.name })
