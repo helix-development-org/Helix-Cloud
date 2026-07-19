@@ -65,13 +65,29 @@ class AutoScalerTest {
     }
 
     @Test
-    fun `minimum is restored after a service terminates`() {
+    fun `minimum is restored after a normal stop`() {
         task(min = 1, max = 2)
         scaler.tick()
-        executor.handles.first().exit(1)
+        manager.stopService("Game-1")
+        executor.handles.first().exit(0)
 
         scaler.tick()
 
+        assertEquals(1, manager.activeCount("Game"))
+    }
+
+    @Test
+    fun `crashed service pauses the task instead of looping`() {
+        task(min = 1, max = 2)
+        manager.onServiceTerminated { scaler.noteTermination(it) }
+        scaler.tick()
+
+        executor.handles.first().exit(1)
+        scaler.tick()
+        assertEquals(0, manager.activeCount("Game"))
+
+        now = 61_000
+        scaler.tick()
         assertEquals(1, manager.activeCount("Game"))
     }
 

@@ -93,6 +93,23 @@ class ServiceManagerTest {
     }
 
     @Test
+    fun `crashed dynamic service stays visible with captured logs and frees its id`() {
+        task()
+        val info = manager.startService("Lobby")
+        val workspace = paths.servicesTemp.resolve(info.id)
+
+        executor.handles.first().exit(1)
+
+        val failed = manager.find(info.id)!!
+        assertEquals(ServiceState.FAILED, failed.state)
+        assertEquals(listOf("log line"), manager.logs(info.id, 10))
+        assertFalse(Files.exists(workspace))
+
+        val restarted = manager.startService("Lobby")
+        assertEquals("Lobby-1", restarted.id)
+    }
+
+    @Test
     fun `unexpected exit ends in FAILED`() {
         task(name = "Static", static = true)
         val info = manager.startService("Static")

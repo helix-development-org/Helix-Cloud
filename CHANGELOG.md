@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.6.2 — 2026-07-19
+
+### Fixes: Docker-Crash-Loop
+- **SELinux-Fix**: Workspace-Mount trägt jetzt das `:z`-Label — auf
+  Fedora/RHEL (SELinux enforcing) konnte der Container die gemountete
+  `Wrapper.jar` nicht lesen und beendete sich sofort mit Exit 1
+  (No-Op auf Systemen ohne SELinux).
+- **Crash-Loop-Backoff**: crasht ein Service (FAILED), pausiert der
+  Auto-Scaler den Task 60 Sekunden statt sofort neu zu starten.
+- **Crash-Diagnose**: die letzten 100 Log-Zeilen werden beim Terminieren
+  gesichert — Container-Logs vor dem `docker rm`, Prozess-Logs vor dem
+  Workspace-Cleanup. FAILED-Services bleiben in `service.list`/Dashboard
+  sichtbar (inkl. `service.logs <id>`), bis ihre Id neu vergeben wird;
+  das Node-Log druckt die letzte Ausgabe direkt beim Crash.
+- Doku: Docker-Executor erfordert `control.host = "0.0.0.0"`.
+
 ## 0.6.1 — 2026-07-19
 
 ### Fixes

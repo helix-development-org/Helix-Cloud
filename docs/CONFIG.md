@@ -84,10 +84,25 @@ idleStopSeconds = 300        # so lange leer, bevor Überschuss stoppt
 
 ## Docker-Execution
 
-Voraussetzungen: `docker` CLI auf der Node. Container laufen im
-konfigurierten Netzwerk, mounten den Workspace nach `/helix` und starten
-denselben Wrapper wie die Prozess-Execution. Die Node ist aus Containern
-über `host.docker.internal` erreichbar (per `--add-host … host-gateway`).
+Voraussetzungen: `docker` CLI auf der Node (Podman mit Docker-Emulation
+funktioniert ebenfalls). Container laufen im konfigurierten Netzwerk,
+mounten den Workspace nach `/helix` (mit `:z` SELinux-Label, No-Op auf
+Nicht-SELinux-Systemen) und starten denselben Wrapper wie die
+Prozess-Execution. Die Node ist aus Containern über
+`host.docker.internal` erreichbar (per `--add-host … host-gateway`).
+
+**Wichtig:** Für Docker-Services muss die Control-API auf allen
+Interfaces lauschen, sonst erreichen die Bridges die Node nicht:
+
+```toml
+[control]
+host = "0.0.0.0"   # statt 127.0.0.1, wenn Docker-Executor genutzt wird
+```
+
+Crasht ein Service direkt nach dem Start, pausiert der Auto-Scaler den
+Task für 60 Sekunden; die letzten Container-Logs bleiben über
+`service.logs <id>` und im Dashboard abrufbar (FAILED-Services bleiben
+sichtbar, bis der nächste Start ihre Id wiederverwendet).
 
 Adress-Matrix Proxy → Backend siehe [ARCHITECTURE.md](ARCHITECTURE.md).
 

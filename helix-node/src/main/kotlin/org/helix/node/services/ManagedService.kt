@@ -55,6 +55,10 @@ class ManagedService(
     @Volatile
     var handle: ServiceHandle? = null
 
+    /** Last log lines captured when the service terminated. */
+    @Volatile
+    var lastLogs: List<String> = emptyList()
+
     /**
      * Whether the service occupies capacity (not yet terminated).
      *

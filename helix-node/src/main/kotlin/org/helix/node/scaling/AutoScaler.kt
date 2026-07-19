@@ -1,7 +1,9 @@
 package org.helix.node.scaling
 
+import java.util.concurrent.ConcurrentHashMap
 import org.helix.api.service.ServiceState
 import org.helix.api.task.TaskDefinition
+import org.helix.node.services.ManagedService
 import org.helix.node.services.ServiceManager
 import org.helix.node.tasks.TaskStore
 import org.slf4j.LoggerFactory
@@ -26,7 +28,28 @@ class AutoScaler(
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val logger = LoggerFactory.getLogger(AutoScaler::class.java)
-    private val retryAtEpochMs = mutableMapOf<String, Long>()
+    private val retryAtEpochMs = ConcurrentHashMap<String, Long>()
+
+    /**
+     * Records a service termination.
+     *
+     * Crashed services (state `FAILED`) put their task into the start
+     * cooldown so a broken service does not restart in a tight loop.
+     *
+     * @param service the terminated service.
+     */
+    fun noteTermination(service: ManagedService) {
+        if (service.state == ServiceState.FAILED) {
+            retryAtEpochMs[service.task.name] = clock() + START_FAILURE_COOLDOWN_MS
+            logger.warn(
+                "Task {} paused for {}s after crash of {} — inspect with: service.logs {}",
+                service.task.name,
+                START_FAILURE_COOLDOWN_MS / 1000,
+                service.id,
+                service.id,
+            )
+        }
+    }
 
     /**
      * Runs one scaling pass over all tasks.

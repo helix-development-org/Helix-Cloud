@@ -155,13 +155,16 @@ class ServiceManager(
     }
 
     /**
-     * Reads the newest log lines of a service.
+     * Reads the newest log lines of a service; for terminated services the
+     * output captured at termination is returned.
      *
      * @param id the service id.
      * @param tail maximum number of lines from the end.
      * @return log lines, or empty for unknown services.
      */
-    fun logs(id: String, tail: Int): List<String> = find(id)?.handle?.logs(tail) ?: emptyList()
+    fun logs(id: String, tail: Int): List<String> = find(id)
+        ?.let { managed -> managed.handle?.logs(tail) ?: managed.lastLogs.takeLast(tail) }
+        ?: emptyList()
 
     /**
      * Applies a bridge heartbeat.
@@ -223,6 +226,8 @@ class ServiceManager(
     )
 
     private fun onExit(managed: ManagedService, exitCode: Int) {
+        managed.lastLogs = runCatching { managed.handle?.logs(FINAL_LOG_LINES) ?: emptyList() }
+            .getOrDefault(emptyList())
         managed.state = if (managed.stopRequested || exitCode == 0) {
             ServiceState.STOPPED
         } else {
@@ -230,10 +235,23 @@ class ServiceManager(
         }
         managed.handle = null
         managed.onlinePlayers = 0
-        logger.info("Service {} terminated with exit code {} ({})", managed.id, exitCode, managed.state)
+        if (managed.state == ServiceState.FAILED) {
+            logger.error(
+                "Service {} failed with exit code {} — last output:\n{}",
+                managed.id,
+                exitCode,
+                managed.lastLogs.joinToString("\n").ifBlank { "(no output captured)" },
+            )
+        } else {
+            logger.info("Service {} terminated with exit code {} ({})", managed.id, exitCode, managed.state)
+        }
         if (!managed.task.staticServices) {
             workspacePreparer.deleteRecursively(managed.workspace)
-            synchronized(this) { services.remove(managed.id) }
+            // Failed services stay visible (with their captured logs) for
+            // diagnosis; their record is replaced on the next start.
+            if (managed.state == ServiceState.STOPPED) {
+                synchronized(this) { services.remove(managed.id) }
+            }
         }
         stopListeners.forEach { it(managed) }
     }
@@ -244,5 +262,10 @@ class ServiceManager(
             index++
         }
         return "${task.name}-$index"
+    }
+
+    private companion object {
+        /** Log lines captured when a service terminates. */
+        const val FINAL_LOG_LINES = 100
     }
 }

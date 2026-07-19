@@ -161,6 +161,7 @@ class HelixNode(private val dataDirectory: Path) {
             if (service.task.environment.proxy) {
                 playerRegistry.dropProxy(service.id)
             }
+            autoScaler.noteTermination(service)
             if (!stopping.get()) {
                 logger.info("Service {} terminated, rebalancing", service.id)
                 scheduler.execute(autoScaler::tick)

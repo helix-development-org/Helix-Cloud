@@ -48,7 +48,10 @@ class DockerServiceExecutor(
             add("-p")
             add("${spec.port}:${spec.port}")
             add("-v")
-            add("${spec.workspace.toAbsolutePath()}:/helix")
+            // :z relabels the mount for SELinux hosts (Fedora/RHEL) and is
+            // a no-op elsewhere; without it the container cannot read the
+            // workspace and exits immediately.
+            add("${spec.workspace.toAbsolutePath()}:/helix:z")
             add("-w")
             add("/helix")
             spec.environmentVariables.forEach { (key, value) ->
@@ -103,6 +106,9 @@ class DockerServiceHandle(
     val containerName: String,
     private val runner: CommandRunner,
 ) : ServiceHandle {
+    @Volatile
+    private var finalLogs: List<String>? = null
+
     /** Whether the container is running according to `docker inspect`. */
     override val alive: Boolean
         get() = runner.run(listOf("docker", "inspect", "-f", "{{.State.Running}}", containerName))
@@ -125,12 +131,16 @@ class DockerServiceHandle(
     /**
      * Waits for container exit on a daemon thread.
      *
+     * The final container output is captured before the container is
+     * removed, so crash diagnostics stay available.
+     *
      * @param callback receives the container exit code.
      */
     override fun onExit(callback: (Int) -> Unit) {
         val thread = Thread {
             val result = runner.run(listOf("docker", "wait", containerName))
             val exitCode = result.output.trim().toIntOrNull() ?: -1
+            finalLogs = fetchLogs(FINAL_LOG_LINES)
             runner.run(listOf("docker", "rm", "-f", containerName))
             callback(exitCode)
         }
@@ -140,12 +150,21 @@ class DockerServiceHandle(
     }
 
     /**
-     * Reads the newest container log lines.
+     * Reads the newest container log lines; after termination the output
+     * captured before container removal is returned.
      *
      * @param tail maximum number of lines from the end.
      * @return the log lines, oldest first.
      */
     override fun logs(tail: Int): List<String> =
+        finalLogs?.takeLast(tail) ?: fetchLogs(tail)
+
+    private fun fetchLogs(tail: Int): List<String> =
         runner.run(listOf("docker", "logs", "--tail", tail.toString(), containerName))
             .output.lines().filter { it.isNotEmpty() }
+
+    private companion object {
+        /** Lines captured from a terminated container. */
+        const val FINAL_LOG_LINES = 100
+    }
 }

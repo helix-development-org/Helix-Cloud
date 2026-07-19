@@ -49,6 +49,7 @@ class DockerServiceExecutorTest {
 
         val run = runner.commands.first { it.take(2) == listOf("docker", "run") }
         assertTrue(run.containsAll(listOf("--name", "helix-lobby-1")))
+        assertTrue(run.any { it.endsWith(":/helix:z") }, "workspace mount must carry the selinux :z label")
         assertTrue(run.containsAll(listOf("--network", "helix")))
         assertTrue(run.containsAll(listOf("-p", "30000:30000")))
         assertTrue(run.containsAll(listOf("-e", "HELIX_SERVICE_ID=Lobby-1")))
@@ -82,11 +83,15 @@ class DockerServiceExecutorTest {
     }
 
     @Test
-    fun `handle waits for exit and removes container`() {
+    fun `handle waits for exit captures final logs and removes container`() {
         val latch = CountDownLatch(1)
         var observed = -100
         val runner = FakeRunner { command ->
-            if (command.getOrNull(1) == "wait") CommandResult(0, "137\n") else CommandResult(0, "")
+            when (command.getOrNull(1)) {
+                "wait" -> CommandResult(0, "137\n")
+                "logs" -> CommandResult(0, "crash reason\n")
+                else -> CommandResult(0, "")
+            }
         }
         val handle = DockerServiceHandle("helix-lobby-1", runner)
 
@@ -97,7 +102,10 @@ class DockerServiceExecutorTest {
 
         assertTrue(latch.await(5, TimeUnit.SECONDS))
         assertEquals(137, observed)
-        assertTrue(runner.commands.contains(listOf("docker", "rm", "-f", "helix-lobby-1")))
+        val logsIndex = runner.commands.indexOfFirst { it.getOrNull(1) == "logs" }
+        val removeIndex = runner.commands.indexOfFirst { it.getOrNull(1) == "rm" }
+        assertTrue(logsIndex in 0 until removeIndex, "logs must be captured before container removal")
+        assertEquals(listOf("crash reason"), handle.logs(10))
     }
 
     @Test
