@@ -15,6 +15,10 @@ import org.helix.api.player.OnlinePlayer
  * installed permission system. Provides team chat (`/tc`), a team member
  * list (`/team`), join/leave notifications for team members and the
  * `team.notify` action for CLI and dashboard announcements.
+ *
+ * Additionally forwards every `moderation` notification (bans, warns,
+ * kicks published by other addons) to all online team members, so staff
+ * sees moderation activity live in chat.
  */
 class TeamUtilsAddon : AddonBase() {
     /**
@@ -67,6 +71,11 @@ class TeamUtilsAddon : AddonBase() {
             } else {
                 val delivered = notifyTeam("&b[Team] &f$text")
                 ActionResult.ok("notified $delivered team members")
+            }
+        }
+        context.registerNotificationListener { category, message ->
+            if (category == "moderation") {
+                notifyTeam(message)
             }
         }
         context.registerPlayerListener(

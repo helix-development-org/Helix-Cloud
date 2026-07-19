@@ -9,6 +9,7 @@ import org.helix.api.action.ActionResult
 import org.helix.api.addon.AddonContext
 import org.helix.api.addon.DisplayResolver
 import org.helix.api.addon.JoinGate
+import org.helix.api.addon.NotificationListener
 import org.helix.api.addon.PermissionResolver
 import org.helix.api.addon.PlayerListener
 import org.helix.api.player.OnlinePlayer
@@ -39,6 +40,12 @@ class RecordingAddonContext(override val dataDirectory: Path) : AddonContext {
 
     /** Published bridge values. */
     val bridgeValues = linkedMapOf<String, String>()
+
+    /** Registered notification listeners. */
+    val notificationListeners = mutableListOf<NotificationListener>()
+
+    /** Published notifications as category to message pairs. */
+    val notifications = mutableListOf<Pair<String, String>>()
 
     /** Invocations the addon made through [actions]. */
     val invocations = mutableListOf<ActionInvocation>()
@@ -89,6 +96,15 @@ class RecordingAddonContext(override val dataDirectory: Path) : AddonContext {
 
     override fun publishBridgeValue(key: String, value: String) {
         bridgeValues[key] = value
+    }
+
+    override fun publishNotification(category: String, message: String) {
+        notifications += category to message
+        notificationListeners.forEach { it.onNotification(category, message) }
+    }
+
+    override fun registerNotificationListener(listener: NotificationListener) {
+        notificationListeners += listener
     }
 
     /**

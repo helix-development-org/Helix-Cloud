@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.0 — 2026-07-19
+
+### Moderations-Notifications für das Team
+- Neuer entkoppelter **Notification-Bus** zwischen Addons:
+  `context.publishNotification(category, message)` und
+  `context.registerNotificationListener`; Listener werden beim Disable
+  aufgeräumt, Fehler in Listenern isoliert.
+- Bans-Addon publiziert Ban und Pardon, Moderations-Addon publiziert Kick
+  und Warn — alles unter der Kategorie `moderation`.
+- Team-Utils leitet `moderation`-Notifications live an alle Online-
+  Teammitglieder weiter (`&e[Warn]`, `&c[Ban]`, `&c[Kick]` im Chat).
+  Publisher und Subscriber kennen sich nicht.
+- SDK: `RecordingAddonContext` zeichnet Notifications auf.
+
 ## 0.4.0 — 2026-07-19
 
 ### Sechs neue Addons

@@ -93,6 +93,12 @@ context.registerPermissionResolver { request ->
 - `context.publishBridgeValue(key, value)` — globale Werte publizieren,
   die die Bridges pollen (`tablist.header`, `tablist.footer`,
   `chat.format`).
+- `context.publishNotification(category, message)` /
+  `context.registerNotificationListener { category, message -> ... }` —
+  entkoppelter Notification-Bus zwischen Addons. Konvention: Bans, Warns
+  und Kicks werden unter der Kategorie `moderation` publiziert; das
+  Team-Utils-Addon leitet diese an Online-Teammitglieder weiter, ohne
+  dass sich die Addons kennen.
 
 ## Spieler-Commands
 
@@ -158,8 +164,9 @@ Referenz-Implementierungen in diesem Repo:
 - `helix-addon-moderation` — permission-gated `/kick`, `/warn`, `/warns`,
   `/announce`, `/tempban` (delegiert an das Ban-Addon) mit Warn-Historie.
 - `helix-addon-teamutils` — Teamchat `/tc`, `/team` (Online-Teammitglieder),
-  Join/Leave-Notifications fürs Team, `team.notify` für CLI/Dashboard.
-  Teammitglied = Permission `helix.team.member`.
+  Join/Leave-Notifications fürs Team, `team.notify` für CLI/Dashboard und
+  Live-Weiterleitung aller `moderation`-Notifications (Bans, Warns, Kicks)
+  an das Team. Teammitglied = Permission `helix.team.member`.
 
 ## Lifecycle
 

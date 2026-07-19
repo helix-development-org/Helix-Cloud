@@ -64,6 +64,17 @@ class ModerationAddonTest {
     }
 
     @Test
+    fun `kick and warn publish moderation notifications`() {
+        context.run("kick", "Mod", "Griefer", "spamming")
+        context.run("warn", "Mod", "Steve", "language")
+
+        assertEquals(2, context.notifications.size)
+        assertTrue(context.notifications[0].second.contains("[Kick]"))
+        assertTrue(context.notifications[1].second.contains("[Warn]"))
+        assertTrue(context.notifications.all { it.first == "moderation" })
+    }
+
+    @Test
     fun `missing arguments yield usage errors`() {
         assertFalse(context.run("kick", "Mod").success)
         assertFalse(context.run("warn", "Mod", "Steve").success)

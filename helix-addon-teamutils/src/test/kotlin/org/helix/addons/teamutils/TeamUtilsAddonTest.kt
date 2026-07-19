@@ -67,6 +67,28 @@ class TeamUtilsAddonTest {
     }
 
     @Test
+    fun `moderation notifications are forwarded to online team members`() {
+        team("Mod1", "Mod2")
+        context.online += listOf(OnlinePlayer("Mod1"), OnlinePlayer("Mod2"), OnlinePlayer("Player"))
+
+        context.notificationListeners.single().onNotification("moderation", "&c[Ban] steve — griefing")
+
+        val messages = context.invocations.filter { it.action == "player.message" }
+        assertEquals(setOf("Mod1", "Mod2"), messages.map { it.arguments.first() }.toSet())
+        assertTrue(messages.all { it.arguments[1].contains("[Ban]") })
+    }
+
+    @Test
+    fun `other notification categories are ignored`() {
+        team("Mod1")
+        context.online += OnlinePlayer("Mod1")
+
+        context.notificationListeners.single().onNotification("economy", "big payout")
+
+        assertTrue(context.invocations.isEmpty())
+    }
+
+    @Test
     fun `commands are gated on the team permission`() {
         val descriptors = context.handlers.values.map { it.first }
 

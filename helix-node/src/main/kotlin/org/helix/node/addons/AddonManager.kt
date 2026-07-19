@@ -18,6 +18,7 @@ import org.helix.api.addon.AddonState
 import org.helix.api.addon.DisplayResolver
 import org.helix.api.addon.HelixAddon
 import org.helix.api.addon.JoinGate
+import org.helix.api.addon.NotificationListener
 import org.helix.api.addon.PermissionResolver
 import org.helix.api.addon.PlayerListener
 import org.helix.api.player.OnlinePlayer
@@ -27,6 +28,7 @@ import org.helix.node.display.BridgeValueStore
 import org.helix.node.display.DisplayResolverRegistry
 import org.helix.node.gates.JoinGateRegistry
 import org.helix.node.gates.PermissionResolverRegistry
+import org.helix.node.notifications.NotificationBus
 import org.helix.node.players.PlayerRegistry
 import org.slf4j.LoggerFactory
 
@@ -45,6 +47,7 @@ import org.slf4j.LoggerFactory
  * @property playerRegistry online players and player event fan-out.
  * @property displayResolvers display profile registry addons register into.
  * @property bridgeValues global values bridges poll.
+ * @property notifications notification bus between addons.
  */
 class AddonManager(
     private val directory: Path,
@@ -54,6 +57,7 @@ class AddonManager(
     private val playerRegistry: PlayerRegistry = PlayerRegistry(),
     private val displayResolvers: DisplayResolverRegistry = DisplayResolverRegistry(),
     private val bridgeValues: BridgeValueStore = BridgeValueStore(),
+    private val notifications: NotificationBus = NotificationBus(),
 ) {
     private val logger = LoggerFactory.getLogger(AddonManager::class.java)
     private val json = Json { ignoreUnknownKeys = true }
@@ -207,6 +211,7 @@ class AddonManager(
         playerRegistry.unregisterOwner(id)
         displayResolvers.unregisterOwner(id)
         bridgeValues.unpublishOwner(id)
+        notifications.unregisterOwner(id)
     }
 
     private fun extractedJarPath(manifest: AddonManifest): Path =
@@ -249,6 +254,14 @@ class AddonManager(
 
         override fun publishBridgeValue(key: String, value: String) {
             bridgeValues.publish(record.manifest.id, key, value)
+        }
+
+        override fun publishNotification(category: String, message: String) {
+            notifications.publish(category, message)
+        }
+
+        override fun registerNotificationListener(listener: NotificationListener) {
+            notifications.register(record.manifest.id, listener)
         }
     }
 }

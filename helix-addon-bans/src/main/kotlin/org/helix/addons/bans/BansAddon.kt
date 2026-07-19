@@ -36,6 +36,7 @@ class BansAddon : AddonBase() {
             val player = invocation.arguments.firstOrNull()
                 ?: return@action ActionResult.error("usage: ban.pardon <player>")
             if (store.pardon(player)) {
+                context.publishNotification("moderation", "&c[Ban] &f$player &7was pardoned.")
                 ActionResult.ok("pardoned $player")
             } else {
                 ActionResult.error("no ban for $player")
@@ -68,6 +69,7 @@ class BansAddon : AddonBase() {
             .joinToString(" ")
             .ifBlank { "You are banned from this network." }
         val entry = store.set(player, reason, durationMs)
+        context.publishNotification("moderation", "&c[Ban] &7${describe(entry)}")
         val kick = context.actions.invoke(
             ActionInvocation(
                 action = "player.kick",

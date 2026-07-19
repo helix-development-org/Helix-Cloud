@@ -1,6 +1,5 @@
 package org.helix.addons.bans
 
-import java.nio.file.Path
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -8,72 +7,47 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.helix.api.action.ActionDescriptor
-import org.helix.api.action.ActionHandler
-import org.helix.api.action.ActionInvocation
-import org.helix.api.action.ActionInvoker
+import org.helix.addon.sdk.testing.RecordingAddonContext
 import org.helix.api.action.ActionResult
-import org.helix.api.addon.AddonContext
-import org.helix.api.addon.JoinGate
 import org.helix.api.proxy.JoinRequest
 
-/**
- * Fake context capturing everything the addon registers.
- */
-private class FakeContext(override val dataDirectory: Path) : AddonContext {
-    val handlers = mutableMapOf<String, ActionHandler>()
-    val gates = mutableListOf<JoinGate>()
-    val invoked = mutableListOf<ActionInvocation>()
-
-    override val actions: ActionInvoker = object : ActionInvoker {
-        override fun invoke(invocation: ActionInvocation): ActionResult {
-            invoked += invocation
-            return ActionResult.ok("kick for ${invocation.arguments.first()} queued")
-        }
-
-        override fun descriptors() = emptyList<org.helix.api.action.ActionDescriptor>()
-    }
-
-    override fun registerAction(descriptor: ActionDescriptor, handler: ActionHandler) {
-        handlers[descriptor.name] = handler
-    }
-
-    override fun registerJoinGate(gate: JoinGate) {
-        gates += gate
-    }
-
-    override fun registerPermissionResolver(resolver: org.helix.api.addon.PermissionResolver) {
-        // not used by the bans addon
-    }
-
-    fun run(action: String, vararg args: String): ActionResult =
-        handlers.getValue(action).execute(ActionInvocation(action, args.toList()))
-}
-
 class BansAddonTest {
-    private val context = FakeContext(createTempDirectory("bans"))
+    private val context = RecordingAddonContext(createTempDirectory("bans")).apply {
+        invocationResult = { invocation -> ActionResult.ok("kick for ${invocation.arguments.first()} queued") }
+    }
     private val addon = BansAddon().also { it.onEnable(context) }
 
     @Test
     fun `ban blocks join and pardon unblocks`() {
         context.run("ban.set", "Steve", "griefing")
 
-        val denied = context.gates.single().check(JoinRequest("steve"))
+        val denied = context.joinGates.single().check(JoinRequest("steve"))
         assertFalse(denied.allowed)
         assertTrue(denied.message!!.contains("griefing"))
 
         assertTrue(context.run("ban.pardon", "STEVE").success)
-        assertTrue(context.gates.single().check(JoinRequest("Steve")).allowed)
+        assertTrue(context.joinGates.single().check(JoinRequest("Steve")).allowed)
     }
 
     @Test
     fun `ban kicks online player through generic action`() {
         context.run("ban.set", "Alex", "7d", "cheating")
 
-        val kick = context.invoked.single()
+        val kick = context.invocations.single()
         assertEquals("player.kick", kick.action)
         assertEquals("Alex", kick.arguments.first())
         assertTrue(kick.arguments[1].contains("cheating"))
+    }
+
+    @Test
+    fun `ban and pardon publish moderation notifications`() {
+        context.run("ban.set", "Alex", "7d", "cheating")
+        context.run("ban.pardon", "Alex")
+
+        assertEquals(listOf("moderation", "moderation"), context.notifications.map { it.first })
+        assertTrue(context.notifications[0].second.contains("[Ban]"))
+        assertTrue(context.notifications[0].second.contains("cheating"))
+        assertTrue(context.notifications[1].second.contains("pardoned"))
     }
 
     @Test

@@ -97,7 +97,12 @@ class ModerationAddon : AddonBase() {
             val target = args.firstOrNull() ?: return@playerCommand usage("/kick <player> [reason...]")
             val reason = args.drop(1).joinToString(" ").ifBlank { "Kicked by a moderator." }
             val result = invoke("player.kick", target, "$reason &7(by $executor)")
-            if (result.success) ActionResult.ok("&7Kicked &f$target&7.") else result
+            if (result.success) {
+                context.publishNotification("moderation", "&c[Kick] &f$target &7by $executor: $reason")
+                ActionResult.ok("&7Kicked &f$target&7.")
+            } else {
+                result
+            }
         }
         playerCommand(
             "warn",
@@ -109,7 +114,9 @@ class ModerationAddon : AddonBase() {
             val reason = args.drop(1).joinToString(" ").ifBlank { return@playerCommand usage("/warn <player> <reason...>") }
             store.warn(target, executor, reason)
             invoke("player.message", target, "&cYou have been warned: &f$reason")
-            ActionResult.ok("&7Warned &f$target&7: $reason (${store.warnsOf(target).size} total)")
+            val total = store.warnsOf(target).size
+            context.publishNotification("moderation", "&e[Warn] &f$target &7by $executor: $reason ($total total)")
+            ActionResult.ok("&7Warned &f$target&7: $reason ($total total)")
         }
         playerCommand(
             "warns",

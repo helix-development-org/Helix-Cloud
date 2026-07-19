@@ -93,4 +93,25 @@ interface AddonContext {
      */
     fun publishBridgeValue(key: String, value: String) {
     }
+
+    /**
+     * Publishes a notification to all registered listeners.
+     *
+     * Use this for events other addons may want to react to — bans,
+     * warns, kicks and similar belong into the `moderation` category.
+     *
+     * @param category notification category, for example `moderation`.
+     * @param message human readable text, `&` color codes allowed.
+     */
+    fun publishNotification(category: String, message: String) {
+    }
+
+    /**
+     * Registers a notification listener owned by this addon. Removed when
+     * the addon is disabled.
+     *
+     * @param listener receives all published notifications.
+     */
+    fun registerNotificationListener(listener: NotificationListener) {
+    }
 }

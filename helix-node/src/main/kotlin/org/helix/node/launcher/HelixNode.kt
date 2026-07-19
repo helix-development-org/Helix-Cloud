@@ -19,6 +19,7 @@ import org.helix.node.display.BridgeValueStore
 import org.helix.node.display.DisplayResolverRegistry
 import org.helix.node.gates.JoinGateRegistry
 import org.helix.node.gates.PermissionResolverRegistry
+import org.helix.node.notifications.NotificationBus
 import org.helix.node.platform.PlatformOverviewService
 import org.helix.node.players.PlayerRegistry
 import org.helix.node.proxy.ProxyCommandQueue
@@ -96,6 +97,9 @@ class HelixNode(private val dataDirectory: Path) {
     /** Global values bridges poll, published by addons. */
     val bridgeValues: BridgeValueStore = BridgeValueStore()
 
+    /** Notification bus between addons. */
+    val notifications: NotificationBus = NotificationBus()
+
     /** Installed addons. */
     val addonManager: AddonManager = AddonManager(
         paths.addons,
@@ -105,6 +109,7 @@ class HelixNode(private val dataDirectory: Path) {
         playerRegistry,
         displayResolvers,
         bridgeValues,
+        notifications,
     )
 
     private val overviewService = PlatformOverviewService(version(), taskStore, manager)
