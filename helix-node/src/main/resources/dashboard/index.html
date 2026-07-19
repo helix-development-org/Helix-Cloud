@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Helix-Cloud</title>
+<style>
+:root {
+  --bg: #f4f6f8; --surface: #ffffff; --surface-2: #eef1f4;
+  --ink: #1a2330; --ink-2: #55627a; --ink-3: #8994a8;
+  --line: #dde3ea; --accent: #4653e8; --accent-ink: #ffffff;
+  --good: #1a7f37; --good-bg: #e3f4e8;
+  --warn: #9a6700; --warn-bg: #fff3d6;
+  --bad: #c1341b; --bad-bg: #fdeae5;
+  --neutral-bg: #e9edf2;
+  --radius: 10px;
+  --shadow: 0 1px 3px rgba(20,30,50,.08);
+}
+:root[data-theme="dark"] {
+  --bg: #10151d; --surface: #1a212c; --surface-2: #232c3a;
+  --ink: #e8edf4; --ink-2: #a6b1c2; --ink-3: #6f7c92;
+  --line: #2c3646; --accent: #7c88ff; --accent-ink: #10151d;
+  --good: #4ecb71; --good-bg: #17301f;
+  --warn: #e5b455; --warn-bg: #33290f;
+  --bad: #ff8a70; --bad-bg: #3a1d15;
+  --neutral-bg: #26303f;
+  --shadow: 0 1px 3px rgba(0,0,0,.4);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--bg); color: var(--ink); min-height: 100vh;
+}
+button { font: inherit; cursor: pointer; border: 0; border-radius: 8px; }
+input, select {
+  font: inherit; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+}
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.layout { display: flex; min-height: 100vh; }
+.sidebar {
+  width: 210px; flex-shrink: 0; background: var(--surface);
+  border-right: 1px solid var(--line); padding: 20px 12px; display: flex; flex-direction: column; gap: 4px;
+}
+.brand { font-weight: 700; font-size: 17px; padding: 0 10px 14px; letter-spacing: .2px; }
+.brand span { color: var(--accent); }
+.nav-btn {
+  display: block; width: 100%; text-align: left; padding: 9px 12px;
+  background: transparent; color: var(--ink-2); border-radius: 8px; font-weight: 500;
+}
+.nav-btn:hover { background: var(--surface-2); color: var(--ink); }
+.nav-btn.active { background: var(--accent); color: var(--accent-ink); }
+.sidebar .spacer { flex: 1; }
+.sidebar .meta { font-size: 12px; color: var(--ink-3); padding: 0 10px; }
+.ghost-btn { background: transparent; color: var(--ink-2); padding: 8px 12px; text-align: left; border-radius: 8px; }
+.ghost-btn:hover { background: var(--surface-2); color: var(--ink); }
+
+.main { flex: 1; padding: 24px 28px; max-width: 1200px; }
+.page-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; gap: 12px; flex-wrap: wrap; }
+h1 { font-size: 20px; margin: 0; }
+.sub { color: var(--ink-3); font-size: 13px; }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 22px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); }
+.tile .label { font-size: 12px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .5px; }
+.tile .value { font-size: 26px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.tile .hint { font-size: 12px; color: var(--ink-3); }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 20px; }
+.card-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); font-weight: 600; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 9px 16px; white-space: nowrap; }
+th { font-size: 12px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .4px; border-bottom: 1px solid var(--line); }
+tr + tr td { border-top: 1px solid var(--line); }
+td { font-variant-numeric: tabular-nums; }
+.empty { padding: 22px 16px; color: var(--ink-3); }
+
+.badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.badge.running { color: var(--good); background: var(--good-bg); }
+.badge.starting, .badge.stopping, .badge.prepared { color: var(--warn); background: var(--warn-bg); }
+.badge.failed { color: var(--bad); background: var(--bad-bg); }
+.badge.stopped, .badge.neutral { color: var(--ink-2); background: var(--neutral-bg); }
+.badge.enabled { color: var(--good); background: var(--good-bg); }
+.badge.disabled { color: var(--ink-2); background: var(--neutral-bg); }
+
+.btn { padding: 7px 14px; background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn.small { padding: 4px 10px; font-size: 12px; }
+.btn.subtle { background: var(--surface-2); color: var(--ink); }
+.btn.danger { background: var(--bad-bg); color: var(--bad); }
+.btn:disabled { opacity: .5; cursor: default; }
+.actions-cell { display: flex; gap: 6px; }
+
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(10,14,20,.55);
+  display: flex; align-items: center; justify-content: center; z-index: 40; padding: 16px;
+}
+.modal {
+  background: var(--surface); border-radius: 12px; border: 1px solid var(--line);
+  width: 100%; max-width: 480px; max-height: 85vh; overflow: auto; padding: 20px;
+}
+.modal h2 { margin: 0 0 14px; font-size: 16px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.form-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-2); }
+.form-grid label.wide { grid-column: 1 / -1; }
+.modal-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+.log-view {
+  background: #0d1117; color: #d5dde6; font: 12px/1.55 ui-monospace, monospace;
+  padding: 14px; border-radius: 8px; max-height: 55vh; overflow: auto; white-space: pre-wrap;
+}
+.modal.wide { max-width: 780px; }
+
+.console-row { display: flex; gap: 8px; padding: 12px 16px; }
+.console-row input { flex: 1; font-family: ui-monospace, monospace; }
+.console-out {
+  font: 12.5px/1.6 ui-monospace, monospace; padding: 4px 16px 14px;
+  white-space: pre-wrap; color: var(--ink-2); max-height: 280px; overflow: auto;
+}
+.console-out .err { color: var(--bad); }
+
+.login-screen {
+  position: fixed; inset: 0; background: var(--bg); z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+}
+.login-box { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 30px; width: 340px; box-shadow: var(--shadow); }
+.login-box h1 { font-size: 20px; margin: 0 0 4px; }
+.login-box .sub { margin-bottom: 18px; }
+.login-box input { width: 100%; margin-bottom: 10px; }
+.login-box .btn { width: 100%; padding: 10px; }
+.login-err { color: var(--bad); font-size: 13px; min-height: 18px; margin-top: 8px; }
+.hidden { display: none !important; }
+.toast {
+  position: fixed; bottom: 18px; right: 18px; z-index: 60;
+  background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 8px;
+  font-size: 13px; box-shadow: var(--shadow); opacity: 0; transition: opacity .2s;
+}
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="login" class="login-screen hidden">
+  <div class="login-box">
+    <h1>Helix<span style="color:var(--accent)">-Cloud</span></h1>
+    <div class="sub">Sign in with your control token</div>
+    <input id="login-token" type="password" placeholder="Bearer token" autocomplete="off">
+    <button class="btn" id="login-btn">Sign in</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
+<div class="layout" id="app">
+  <nav class="sidebar">
+    <div class="brand">Helix<span>-Cloud</span></div>
+    <button class="nav-btn" data-view="overview">Overview</button>
+    <button class="nav-btn" data-view="tasks">Tasks</button>
+    <button class="nav-btn" data-view="services">Services</button>
+    <button class="nav-btn" data-view="addons">Addons</button>
+    <div class="spacer"></div>
+    <div class="meta" id="meta-version"></div>
+    <button class="ghost-btn" id="theme-btn">Toggle theme</button>
+    <button class="ghost-btn" id="logout-btn">Sign out</button>
+  </nav>
+  <main class="main" id="view"></main>
+</div>
+
+<div id="modal-root"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const API = "/api/v1";
+let token = localStorage.getItem("helix.token") || "";
+let view = "overview";
+let refreshTimer = null;
+
+/* ---------- helpers ---------- */
+const $ = (sel, el) => (el || document).querySelector(sel);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+async function api(path, opts = {}) {
+  const res = await fetch(API + path, {
+    ...opts,
+    headers: {
+      "Authorization": "Bearer " + token,
+      ...(opts.body ? {"Content-Type": "application/json"} : {}),
+      ...(opts.headers || {}),
+    },
+  });
+  if (res.status === 401) { showLogin(); throw new Error("unauthorized"); }
+  const text = await res.text();
+  const body = text ? JSON.parse(text) : null;
+  if (!res.ok) throw new Error(body && body.message ? body.message : res.status + "");
+  return body;
+}
+
+function toast(message) {
+  const el = $("#toast");
+  el.textContent = message;
+  el.classList.add("show");
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove("show"), 2500);
+}
+
+function badge(state) {
+  const cls = String(state).toLowerCase();
+  return `<span class="badge ${esc(cls)}">${esc(state)}</span>`;
+}
+
+function uptime(startedAtEpochMs) {
+  if (!startedAtEpochMs) return "—";
+  const s = Math.max(0, Math.floor((Date.now() - startedAtEpochMs) / 1000));
+  if (s < 60) return s + "s";
+  if (s < 3600) return Math.floor(s / 60) + "m " + (s % 60) + "s";
+  return Math.floor(s / 3600) + "h " + Math.floor((s % 3600) / 60) + "m";
+}
+
+/* ---------- login ---------- */
+function showLogin() {
+  stopRefresh();
+  $("#app").classList.add("hidden");
+  $("#login").classList.remove("hidden");
+}
+
+async function tryLogin(candidate) {
+  token = candidate;
+  const overview = await api("/platform/overview");
+  localStorage.setItem("helix.token", token);
+  $("#login").classList.add("hidden");
+  $("#app").classList.remove("hidden");
+  $("#meta-version").textContent = "Helix-Cloud " + overview.version;
+  render();
+}
+
+$("#login-btn").addEventListener("click", async () => {
+  try {
+    $("#login-err").textContent = "";
+    await tryLogin($("#login-token").value.trim());
+  } catch (e) {
+    $("#login-err").textContent = "Login failed: " + e.message;
+  }
+});
+$("#login-token").addEventListener("keydown", e => { if (e.key === "Enter") $("#login-btn").click(); });
+$("#logout-btn").addEventListener("click", () => {
+  localStorage.removeItem("helix.token"); token = ""; showLogin();
+});
+
+/* ---------- theme ---------- */
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem("helix.theme", theme);
+}
+$("#theme-btn").addEventListener("click", () =>
+  applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
+applyTheme(localStorage.getItem("helix.theme") ||
+  (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+
+/* ---------- navigation & refresh ---------- */
+document.querySelectorAll(".nav-btn").forEach(btn =>
+  btn.addEventListener("click", () => { view = btn.dataset.view; render(); }));
+
+function stopRefresh() { if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; } }
+
+async function render() {
+  stopRefresh();
+  document.querySelectorAll(".nav-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.view === view));
+  const draw = views[view];
+  try { await draw(); } catch (e) { if (e.message !== "unauthorized") toast(e.message); }
+  refreshTimer = setInterval(async () => {
+    try { await draw(); } catch (e) { /* transient */ }
+  }, 4000);
+}
+
+/* ---------- views ---------- */
+const views = {
+  async overview() {
+    const [overview, snapshot] = await Promise.all([
+      api("/platform/overview"),
+      api("/internal/routing?proxyServiceId=dashboard"),
+    ]);
+    $("#view").innerHTML = `
+      <div class="page-head">
+        <div><h1>Overview</h1><div class="sub">Live platform status</div></div>
+        <button class="btn ${snapshot.maintenance ? "danger" : "subtle"}" id="maint-btn">
+          ${snapshot.maintenance ? "Maintenance: ON — disable" : "Enable maintenance"}
+        </button>
+      </div>
+      <div class="tiles">
+        <div class="tile"><div class="label">Services running</div>
+          <div class="value">${overview.servicesRunning}<span class="hint"> / ${overview.servicesTotal}</span></div></div>
+        <div class="tile"><div class="label">Players online</div>
+          <div class="value">${overview.onlinePlayers}<span class="hint"> / ${overview.maxPlayers} slots</span></div></div>
+        <div class="tile"><div class="label">Tasks</div><div class="value">${overview.taskCount}</div></div>
+        <div class="tile"><div class="label">Version</div><div class="value">${esc(overview.version)}</div></div>
+      </div>
+      <div class="card">
+        <div class="card-head">Action console<span class="sub">every CLI action works here too</span></div>
+        <div class="console-row">
+          <input id="console-in" placeholder="e.g. service.list  ·  task.create Lobby paper 1.21.11 min=1 max=3" spellcheck="false">
+          <button class="btn" id="console-run">Run</button>
+        </div>
+        <div class="console-out" id="console-out"></div>
+      </div>`;
+    $("#maint-btn").addEventListener("click", async () => {
+      await runAction("proxy.maintenance", [snapshot.maintenance ? "off" : "on"]);
+      render();
+    });
+    const run = async () => {
+      const line = $("#console-in").value.trim();
+      if (!line) return;
+      const parts = line.split(/\s+/);
+      const result = await runAction(parts[0], parts.slice(1));
+      $("#console-out").innerHTML = result.lines.map(l =>
+        `<div class="${result.success ? "" : "err"}">${esc(l)}</div>`).join("") ||
+        `<div class="${result.success ? "" : "err"}">${result.success ? "ok" : "failed"}</div>`;
+    };
+    $("#console-run").addEventListener("click", run);
+    $("#console-in").addEventListener("keydown", e => { if (e.key === "Enter") run(); });
+  },
+
+  async tasks() {
+    const tasks = await api("/tasks");
+    const rows = tasks.map(t => `
+      <tr>
+        <td><strong>${esc(t.name)}</strong></td>
+        <td>${esc(t.environment)} ${esc(t.version)}</td>
+        <td>${esc(t.executor)}</td>
+        <td>${t.staticServices ? badge("static") : badge("dynamic")}</td>
+        <td>${t.minServiceCount}–${t.maxServiceCount}</td>
+        <td>${t.memoryMb} MB</td>
+        <td>${t.autoScale.enabled ? badge("enabled") : badge("disabled")}</td>
+        <td class="actions-cell">
+          <button class="btn small" data-start="${esc(t.name)}">+ Service</button>
+          <button class="btn small danger" data-del="${esc(t.name)}">Delete</button>
+        </td>
+      </tr>`).join("");
+    $("#view").innerHTML = `
+      <div class="page-head">
+        <div><h1>Tasks</h1><div class="sub">Blueprints for services</div></div>
+        <button class="btn" id="task-new">New task</button>
+      </div>
+      <div class="card"><div class="table-wrap">
+        ${tasks.length ? `<table>
+          <tr><th>Name</th><th>Platform</th><th>Executor</th><th>Kind</th>
+              <th>Services</th><th>Memory</th><th>Autoscale</th><th></th></tr>${rows}</table>`
+          : `<div class="empty">No tasks yet — create one to get started.</div>`}
+      </div></div>`;
+    $("#task-new").addEventListener("click", taskModal);
+    document.querySelectorAll("[data-start]").forEach(b => b.addEventListener("click", async () => {
+      try { const info = await api(`/tasks/${b.dataset.start}/services`, {method: "POST"});
+        toast("Started " + info.id); render(); } catch (e) { toast(e.message); }
+    }));
+    document.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", async () => {
+      if (!confirm(`Delete task ${b.dataset.del}?`)) return;
+      try { await api(`/tasks/${b.dataset.del}`, {method: "DELETE"}); toast("Deleted"); render(); }
+      catch (e) { toast(e.message); }
+    }));
+  },
+
+  async services() {
+    const services = await api("/services");
+    const rows = services.map(s => `
+      <tr>
+        <td><strong>${esc(s.id)}</strong></td>
+        <td>${badge(s.state)}</td>
+        <td>${esc(s.executor)}</td>
+        <td>${s.port}</td>
+        <td>${s.onlinePlayers} / ${s.maxPlayers}</td>
+        <td>${uptime(s.startedAtEpochMs)}</td>
+        <td class="actions-cell">
+          <button class="btn small subtle" data-logs="${esc(s.id)}">Logs</button>
+          <button class="btn small" data-stop="${esc(s.id)}">Stop</button>
+          <button class="btn small danger" data-kill="${esc(s.id)}">Kill</button>
+        </td>
+      </tr>`).join("");
+    $("#view").innerHTML = `
+      <div class="page-head">
+        <div><h1>Services</h1><div class="sub">Running instances</div></div>
+      </div>
+      <div class="card"><div class="table-wrap">
+        ${services.length ? `<table>
+          <tr><th>Service</th><th>State</th><th>Executor</th><th>Port</th>
+              <th>Players</th><th>Uptime</th><th></th></tr>${rows}</table>`
+          : `<div class="empty">No services — start one from the Tasks page.</div>`}
+      </div></div>`;
+    document.querySelectorAll("[data-stop]").forEach(b => b.addEventListener("click", async () => {
+      try { await api(`/services/${b.dataset.stop}/stop`, {method: "POST"}); toast("Stopping " + b.dataset.stop); }
+      catch (e) { toast(e.message); }
+    }));
+    document.querySelectorAll("[data-kill]").forEach(b => b.addEventListener("click", async () => {
+      try { await api(`/services/${b.dataset.kill}/kill`, {method: "POST"}); toast("Killed " + b.dataset.kill); }
+      catch (e) { toast(e.message); }
+    }));
+    document.querySelectorAll("[data-logs]").forEach(b =>
+      b.addEventListener("click", () => logsModal(b.dataset.logs)));
+  },
+
+  async addons() {
+    const addons = await api("/addons");
+    const rows = addons.map(a => `
+      <tr>
+        <td><strong>${esc(a.manifest.id)}</strong></td>
+        <td>${esc(a.manifest.name)}</td>
+        <td>${esc(a.manifest.version)}</td>
+        <td>${badge(a.state)}</td>
+        <td>${esc(a.manifest.description)}</td>
+        <td class="actions-cell">
+          ${a.state === "ENABLED"
+            ? `<button class="btn small subtle" data-disable="${esc(a.manifest.id)}">Disable</button>`
+            : `<button class="btn small" data-enable="${esc(a.manifest.id)}">Enable</button>`}
+        </td>
+      </tr>`).join("");
+    $("#view").innerHTML = `
+      <div class="page-head">
+        <div><h1>Addons</h1><div class="sub">Drop .hxa files into Helix/addons/ and restart</div></div>
+      </div>
+      <div class="card"><div class="table-wrap">
+        ${addons.length ? `<table>
+          <tr><th>Id</th><th>Name</th><th>Version</th><th>State</th><th>Description</th><th></th></tr>${rows}</table>`
+          : `<div class="empty">No addons installed.</div>`}
+      </div></div>`;
+    document.querySelectorAll("[data-enable]").forEach(b => b.addEventListener("click", async () => {
+      try { await api(`/addons/${b.dataset.enable}/enable`, {method: "POST"}); toast("Enabled"); render(); }
+      catch (e) { toast(e.message); }
+    }));
+    document.querySelectorAll("[data-disable]").forEach(b => b.addEventListener("click", async () => {
+      try { await api(`/addons/${b.dataset.disable}/disable`, {method: "POST"}); toast("Disabled"); render(); }
+      catch (e) { toast(e.message); }
+    }));
+  },
+};
+
+/* ---------- actions ---------- */
+async function runAction(action, args) {
+  return api("/actions", {method: "POST", body: JSON.stringify({action, arguments: args || []})});
+}
+
+/* ---------- modals ---------- */
+function closeModal() { $("#modal-root").innerHTML = ""; }
+
+function taskModal() {
+  $("#modal-root").innerHTML = `
+    <div class="modal-backdrop" id="backdrop">
+      <div class="modal">
+        <h2>New task</h2>
+        <div class="form-grid">
+          <label class="wide">Name<input id="f-name" placeholder="Lobby"></label>
+          <label>Platform<select id="f-env"><option>PAPER</option><option>VELOCITY</option></select></label>
+          <label>Version<input id="f-version" placeholder="1.21.11"></label>
+          <label>Executor<select id="f-exec"><option>PROCESS</option><option>DOCKER</option></select></label>
+          <label>Kind<select id="f-static"><option value="false">dynamic (temporary)</option><option value="true">static (persistent)</option></select></label>
+          <label>Min services<input id="f-min" type="number" value="1" min="0"></label>
+          <label>Max services<input id="f-max" type="number" value="1" min="1"></label>
+          <label>Memory MB<input id="f-mem" type="number" value="1024" min="128"></label>
+          <label>Max players<input id="f-players" type="number" value="100" min="1"></label>
+          <label>Start port<input id="f-port" type="number" value="25565"></label>
+          <label>Autoscale<select id="f-scale"><option value="false">off</option><option value="true">on</option></select></label>
+        </div>
+        <div class="modal-foot">
+          <button class="btn subtle" id="m-cancel">Cancel</button>
+          <button class="btn" id="m-create">Create</button>
+        </div>
+      </div>
+    </div>`;
+  $("#m-cancel").addEventListener("click", closeModal);
+  $("#backdrop").addEventListener("click", e => { if (e.target.id === "backdrop") closeModal(); });
+  $("#f-env").addEventListener("change", () => {
+    $("#f-port").value = $("#f-env").value === "VELOCITY" ? 25577 : 25565;
+  });
+  $("#m-create").addEventListener("click", async () => {
+    const args = [
+      $("#f-name").value.trim(), $("#f-env").value, $("#f-version").value.trim(),
+      "executor=" + $("#f-exec").value,
+      "static=" + $("#f-static").value,
+      "min=" + $("#f-min").value, "max=" + $("#f-max").value,
+      "memory=" + $("#f-mem").value, "maxplayers=" + $("#f-players").value,
+      "startport=" + $("#f-port").value, "autoscale=" + $("#f-scale").value,
+    ];
+    const result = await runAction("task.create", args);
+    if (result.success) { closeModal(); toast(result.lines[0] || "created"); render(); }
+    else toast(result.lines[0] || "failed");
+  });
+}
+
+async function logsModal(serviceId) {
+  $("#modal-root").innerHTML = `
+    <div class="modal-backdrop" id="backdrop">
+      <div class="modal wide">
+        <h2>Logs — ${esc(serviceId)}</h2>
+        <div class="log-view" id="log-view">loading…</div>
+        <div class="modal-foot"><button class="btn subtle" id="m-close">Close</button></div>
+      </div>
+    </div>`;
+  const load = async () => {
+    try {
+      const logs = await api(`/services/${serviceId}/logs?tail=200`);
+      const el = $("#log-view");
+      if (el) { el.textContent = logs.lines.join("\n") || "(no output yet)"; el.scrollTop = el.scrollHeight; }
+    } catch (e) { /* service may be gone */ }
+  };
+  const timer = setInterval(load, 2000);
+  const close = () => { clearInterval(timer); closeModal(); };
+  $("#m-close").addEventListener("click", close);
+  $("#backdrop").addEventListener("click", e => { if (e.target.id === "backdrop") close(); });
+  await load();
+}
+
+/* ---------- boot ---------- */
+(async () => {
+  if (!token) { showLogin(); return; }
+  try { await tryLogin(token); } catch (e) { showLogin(); }
+})();
+</script>
+</body>
+</html>

@@ -187,4 +187,14 @@ class ControlServerTest {
 
         assertEquals(HttpStatusCode.OK, client.get("/api/v1/addons") { bearerAuth("secret") }.status)
     }
+
+    @Test
+    fun `dashboard is served without authentication`() = testApplication {
+        val client = apiClient()
+
+        val response = client.get("/")
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(response.body<String>().contains("Helix-Cloud"))
+    }
 }
