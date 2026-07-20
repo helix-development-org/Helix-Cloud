@@ -11,11 +11,29 @@ import org.helix.node.actions.ActionRegistry
  */
 class AddonActions(private val manager: AddonManager) {
     /**
-     * Registers `addon.list`, `addon.enable` and `addon.disable`.
+     * Registers `addon.list`, `addon.list.reload`, `addon.enable` and
+     * `addon.disable`.
      *
      * @param registry target registry.
      */
     fun registerAll(registry: ActionRegistry) {
+        registry.register(
+            ActionDescriptor(
+                "addon.list.reload",
+                "Loads new .hxa files from Helix/addons/ without a restart.",
+                "addon.list.reload",
+            ),
+        ) {
+            val added = manager.reload()
+            if (added.isEmpty()) {
+                ActionResult.ok("no new addons found in Helix/addons/")
+            } else {
+                ActionResult.ok(
+                    "loaded ${added.size} new addon${if (added.size == 1) "" else "s"}:",
+                    *added.map { "${it.manifest.id} ${it.manifest.version} [${it.state}]" }.toTypedArray(),
+                )
+            }
+        }
         registry.register(
             ActionDescriptor("addon.list", "Lists installed addons.", "addon.list"),
         ) {

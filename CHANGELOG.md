@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.0 — 2026-07-20
+
+### Addons ohne Neustart nachladen
+- Neue Action `addon.list.reload`: scannt `Helix/addons/` und lädt jede
+  noch nicht geladene `.hxa` live nach (aktiviert sie samt Actions,
+  Player-Commands, Gates usw.), ohne den Launcher neu zu starten. Bereits
+  geladene Addons bleiben unangetastet, kaputte Pakete werden übersprungen.
+- `AddonManager.reload()` als zugrundeliegender Mechanismus.
+
 ## 0.7.0 — 2026-07-20
 
 ### Komplett neues Web-Dashboard

@@ -186,3 +186,17 @@ Referenz-Implementierungen in diesem Repo:
 
 Verwaltung über CLI/REST/Dashboard: `addon.list`, `addon.enable <id>`,
 `addon.disable <id>`.
+
+## Addons zur Laufzeit nachladen
+
+Neue `.hxa` Dateien lassen sich ohne Node-Neustart laden: einfach in
+`Helix/addons/` ablegen und `addon.list.reload` ausführen (CLI, REST oder
+Dashboard). Die Action scannt den Ordner, installiert und aktiviert jede
+noch nicht geladene Datei und lässt bereits geladene Addons unangetastet.
+Fehlerhafte Pakete werden übersprungen und geloggt.
+
+```text
+helix> addon.list.reload
+loaded 1 new addon:
+helix.friends 1.0.0 [ENABLED]
+```

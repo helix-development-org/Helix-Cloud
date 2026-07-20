@@ -92,6 +92,34 @@ class AddonManager(
     }
 
     /**
+     * Scans the addon directory and installs every `.hxa` that is not
+     * loaded yet, without touching already-loaded addons.
+     *
+     * Lets operators drop new HXA files into `Helix/addons/` and pick them
+     * up live via the `addon.list.reload` action — no node restart needed.
+     * Malformed packages are logged and skipped.
+     *
+     * @return snapshots of the newly installed addons.
+     */
+    @Synchronized
+    fun reload(): List<AddonInfo> {
+        Files.createDirectories(directory)
+        val added = mutableListOf<AddonInfo>()
+        directory.listDirectoryEntries()
+            .filter { it.extension == "hxa" }
+            .sorted()
+            .forEach { file ->
+                runCatching {
+                    val manifest = readManifest(file)
+                    if (!loaded.containsKey(manifest.id)) {
+                        added += install(file)
+                    }
+                }.onFailure { logger.error("Failed to load addon {}", file.fileName, it) }
+            }
+        return added
+    }
+
+    /**
      * Installs one HXA file and enables the addon.
      *
      * @param file path of the `.hxa` package.

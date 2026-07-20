@@ -6,6 +6,7 @@ import java.nio.file.Path
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlin.io.path.createTempDirectory
+import kotlin.io.path.writeText
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -25,6 +26,17 @@ class TestAddon : HelixAddon {
     override fun onEnable(context: AddonContext) {
         context.registerAction(ActionDescriptor("test.ping", "ping", "test.ping")) {
             ActionResult.ok("pong from ${context.dataDirectory.fileName}")
+        }
+    }
+}
+
+/**
+ * Second test addon registering a distinct action, for reload tests.
+ */
+class SecondTestAddon : HelixAddon {
+    override fun onEnable(context: AddonContext) {
+        context.registerAction(ActionDescriptor("test.pong", "pong", "test.pong")) {
+            ActionResult.ok("pong")
         }
     }
 }
@@ -103,6 +115,33 @@ class AddonManagerTest {
         writeHxa(id = "helix.nojar", withJar = false)
 
         assertTrue(manager.loadAll().isEmpty())
+    }
+
+    @Test
+    fun `reload loads new addons and leaves existing ones untouched`() {
+        writeHxa(id = "helix.first")
+        manager.loadAll()
+        val firstAction = registry.invoke(ActionInvocation("test.ping"))
+        assertTrue(firstAction.success)
+
+        // a second addon appears in the folder at runtime
+        writeHxa(id = "helix.second", main = SecondTestAddon::class.java.name)
+        val added = manager.reload()
+
+        assertEquals(listOf("helix.second"), added.map { it.manifest.id })
+        assertEquals(
+            setOf("helix.first", "helix.second"),
+            manager.addons().map { it.manifest.id }.toSet(),
+        )
+        // reloading again finds nothing new
+        assertTrue(manager.reload().isEmpty())
+    }
+
+    @Test
+    fun `reload skips broken packages`() {
+        directory.resolve("broken.hxa").writeText("not a zip")
+
+        assertTrue(manager.reload().isEmpty())
     }
 
     @Test
