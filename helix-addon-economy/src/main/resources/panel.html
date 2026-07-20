@@ -1,0 +1,45 @@
+<div class="card">
+  <div class="card-head"><h2>Adjust balance</h2></div>
+  <div class="card-body">
+    <div class="row">
+      <input id="p" placeholder="Player" style="max-width:220px">
+      <input id="a" type="number" placeholder="Amount" style="max-width:160px">
+      <button class="btn" data-op="give">Give</button>
+      <button class="btn subtle" data-op="take">Take</button>
+      <button class="btn subtle" data-op="set">Set</button>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-head"><h2>Balances</h2><div class="right"><button class="btn sm subtle" id="refresh">Refresh</button></div></div>
+  <div id="list"><div class="empty">loading…</div></div>
+</div>
+<script>
+"use strict";
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+async function load() {
+  const r = await Helix.action("eco.export");
+  let bal = {}; try { bal = JSON.parse(r.lines[0] || "{}"); } catch (e) {}
+  const rows = Object.entries(bal);
+  const box = document.getElementById("list");
+  box.innerHTML = rows.length ? `<table><thead><tr><th>Player</th><th>Balance</th><th></th></tr></thead><tbody>${
+    rows.map(([n, v]) => `<tr><td><strong>${esc(n)}</strong></td><td class="mono">${v} coins</td>
+      <td style="text-align:right">
+        <button class="btn sm subtle" data-q="give|${esc(n)}">+</button>
+        <button class="btn sm subtle" data-q="take|${esc(n)}">−</button>
+        <button class="btn sm subtle" data-q="set|${esc(n)}">set</button></td></tr>`).join("")
+  }</tbody></table>` : '<div class="empty">No balances yet</div>';
+  box.querySelectorAll("[data-q]").forEach(b => b.onclick = async () => {
+    const [op, name] = b.dataset.q.split("|");
+    const amt = prompt(`${op} amount for ${name}?`, "100"); if (amt == null) return;
+    const r = await Helix.action("eco." + op, name, amt); Helix.toast(r.lines[0] || "done"); load();
+  });
+}
+document.querySelectorAll("[data-op]").forEach(b => b.onclick = async () => {
+  const p = document.getElementById("p").value.trim(), a = document.getElementById("a").value.trim();
+  if (!p || !a) return Helix.toast("player and amount required");
+  const r = await Helix.action("eco." + b.dataset.op, p, a); Helix.toast(r.lines[0] || "done"); load();
+});
+document.getElementById("refresh").onclick = load;
+Helix.ready(load);
+</script>

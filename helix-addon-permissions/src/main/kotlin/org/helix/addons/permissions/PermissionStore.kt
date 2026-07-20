@@ -110,6 +110,15 @@ class PermissionStore(private val file: Path) {
     }
 
     /**
+     * Full snapshot of groups and users, for export to the dashboard.
+     *
+     * @return the current document.
+     */
+    @Synchronized
+    fun document(): PermissionDocument =
+        PermissionDocument(groups.values.toList(), users.values.toList())
+
+    /**
      * Resolves whether a player has a permission.
      *
      * @param player player name.

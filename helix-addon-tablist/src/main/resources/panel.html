@@ -1,0 +1,44 @@
+<div class="card">
+  <div class="card-head"><h2>Tab list</h2><div class="sub">&amp; color codes · \n line breaks · placeholders {online} {max}</div></div>
+  <div class="card-body">
+    <div class="grid c2">
+      <div class="field"><label>Header</label><textarea id="header" rows="4" style="font-family:var(--mono)"></textarea></div>
+      <div class="field"><label>Footer</label><textarea id="footer" rows="4" style="font-family:var(--mono)"></textarea></div>
+    </div>
+    <div class="row" style="margin-top:14px"><button class="btn" id="save">Save</button><span class="muted" id="hint"></span></div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-head"><h2>Preview</h2></div>
+  <div class="card-body"><div id="preview" style="background:var(--surface-2);border-radius:var(--radius-sm);padding:16px;text-align:center;white-space:pre-wrap;line-height:1.7"></div></div>
+</div>
+<script>
+"use strict";
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const COLORS = { "0":"#000","1":"#00a","2":"#0a0","3":"#0aa","4":"#a00","5":"#a0a","6":"#fa0","7":"#aaa","8":"#555","9":"#55f","a":"#5f5","b":"#5ff","c":"#f55","d":"#f5f","e":"#ff5","f":"#fff" };
+function mc(text) {
+  let out = "", color = "var(--ink)";
+  const parts = String(text).replace(/\\n/g,"\n").replace(/\{online\}/g,"12").replace(/\{max\}/g,"100").split(/(&[0-9a-fk-or])/i);
+  for (const p of parts) { if (/^&[0-9a-f]$/i.test(p)) color = COLORS[p[1].toLowerCase()]; else if (/^&[k-or]$/i.test(p)) {} else if (p) out += `<span style="color:${color}">${esc(p)}</span>`; }
+  return out.replace(/\n/g, "<br>");
+}
+async function load() {
+  const r = await Helix.action("tablist.export");
+  let c = {}; try { c = JSON.parse(r.lines[0] || "{}"); } catch (e) {}
+  document.getElementById("header").value = c.header || "";
+  document.getElementById("footer").value = c.footer || "";
+  preview();
+}
+function preview() {
+  document.getElementById("preview").innerHTML = mc(document.getElementById("header").value) + '<br><span style="color:var(--ink-3)">— player list —</span><br>' + mc(document.getElementById("footer").value);
+}
+document.getElementById("header").oninput = preview;
+document.getElementById("footer").oninput = preview;
+document.getElementById("save").onclick = async () => {
+  const h = document.getElementById("header").value, f = document.getElementById("footer").value;
+  await Helix.action("tablist.header", ...h.split(" "));
+  await Helix.action("tablist.footer", ...f.split(" "));
+  Helix.toast("Tab list updated");
+};
+Helix.ready(load);
+</script>

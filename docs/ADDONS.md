@@ -187,6 +187,43 @@ Referenz-Implementierungen in diesem Repo:
 Verwaltung über CLI/REST/Dashboard: `addon.list`, `addon.enable <id>`,
 `addon.disable <id>`.
 
+## Eigene Dashboard-Seite beisteuern
+
+Ein Addon kann eine eigene Seite ins Webpanel bringen. Die Seite ist ein
+HTML-Fragment (mit `<style>`/`<script>`), das das Dashboard in einem
+**sandboxed iframe** rendert. Der Control-Token bleibt im Host — Panel-Code
+kann ihn nicht lesen. Actions ruft die Seite über die injizierte Brücke
+`Helix.action(name, ...args)` auf (Promise auf `{success, lines}`), plus
+`Helix.toast(msg)` und `Helix.ready(cb)`. CSS-Variablen des Dashboards
+(`--accent`, `--surface`, …) und Basisklassen (`.card`, `.btn`, `.badge`,
+`table`) stehen bereit, damit Panels nativ aussehen.
+
+```kotlin
+class MyAddon : AddonBase() {
+    override fun enable() {
+        action("my.export", "Data for the panel.") { ActionResult.ok(json) }
+        panel(id = "my", title = "My Page", resource = "/panel.html")
+    }
+}
+```
+
+`panel.html` (im `resources/` des Addons):
+
+```html
+<div class="card"><div class="card-head"><h2>My Page</h2></div>
+  <div class="card-body" id="out">loading…</div></div>
+<script>
+  Helix.ready(async () => {
+    const r = await Helix.action("my.export");
+    document.getElementById("out").textContent = r.lines[0];
+  });
+</script>
+```
+
+Das Panel erscheint in der Sidebar unter **Extensions** und verschwindet
+wieder, wenn das Addon deaktiviert wird. Mitgelieferte Panels:
+Permissions, Economy, Bans, Chat, Tablist, Discord.
+
 ## Addons zur Laufzeit nachladen
 
 Neue `.hxa` Dateien lassen sich ohne Node-Neustart laden: einfach in

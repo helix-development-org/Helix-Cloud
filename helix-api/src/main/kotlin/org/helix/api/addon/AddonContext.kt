@@ -107,6 +107,15 @@ interface AddonContext {
     }
 
     /**
+     * Registers a dashboard page contributed by this addon. Removed when
+     * the addon is disabled.
+     *
+     * @param panel the page to add to the dashboard sidebar.
+     */
+    fun registerDashboardPanel(panel: DashboardPanel) {
+    }
+
+    /**
      * Registers a notification listener owned by this addon. Removed when
      * the addon is disabled.
      *

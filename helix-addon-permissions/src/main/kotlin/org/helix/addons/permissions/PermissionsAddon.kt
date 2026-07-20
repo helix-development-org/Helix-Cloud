@@ -1,5 +1,6 @@
 package org.helix.addons.permissions
 
+import kotlinx.serialization.json.Json
 import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
@@ -101,6 +102,15 @@ class PermissionsAddon : AddonBase() {
             val granted = store.has(player, permission)
             ActionResult.ok("$player ${if (granted) "HAS" else "does NOT have"} $permission")
         }
+        action("perm.export", "Exports all groups and users as JSON (used by the dashboard).", "perm.export") {
+            ActionResult.ok(Json.encodeToString(store.document()))
+        }
+        panel("permissions", "Permissions", "/panel.html", PANEL_ICON)
+    }
+
+    private companion object {
+        /** Sidebar icon for the permissions panel. */
+        const val PANEL_ICON = "<path d=\"M9 12l2 2 4-4\"/><path d=\"M12 3l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V7z\"/>"
     }
 
     private fun createGroup(invocation: ActionInvocation): ActionResult {

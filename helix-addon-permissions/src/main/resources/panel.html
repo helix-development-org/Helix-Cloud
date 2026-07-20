@@ -1,0 +1,97 @@
+<div class="card">
+  <div class="card-head"><h2>Groups</h2><div class="right"><button class="btn sm" id="new-group">+ New group</button></div></div>
+  <div id="groups"><div class="empty">loading…</div></div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Player</h2><div class="sub">inspect and edit a player's groups &amp; permissions</div></div>
+  <div class="card-body">
+    <div class="row"><input id="user-name" placeholder="Player name" style="max-width:280px"><button class="btn subtle" id="user-load">Load</button></div>
+    <div id="user-detail" style="margin-top:14px"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+let doc = { groups: [], users: [] };
+
+async function load() {
+  const res = await Helix.action("perm.export");
+  try { doc = JSON.parse(res.lines[0] || "{}"); } catch (e) { doc = { groups: [], users: [] }; }
+  renderGroups();
+}
+
+function renderGroups() {
+  const box = document.getElementById("groups");
+  if (!doc.groups.length) { box.innerHTML = '<div class="empty">No groups yet</div>'; return; }
+  const sorted = [...doc.groups].sort((a, b) => (b.weight||0) - (a.weight||0));
+  box.innerHTML = `<table><thead><tr><th>Group</th><th>Weight</th><th>Default</th><th>Parents</th><th>Permissions</th><th></th></tr></thead><tbody>${
+    sorted.map(g => `<tr>
+      <td><strong>${esc(g.name)}</strong></td>
+      <td class="mono">${g.weight||0}</td>
+      <td>${g.default ? '<span class="badge good">default</span>' : '<span class="muted">—</span>'}</td>
+      <td>${(g.parents||[]).length ? (g.parents||[]).map(p=>`<span class="tag">${esc(p)}</span>`).join(" ") : '<span class="muted">—</span>'}</td>
+      <td>${(g.permissions||[]).length ? `<span class="tag">${(g.permissions||[]).length} nodes</span>` : '<span class="muted">—</span>'}</td>
+      <td style="text-align:right"><button class="btn sm subtle" data-edit="${esc(g.name)}">Edit</button> <button class="btn sm danger" data-del="${esc(g.name)}">Delete</button></td>
+    </tr>${g._open ? groupEditor(g) : ""}`).join("")
+  }</tbody></table>`;
+  box.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => { const g = doc.groups.find(x=>x.name===b.dataset.edit); g._open = !g._open; renderGroups(); });
+  box.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { if (!confirm(`Delete group ${b.dataset.del}?`)) return; await Helix.action("perm.group.delete", b.dataset.del); Helix.toast("Deleted " + b.dataset.del); load(); });
+  bindEditors();
+}
+
+function groupEditor(g) {
+  return `<tr><td colspan="6" style="background:var(--surface-2)"><div class="card-body">
+    <div class="grid c2">
+      <div class="field"><label>Add permission node (use -node to negate, * wildcards)</label>
+        <div class="row"><input id="perm-in-${esc(g.name)}" placeholder="helix.command.fly" style="max-width:320px"><button class="btn sm" data-grant="${esc(g.name)}">Grant</button></div></div>
+      <div class="field"><label>Add parent group</label>
+        <div class="row"><select id="parent-in-${esc(g.name)}" style="max-width:220px">${doc.groups.filter(x=>x.name!==g.name).map(x=>`<option>${esc(x.name)}</option>`).join("")}</select><button class="btn sm subtle" data-addparent="${esc(g.name)}">Add</button></div></div>
+    </div>
+    <div style="margin-top:12px">${(g.permissions||[]).length ? (g.permissions||[]).map(p=>`<span class="chip">${esc(p)}<button data-revoke="${esc(g.name)}|${esc(p)}">×</button></span>`).join("") : '<span class="muted">no permissions</span>'}</div>
+    <div style="margin-top:8px">${(g.parents||[]).map(p=>`<span class="chip">⤷ ${esc(p)}<button data-rmparent="${esc(g.name)}|${esc(p)}">×</button></span>`).join("")}</div>
+  </div></td></tr>`;
+}
+
+function bindEditors() {
+  const box = document.getElementById("groups");
+  box.querySelectorAll("[data-grant]").forEach(b => b.onclick = async () => { const v = document.getElementById("perm-in-"+b.dataset.grant).value.trim(); if(!v) return; await Helix.action("perm.group.grant", b.dataset.grant, v); load(); });
+  box.querySelectorAll("[data-revoke]").forEach(b => b.onclick = async () => { const [g,p]=b.dataset.revoke.split("|"); await Helix.action("perm.group.revoke", g, p); load(); });
+  box.querySelectorAll("[data-addparent]").forEach(b => b.onclick = async () => { const v = document.getElementById("parent-in-"+b.dataset.addparent).value; if(!v) return; await Helix.action("perm.group.addparent", b.dataset.addparent, v); load(); });
+  box.querySelectorAll("[data-rmparent]").forEach(b => b.onclick = async () => { const [g,p]=b.dataset.rmparent.split("|"); await Helix.action("perm.group.removeparent", g, p); load(); });
+}
+
+document.getElementById("new-group").onclick = async () => {
+  const name = prompt("Group name?"); if (!name) return;
+  const weight = prompt("Weight (higher wins conflicts)?", "0") || "0";
+  const r = await Helix.action("perm.group.create", name, "weight=" + weight);
+  Helix.toast(r.lines[0] || "created"); load();
+};
+
+async function loadUser() {
+  const name = document.getElementById("user-name").value.trim(); if (!name) return;
+  await load();
+  const u = (doc.users || []).find(x => x.name.toLowerCase() === name.toLowerCase()) || { name: name.toLowerCase(), groups: [], permissions: [] };
+  const defaults = doc.groups.filter(g => g.default).map(g => g.name);
+  const groups = u.groups.length ? u.groups : defaults;
+  document.getElementById("user-detail").innerHTML = `
+    <div class="grid c2">
+      <div class="field"><label>Groups${u.groups.length ? "" : " (defaults)"}</label>
+        <div>${groups.map(g=>`<span class="chip">${esc(g)}${u.groups.length?`<button data-ug="${esc(g)}">×</button>`:""}</span>`).join("") || '<span class="muted">none</span>'}</div>
+        <div class="row" style="margin-top:8px"><select id="ug-add">${doc.groups.map(g=>`<option>${esc(g.name)}</option>`).join("")}</select><button class="btn sm" id="ug-btn">Add to group</button></div></div>
+      <div class="field"><label>Personal permissions</label>
+        <div>${(u.permissions||[]).map(p=>`<span class="chip">${esc(p)}<button data-up="${esc(p)}">×</button></span>`).join("") || '<span class="muted">none</span>'}</div>
+        <div class="row" style="margin-top:8px"><input id="up-in" placeholder="node or -node" style="max-width:240px"><button class="btn sm" id="up-btn">Grant</button></div></div>
+    </div>`;
+  const uname = u.name;
+  document.getElementById("ug-btn").onclick = async () => { await Helix.action("perm.user.addgroup", uname, document.getElementById("ug-add").value); document.getElementById("user-name").value = uname; loadUser(); };
+  document.getElementById("up-btn").onclick = async () => { const v = document.getElementById("up-in").value.trim(); if(!v) return; await Helix.action("perm.user.grant", uname, v); document.getElementById("user-name").value = uname; loadUser(); };
+  document.querySelectorAll("[data-ug]").forEach(b => b.onclick = async () => { await Helix.action("perm.user.removegroup", uname, b.dataset.ug); document.getElementById("user-name").value = uname; loadUser(); });
+  document.querySelectorAll("[data-up]").forEach(b => b.onclick = async () => { await Helix.action("perm.user.revoke", uname, b.dataset.up); document.getElementById("user-name").value = uname; loadUser(); });
+}
+document.getElementById("user-load").onclick = loadUser;
+document.getElementById("user-name").onkeydown = e => { if (e.key === "Enter") loadUser(); };
+
+Helix.ready(load);
+</script>

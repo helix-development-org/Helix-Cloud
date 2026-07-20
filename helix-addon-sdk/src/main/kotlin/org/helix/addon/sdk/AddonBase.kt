@@ -4,6 +4,7 @@ import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
 import org.helix.api.addon.AddonContext
+import org.helix.api.addon.DashboardPanel
 import org.helix.api.addon.HelixAddon
 
 /**
@@ -47,5 +48,21 @@ abstract class AddonBase : HelixAddon {
         handler: (ActionInvocation) -> ActionResult,
     ) {
         context.registerAction(ActionDescriptor(name, description, usage), handler)
+    }
+
+    /**
+     * Registers a dashboard page whose markup is loaded from an addon
+     * classpath resource.
+     *
+     * @param id url-safe panel id.
+     * @param title sidebar label.
+     * @param resource classpath path of the panel html, for example
+     *   `/panel.html`.
+     * @param icon optional inner SVG markup for the sidebar icon.
+     */
+    protected fun panel(id: String, title: String, resource: String, icon: String = "") {
+        val html = javaClass.getResourceAsStream(resource)?.bufferedReader()?.use { it.readText() }
+            ?: error("panel resource not found: $resource")
+        context.registerDashboardPanel(DashboardPanel(id = id, title = title, icon = icon, html = html))
     }
 }

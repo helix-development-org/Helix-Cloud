@@ -53,5 +53,16 @@ data class DiscordConfig(
             }
             return json.decodeFromString(Files.readString(file))
         }
+
+        /**
+         * Writes the configuration to disk.
+         *
+         * @param file path of `discord.json`.
+         * @param config configuration to persist.
+         */
+        fun save(file: Path, config: DiscordConfig) {
+            Files.createDirectories(file.parent)
+            Files.writeString(file, json.encodeToString(config))
+        }
     }
 }

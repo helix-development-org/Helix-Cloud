@@ -113,6 +113,15 @@ class PrettyChatAddon : AddonBase() {
                 )
             }
         }
+        action("chat.export", "Exports the chat configuration as JSON (dashboard).", "chat.export") {
+            ActionResult.ok(json.encodeToString(config))
+        }
+        panel(
+            "chat",
+            "Chat",
+            "/panel.html",
+            "<path d=\"M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z\"/>",
+        )
     }
 
     private fun load(): ChatConfig {

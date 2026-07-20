@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.9.0 — 2026-07-20
+
+### Addon-Seiten im Dashboard
+- Neuer Mechanismus: Addons können eigene Dashboard-Seiten beisteuern
+  (`AddonContext.registerDashboardPanel` / `AddonBase.panel(...)`). Die
+  Seite (HTML/JS) wird in einem sandboxed iframe gerendert; über die
+  injizierte Brücke `Helix.action()` ruft sie Actions auf, ohne dass der
+  Control-Token je in den Panel-Code gelangt. CSS-Variablen und
+  Basisklassen des Dashboards werden injiziert, Theme-Wechsel wird
+  durchgereicht. Panels erscheinen unter „Extensions" und werden beim
+  Disable entfernt.
+- Endpoints `GET /panels` und `GET /panels/{id}`.
+- **Sechs Addons bekommen eine Seite**: Permissions (Gruppen/Player
+  verwalten), Economy (Guthaben admin-seitig anpassen), Bans (bannen,
+  Übersicht, pardon), Chat (Format + Prefix-Regeln), Tablist
+  (Header/Footer mit Live-Preview), Discord (Bot-Status + Config).
+  Dazu die JSON-Export-Actions `perm.export`, `eco.export`, `ban.export`,
+  `chat.export`, `tablist.export`, `discord.config.get`/`discord.config.set`.
+
 ## 0.8.0 — 2026-07-20
 
 ### Addons ohne Neustart nachladen

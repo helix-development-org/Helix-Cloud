@@ -65,6 +65,15 @@ class BalanceStore(private val file: Path) {
     }
 
     /**
+     * Snapshot of all balances.
+     *
+     * @return player name to balance, highest first.
+     */
+    @Synchronized
+    fun all(): Map<String, Long> =
+        balances.entries.sortedByDescending { it.value }.associate { it.key to it.value }
+
+    /**
      * Transfers coins between two players atomically.
      *
      * @param from paying player.
@@ -139,6 +148,15 @@ class EconomyAddon : AddonBase() {
                 amount
             }
         }
+        action("eco.export", "Exports all balances as JSON (used by the dashboard).", "eco.export") {
+            ActionResult.ok(kotlinx.serialization.json.Json.encodeToString(store.all()))
+        }
+        panel(
+            "economy",
+            "Economy",
+            "/panel.html",
+            "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M14.5 9a2.5 2.5 0 00-2.5-1.5c-1.4 0-2.5.8-2.5 2s1.1 1.8 2.5 2 2.5.8 2.5 2-1.1 2-2.5 2A2.5 2.5 0 019.5 15M12 6v1.5M12 16.5V18\"/>",
+        )
     }
 
     private fun pay(invocation: ActionInvocation): ActionResult {

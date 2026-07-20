@@ -37,6 +37,7 @@ import org.helix.api.task.TaskDefinition
 import org.helix.node.actions.PlayerCommandService
 import org.helix.node.addons.AddonManager
 import org.helix.node.config.NodeConfig
+import org.helix.node.dashboard.DashboardPanelRegistry
 import org.helix.node.display.BridgeValueStore
 import org.helix.node.display.DisplayResolverRegistry
 import org.helix.node.events.EventLog
@@ -82,6 +83,7 @@ data class ControlDependencies(
     val bridgeValues: BridgeValueStore = BridgeValueStore(),
     val logBuffer: LogBuffer = LogBuffer(),
     val eventLog: EventLog = EventLog(),
+    val dashboardPanels: DashboardPanelRegistry = DashboardPanelRegistry(),
 ) {
     /** Player command execution shared by the internal routes. */
     val playerCommands: PlayerCommandService = PlayerCommandService(registry, permissionResolvers)
@@ -125,6 +127,7 @@ fun Application.controlModule(dependencies: ControlDependencies) {
                 serviceRoutes(dependencies)
                 proxyRoutes(dependencies)
                 observabilityRoutes(dependencies)
+                panelRoutes(dependencies)
                 actionRoutes(dependencies)
                 addonRoutes(dependencies)
                 internalRoutes(dependencies)
@@ -147,6 +150,20 @@ private fun io.ktor.server.routing.Route.observabilityRoutes(dependencies: Contr
     get("/events") {
         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 200
         call.respond(dependencies.eventLog.recent(limit))
+    }
+}
+
+private fun io.ktor.server.routing.Route.panelRoutes(dependencies: ControlDependencies) {
+    get("/panels") {
+        call.respond(dependencies.dashboardPanels.list())
+    }
+    get("/panels/{id}") {
+        val panel = dependencies.dashboardPanels.find(call.parameters["id"].orEmpty())
+        if (panel == null) {
+            call.respond(HttpStatusCode.NotFound, ErrorResponse("unknown panel"))
+        } else {
+            call.respond(panel)
+        }
     }
 }
 

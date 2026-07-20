@@ -15,6 +15,7 @@ import org.helix.api.addon.AddonContext
 import org.helix.api.addon.AddonInfo
 import org.helix.api.addon.AddonManifest
 import org.helix.api.addon.AddonState
+import org.helix.api.addon.DashboardPanel
 import org.helix.api.addon.DisplayResolver
 import org.helix.api.addon.HelixAddon
 import org.helix.api.addon.JoinGate
@@ -24,6 +25,7 @@ import org.helix.api.addon.PlayerListener
 import org.helix.api.player.OnlinePlayer
 import org.helix.api.proxy.PermissionCheckRequest
 import org.helix.node.actions.ActionRegistry
+import org.helix.node.dashboard.DashboardPanelRegistry
 import org.helix.node.display.BridgeValueStore
 import org.helix.node.display.DisplayResolverRegistry
 import org.helix.node.gates.JoinGateRegistry
@@ -48,6 +50,7 @@ import org.slf4j.LoggerFactory
  * @property displayResolvers display profile registry addons register into.
  * @property bridgeValues global values bridges poll.
  * @property notifications notification bus between addons.
+ * @property dashboardPanels dashboard pages contributed by addons.
  */
 class AddonManager(
     private val directory: Path,
@@ -58,6 +61,7 @@ class AddonManager(
     private val displayResolvers: DisplayResolverRegistry = DisplayResolverRegistry(),
     private val bridgeValues: BridgeValueStore = BridgeValueStore(),
     private val notifications: NotificationBus = NotificationBus(),
+    private val dashboardPanels: DashboardPanelRegistry = DashboardPanelRegistry(),
 ) {
     private val logger = LoggerFactory.getLogger(AddonManager::class.java)
     private val json = Json { ignoreUnknownKeys = true }
@@ -240,6 +244,7 @@ class AddonManager(
         displayResolvers.unregisterOwner(id)
         bridgeValues.unpublishOwner(id)
         notifications.unregisterOwner(id)
+        dashboardPanels.unregisterOwner(id)
     }
 
     private fun extractedJarPath(manifest: AddonManifest): Path =
@@ -286,6 +291,10 @@ class AddonManager(
 
         override fun publishNotification(category: String, message: String) {
             notifications.publish(category, message)
+        }
+
+        override fun registerDashboardPanel(panel: DashboardPanel) {
+            dashboardPanels.register(record.manifest.id, panel)
         }
 
         override fun registerNotificationListener(listener: NotificationListener) {

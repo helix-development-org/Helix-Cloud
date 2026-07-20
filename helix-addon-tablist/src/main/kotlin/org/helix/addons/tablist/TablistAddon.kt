@@ -68,6 +68,15 @@ class TablistAddon : AddonBase() {
         action("tablist.show", "Shows the current tab list configuration.", "tablist.show") {
             ActionResult.ok("header: ${config.header}", "footer: ${config.footer}")
         }
+        action("tablist.export", "Exports the tab list configuration as JSON (dashboard).", "tablist.export") {
+            ActionResult.ok(json.encodeToString(config))
+        }
+        panel(
+            "tablist",
+            "Tablist",
+            "/panel.html",
+            "<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M3 9h18M8 13h8M8 16h5\"/>",
+        )
     }
 
     private fun publish() {

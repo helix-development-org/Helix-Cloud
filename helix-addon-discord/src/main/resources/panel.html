@@ -1,0 +1,53 @@
+<div class="card">
+  <div class="card-head"><h2>Bot status</h2><div class="right"><button class="btn sm subtle" id="refresh">Refresh</button></div></div>
+  <div class="card-body"><div id="status" class="row"></div></div>
+</div>
+<div class="card">
+  <div class="card-head"><h2>Configuration</h2><div class="sub">saving reconnects the bot</div></div>
+  <div class="card-body">
+    <div class="grid c2">
+      <div class="field"><label>Bot token <span class="muted">(leave blank to keep current)</span></label><input id="token" type="password" placeholder="••••••••"></div>
+      <div class="field"><label>Channel ID</label><input id="channel" placeholder="123456789012345678"></div>
+      <div class="field"><label>Command prefix</label><input id="prefix" placeholder="!"></div>
+      <div class="field"><label>Notification categories <span class="muted">(comma-separated)</span></label><input id="categories" placeholder="moderation"></div>
+      <div class="field wide" style="grid-column:1/-1"><label>Admin user IDs <span class="muted">(comma-separated, may use !run)</span></label><input id="admins" placeholder="1111,2222"></div>
+    </div>
+    <div class="row" style="margin-top:14px"><button class="btn" id="save">Save &amp; reconnect</button></div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-head"><h2>Send test message</h2></div>
+  <div class="card-body"><div class="row"><input id="msg" placeholder="Hello from Helix" style="max-width:400px"><button class="btn subtle" id="send">Send</button></div></div>
+</div>
+<script>
+"use strict";
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+async function load() {
+  const r = await Helix.action("discord.config.get");
+  let c = {}; try { c = JSON.parse(r.lines[0] || "{}"); } catch (e) {}
+  document.getElementById("channel").value = c.channelId || "";
+  document.getElementById("prefix").value = c.commandPrefix || "!";
+  document.getElementById("categories").value = (c.notificationCategories || []).join(",");
+  document.getElementById("admins").value = (c.adminUserIds || []).join(",");
+  document.getElementById("status").innerHTML =
+    (c.connected ? '<span class="badge good">connected</span>' : '<span class="badge neutral">offline</span>')
+    + (c.tokenSet ? '<span class="badge good">token set</span>' : '<span class="badge warn">no token</span>')
+    + `<span class="tag">channel ${c.channelId ? esc(c.channelId) : "—"}</span>`;
+}
+document.getElementById("save").onclick = async () => {
+  const args = [];
+  const t = document.getElementById("token").value.trim(); if (t) args.push("token=" + t);
+  args.push("channel=" + document.getElementById("channel").value.trim());
+  args.push("prefix=" + (document.getElementById("prefix").value.trim() || "!"));
+  args.push("categories=" + document.getElementById("categories").value.trim());
+  args.push("admins=" + document.getElementById("admins").value.trim());
+  const r = await Helix.action("discord.config.set", ...args);
+  Helix.toast(r.lines[0] || "saved"); document.getElementById("token").value = ""; setTimeout(load, 800);
+};
+document.getElementById("send").onclick = async () => {
+  const m = document.getElementById("msg").value.trim(); if (!m) return;
+  const r = await Helix.action("discord.send", ...m.split(" ")); Helix.toast(r.success ? "sent" : (r.lines[0] || "failed"));
+};
+document.getElementById("refresh").onclick = load;
+Helix.ready(load);
+</script>

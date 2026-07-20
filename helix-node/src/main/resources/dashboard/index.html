@@ -302,6 +302,7 @@ let view = "overview";
 let timer = null;
 let logPaused = false;
 let eventFilter = "all";
+let panels = [];
 
 const NAV = [
   { group: "Platform" },
@@ -350,6 +351,7 @@ async function tryLogin(t) {
   localStorage.setItem("helix.token", token);
   $("#login").classList.add("hidden"); $("#app").classList.remove("hidden");
   $("#ver-chip").textContent = "v" + ov.version;
+  try { panels = await api("/panels"); } catch (e) { panels = []; }
   buildNav(); render();
 }
 $("#login-btn").onclick = async () => { try { $("#login-err").textContent = ""; await tryLogin($("#login-token").value.trim()); } catch (e) { $("#login-err").textContent = "Sign in failed — check your token"; } };
@@ -357,16 +359,26 @@ $("#login-token").onkeydown = e => { if (e.key === "Enter") $("#login-btn").clic
 $("#logout-btn").onclick = () => { localStorage.removeItem("helix.token"); token = ""; showLogin(); };
 
 /* ---------- theme ---------- */
-function applyTheme(t) { document.documentElement.dataset.theme = t; localStorage.setItem("helix.theme", t); }
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t; localStorage.setItem("helix.theme", t);
+  const f = document.getElementById("panel-frame");
+  if (f && f.contentWindow) { try { f.contentWindow.postMessage({ type: "helix:theme", css: panelThemeCss() }, "*"); } catch (e) {} }
+}
 $("#theme-btn").onclick = () => applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
 applyTheme(localStorage.getItem("helix.theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
 
 /* ---------- nav ---------- */
 function buildNav() {
-  $("#nav").innerHTML = NAV.map(n => n.group
+  let html = NAV.map(n => n.group
     ? `<div class="nav-group">${n.label || n.group}</div>`
     : `<button class="nav-btn" data-view="${n.id}">${svg(n.icon, "ico")}<span>${n.label}</span><span class="tag hidden" id="tag-${n.id}"></span></button>`
   ).join("");
+  if (panels.length) {
+    html += `<div class="nav-group">Extensions</div>` + panels.map(p =>
+      `<button class="nav-btn" data-view="panel:${p.id}">${svg(p.icon || '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>', "ico")}<span>${esc(p.title)}</span></button>`
+    ).join("");
+  }
+  $("#nav").innerHTML = html;
   document.querySelectorAll(".nav-btn[data-view]").forEach(b => b.onclick = () => { view = b.dataset.view; render(); });
 }
 function setTag(id, val) { const el = $("#tag-" + id); if (!el) return; if (val == null) el.classList.add("hidden"); else { el.textContent = val; el.classList.remove("hidden"); } }
@@ -376,6 +388,12 @@ function stop() { if (timer) { clearInterval(timer); timer = null; } }
 async function render() {
   stop();
   document.querySelectorAll(".nav-btn[data-view]").forEach(b => b.classList.toggle("active", b.dataset.view === view));
+  if (view.startsWith("panel:")) {
+    const p = panels.find(x => x.id === view.slice(6));
+    $("#page-title").textContent = p ? p.title : "Extension";
+    try { loadbar(true); await drawPanel(view.slice(6)); setConn(true); } catch (e) { if (e.message !== "unauthorized") setConn(false); } finally { loadbar(false); }
+    return;
+  }
   const def = VIEWS[view];
   $("#page-title").textContent = def.title;
   try { loadbar(true); await def.draw(); setConn(true); } catch (e) { if (e.message !== "unauthorized") { setConn(false); } } finally { loadbar(false); }
@@ -623,6 +641,72 @@ async function drawSettings() {
 
 function emptyState(big, sub) { return `<div class="empty"><div class="big">${esc(big)}</div>${sub ? `<div>${esc(sub)}</div>` : ""}</div>`; }
 function go(v) { view = v; render(); }
+
+/* ---------- addon panels (sandboxed iframe) ---------- */
+const PANEL_VARS = ["--bg","--surface","--surface-2","--surface-3","--ink","--ink-2","--ink-3","--line","--line-strong","--accent","--accent-2","--accent-soft","--accent-ink","--good","--good-soft","--warn","--warn-soft","--bad","--bad-soft","--info","--info-soft","--radius","--radius-sm","--shadow","--mono"];
+function panelThemeCss() {
+  const cs = getComputedStyle(document.documentElement);
+  return ":root{" + PANEL_VARS.map(v => `${v}:${cs.getPropertyValue(v).trim()}`).join(";") + "}";
+}
+const PANEL_BASE_CSS = `
+*{box-sizing:border-box}
+body{margin:0;padding:22px 24px;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+h1,h2,h3{letter-spacing:-.01em} h2{font-size:15px;margin:0 0 12px}
+button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--radius-sm);padding:8px 11px;width:100%;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:18px;overflow:hidden}
+.card-head{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.card-head h2{margin:0} .card-head .sub{color:var(--ink-3);font-size:12.5px} .card-head .right{margin-left:auto;display:flex;gap:8px}
+.card-body{padding:16px 18px}
+table{width:100%;border-collapse:collapse} th,td{text-align:left;padding:10px 18px;white-space:nowrap}
+th{font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;font-weight:700;border-bottom:1px solid var(--line);background:var(--surface-2)}
+tbody tr:hover{background:var(--surface-2)} tbody tr+tr td{border-top:1px solid var(--line)}
+td{font-variant-numeric:tabular-nums} .muted{color:var(--ink-3)} .mono{font-family:var(--mono);font-size:12.5px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:var(--accent);color:var(--accent-ink);font-weight:600;border-radius:var(--radius-sm);font-size:13px;transition:filter .13s}
+.btn:hover{filter:brightness(1.08)} .btn.sm{padding:5px 10px;font-size:12px}
+.btn.subtle{background:var(--surface-2);color:var(--ink);border:1px solid var(--line-strong)} .btn.subtle:hover{filter:none;background:var(--surface-3)}
+.btn.danger{background:var(--bad-soft);color:var(--bad)} .btn.ghost{background:transparent;color:var(--ink-2)} .btn.ghost:hover{background:var(--surface-2);filter:none}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600}
+.badge.good{color:var(--good);background:var(--good-soft)} .badge.warn{color:var(--warn);background:var(--warn-soft)} .badge.bad{color:var(--bad);background:var(--bad-soft)} .badge.neutral{color:var(--ink-2);background:var(--surface-3)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap} .grid{display:grid;gap:12px} .grid.c2{grid-template-columns:1fr 1fr} .grid.c3{grid-template-columns:1fr 1fr 1fr}
+.field{display:flex;flex-direction:column;gap:5px} .field label{font-size:12px;color:var(--ink-2);font-weight:600}
+.empty{padding:34px;text-align:center;color:var(--ink-3)}
+.tag{font-size:11px;background:var(--surface-3);color:var(--ink-2);padding:1px 8px;border-radius:20px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--line);border-radius:20px;padding:3px 6px 3px 11px;font-size:12px;margin:2px}
+.chip button{color:var(--ink-3);width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:14px} .chip button:hover{background:var(--bad-soft);color:var(--bad)}
+::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:6px}
+`;
+const PANEL_RUNTIME = `<script>(function(){let seq=0;const pending={};
+window.addEventListener("message",function(ev){var m=ev.data||{};
+ if(m.type==="helix:result"){var p=pending[m.id];if(p){delete pending[m.id];m.ok?p.resolve(m.result):p.reject(new Error(m.error||"error"));}}
+ else if(m.type==="helix:theme"){var s=document.getElementById("helix-theme");if(s)s.textContent=m.css;}});
+window.Helix={
+ action:function(name){var args=[].slice.call(arguments,1).flat();return new Promise(function(res,rej){var id=++seq;pending[id]={resolve:res,reject:rej};parent.postMessage({type:"helix:action",id:id,action:name,args:args},"*");});},
+ toast:function(msg){parent.postMessage({type:"helix:toast",message:String(msg)},"*");},
+ ready:function(cb){document.readyState==="loading"?document.addEventListener("DOMContentLoaded",cb):cb();}
+};})();<\/script>`;
+let _panelBridge = false;
+function ensurePanelBridge() {
+  if (_panelBridge) return; _panelBridge = true;
+  window.addEventListener("message", async (ev) => {
+    const f = $("#panel-frame"); if (!f || ev.source !== f.contentWindow) return;
+    const m = ev.data || {};
+    if (m.type === "helix:action") {
+      try { const r = await api("/actions", { method: "POST", body: JSON.stringify({ action: m.action, arguments: (m.args || []).map(String) }) }); f.contentWindow.postMessage({ type: "helix:result", id: m.id, ok: true, result: r }, "*"); }
+      catch (e) { f.contentWindow.postMessage({ type: "helix:result", id: m.id, ok: false, error: e.message }, "*"); }
+    } else if (m.type === "helix:toast") { toast(m.message); }
+  });
+}
+async function drawPanel(id) {
+  ensurePanelBridge();
+  const panel = await api("/panels/" + id);
+  const srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8">`
+    + `<style id="helix-theme">${panelThemeCss()}</style><style>${PANEL_BASE_CSS}</style>${PANEL_RUNTIME}</head>`
+    + `<body>${panel.html}</body></html>`;
+  $("#view").innerHTML = `<iframe id="panel-frame" sandbox="allow-scripts" style="width:100%;height:calc(100vh - 120px);border:none;background:var(--bg);border-radius:var(--radius)"></iframe>`;
+  $("#panel-frame").srcdoc = srcdoc;
+}
 
 /* ---------- actions ---------- */
 async function svc(id, op) { try { await api(`/services/${id}/${op}`, { method: "POST" }); toast(`${op} ${id}`); if (view==='services') drawServices(); } catch (e) { toast(e.message); } }

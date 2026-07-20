@@ -14,8 +14,30 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionResult
+
+/**
+ * Bot configuration exposed to the dashboard with the token masked.
+ *
+ * @property channelId configured channel id.
+ * @property commandPrefix command prefix.
+ * @property notificationCategories forwarded notification categories.
+ * @property adminUserIds ids allowed to use `!run`.
+ * @property tokenSet whether a bot token is stored.
+ * @property connected whether the bot is currently connected.
+ */
+@Serializable
+data class DiscordPublicConfig(
+    val channelId: String,
+    val commandPrefix: String,
+    val notificationCategories: List<String>,
+    val adminUserIds: List<String>,
+    val tokenSet: Boolean,
+    val connected: Boolean,
+)
 
 /**
  * Discord bot addon built on Kord.
@@ -74,7 +96,52 @@ class DiscordBotAddon : AddonBase() {
             startBot()
             ActionResult.ok("reloaded — configured: ${config.configured()}")
         }
+        action("discord.config.get", "Exports the bot configuration as JSON (token masked).", "discord.config.get") {
+            val public = DiscordPublicConfig(
+                channelId = config.channelId,
+                commandPrefix = config.commandPrefix,
+                notificationCategories = config.notificationCategories,
+                adminUserIds = config.adminUserIds,
+                tokenSet = config.botToken.isNotBlank(),
+                connected = kordRef.get() != null,
+            )
+            ActionResult.ok(Json.encodeToString(public))
+        }
+        action(
+            "discord.config.set",
+            "Updates the bot config and reconnects. Keys: token, channel, prefix, categories, admins.",
+            "discord.config.set <key=value>...",
+        ) { invocation -> updateConfig(invocation) }
+        panel(
+            "discord",
+            "Discord",
+            "/panel.html",
+            "<path d=\"M8 12a1 1 0 100-2 1 1 0 000 2zM16 12a1 1 0 100-2 1 1 0 000 2z\"/>" +
+                "<path d=\"M7 5.5A16 16 0 0117 5.5C19 9 19.5 13 19 17a13 13 0 01-4 2l-1-2M9 17l-1 2a13 13 0 01-4-2c-.5-4 0-8 2-11.5\"/>",
+        )
         startBot()
+    }
+
+    private fun updateConfig(invocation: org.helix.api.action.ActionInvocation): ActionResult {
+        val overrides = invocation.arguments.mapNotNull { arg ->
+            val parts = arg.split("=", limit = 2)
+            if (parts.size == 2) parts[0].lowercase() to parts[1] else null
+        }.toMap()
+        /** Parses a comma-separated override into a clean list, or null. */
+        fun list(key: String) = overrides[key]?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() }
+        val current = DiscordConfig.load(configFile())
+        val updated = current.copy(
+            botToken = overrides["token"]?.takeIf { it.isNotBlank() } ?: current.botToken,
+            channelId = overrides["channel"] ?: current.channelId,
+            commandPrefix = overrides["prefix"] ?: current.commandPrefix,
+            notificationCategories = list("categories") ?: current.notificationCategories,
+            adminUserIds = list("admins") ?: current.adminUserIds,
+        )
+        DiscordConfig.save(configFile(), updated)
+        stopBot()
+        config = updated
+        startBot()
+        return ActionResult.ok("configuration saved — configured: ${updated.configured()}")
     }
 
     /**

@@ -57,6 +57,15 @@ class BansAddon : AddonBase() {
                 ?.let { ActionResult.ok(describe(it)) }
                 ?: ActionResult.ok("$player is not banned")
         }
+        action("ban.export", "Exports all active bans as JSON (used by the dashboard).", "ban.export") {
+            ActionResult.ok(kotlinx.serialization.json.Json.encodeToString(store.all()))
+        }
+        panel(
+            "bans",
+            "Bans",
+            "/panel.html",
+            "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M5.6 5.6l12.8 12.8\"/>",
+        )
     }
 
     private fun setBan(invocation: ActionInvocation): ActionResult {
