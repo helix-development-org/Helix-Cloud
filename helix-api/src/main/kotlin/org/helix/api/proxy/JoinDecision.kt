@@ -19,6 +19,7 @@ data class JoinDecision(
          *
          * @return an allowing [JoinDecision].
          */
+        @JvmStatic
         fun allow(): JoinDecision = JoinDecision(allowed = true)
 
         /**
@@ -27,6 +28,7 @@ data class JoinDecision(
          * @param message denial message shown to the player.
          * @return a denying [JoinDecision].
          */
+        @JvmStatic
         fun deny(message: String): JoinDecision = JoinDecision(allowed = false, message = message)
     }
 }

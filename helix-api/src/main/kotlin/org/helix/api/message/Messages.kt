@@ -22,6 +22,16 @@ interface Messages {
     fun format(key: String, vararg params: Pair<String, String>): String
 
     /**
+     * Formats a message from a parameter map — the Java-friendly overload.
+     *
+     * @param key message key.
+     * @param params placeholder name to value.
+     * @return the formatted message, or the key itself if unknown.
+     */
+    fun format(key: String, params: Map<String, String>): String =
+        applyPlaceholders(raw(key), params.entries.map { it.key to it.value }.toTypedArray())
+
+    /**
      * Returns the raw template without substitution.
      *
      * @param key message key.

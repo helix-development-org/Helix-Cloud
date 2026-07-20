@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
  * @property source where the invocation originated.
  */
 @Serializable
-data class ActionInvocation(
+data class ActionInvocation @JvmOverloads constructor(
     val action: String,
     val arguments: List<String> = emptyList(),
     val source: ActionSource = ActionSource.SYSTEM,

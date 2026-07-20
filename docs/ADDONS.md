@@ -139,6 +139,28 @@ val packageHxa by tasks.registering(Zip::class) {
 }
 ```
 
+## Java-Addons
+
+Die komplette Addon-API ist auch aus reinem Java nutzbar (kein Kotlin
+nötig). Factory-Methoden sind `@JvmStatic` (`ActionResult.ok(...)`,
+`JoinDecision.deny(...)`), Konstruktoren mit Defaults sind
+`@JvmOverloads` (z.B. `new ActionDescriptor(name, desc, usage)`),
+Handler sind SAM-Interfaces (Java-Lambdas), und `Messages.format` hat
+eine `Map`-Überladung.
+
+```java
+public class MyAddon implements HelixAddon {
+    @Override public void onEnable(AddonContext ctx) {
+        Messages msg = ctx.messages(java.util.Map.of("greet", "&aHi {name}!"));
+        ctx.registerAction(
+            new ActionDescriptor("my.greet", "Greets", "my.greet <name>"),
+            inv -> ActionResult.ok(msg.format("greet",
+                java.util.Map.of("name", inv.getArguments().get(0))))
+        );
+    }
+}
+```
+
 Referenz-Implementierungen in diesem Repo:
 
 - `helix-addon-example` — minimales Addon (Actions, Action-Aufrufe)

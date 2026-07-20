@@ -24,6 +24,7 @@ data class ProxyCommand(
          * @param reason message shown to the kicked player.
          * @return the kick [ProxyCommand].
          */
+        @JvmStatic
         fun kick(player: String, reason: String?): ProxyCommand =
             ProxyCommand(type = "kick", player = player, reason = reason)
 

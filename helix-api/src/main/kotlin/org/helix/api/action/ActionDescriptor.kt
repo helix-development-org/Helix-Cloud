@@ -17,7 +17,7 @@ import kotlinx.serialization.Serializable
  *   player command; `null` means everyone.
  */
 @Serializable
-data class ActionDescriptor(
+data class ActionDescriptor @JvmOverloads constructor(
     val name: String,
     val description: String,
     val usage: String,

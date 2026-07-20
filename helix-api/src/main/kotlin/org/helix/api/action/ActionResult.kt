@@ -20,6 +20,7 @@ data class ActionResult(
          * @param lines output lines shown to the caller.
          * @return a successful [ActionResult].
          */
+        @JvmStatic
         fun ok(vararg lines: String): ActionResult = ActionResult(success = true, lines = lines.toList())
 
         /**
@@ -28,6 +29,7 @@ data class ActionResult(
          * @param lines error lines shown to the caller.
          * @return a failed [ActionResult].
          */
+        @JvmStatic
         fun error(vararg lines: String): ActionResult = ActionResult(success = false, lines = lines.toList())
     }
 }
