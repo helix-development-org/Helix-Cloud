@@ -1,5 +1,21 @@
 # Changelog
 
+> Versionierung: Helix-Cloud ist noch in der Pre-1.0-Entwicklung. Die
+> frühere `1.x`-Zählung war verfrüht und wurde auf `0.x` umgestellt
+> (Meilensteine `v1.0.0`…`v1.9.0` → `v0.1.0`…`v0.10.0`). `1.0.0` kommt,
+> wenn die Plattform wirklich stabil und feature-complete ist.
+
+## 0.11.0 — 2026-07-20
+
+### Addon-API vollständig aus Java nutzbar
+- Factory-Methoden sind `@JvmStatic` (`ActionResult.ok/error`,
+  `JoinDecision.allow/deny`, `ProxyCommand.kick`), Konstruktoren mit
+  Defaults `@JvmOverloads` (`ActionDescriptor`, `ActionInvocation`), und
+  `Messages.format` hat eine `Map`-Überladung. Handler waren als
+  SAM-Interfaces bereits als Java-Lambdas nutzbar.
+- Verifiziert durch ein reines Java-`.hxa`, das in der Node lädt und
+  dessen Action läuft.
+
 ## 0.10.0 — 2026-07-20
 
 ### Konfigurierbare Addon-Nachrichten
