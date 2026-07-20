@@ -39,4 +39,20 @@ class BridgeValueStore {
      * @return key to value map.
      */
     fun all(): Map<String, String> = values.toMap()
+
+    /**
+     * Snapshot filtered to values whose owning addon passes [ownerActive].
+     *
+     * Used to hide values of addons that are disabled for a given task.
+     *
+     * @param ownerActive predicate deciding whether an owner's values show.
+     * @return key to value map for allowed owners only.
+     */
+    fun all(ownerActive: (owner: String) -> Boolean): Map<String, String> {
+        val allowedKeys = owners.entries
+            .filter { ownerActive(it.key) }
+            .flatMap { it.value }
+            .toSet()
+        return values.filterKeys { it in allowedKeys }
+    }
 }

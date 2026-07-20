@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.15.0 — 2026-07-20
+
+### Task-Konfiguration & Pro-Task-Addons im Dashboard
+- Jeder Task hat eine eigene Detailseite (aus der Tasks-Liste geöffnet):
+  vollständige Konfiguration bearbeiten (Version, Executor, Kind, Min/Max,
+  Speicher, Ports, Autoscale, Templates, JVM-Args) und speichern.
+- **Pro-Task-Addon-Aktivierung**: pro Task lassen sich Addons einzeln an-/
+  abschalten (`TaskDefinition.disabledAddons`), verwaltet über Toggles auf
+  der Task-Seite.
+- Service-spezifische Addon-Effekte respektieren das: Bridge-Values
+  (`chat.format`, `tablist.*` …) werden pro Service nach dem Task gefiltert
+  (`/internal/bridge-values?serviceId=…`), und Addons können
+  `context.isActiveForTask(task)` abfragen. Netzwerkweite Addons bleiben
+  global. Verifiziert: Task mit deaktiviertem Chat-Addon erhält kein
+  Chat-Format, Tablist bleibt.
+
 > Versionierung: Helix-Cloud ist noch in der Pre-1.0-Entwicklung. Die
 > frühere `1.x`-Zählung war verfrüht und wurde auf `0.x` umgestellt
 > (Meilensteine `v1.0.0`…`v1.9.0` → `v0.1.0`…`v0.10.0`). `1.0.0` kommt,

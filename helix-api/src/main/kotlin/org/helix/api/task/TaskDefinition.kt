@@ -29,6 +29,8 @@ import org.helix.api.execution.ExecutorType
  *   as proxy fallback/lobby targets.
  * @property maintenance whether services of this task reject regular joins.
  * @property autoScale player-based scaling behaviour.
+ * @property disabledAddons addon ids turned off for this task; every other
+ *   installed addon is active. Empty means all addons are active.
  */
 @Serializable
 data class TaskDefinition(
@@ -47,7 +49,16 @@ data class TaskDefinition(
     val fallbackEligible: Boolean = false,
     val maintenance: Boolean = false,
     val autoScale: AutoScaleSettings = AutoScaleSettings(),
+    val disabledAddons: List<String> = emptyList(),
 ) {
+    /**
+     * Whether an addon is active for this task.
+     *
+     * @param addonId the addon id.
+     * @return `true` unless the addon is explicitly disabled here.
+     */
+    fun isAddonActive(addonId: String): Boolean = addonId !in disabledAddons
+
     init {
         require(name.isNotBlank()) { "task name must not be blank" }
         require(name.all { it.isLetterOrDigit() || it == '-' || it == '_' }) {

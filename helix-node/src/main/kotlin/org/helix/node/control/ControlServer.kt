@@ -351,7 +351,14 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
         call.respond(dependencies.displayResolvers.resolve(request.name))
     }
     get("/internal/bridge-values") {
-        call.respond(dependencies.bridgeValues.all())
+        val serviceId = call.request.queryParameters["serviceId"]
+        val task = serviceId?.let { dependencies.manager.find(it)?.task }
+        val values = if (task == null) {
+            dependencies.bridgeValues.all()
+        } else {
+            dependencies.bridgeValues.all { owner -> task.isAddonActive(owner) }
+        }
+        call.respond(values)
     }
 }
 

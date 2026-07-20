@@ -395,6 +395,12 @@ async function render() {
     try { loadbar(true); await drawPanel(view.slice(6)); setConn(true); } catch (e) { if (e.message !== "unauthorized") setConn(false); } finally { loadbar(false); }
     return;
   }
+  if (view.startsWith("task:")) {
+    const name = view.slice(5);
+    $("#page-title").textContent = "Task · " + name;
+    try { loadbar(true); await drawTaskDetail(name); setConn(true); } catch (e) { if (e.message !== "unauthorized") setConn(false); } finally { loadbar(false); }
+    return;
+  }
   const def = VIEWS[view];
   $("#page-title").textContent = def.title;
   try { loadbar(true); await def.draw(); setConn(true); } catch (e) { if (e.message !== "unauthorized") { setConn(false); } } finally { loadbar(false); }
@@ -486,7 +492,7 @@ async function drawTasks() {
   $("#view").innerHTML = `<div class="card">
     <div class="card-head"><h2>Tasks</h2><div class="head-actions"><button class="btn sm" onclick="taskModal()">${svg('<path d="M12 5v14M5 12h14"/>','ico')} New task</button></div></div>
     <div class="table-wrap">${tasks.length ? `<table><thead><tr><th>Name</th><th>Platform</th><th>Executor</th><th>Kind</th><th>Services</th><th>Memory</th><th>Autoscale</th><th></th></tr></thead><tbody>${
-      tasks.map(t => `<tr>
+      tasks.map(t => `<tr style="cursor:pointer" onclick="go('task:${esc(t.name)}')">
         <td><strong>${esc(t.name)}</strong></td>
         <td>${esc(t.environment)} <span class="muted">${esc(t.version)}</span></td>
         <td><span class="muted">${esc(t.executor)}</span></td>
@@ -494,11 +500,94 @@ async function drawTasks() {
         <td class="mono">${t.minServiceCount}–${t.maxServiceCount}</td>
         <td class="mono">${t.memoryMb} MB</td>
         <td>${t.autoScale.enabled ? '<span class="badge b-enabled">on</span>' : '<span class="badge b-disabled">off</span>'}</td>
-        <td><div class="row-actions">
+        <td onclick="event.stopPropagation()"><div class="row-actions">
+          <button class="btn sm subtle" onclick="go('task:${esc(t.name)}')">Configure</button>
           <button class="btn sm subtle" onclick="startSvc('${esc(t.name)}')">Deploy</button>
           <button class="btn sm danger" onclick="delTask('${esc(t.name)}')">Delete</button></div></td>
       </tr>`).join("")
     }</tbody></table>` : emptyState("No tasks yet", "Create a task blueprint to deploy services")}</div></div>`;
+}
+
+async function drawTaskDetail(name) {
+  const [task, addons, services] = await Promise.all([
+    api("/tasks/" + name), api("/addons"), api("/services"),
+  ]);
+  const own = services.filter(s => s.taskName === name);
+  const num = (id, v, min) => `<input id="${id}" type="number" value="${v}" ${min != null ? `min="${min}"` : ""}>`;
+  const sel = (id, opts, cur) => `<select id="${id}">${opts.map(o => `<option ${o === cur ? "selected" : ""}>${o}</option>`).join("")}</select>`;
+  const disabled = new Set(task.disabledAddons || []);
+  $("#view").innerHTML = `
+    <div class="page-head">
+      <div><button class="btn sm ghost" onclick="go('tasks')">${svg('<path d="M15 18l-6-6 6-6"/>','ico')} Tasks</button></div>
+      <div class="head-actions">
+        <button class="btn subtle" onclick="startSvc('${esc(name)}')">Deploy service</button>
+        <button class="btn danger" onclick="delTask('${esc(name)}')">Delete task</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>${esc(name)}</h2><div class="sub">${esc(task.environment)} · ${esc(task.version)} · ${own.length} service(s)</div></div>
+      <div class="card-body">
+        <div class="form-grid">
+          <div class="field"><label>Version</label><input id="t-version" value="${esc(task.version)}"></div>
+          <div class="field"><label>Executor</label>${sel("t-exec", ["PROCESS","DOCKER"], task.executor)}</div>
+          <div class="field"><label>Kind</label>${sel("t-static", ["dynamic","static"], task.staticServices ? "static" : "dynamic")}</div>
+          <div class="field"><label>Start port</label>${num("t-port", task.startPort)}</div>
+          <div class="field"><label>Min services</label>${num("t-min", task.minServiceCount, 0)}</div>
+          <div class="field"><label>Max services</label>${num("t-max", task.maxServiceCount, 1)}</div>
+          <div class="field"><label>Memory (MB)</label>${num("t-mem", task.memoryMb, 128)}</div>
+          <div class="field"><label>Max players</label>${num("t-players", task.maxPlayers, 1)}</div>
+          <div class="field"><label>Fallback eligible</label>${sel("t-fallback", ["false","true"], String(task.fallbackEligible))}</div>
+          <div class="field"><label>Maintenance</label>${sel("t-maint", ["false","true"], String(task.maintenance))}</div>
+          <div class="field"><label>Autoscale</label>${sel("t-scale", ["false","true"], String(task.autoScale.enabled))}</div>
+          <div class="field"><label>Scale threshold</label><input id="t-thr" type="number" step="0.05" value="${task.autoScale.playerRatioThreshold}"></div>
+          <div class="field"><label>Idle stop (s)</label>${num("t-idle", task.autoScale.idleStopSeconds, 0)}</div>
+          <div class="field wide"><label>Templates (comma)</label><input id="t-templates" value="${esc((task.templates||[]).join(", "))}"></div>
+          <div class="field wide"><label>JVM args (space)</label><input id="t-jvm" class="mono" value="${esc((task.jvmArgs||[]).join(" "))}"></div>
+        </div>
+        <div class="row" style="margin-top:16px"><button class="btn" id="t-save">Save configuration</button></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Addons</h2><div class="sub">which addons are active for this task</div></div>
+      <div class="table-wrap">${addons.length ? `<table><thead><tr><th>Addon</th><th>State</th><th style="text-align:right">Active here</th></tr></thead><tbody>${
+        addons.map(a => {
+          const id = a.manifest.id;
+          const on = !disabled.has(id);
+          return `<tr>
+            <td><strong>${esc(a.manifest.name)}</strong> <span class="muted mono" style="font-size:11px">${esc(id)}</span></td>
+            <td>${a.state === "ENABLED" ? '<span class="badge b-enabled">loaded</span>' : '<span class="badge b-disabled">'+esc(a.state.toLowerCase())+'</span>'}</td>
+            <td style="text-align:right"><label class="switch" style="justify-content:flex-end"><input type="checkbox" class="addon-tog" data-id="${esc(id)}" ${on ? "checked" : ""}><span class="track"></span></label></td>
+          </tr>`;
+        }).join("")
+      }</tbody></table>` : emptyState("No addons installed")}</div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Services</h2></div>
+      <div class="table-wrap">${own.length ? servicesTable(own, true) : emptyState("No services of this task")}</div>
+    </div>`;
+  $("#t-save").onclick = async () => {
+    const disabledAddons = [...document.querySelectorAll(".addon-tog")].filter(c => !c.checked).map(c => c.dataset.id);
+    const body = {
+      name,
+      environment: task.environment,
+      version: $("#t-version").value.trim() || task.version,
+      executor: $("#t-exec").value,
+      staticServices: $("#t-static").value === "static",
+      minServiceCount: +$("#t-min").value,
+      maxServiceCount: +$("#t-max").value,
+      memoryMb: +$("#t-mem").value,
+      maxPlayers: +$("#t-players").value,
+      startPort: +$("#t-port").value,
+      jvmArgs: $("#t-jvm").value.split(/\s+/).filter(Boolean),
+      templates: $("#t-templates").value.split(",").map(s => s.trim()).filter(Boolean),
+      fallbackEligible: $("#t-fallback").value === "true",
+      maintenance: $("#t-maint").value === "true",
+      autoScale: { enabled: $("#t-scale").value === "true", playerRatioThreshold: +$("#t-thr").value, idleStopSeconds: +$("#t-idle").value },
+      disabledAddons,
+    };
+    try { await api("/tasks/" + name, { method: "PUT", body: JSON.stringify(body) }); toast("Task saved"); drawTaskDetail(name); }
+    catch (e) { toast(e.message); }
+  };
 }
 
 async function drawProxy() {
@@ -743,7 +832,7 @@ async function drawPanel(id) {
 /* ---------- actions ---------- */
 async function svc(id, op) { try { await api(`/services/${id}/${op}`, { method: "POST" }); toast(`${op} ${id}`); if (view==='services') drawServices(); } catch (e) { toast(e.message); } }
 async function startSvc(task) { try { const i = await api(`/tasks/${task}/services`, { method: "POST" }); toast("Deployed " + i.id); go("services"); } catch (e) { toast(e.message); } }
-async function delTask(name) { if (!confirm(`Delete task ${name}?`)) return; try { await api(`/tasks/${name}`, { method: "DELETE" }); toast("Deleted " + name); drawTasks(); } catch (e) { toast(e.message); } }
+async function delTask(name) { if (!confirm(`Delete task ${name}?`)) return; try { await api(`/tasks/${name}`, { method: "DELETE" }); toast("Deleted " + name); go("tasks"); } catch (e) { toast(e.message); } }
 async function addon(id, op) { try { await api(`/addons/${id}/${op}`, { method: "POST" }); toast(`${op}d ${id}`); drawAddons(); } catch (e) { toast(e.message); } }
 function copyToken() { navigator.clipboard?.writeText(token); toast("Token copied"); }
 

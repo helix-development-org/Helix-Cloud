@@ -140,6 +140,18 @@ interface AddonContext {
     }
 
     /**
+     * Whether this addon is active for the given task.
+     *
+     * Tasks can turn addons off individually; addons with per-service
+     * behaviour should consult this for the task of the service/player they
+     * act on. Network-wide addons may ignore it.
+     *
+     * @param taskName the task name.
+     * @return `true` unless the addon is disabled for that task.
+     */
+    fun isActiveForTask(taskName: String): Boolean = true
+
+    /**
      * Declares the addon's configurable message templates.
      *
      * The defaults seed `data/<addon>/messages.json` on first use (missing

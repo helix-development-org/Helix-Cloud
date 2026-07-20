@@ -75,6 +75,7 @@ version = "3.4.0"
 | `templates` | `["default"]` | Ordner unter `templates/`, in den Workspace kopiert |
 | `fallbackEligible` | `false` | Backend darf Proxy-Fallback/Lobby sein |
 | `maintenance` | `false` | Services dieses Tasks lehnen Joins ab |
+| `disabledAddons` | `[]` | Addon-Ids, die für diesen Task **aus** sind; alle anderen sind aktiv |
 
 ```toml
 [autoScale]

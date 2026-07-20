@@ -59,6 +59,7 @@ import org.slf4j.LoggerFactory
  * @property dashboardPanels dashboard pages contributed by addons.
  * @property messages configurable message bundles of addons.
  * @property storageProvider backend for addon document storage.
+ * @property taskAddonActive whether an addon is active for a task.
  */
 class AddonManager(
     private val directory: Path,
@@ -72,6 +73,7 @@ class AddonManager(
     private val dashboardPanels: DashboardPanelRegistry = DashboardPanelRegistry(),
     private val messages: MessageRegistry = MessageRegistry(),
     private val storageProvider: StorageProvider = JsonStorageProvider(),
+    private val taskAddonActive: (taskName: String, addonId: String) -> Boolean = { _, _ -> true },
 ) {
     private val logger = LoggerFactory.getLogger(AddonManager::class.java)
     private val json = Json { ignoreUnknownKeys = true }
@@ -272,6 +274,9 @@ class AddonManager(
 
         override fun storage(): AddonStorage =
             storageProvider.forAddon(record.manifest.id, dataDirectory)
+
+        override fun isActiveForTask(taskName: String): Boolean =
+            taskAddonActive(taskName, record.manifest.id)
 
         override fun registerAction(descriptor: ActionDescriptor, handler: ActionHandler) {
             registry.register(descriptor, handler)

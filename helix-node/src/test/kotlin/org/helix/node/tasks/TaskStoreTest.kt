@@ -28,6 +28,7 @@ class TaskStoreTest {
         templates = listOf("default", "lobby"),
         fallbackEligible = true,
         autoScale = AutoScaleSettings(enabled = true, playerRatioThreshold = 0.75, idleStopSeconds = 120),
+        disabledAddons = listOf("helix.chat", "helix.tablist"),
     )
 
     @Test

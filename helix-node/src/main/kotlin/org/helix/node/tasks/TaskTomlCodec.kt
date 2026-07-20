@@ -47,6 +47,8 @@ object TaskTomlCodec {
                 ?: defaults.templates,
             fallbackEligible = toml.getBoolean("fallbackEligible") ?: defaults.fallbackEligible,
             maintenance = toml.getBoolean("maintenance") ?: defaults.maintenance,
+            disabledAddons = toml.getArray("disabledAddons")?.toList()?.map { it.toString() }
+                ?: defaults.disabledAddons,
             autoScale = AutoScaleSettings(
                 enabled = toml.getBoolean("autoScale.enabled") ?: false,
                 playerRatioThreshold = toml.getDouble("autoScale.playerRatioThreshold") ?: 0.8,
@@ -76,6 +78,7 @@ object TaskTomlCodec {
         appendLine("templates = [${task.templates.joinToString { it.tomlQuoted() }}]")
         appendLine("fallbackEligible = ${task.fallbackEligible}")
         appendLine("maintenance = ${task.maintenance}")
+        appendLine("disabledAddons = [${task.disabledAddons.joinToString { it.tomlQuoted() }}]")
         appendLine()
         appendLine("[autoScale]")
         appendLine("enabled = ${task.autoScale.enabled}")

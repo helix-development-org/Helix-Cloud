@@ -268,6 +268,26 @@ class ControlServerTest {
     }
 
     @Test
+    fun `bridge values are filtered by the service's task addons`() = testApplication {
+        val client = apiClient()
+        dependencies.bridgeValues.publish("helix.chat", "chat.format", "{message}")
+        dependencies.bridgeValues.publish("helix.tablist", "tablist.header", "hi")
+        client.put("/api/v1/tasks/Lobby") {
+            bearerAuth("secret"); contentType(ContentType.Application.Json)
+            setBody(lobby.copy(disabledAddons = listOf("helix.chat")))
+        }
+        client.post("/api/v1/tasks/Lobby/services") { bearerAuth("secret") }
+
+        val all: Map<String, String> = client.get("/api/v1/internal/bridge-values") { bearerAuth("secret") }.body()
+        assertTrue(all.containsKey("chat.format") && all.containsKey("tablist.header"))
+
+        val scoped: Map<String, String> =
+            client.get("/api/v1/internal/bridge-values?serviceId=Lobby-1") { bearerAuth("secret") }.body()
+        assertTrue(scoped.containsKey("tablist.header"))
+        assertTrue(!scoped.containsKey("chat.format"))
+    }
+
+    @Test
     fun `dashboard is served without authentication`() = testApplication {
         val client = apiClient()
 

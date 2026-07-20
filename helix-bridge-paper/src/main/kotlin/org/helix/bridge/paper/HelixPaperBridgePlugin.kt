@@ -109,7 +109,7 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
 
     private fun pulse(settings: BridgeSettings, client: NodeHttpClient) {
         sendHeartbeat(settings, client)
-        syncBridgeValues(client)
+        syncBridgeValues(settings, client)
         applyTablist()
         if (pollCounter++ % DISPLAY_REFRESH_CYCLES == 0) {
             server.onlinePlayers.forEach { player -> refreshDisplay(client, player.name) }
@@ -127,9 +127,9 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
             .onFailure { logger.warning("Helix heartbeat failed: ${it.message}") }
     }
 
-    private fun syncBridgeValues(client: NodeHttpClient) {
+    private fun syncBridgeValues(settings: BridgeSettings, client: NodeHttpClient) {
         runCatching {
-            client.getJson("/api/v1/internal/bridge-values")?.let { body ->
+            client.getJson("/api/v1/internal/bridge-values?serviceId=${settings.serviceId}")?.let { body ->
                 bridgeValues = json.decodeFromString<Map<String, String>>(body)
             }
         }.onFailure { logger.warning("Helix bridge value sync failed: ${it.message}") }

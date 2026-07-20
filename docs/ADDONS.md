@@ -232,6 +232,21 @@ val store = MyStore(context.storage())
 `AddonStorage` bietet `read(key)`, `write(key, value)`, `delete(key)` und
 `keys()`. Für Tests gibt es `InMemoryAddonStorage`.
 
+## Pro-Task-Aktivierung
+
+Jeder Task kann Addons einzeln abschalten (`disabledAddons` im Task,
+editierbar über die Task-Detailseite im Dashboard). Addons mit
+service-spezifischem Verhalten sollten das respektieren:
+
+- `context.isActiveForTask(taskName)` — ob dieses Addon für den Task aktiv
+  ist.
+- Bridge-Values (`chat.format`, `tablist.header` …) werden automatisch pro
+  Service gefiltert: ein Service bekommt nur Werte von Addons, die für
+  seinen Task aktiv sind. Ein Task mit `disabledAddons = ["helix.chat"]`
+  bekommt also kein Chat-Format, während der Rest normal läuft.
+
+Netzwerkweite Addons (z.B. Bans) ignorieren die Task-Aktivierung.
+
 ## Konfigurierbare Nachrichten
 
 Alle player-facing Texte eines Addons sollen einstellbar sein. Dafür

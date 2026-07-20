@@ -141,6 +141,9 @@ class HelixNode(
         dashboardPanels,
         messages,
         storageProvider,
+        taskAddonActive = { taskName, addonId ->
+            taskStore.find(taskName)?.isAddonActive(addonId) ?: true
+        },
     )
 
     private val overviewService = PlatformOverviewService(version(), taskStore, manager)
