@@ -32,10 +32,17 @@ import org.helix.api.player.PlayerEvent
 import org.helix.api.proxy.JoinRequest
 import org.helix.api.proxy.PermissionCheckRequest
 import org.helix.api.proxy.PermissionDecision
+import org.helix.api.proxy.ProxyPoll
 import org.helix.api.service.ServiceState
 import org.helix.api.task.TaskDefinition
 import org.helix.node.config.NodeConfig
 import org.slf4j.LoggerFactory
+
+/** Maximum time a proxy long-poll is held open before returning empty. */
+private const val POLL_TIMEOUT_MS = 25_000L
+
+/** Longest single wait between re-checks inside a long-poll. */
+private const val POLL_RECHECK_MS = 1_000L
 
 /**
  * Installs the complete control API and the dashboard.
@@ -169,6 +176,7 @@ private fun io.ktor.server.routing.Route.proxyRoutes(dependencies: ControlDepend
     post("/proxy/maintenance") {
         val request = call.receive<MaintenanceRequest>()
         dependencies.routing.maintenance = request.enabled
+        dependencies.proxyEvents.bumpRouting()
         dependencies.eventLog.record(
             "proxy",
             if (request.enabled) "Maintenance enabled" else "Maintenance disabled",
@@ -297,6 +305,24 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
     get("/internal/commands") {
         val proxyServiceId = call.request.queryParameters["proxyServiceId"].orEmpty()
         call.respond(dependencies.commandQueue.drain(proxyServiceId))
+    }
+    get("/internal/poll") {
+        val proxyServiceId = call.request.queryParameters["proxyServiceId"].orEmpty()
+        val seenRouting = call.request.queryParameters["routingVersion"]?.toIntOrNull() ?: -1
+        val seenCatalog = call.request.queryParameters["commandCatalogVersion"]?.toIntOrNull() ?: -1
+        val hub = dependencies.proxyEvents
+        val deadline = System.currentTimeMillis() + POLL_TIMEOUT_MS
+        while (true) {
+            val commands = dependencies.commandQueue.drain(proxyServiceId)
+            val routing = hub.routingVersion.get()
+            val catalog = hub.commandCatalogVersion.get()
+            val changed = commands.isNotEmpty() || routing != seenRouting || catalog != seenCatalog
+            if (changed || System.currentTimeMillis() >= deadline) {
+                call.respond(ProxyPoll(commands, routing, catalog))
+                break
+            }
+            hub.await((deadline - System.currentTimeMillis()).coerceIn(1, POLL_RECHECK_MS))
+        }
     }
     post("/internal/permission-check") {
         val request = call.receive<PermissionCheckRequest>()

@@ -28,6 +28,7 @@ import org.helix.api.proxy.JoinRequest
 import org.helix.api.proxy.PermissionCheckRequest
 import org.helix.api.proxy.PermissionDecision
 import org.helix.api.proxy.ProxyCommand
+import org.helix.api.proxy.ProxyPoll
 import org.helix.api.proxy.RoutingSnapshot
 import org.slf4j.Logger
 
@@ -49,7 +50,11 @@ class HelixVelocityBridgePlugin @Inject constructor(
     private var settings: BridgeSettings? = null
     private var client: NodeHttpClient? = null
     private var registry: BackendRegistry? = null
-    private var syncTask: ScheduledTask? = null
+    private var heartbeatTask: ScheduledTask? = null
+
+    @Volatile
+    private var polling = false
+    private var pollThread: Thread? = null
 
     /**
      * Boots the bridge after the proxy initialized.
@@ -69,23 +74,69 @@ class HelixVelocityBridgePlugin @Inject constructor(
         val backendRegistry = BackendRegistry(proxy, logger)
         registry = backendRegistry
         ProxyCommands(proxy, backendRegistry).register(this)
-        syncTask = proxy.scheduler
-            .buildTask(this, Runnable { sync(loaded, httpClient, backendRegistry) })
+        // Heartbeat is the only periodic task; everything else (commands,
+        // routing, player-command registration) is delivered instantly via
+        // a long-poll the node answers the moment something changes.
+        heartbeatTask = proxy.scheduler
+            .buildTask(this, Runnable { sendHeartbeat(loaded, httpClient) })
             .delay(Duration.ofSeconds(1))
             .repeat(Duration.ofSeconds(5))
             .schedule()
+        startPollLoop(loaded, httpClient, backendRegistry)
         logger.info("Helix bridge enabled for {} → {}", loaded.serviceId, loaded.controlUrl)
     }
 
     /**
-     * Stops the sync scheduler.
+     * Stops the heartbeat task and the poll loop.
      *
      * @param event the shutdown event.
      */
     @Subscribe
     fun onProxyShutdown(event: ProxyShutdownEvent) {
-        syncTask?.cancel()
-        syncTask = null
+        heartbeatTask?.cancel()
+        heartbeatTask = null
+        polling = false
+        pollThread?.interrupt()
+        pollThread = null
+    }
+
+    private fun startPollLoop(settings: BridgeSettings, client: NodeHttpClient, registry: BackendRegistry) {
+        polling = true
+        pollThread = Thread {
+            var routingVersion = -1
+            var catalogVersion = -1
+            while (polling) {
+                try {
+                    val body = client.getJsonLong(
+                        "/api/v1/internal/poll?proxyServiceId=${settings.serviceId}" +
+                            "&routingVersion=$routingVersion&commandCatalogVersion=$catalogVersion",
+                    )
+                    if (body == null) {
+                        Thread.sleep(RECONNECT_DELAY_MS)
+                        continue
+                    }
+                    val poll = json.decodeFromString<ProxyPoll>(body)
+                    poll.commands.forEach(::executeCommand)
+                    if (poll.routingVersion != routingVersion) {
+                        syncRouting(settings, client, registry)
+                        routingVersion = poll.routingVersion
+                    }
+                    if (poll.commandCatalogVersion != catalogVersion) {
+                        syncPlayerCommands(settings, client)
+                        catalogVersion = poll.commandCatalogVersion
+                    }
+                } catch (interrupt: InterruptedException) {
+                    return@Thread
+                } catch (failure: Exception) {
+                    logger.warn("Helix poll failed, retrying: {}", failure.message)
+                    runCatching { Thread.sleep(RECONNECT_DELAY_MS) }
+                }
+            }
+        }.apply {
+            name = "helix-poll-${settings.serviceId}"
+            isDaemon = true
+            start()
+        }
     }
 
     /**
@@ -210,7 +261,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
         }
     }
 
-    private fun sync(settings: BridgeSettings, client: NodeHttpClient, registry: BackendRegistry) {
+    private fun sendHeartbeat(settings: BridgeSettings, client: NodeHttpClient) {
         runCatching {
             val report = HeartbeatReport(
                 serviceId = settings.serviceId,
@@ -219,6 +270,9 @@ class HelixVelocityBridgePlugin @Inject constructor(
             )
             client.postJson("/api/v1/internal/heartbeat", json.encodeToString(report))
         }.onFailure { logger.warn("Helix heartbeat failed: {}", it.message) }
+    }
+
+    private fun syncRouting(settings: BridgeSettings, client: NodeHttpClient, registry: BackendRegistry) {
         runCatching {
             val body = client.getJson("/api/v1/internal/routing?proxyServiceId=${settings.serviceId}")
                 ?: return@runCatching
@@ -226,11 +280,9 @@ class HelixVelocityBridgePlugin @Inject constructor(
             registry.sync(snapshot)
             maintenance.set(snapshot.maintenance)
         }.onFailure { logger.warn("Helix routing sync failed: {}", it.message) }
-        runCatching {
-            val body = client.getJson("/api/v1/internal/commands?proxyServiceId=${settings.serviceId}")
-                ?: return@runCatching
-            json.decodeFromString<List<ProxyCommand>>(body).forEach(::executeCommand)
-        }.onFailure { logger.warn("Helix command poll failed: {}", it.message) }
+    }
+
+    private fun syncPlayerCommands(settings: BridgeSettings, client: NodeHttpClient) {
         runCatching {
             val body = client.getJson("/api/v1/internal/player-commands") ?: return@runCatching
             json.decodeFromString<List<ActionDescriptor>>(body)
@@ -308,4 +360,9 @@ class HelixVelocityBridgePlugin @Inject constructor(
 
     private fun colored(text: String): Component =
         LegacyComponentSerializer.legacyAmpersand().deserialize(text)
+
+    private companion object {
+        /** Delay before reconnecting the poll loop after a failure. */
+        const val RECONNECT_DELAY_MS = 1_000L
+    }
 }

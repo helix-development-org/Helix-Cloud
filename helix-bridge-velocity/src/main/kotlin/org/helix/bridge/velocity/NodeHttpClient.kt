@@ -66,4 +66,20 @@ class NodeHttpClient(private val settings: BridgeSettings) {
         val response = client.send(request, HttpResponse.BodyHandlers.ofString())
         return if (response.statusCode() in 200..299) response.body() else null
     }
+
+    /**
+     * Gets a JSON document with a long timeout, for long-polling the node.
+     *
+     * @param path absolute API path including query parameters.
+     * @return the body text, or `null` on non-2xx responses.
+     */
+    fun getJsonLong(path: String): String? {
+        val request = HttpRequest.newBuilder(URI.create(settings.controlUrl + path))
+            .header("Authorization", "Bearer ${settings.token}")
+            .timeout(Duration.ofSeconds(40))
+            .GET()
+            .build()
+        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+        return if (response.statusCode() in 200..299) response.body() else null
+    }
 }

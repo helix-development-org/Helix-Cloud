@@ -14,6 +14,7 @@ import org.helix.node.messages.MessageRegistry
 import org.helix.node.platform.PlatformOverviewService
 import org.helix.node.players.PlayerRegistry
 import org.helix.node.proxy.ProxyCommandQueue
+import org.helix.node.proxy.ProxyEventHub
 import org.helix.node.proxy.ProxyRoutingService
 import org.helix.node.services.ServiceManager
 import org.helix.node.tasks.TaskStore
@@ -50,6 +51,7 @@ data class ControlDependencies(
     val eventLog: EventLog = EventLog(),
     val dashboardPanels: DashboardPanelRegistry = DashboardPanelRegistry(),
     val messages: MessageRegistry = MessageRegistry(),
+    val proxyEvents: ProxyEventHub = ProxyEventHub(),
 ) {
     /** Player command execution shared by the internal routes. */
     val playerCommands: PlayerCommandService = PlayerCommandService(registry, permissionResolvers)

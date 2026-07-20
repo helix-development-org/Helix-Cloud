@@ -27,6 +27,7 @@ import org.helix.node.notifications.NotificationBus
 import org.helix.node.platform.PlatformOverviewService
 import org.helix.node.players.PlayerRegistry
 import org.helix.node.proxy.ProxyCommandQueue
+import org.helix.node.proxy.ProxyEventHub
 import org.helix.node.proxy.ProxyRoutingService
 import org.helix.node.resources.ClasspathInternalResources
 import org.helix.node.scaling.AutoScaler
@@ -84,11 +85,14 @@ class HelixNode(
             ExecutorType.DOCKER to DockerServiceExecutor(config.docker),
         ),
         environmentProvider = ::bridgeEnvironment,
-        eventSink = { category, level, message -> eventLog.record(category, message, level) },
+        eventSink = ::recordEvent,
     )
 
     /** Proxy routing state. */
     val routing: ProxyRoutingService = ProxyRoutingService(manager)
+
+    /** Wakes long-polling proxy bridges the instant something changes. */
+    val proxyEvents: ProxyEventHub = ProxyEventHub()
 
     /** Aggregated join gates of all addons. */
     val joinGates: JoinGateRegistry = JoinGateRegistry()
@@ -156,6 +160,7 @@ class HelixNode(
             eventLog = eventLog,
             dashboardPanels = dashboardPanels,
             messages = messages,
+            proxyEvents = proxyEvents,
         ),
     )
 
@@ -176,7 +181,8 @@ class HelixNode(
             shutdown = ::shutdown,
             commandQueue = commandQueue,
             playerRegistry = playerRegistry,
-            eventSink = { category, level, message -> eventLog.record(category, message, level) },
+            eventSink = ::recordEvent,
+            proxyEvents = proxyEvents,
         ).registerAll(registry)
         AddonActions(addonManager).registerAll(registry)
         addonManager.loadAll()
@@ -259,7 +265,19 @@ class HelixNode(
         notifications.register("__events__") { category, message ->
             eventLog.record(category, message.replace(Regex("&[0-9a-fk-orA-FK-OR]"), ""))
         }
+        // Any change to registered actions may add/remove a player-command,
+        // so wake long-polling proxies to re-register instantly.
+        registry.onChange { proxyEvents.bumpCommandCatalog() }
         eventLog.record("node", "Node started (version ${version()})")
+    }
+
+    private fun recordEvent(category: String, level: String, message: String) {
+        eventLog.record(category, message, level)
+        // Service lifecycle and maintenance change the routing snapshot;
+        // wake long-polling proxies so they re-fetch it instantly.
+        if (category == "service" || category == "proxy") {
+            proxyEvents.bumpRouting()
+        }
     }
 
     private fun bridgeEnvironment(service: ManagedService): Map<String, String> {

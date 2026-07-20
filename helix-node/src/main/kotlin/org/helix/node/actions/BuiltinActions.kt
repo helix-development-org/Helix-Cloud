@@ -12,6 +12,7 @@ import org.helix.node.launcher.NodePaths
 import org.helix.node.platform.PlatformOverviewService
 import org.helix.node.players.PlayerRegistry
 import org.helix.node.proxy.ProxyCommandQueue
+import org.helix.node.proxy.ProxyEventHub
 import org.helix.node.proxy.ProxyRoutingService
 import org.helix.api.proxy.ProxyCommand
 import org.helix.node.services.ServiceManager
@@ -30,6 +31,8 @@ import org.helix.node.versions.VersionCatalog
  * @property shutdown initiates node shutdown, wired by the launcher.
  * @property commandQueue pending commands for proxy bridges.
  * @property playerRegistry online players of the network.
+ * @property eventSink records dashboard events.
+ * @property proxyEvents wakes long-polling proxy bridges on new commands.
  */
 class BuiltinActions(
     private val paths: NodePaths,
@@ -42,6 +45,7 @@ class BuiltinActions(
     private val commandQueue: ProxyCommandQueue = ProxyCommandQueue(),
     private val playerRegistry: PlayerRegistry = PlayerRegistry(),
     private val eventSink: (category: String, level: String, message: String) -> Unit = { _, _, _ -> },
+    private val proxyEvents: ProxyEventHub = ProxyEventHub(),
 ) {
     /**
      * Registers every built-in action.
@@ -296,6 +300,7 @@ class BuiltinActions(
             ActionResult.error("no active proxy to deliver to")
         } else {
             commandQueue.enqueue(proxies, command)
+            proxyEvents.signal()
             ActionResult.ok("${command.type} queued on ${proxies.joinToString()}")
         }
     }

@@ -5,6 +5,20 @@
 > (Meilensteine `v1.0.0`…`v1.9.0` → `v0.1.0`…`v0.10.0`). `1.0.0` kommt,
 > wenn die Plattform wirklich stabil und feature-complete ist.
 
+## 0.13.0 — 2026-07-20
+
+### Instant statt Polling (Latenz)
+- Die Velocity-Bridge holt Commands, Routing und Player-Command-
+  Registrierung nicht mehr im 5s-Takt, sondern per **Long-Poll**: die
+  Node antwortet in dem Moment, in dem etwas passiert. Nur der Heartbeat
+  läuft noch auf dem 5s-Timer.
+- Neuer `ProxyEventHub` weckt wartende Long-Polls sofort; Versionierung
+  für Routing und Player-Command-Katalog lässt die Bridge gezielt neu
+  laden. Neuer Endpoint `GET /internal/poll`.
+- Ergebnis: Kicks, Nachrichten, Broadcasts, Routing-Updates und neue
+  Commands erreichen den Proxy in **~30 ms** statt bisher bis zu 5s
+  (im Schnitt ~2,5s). Gemessen: Command-Latenz 30 ms, Routing-Latenz 37 ms.
+
 ## 0.12.0 — 2026-07-20
 
 ### Aufräumen der Codebase

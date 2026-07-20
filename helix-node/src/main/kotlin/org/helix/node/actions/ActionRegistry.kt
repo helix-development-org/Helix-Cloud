@@ -1,6 +1,7 @@
 package org.helix.node.actions
 
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionHandler
 import org.helix.api.action.ActionInvocation
@@ -18,8 +19,19 @@ import org.slf4j.LoggerFactory
 class ActionRegistry : ActionInvoker {
     private val logger = LoggerFactory.getLogger(ActionRegistry::class.java)
     private val entries = ConcurrentHashMap<String, Entry>()
+    private val changeListeners = CopyOnWriteArrayList<() -> Unit>()
 
     private data class Entry(val descriptor: ActionDescriptor, val handler: ActionHandler)
+
+    /**
+     * Registers a listener invoked whenever the set of actions changes,
+     * used to notify proxies about new or removed player-commands.
+     *
+     * @param listener called after every register/unregister.
+     */
+    fun onChange(listener: () -> Unit) {
+        changeListeners += listener
+    }
 
     /**
      * Registers an action.
@@ -31,6 +43,7 @@ class ActionRegistry : ActionInvoker {
     fun register(descriptor: ActionDescriptor, handler: ActionHandler) {
         val previous = entries.putIfAbsent(descriptor.name, Entry(descriptor, handler))
         require(previous == null) { "action already registered: ${descriptor.name}" }
+        changeListeners.forEach { it() }
     }
 
     /**
@@ -39,7 +52,13 @@ class ActionRegistry : ActionInvoker {
      * @param name the action name.
      * @return `true` if the action existed.
      */
-    fun unregister(name: String): Boolean = entries.remove(name) != null
+    fun unregister(name: String): Boolean {
+        val removed = entries.remove(name) != null
+        if (removed) {
+            changeListeners.forEach { it() }
+        }
+        return removed
+    }
 
     /**
      * Executes the action named in [invocation].
