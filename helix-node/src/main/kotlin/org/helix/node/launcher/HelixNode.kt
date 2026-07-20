@@ -9,7 +9,10 @@ import org.helix.api.execution.ExecutorType
 import org.helix.node.actions.ActionRegistry
 import org.helix.node.actions.BuiltinActions
 import org.helix.node.addons.AddonActions
+import com.zaxxer.hikari.HikariDataSource
 import org.helix.node.audit.AuditLog
+import org.helix.node.audit.FileAuditSink
+import org.helix.node.audit.PostgresAuditSink
 import org.helix.node.addons.AddonManager
 import org.helix.node.cli.NodeCli
 import org.helix.node.config.NodeConfig
@@ -38,6 +41,7 @@ import org.helix.node.services.ServiceManager
 import org.helix.node.services.WorkspacePreparer
 import org.helix.node.services.docker.DockerServiceExecutor
 import org.helix.node.storage.JsonStorageProvider
+import org.helix.node.storage.PostgresPool
 import org.helix.node.storage.PostgresStorageProvider
 import org.helix.node.storage.StorageProvider
 import org.helix.node.tasks.TaskStore
@@ -64,11 +68,25 @@ class HelixNode(
     /** Data directory layout. */
     val paths: NodePaths = NodePaths(dataDirectory).createAll()
 
-    /** Complete, durable audit trail. */
-    val audit: AuditLog = AuditLog(paths.root.resolve("audit/audit.jsonl"))
-
     /** Effective node configuration. */
     val config: NodeConfig = NodeConfigLoader().load(dataDirectory)
+
+    /**
+     * Shared PostgreSQL connection pool, or `null` when file storage is used.
+     *
+     * Owned here and shared by both the addon storage provider and the audit
+     * log so `postgres` mode uses a single pool.
+     */
+    private val dbPool: HikariDataSource? =
+        if (config.storage.isPostgres()) PostgresPool.create(config.storage) else null
+
+    /** Complete, durable audit trail. */
+    val audit: AuditLog =
+        if (dbPool != null) {
+            AuditLog(PostgresAuditSink(dbPool))
+        } else {
+            AuditLog(FileAuditSink(paths.root.resolve("audit/audit.jsonl")))
+        }
 
     /** Configured tasks. */
     val taskStore: TaskStore = TaskStore(paths.tasks)
@@ -130,7 +148,7 @@ class HelixNode(
 
     /** Backend for addon document storage (files or PostgreSQL). */
     val storageProvider: StorageProvider =
-        if (config.storage.isPostgres()) PostgresStorageProvider(config.storage) else JsonStorageProvider()
+        if (dbPool != null) PostgresStorageProvider(dbPool) else JsonStorageProvider()
 
     /** Installed addons. */
     val addonManager: AddonManager = AddonManager(
@@ -251,6 +269,7 @@ class HelixNode(
             addonManager.disableAll()
             controlServer.stop()
             runCatching { storageProvider.close() }
+            runCatching { dbPool?.close() }
             exitProcess(0)
         }, "helix-shutdown").start()
     }

@@ -1,29 +1,21 @@
 package org.helix.node.storage
 
-import com.zaxxer.hikari.HikariConfig
-import com.zaxxer.hikari.HikariDataSource
+import javax.sql.DataSource
 import java.nio.file.Path
 import org.helix.api.storage.AddonStorage
-import org.helix.node.config.NodeConfig
 import org.slf4j.LoggerFactory
 
 /**
  * [StorageProvider] for the `postgres` mode: all addons share one pooled
  * PostgreSQL database and the `addon_storage` table.
  *
- * @property settings database connection settings.
+ * The connection pool is owned externally (shared with the audit log) and
+ * is not closed here.
+ *
+ * @property dataSource shared pooled data source.
  */
-class PostgresStorageProvider(settings: NodeConfig.StorageSettings) : StorageProvider {
+class PostgresStorageProvider(private val dataSource: DataSource) : StorageProvider {
     private val logger = LoggerFactory.getLogger(PostgresStorageProvider::class.java)
-    private val dataSource = HikariDataSource(
-        HikariConfig().apply {
-            jdbcUrl = settings.url
-            username = settings.user
-            password = settings.password
-            maximumPoolSize = settings.poolSize
-            poolName = "helix-storage"
-        },
-    )
 
     init {
         dataSource.connection.use { connection ->
@@ -35,13 +27,9 @@ class PostgresStorageProvider(settings: NodeConfig.StorageSettings) : StoragePro
                 )
             }
         }
-        logger.info("Addon storage using PostgreSQL at {}", settings.url)
+        logger.info("Addon storage using PostgreSQL")
     }
 
     override fun forAddon(addonId: String, dataDirectory: Path): AddonStorage =
         PostgresAddonStorage(dataSource, addonId)
-
-    override fun close() {
-        dataSource.close()
-    }
 }

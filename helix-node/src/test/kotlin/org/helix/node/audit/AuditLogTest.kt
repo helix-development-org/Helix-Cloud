@@ -11,7 +11,7 @@ class AuditLogTest {
     @Test
     fun `records newest first and filters by category`() {
         var now = 0L
-        val log = AuditLog(file, clock = { now })
+        val log = AuditLog(FileAuditSink(file), clock = { now })
         now = 1; log.record("http", "helix", "GET /api/v1/tasks → 200")
         now = 2; log.record("action", "rest", "service.start Lobby")
         now = 3; log.record("http", "anonymous", "GET /api/v1/tasks → 401", "denied")

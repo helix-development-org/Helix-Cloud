@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.17.0 — 2026-07-20
+
+### Audit-Log in der Datenbank
+- Der Audit-Trail wird jetzt im `postgres`-Storage-Modus in der Datenbank
+  gespeichert (Tabelle `audit_log`) statt in `Helix/audit/audit.jsonl`.
+  Damit liegt bei zentralem Storage der komplette Trail zentral in Postgres.
+- Neue Abstraktion `AuditSink` mit zwei Implementierungen: `FileAuditSink`
+  (JSONL, Standard bei `mode = "json"`) und `PostgresAuditSink` (Tabelle
+  `audit_log`, Standard bei `mode = "postgres"`). `AuditLog` schreibt an den
+  Sink und lädt beim Start die letzten Einträge zurück — der Trail überlebt
+  Neustarts in beiden Modi.
+- Node öffnet im Postgres-Modus **einen** gemeinsamen Connection-Pool
+  (`PostgresPool`), der von Addon-Storage und Audit-Log geteilt und beim
+  Shutdown geschlossen wird.
+
 ## 0.16.0 — 2026-07-20
 
 ### Vollständiger Audit-Log

@@ -1,47 +1,40 @@
 package org.helix.node.audit
 
-import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardOpenOption
-import kotlinx.serialization.json.Json
 import org.helix.api.audit.AuditEntry
-import org.slf4j.LoggerFactory
 
 /**
  * Complete, durable audit trail.
  *
- * Every recorded entry is appended to `Helix/audit/audit.jsonl` (one JSON
- * object per line, append-only) and kept in an in-memory ring buffer for
- * fast dashboard/API reads. On startup the tail of the file is loaded back
- * so the trail survives restarts.
+ * Every recorded entry is appended to the configured [AuditSink] (a JSONL
+ * file or the shared PostgreSQL database) and kept in an in-memory ring
+ * buffer for fast dashboard/API reads. On startup the tail of the sink is
+ * loaded back so the trail survives restarts.
  *
- * @property file the `audit.jsonl` path.
+ * @property sink durable backend the trail is written to and read from.
  * @property capacity in-memory ring buffer size.
  * @property clock epoch millis source, injectable for tests.
  */
 class AuditLog(
-    private val file: Path,
+    private val sink: AuditSink,
     private val capacity: Int = 5000,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
-    private val logger = LoggerFactory.getLogger(AuditLog::class.java)
-    private val json = Json { ignoreUnknownKeys = true }
     private val entries = ArrayDeque<AuditEntry>()
 
+    /**
+     * Convenience constructor persisting to a JSONL file.
+     *
+     * @param file the `audit.jsonl` path.
+     */
+    constructor(file: Path) : this(FileAuditSink(file))
+
     init {
-        if (Files.exists(file)) {
-            runCatching {
-                Files.readAllLines(file).takeLast(capacity).forEach { line ->
-                    if (line.isNotBlank()) {
-                        entries.addLast(json.decodeFromString<AuditEntry>(line))
-                    }
-                }
-            }.onFailure { logger.warn("Could not load audit history: {}", it.message) }
-        }
+        sink.loadRecent(capacity).forEach { entries.addLast(it) }
     }
 
     /**
-     * Records an audit entry, appending it to disk and the ring buffer.
+     * Records an audit entry, persisting it and updating the ring buffer.
      *
      * @param category coarse grouping.
      * @param actor who caused it.
@@ -55,15 +48,7 @@ class AuditLog(
         while (entries.size > capacity) {
             entries.removeFirst()
         }
-        runCatching {
-            Files.createDirectories(file.parent)
-            Files.writeString(
-                file,
-                json.encodeToString(entry) + "\n",
-                StandardOpenOption.CREATE,
-                StandardOpenOption.APPEND,
-            )
-        }.onFailure { logger.warn("Could not persist audit entry: {}", it.message) }
+        sink.append(entry)
     }
 
     /**

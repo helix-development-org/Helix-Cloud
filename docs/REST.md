@@ -13,7 +13,7 @@ Das Dashboard unter `/` ist statisch und nutzt dieselbe API.
 | GET | `/platform/overview` | Aggregierte Zähler (Services, Player, Version) |
 | GET | `/logs?tail=300` | Node-Log (Ringpuffer über stdout/stderr-Capture) |
 | GET | `/events?limit=200` | Event-Timeline (neueste zuerst): Service-Lifecycle, Player, Moderation, Proxy, Tasks |
-| GET | `/audit?limit=300&category=<cat>` | Vollständiger Audit-Log: jeder HTTP-Request, jede Action, Auth-Versuche, Lifecycle (persistiert in `audit.jsonl`) |
+| GET | `/audit?limit=300&category=<cat>` | Vollständiger Audit-Log: jeder HTTP-Request, jede Action, Auth-Versuche, Lifecycle (persistiert in `audit.jsonl` bzw. bei `storage.mode = "postgres"` in Tabelle `audit_log`) |
 | GET | `/proxy` | Proxy-Übersicht: Maintenance, Proxies, Backend-Routing |
 | POST | `/proxy/maintenance` | Maintenance schalten — Body `{"enabled": true}` |
 | GET | `/panels` / `/panels/{id}` | Addon-Dashboard-Seiten (Metadaten / HTML) |
