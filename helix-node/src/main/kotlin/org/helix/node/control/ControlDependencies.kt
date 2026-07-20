@@ -10,6 +10,7 @@ import org.helix.node.events.EventLog
 import org.helix.node.gates.JoinGateRegistry
 import org.helix.node.gates.PermissionResolverRegistry
 import org.helix.node.logging.LogBuffer
+import org.helix.node.audit.AuditLog
 import org.helix.node.messages.MessageRegistry
 import org.helix.node.platform.PlatformOverviewService
 import org.helix.node.players.PlayerRegistry
@@ -52,6 +53,7 @@ data class ControlDependencies(
     val dashboardPanels: DashboardPanelRegistry = DashboardPanelRegistry(),
     val messages: MessageRegistry = MessageRegistry(),
     val proxyEvents: ProxyEventHub = ProxyEventHub(),
+    val audit: AuditLog = AuditLog(java.nio.file.Path.of("audit.jsonl")),
 ) {
     /** Player command execution shared by the internal routes. */
     val playerCommands: PlayerCommandService = PlayerCommandService(registry, permissionResolvers)

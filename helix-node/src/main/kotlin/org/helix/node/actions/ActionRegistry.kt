@@ -20,6 +20,7 @@ class ActionRegistry : ActionInvoker {
     private val logger = LoggerFactory.getLogger(ActionRegistry::class.java)
     private val entries = ConcurrentHashMap<String, Entry>()
     private val changeListeners = CopyOnWriteArrayList<() -> Unit>()
+    private val invocationListeners = CopyOnWriteArrayList<(ActionInvocation, ActionResult) -> Unit>()
 
     private data class Entry(val descriptor: ActionDescriptor, val handler: ActionHandler)
 
@@ -31,6 +32,16 @@ class ActionRegistry : ActionInvoker {
      */
     fun onChange(listener: () -> Unit) {
         changeListeners += listener
+    }
+
+    /**
+     * Registers a listener invoked after every action execution, used to
+     * audit all invocations.
+     *
+     * @param listener receives the invocation and its result.
+     */
+    fun onInvocation(listener: (ActionInvocation, ActionResult) -> Unit) {
+        invocationListeners += listener
     }
 
     /**
@@ -69,13 +80,18 @@ class ActionRegistry : ActionInvoker {
      */
     override fun invoke(invocation: ActionInvocation): ActionResult {
         val entry = entries[invocation.action]
-            ?: return ActionResult.error("unknown action: ${invocation.action}")
-        return try {
-            entry.handler.execute(invocation)
-        } catch (failure: Exception) {
-            logger.error("Action {} failed", invocation.action, failure)
-            ActionResult.error("${invocation.action} failed: ${failure.message}")
+        val result = if (entry == null) {
+            ActionResult.error("unknown action: ${invocation.action}")
+        } else {
+            try {
+                entry.handler.execute(invocation)
+            } catch (failure: Exception) {
+                logger.error("Action {} failed", invocation.action, failure)
+                ActionResult.error("${invocation.action} failed: ${failure.message}")
+            }
         }
+        invocationListeners.forEach { it(invocation, result) }
+        return result
     }
 
     /**

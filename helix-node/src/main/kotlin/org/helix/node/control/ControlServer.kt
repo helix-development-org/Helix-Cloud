@@ -4,11 +4,16 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationCallPipeline
+import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.UserIdPrincipal
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.bearer
+import io.ktor.server.auth.principal
+import io.ktor.server.request.httpMethod
+import io.ktor.server.request.path
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.http.content.staticResources
@@ -71,6 +76,25 @@ fun Application.controlModule(dependencies: ControlDependencies) {
             }
         }
     }
+    intercept(ApplicationCallPipeline.Monitoring) {
+        proceed()
+        val path = call.request.path()
+        if (path.startsWith("/api/") && !path.startsWith("/api/v1/internal/poll")) {
+            val status = call.response.status()?.value ?: 0
+            val actor = call.principal<UserIdPrincipal>()?.name ?: "anonymous"
+            val outcome = when {
+                status == 401 || status == 403 -> "denied"
+                status in 200..399 -> "ok"
+                else -> "error"
+            }
+            dependencies.audit.record(
+                "http",
+                actor,
+                "${call.request.httpMethod.value} $path → $status",
+                outcome,
+            )
+        }
+    }
     routing {
         staticResources("/", "dashboard") {
             default("index.html")
@@ -106,6 +130,11 @@ private fun io.ktor.server.routing.Route.observabilityRoutes(dependencies: Contr
     get("/events") {
         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 200
         call.respond(dependencies.eventLog.recent(limit))
+    }
+    get("/audit") {
+        val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 300
+        val category = call.request.queryParameters["category"]
+        call.respond(dependencies.audit.recent(limit, category))
     }
 }
 

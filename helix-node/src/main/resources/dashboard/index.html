@@ -313,6 +313,7 @@ const NAV = [
   { group: "Observability" },
   { id: "events", label: "Events", icon: '<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>' },
   { id: "logs", label: "Logs", icon: '<path d="M4 4h16v16H4z"/><path d="M8 9l2 2-2 2M13 15h3"/>' },
+  { id: "audit", label: "Audit", icon: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>' },
   { group: "System" },
   { id: "addons", label: "Addons", icon: '<path d="M20 7h-4V3H8v4H4v14h16V7z"/><path d="M9 12h6M12 9v6"/>' },
   { id: "messages", label: "Messages", icon: '<path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><path d="M7 9h10M7 13h6"/>' },
@@ -415,6 +416,7 @@ const VIEWS = {
   proxy: { title: "Proxy", interval: 3000, draw: drawProxy },
   events: { title: "Events", interval: 4000, draw: drawEvents },
   logs: { title: "Logs", interval: 2000, draw: drawLogs },
+  audit: { title: "Audit", interval: 5000, draw: drawAudit },
   addons: { title: "Addons", interval: 6000, draw: drawAddons },
   messages: { title: "Messages", interval: 0, draw: drawMessages },
   settings: { title: "Settings", interval: 0, draw: drawSettings },
@@ -675,6 +677,28 @@ function paintLogs(lines) {
     return `<div class="${cls}">${esc(l)}</div>`;
   }).join("");
   if (atBottom) box.scrollTop = box.scrollHeight;
+}
+
+let auditFilter = "all";
+async function drawAudit() {
+  const entries = await api("/audit?limit=500");
+  const cats = ["all", ...new Set(entries.map(e => e.category))];
+  const oColor = o => o === "denied" || o === "error" ? "var(--bad)" : o === "warn" ? "var(--warn)" : "var(--good)";
+  const shown = auditFilter === "all" ? entries : entries.filter(e => e.category === auditFilter);
+  $("#view").innerHTML = `<div class="card">
+      <div class="card-head"><h2>Audit log</h2><div class="head-actions"><div class="seg" id="auseg">${
+        cats.map(c => `<button data-cat="${c}" class="${c===auditFilter?'active':''}">${c}</button>`).join("")
+      }</div></div></div>
+    <div class="card"><div class="table-wrap">${shown.length ? `<table><thead><tr><th>Time</th><th>Category</th><th>Actor</th><th>Summary</th><th>Outcome</th></tr></thead><tbody>${
+      shown.map(e => `<tr>
+        <td class="muted" style="white-space:nowrap">${ago(e.epochMs)}</td>
+        <td><span class="badge plain b-neutral">${esc(e.category)}</span></td>
+        <td class="mono">${esc(e.actor)}</td>
+        <td>${esc(e.summary)}</td>
+        <td><span style="color:${oColor(e.outcome)};font-weight:600;font-size:12px">${esc(e.outcome)}</span></td>
+      </tr>`).join("")
+    }</tbody></table>` : emptyState("No audit entries")}</div></div>`;
+  document.querySelectorAll("#auseg button").forEach(b => b.onclick = () => { auditFilter = b.dataset.cat; drawAudit(); });
 }
 
 async function drawAddons() {

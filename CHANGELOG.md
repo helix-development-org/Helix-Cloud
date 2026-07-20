@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.16.0 — 2026-07-20
+
+### Vollständiger Audit-Log
+- Neuer durabler Audit-Trail (`AuditLog`): erfasst **jeden** HTTP-Request
+  (Methode, Pfad, Status, Actor), **jede** Action-Invocation (Quelle,
+  Argumente, Ergebnis), Auth-Versuche (inkl. abgelehnter 401),
+  Service-Lifecycle, Player-Join/Leave, Moderation und Node-Lifecycle.
+- Persistiert als append-only `Helix/audit/audit.jsonl` (überlebt
+  Neustarts, wird beim Start zurückgeladen) plus In-Memory-Ringpuffer.
+- Endpoint `GET /audit?limit=&category=` und neue Dashboard-Seite
+  **Audit** mit Kategorie-Filter und Outcome-Färbung.
+
 ## 0.15.0 — 2026-07-20
 
 ### Task-Konfiguration & Pro-Task-Addons im Dashboard

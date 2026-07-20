@@ -9,6 +9,7 @@ import org.helix.api.execution.ExecutorType
 import org.helix.node.actions.ActionRegistry
 import org.helix.node.actions.BuiltinActions
 import org.helix.node.addons.AddonActions
+import org.helix.node.audit.AuditLog
 import org.helix.node.addons.AddonManager
 import org.helix.node.cli.NodeCli
 import org.helix.node.config.NodeConfig
@@ -62,6 +63,9 @@ class HelixNode(
 
     /** Data directory layout. */
     val paths: NodePaths = NodePaths(dataDirectory).createAll()
+
+    /** Complete, durable audit trail. */
+    val audit: AuditLog = AuditLog(paths.root.resolve("audit/audit.jsonl"))
 
     /** Effective node configuration. */
     val config: NodeConfig = NodeConfigLoader().load(dataDirectory)
@@ -172,6 +176,7 @@ class HelixNode(
             dashboardPanels = dashboardPanels,
             messages = messages,
             proxyEvents = proxyEvents,
+            audit = audit,
         ),
     )
 
@@ -267,24 +272,35 @@ class HelixNode(
             object : org.helix.api.addon.PlayerListener {
                 override fun onJoin(player: org.helix.api.player.OnlinePlayer) {
                     eventLog.record("player", "${player.name} joined the network")
+                    audit.record("player", player.name, "joined the network")
                 }
 
                 override fun onLeave(player: org.helix.api.player.OnlinePlayer) {
                     eventLog.record("player", "${player.name} left the network")
+                    audit.record("player", player.name, "left the network")
                 }
             },
         )
         notifications.register("__events__") { category, message ->
-            eventLog.record(category, message.replace(Regex("&[0-9a-fk-orA-FK-OR]"), ""))
+            val plain = message.replace(Regex("&[0-9a-fk-orA-FK-OR]"), "")
+            eventLog.record(category, plain)
+            audit.record(category, "addon", plain)
+        }
+        // Every action invocation is audited (CLI, REST, bridge, addon).
+        registry.onInvocation { invocation, result ->
+            val summary = (invocation.action + " " + invocation.arguments.joinToString(" ")).trim()
+            audit.record("action", invocation.source.name.lowercase(), summary, if (result.success) "ok" else "error")
         }
         // Any change to registered actions may add/remove a player-command,
         // so wake long-polling proxies to re-register instantly.
         registry.onChange { proxyEvents.bumpCommandCatalog() }
         eventLog.record("node", "Node started (version ${version()})")
+        audit.record("node", "system", "Node started (version ${version()})")
     }
 
     private fun recordEvent(category: String, level: String, message: String) {
         eventLog.record(category, message, level)
+        audit.record(category, "system", message, if (level == "info") "ok" else level)
         // Service lifecycle and maintenance change the routing snapshot;
         // wake long-polling proxies so they re-fetch it instantly.
         if (category == "service" || category == "proxy") {
