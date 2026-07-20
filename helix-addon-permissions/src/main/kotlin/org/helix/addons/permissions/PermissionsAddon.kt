@@ -4,6 +4,7 @@ import kotlinx.serialization.json.Json
 import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
+import org.helix.api.action.ActionSource
 
 /**
  * Permission system addon.
@@ -105,6 +106,13 @@ class PermissionsAddon : AddonBase() {
         action("perm.export", "Exports all groups and users as JSON (used by the dashboard).", "perm.export") {
             ActionResult.ok(Json.encodeToString(store.document()))
         }
+        action(
+            "permissions",
+            "Manage permissions in-game.",
+            "permissions <group|user|check> ...",
+            playerCommand = true,
+            permission = "helix.permissions",
+        ) { invocation -> permissionsCommand(invocation.arguments.drop(1)) }
         panel("permissions", "Permissions", "/panel.html", PANEL_ICON)
     }
 
@@ -112,6 +120,31 @@ class PermissionsAddon : AddonBase() {
         /** Sidebar icon for the permissions panel. */
         const val PANEL_ICON = "<path d=\"M9 12l2 2 4-4\"/><path d=\"M12 3l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V7z\"/>"
     }
+
+    /**
+     * Dispatches the `/permissions` in-game subcommands to the `perm.*` actions.
+     *
+     * @param args arguments after the executing player name.
+     * @return the command result.
+     */
+    private fun permissionsCommand(args: List<String>): ActionResult = when (args.firstOrNull()?.lowercase()) {
+        "group" -> args.getOrNull(1)?.let { sub -> delegate("perm.group.${sub.lowercase()}", args.drop(2)) }
+            ?: ActionResult.error(
+                "usage: /permissions group <create|delete|list|info|grant|revoke|addparent|removeparent> ...",
+            )
+        "user" -> args.getOrNull(1)?.let { sub -> delegate("perm.user.${sub.lowercase()}", args.drop(2)) }
+            ?: ActionResult.error("usage: /permissions user <info|addgroup|removegroup|grant|revoke> ...")
+        "check" -> delegate("perm.check", args.drop(1))
+        else -> ActionResult.ok(
+            "&bPermission commands:",
+            "&f/permissions group <create|delete|list|info|grant|revoke|addparent|removeparent> ...",
+            "&f/permissions user <info|addgroup|removegroup|grant|revoke> ...",
+            "&f/permissions check <player> <permission>",
+        )
+    }
+
+    private fun delegate(action: String, arguments: List<String>): ActionResult =
+        context.actions.invoke(ActionInvocation(action = action, arguments = arguments, source = ActionSource.ADDON))
 
     private fun createGroup(invocation: ActionInvocation): ActionResult {
         val name = invocation.arguments.firstOrNull()

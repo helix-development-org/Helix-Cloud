@@ -36,18 +36,26 @@ abstract class AddonBase : HelixAddon {
     /**
      * Registers an action owned by this addon.
      *
+     * Set [playerCommand] to expose it as an in-game command `/<name>` (the
+     * name must be dot-free); the handler then receives the player name as
+     * first argument. [permission] gates the in-game command.
+     *
      * @param name unique action name.
      * @param description one-line summary.
      * @param usage argument hint.
+     * @param playerCommand whether proxy bridges register it as `/<name>`.
+     * @param permission permission node required to run the in-game command.
      * @param handler executed on invocation.
      */
     protected fun action(
         name: String,
         description: String,
         usage: String = name,
+        playerCommand: Boolean = false,
+        permission: String? = null,
         handler: (ActionInvocation) -> ActionResult,
     ) {
-        context.registerAction(ActionDescriptor(name, description, usage), handler)
+        context.registerAction(ActionDescriptor(name, description, usage, playerCommand, permission), handler)
     }
 
     /**

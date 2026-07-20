@@ -5,6 +5,7 @@ import io.papermc.paper.event.player.AsyncChatEvent
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.json.Json
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.entity.Player
@@ -159,9 +160,69 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
                 "/api/v1/internal/display",
                 json.encodeToString(JoinRequest(name = playerName)),
             )?.let { body ->
-                displayProfiles[playerName.lowercase()] = json.decodeFromString<DisplayProfile>(body)
+                val profile = json.decodeFromString<DisplayProfile>(body)
+                displayProfiles[playerName.lowercase()] = profile
+                server.getPlayerExact(playerName)?.let { player ->
+                    server.scheduler.runTask(this, Runnable { applyDisplay(player, profile) })
+                }
             }
         }.onFailure { logger.warning("Helix display fetch failed: ${it.message}") }
+    }
+
+    /**
+     * Applies a display profile to the player's tab-list entry and the name
+     * shown above their head (via a per-player scoreboard team). Must run on
+     * the main server thread.
+     *
+     * @param player the online player.
+     * @param profile the resolved prefix/suffix/color.
+     */
+    private fun applyDisplay(player: Player, profile: DisplayProfile) {
+        val scoreboard = server.scoreboardManager?.mainScoreboard ?: return
+        val teamName = "hlx" + Integer.toHexString(player.name.lowercase().hashCode())
+        val hasContent = profile.prefix.isNotEmpty() || profile.suffix.isNotEmpty() || profile.color.isNotEmpty()
+        if (!hasContent) {
+            scoreboard.getTeam(teamName)?.takeIf { it.hasEntry(player.name) }?.removeEntry(player.name)
+            player.playerListName(null)
+            return
+        }
+        val team = scoreboard.getTeam(teamName) ?: scoreboard.registerNewTeam(teamName)
+        team.prefix(colored(profile.prefix))
+        team.suffix(colored(profile.suffix))
+        namedColor(profile.color)?.let { team.color(it) }
+        if (!team.hasEntry(player.name)) {
+            team.addEntry(player.name)
+        }
+        player.playerListName(colored("${profile.prefix}${profile.color}${player.name}${profile.suffix}"))
+    }
+
+    /**
+     * Maps a legacy `&`-color code to a named colour for scoreboard teams.
+     *
+     * @param code a color string such as `&c`, or empty.
+     * @return the matching colour, or `null` when none applies.
+     */
+    private fun namedColor(code: String): NamedTextColor? {
+        val ch = code.trim().removePrefix("&").removePrefix("§").firstOrNull()?.lowercaseChar() ?: return null
+        return when (ch) {
+            '0' -> NamedTextColor.BLACK
+            '1' -> NamedTextColor.DARK_BLUE
+            '2' -> NamedTextColor.DARK_GREEN
+            '3' -> NamedTextColor.DARK_AQUA
+            '4' -> NamedTextColor.DARK_RED
+            '5' -> NamedTextColor.DARK_PURPLE
+            '6' -> NamedTextColor.GOLD
+            '7' -> NamedTextColor.GRAY
+            '8' -> NamedTextColor.DARK_GRAY
+            '9' -> NamedTextColor.BLUE
+            'a' -> NamedTextColor.GREEN
+            'b' -> NamedTextColor.AQUA
+            'c' -> NamedTextColor.RED
+            'd' -> NamedTextColor.LIGHT_PURPLE
+            'e' -> NamedTextColor.YELLOW
+            'f' -> NamedTextColor.WHITE
+            else -> null
+        }
     }
 
     private fun colored(text: String): Component =

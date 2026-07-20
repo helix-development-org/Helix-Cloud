@@ -130,6 +130,34 @@ Spieler in den Chat geschrieben. Nachrichten an andere Spieler laufen über
 die generischen Actions `player.message <player> <text...>` und
 `player.broadcast <text...>`.
 
+Wer von `AddonBase` erbt, nutzt kurz `action(name, desc, usage,
+playerCommand = true, permission = "…") { … }`. Ein bewährtes Muster ist ein
+**Dispatcher-Command**, der Subcommands auf die eigenen `punkt.getrennten`
+Actions abbildet (so werden `/bans`, `/permissions` gebaut):
+
+```kotlin
+action("bans", "Manage bans.", "bans <set|pardon|list> …",
+    playerCommand = true, permission = "helix.bans") { inv ->
+    val args = inv.arguments.drop(1)            // ohne Spielernamen
+    when (args.firstOrNull()) {
+        "set"    -> context.actions.invoke(ActionInvocation("ban.set", args.drop(1)))
+        "pardon" -> context.actions.invoke(ActionInvocation("ban.pardon", args.drop(1)))
+        else     -> ActionResult.ok("/bans set … | /bans pardon …")
+    }
+}
+```
+
+### Eingebaute In-Game-Commands
+
+- `/helix <addons|enable|disable|reload> [id]` (Permission `helix.admin`) —
+  Addons anzeigen, aktivieren, deaktivieren, neue `.hxa` live nachladen.
+- `/bans …` (Permission `helix.bans`) — aus dem Bans-Addon.
+- `/permissions …` (Permission `helix.permissions`) — aus dem Permissions-Addon.
+
+Die Permission jedes Player-Commands wird auch nativ ausgewertet
+(`GET /internal/permission-nodes`), d.h. OPs/LuckPerms erhalten die Commands
+auch ohne Permission-Addon.
+
 ## Packen mit Gradle
 
 ```kotlin
@@ -183,7 +211,9 @@ Referenz-Implementierungen in diesem Repo:
   `{online}`/`{max}`.
 - `helix-addon-chat` — Chat-Format (`chat.format`) plus permission-basierte
   Prefix-Regeln (`chat.prefix.add/list/remove`), gerendert von der
-  Paper-Bridge.
+  Paper-Bridge. Das aufgelöste Display-Profil (Prefix/Suffix/Farbe) färbt
+  zusätzlich den **Namen über dem Kopf** (per Scoreboard-Team) und den
+  **Tablist-Namen** des Spielers.
 - `helix-addon-economy` — Coins mit `/balance` und `/pay` sowie
   `eco.give/take/set/get`.
 - `helix-addon-moderation` — permission-gated `/kick`, `/warn`, `/warns`,

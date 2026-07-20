@@ -11,12 +11,21 @@ import org.helix.node.actions.ActionRegistry
  */
 class AddonActions(private val manager: AddonManager) {
     /**
-     * Registers `addon.list`, `addon.list.reload`, `addon.enable` and
-     * `addon.disable`.
+     * Registers `addon.list`, `addon.list.reload`, `addon.enable`,
+     * `addon.disable` and the in-game `/helix` management command.
      *
      * @param registry target registry.
      */
     fun registerAll(registry: ActionRegistry) {
+        registry.register(
+            ActionDescriptor(
+                "helix",
+                "Helix management: list, enable, disable and reload addons.",
+                "helix <addons|enable|disable|reload> [id]",
+                playerCommand = true,
+                permission = "helix.admin",
+            ),
+        ) { invocation -> helixCommand(invocation.arguments.drop(1)) }
         registry.register(
             ActionDescriptor(
                 "addon.list.reload",
@@ -63,5 +72,50 @@ class AddonActions(private val manager: AddonManager) {
                 ?: return@register ActionResult.error("usage: addon.disable <id>")
             if (manager.disable(id)) ActionResult.ok("disabled $id") else ActionResult.error("unknown addon: $id")
         }
+    }
+
+    /**
+     * Dispatches the `/helix` in-game subcommands.
+     *
+     * @param args the arguments after the player name.
+     * @return the command result.
+     */
+    private fun helixCommand(args: List<String>): ActionResult = when (args.firstOrNull()?.lowercase()) {
+        "addons", "list" -> {
+            val addons = manager.addons()
+            if (addons.isEmpty()) {
+                ActionResult.ok("&7No addons installed.")
+            } else {
+                ActionResult.ok(
+                    "&bAddons (${addons.size}):",
+                    *addons.map { "&7- &f${it.manifest.id} &7${it.manifest.version} &8[${it.state}]" }
+                        .toTypedArray(),
+                )
+            }
+        }
+        "enable" -> args.getOrNull(1)?.let { id ->
+            if (manager.enable(id)) ActionResult.ok("&aEnabled &f$id") else ActionResult.error("&cUnknown addon: $id")
+        } ?: ActionResult.error("usage: /helix enable <id>")
+        "disable" -> args.getOrNull(1)?.let { id ->
+            if (manager.disable(id)) ActionResult.ok("&aDisabled &f$id") else ActionResult.error("&cUnknown addon: $id")
+        } ?: ActionResult.error("usage: /helix disable <id>")
+        "reload" -> {
+            val added = manager.reload()
+            if (added.isEmpty()) {
+                ActionResult.ok("&7No new addons found in Helix/addons/.")
+            } else {
+                ActionResult.ok(
+                    "&aLoaded ${added.size} new addon${if (added.size == 1) "" else "s"}:",
+                    *added.map { "&7- &f${it.manifest.id} &8[${it.state}]" }.toTypedArray(),
+                )
+            }
+        }
+        else -> ActionResult.ok(
+            "&bHelix commands:",
+            "&f/helix addons &7— list installed addons",
+            "&f/helix enable <id> &7— enable an addon",
+            "&f/helix disable <id> &7— disable an addon",
+            "&f/helix reload &7— load new .hxa files",
+        )
     }
 }

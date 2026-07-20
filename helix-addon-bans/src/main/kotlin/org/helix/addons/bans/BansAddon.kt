@@ -70,6 +70,13 @@ class BansAddon : AddonBase() {
         action("ban.export", "Exports all active bans as JSON (used by the dashboard).", "ban.export") {
             ActionResult.ok(kotlinx.serialization.json.Json.encodeToString(store.all()))
         }
+        action(
+            "bans",
+            "Manage bans in-game.",
+            "bans <set|pardon|check|list> ...",
+            playerCommand = true,
+            permission = "helix.bans",
+        ) { invocation -> bansCommand(invocation.arguments.drop(1)) }
         panel(
             "bans",
             "Bans",
@@ -77,6 +84,32 @@ class BansAddon : AddonBase() {
             "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M5.6 5.6l12.8 12.8\"/>",
         )
     }
+
+    /**
+     * Dispatches the `/bans` in-game subcommands to the `ban.*` actions.
+     *
+     * @param args arguments after the executing player name.
+     * @return the command result.
+     */
+    private fun bansCommand(args: List<String>): ActionResult {
+        val rest = args.drop(1)
+        return when (args.firstOrNull()?.lowercase()) {
+            "set" -> delegate("ban.set", rest)
+            "pardon" -> delegate("ban.pardon", rest)
+            "check" -> delegate("ban.check", rest)
+            "list" -> delegate("ban.list", emptyList())
+            else -> ActionResult.ok(
+                "&cBan commands:",
+                "&f/bans set <player> [duration] [reason...] &7— 30m, 12h, 7d or permanent",
+                "&f/bans pardon <player>",
+                "&f/bans check <player>",
+                "&f/bans list",
+            )
+        }
+    }
+
+    private fun delegate(action: String, arguments: List<String>): ActionResult =
+        context.actions.invoke(ActionInvocation(action = action, arguments = arguments, source = ActionSource.ADDON))
 
     private fun setBan(invocation: ActionInvocation): ActionResult {
         val arguments = invocation.arguments

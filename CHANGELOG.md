@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.19.0 — 2026-07-20
+
+### In-Game-Commands
+- Neuer `/helix`-Command (Permission `helix.admin`): Addons anzeigen
+  (`/helix addons`), aktivieren/deaktivieren (`/helix enable|disable <id>`)
+  und neue `.hxa` live nachladen (`/helix reload`).
+- Addon-Actions werden zu In-Game-Commands: `/bans …` (Permission
+  `helix.bans`) und `/permissions …` (Permission `helix.permissions`) als
+  Dispatcher auf die bestehenden `ban.*`/`perm.*`-Actions.
+- `AddonBase.action(...)` unterstützt jetzt `playerCommand` und `permission`;
+  die Permission jedes Player-Commands wird über `GET /internal/permission-nodes`
+  auch nativ ausgewertet (OP/LuckPerms funktionieren ohne Permission-Addon).
+
+### Chat: Name über dem Kopf & Tablist
+- Das vom Chat-Addon aufgelöste Display-Profil (Prefix/Suffix/Farbe) färbt
+  nun auch den Namen **über dem Spielerkopf** (per Scoreboard-Team) und den
+  **Tablist-Namen** — nicht mehr nur die Chat-Zeile.
+
 ## 0.18.0 — 2026-07-20
 
 ### Web-Panel-Login per Minecraft-Account

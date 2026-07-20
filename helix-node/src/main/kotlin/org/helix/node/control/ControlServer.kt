@@ -172,6 +172,11 @@ private fun knownPermissionNodes(dependencies: ControlDependencies): List<String
     addAll(PanelAuthService.VIEW_NODES.values)
     dependencies.dashboardPanels.list().forEach { add(PanelAuthService.panelNode(it.id)) }
     add("helix.maintenance.bypass")
+    // permissions gating in-game commands (/helix, /bans, /permissions, …)
+    dependencies.registry.descriptors()
+        .filter { it.playerCommand }
+        .mapNotNull { it.permission }
+        .forEach { add(it) }
 }.distinct()
 
 private fun io.ktor.server.routing.Route.publicAuthRoutes(dependencies: ControlDependencies) {
