@@ -1,6 +1,5 @@
 package org.helix.addons.tablist
 
-import java.nio.file.Files
 import kotlinx.serialization.json.Json
 import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionResult
@@ -71,16 +70,10 @@ class TablistAddon : AddonBase() {
         context.publishBridgeValue("tablist.footer", config.footer.replace("\\n", "\n"))
     }
 
-    private fun load(): TablistConfig {
-        val file = context.dataDirectory.resolve("tablist.json")
-        return if (Files.exists(file)) {
-            json.decodeFromString(Files.readString(file))
-        } else {
-            TablistConfig()
-        }
-    }
+    private fun load(): TablistConfig =
+        context.storage().read("tablist")?.let { json.decodeFromString(it) } ?: TablistConfig()
 
     private fun save() {
-        Files.writeString(context.dataDirectory.resolve("tablist.json"), json.encodeToString(config))
+        context.storage().write("tablist", json.encodeToString(config))
     }
 }

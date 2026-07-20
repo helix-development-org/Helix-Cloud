@@ -77,14 +77,14 @@ class DiscordAddonTest {
 
     @Test
     fun `config writes defaults on first load and persists edits`() {
-        val file = createTempDirectory("discord").resolve("discord.json")
+        val storage = org.helix.api.storage.InMemoryAddonStorage()
 
-        val defaults = DiscordConfig.load(file)
+        val defaults = DiscordConfig.load(storage)
 
         assertFalse(defaults.configured())
         assertEquals("!", defaults.commandPrefix)
         assertEquals(listOf("moderation"), defaults.notificationCategories)
-        assertTrue(file.toFile().readText().contains("botToken"))
+        assertTrue(storage.read("discord")!!.contains("botToken"))
     }
 
     @Test

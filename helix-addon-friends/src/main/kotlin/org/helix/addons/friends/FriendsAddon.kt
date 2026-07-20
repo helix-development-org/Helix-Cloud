@@ -23,7 +23,7 @@ class FriendsAddon : AddonBase() {
      * Registers the `/friend` player command and the join listener.
      */
     override fun enable() {
-        store = FriendStore(context.dataDirectory.resolve("friends.json"))
+        store = FriendStore(context.storage())
         msg = context.messages(
             mapOf(
                 "joined" to "&aYour friend &f{player} &ajoined the network.",

@@ -7,6 +7,8 @@ import org.helix.api.action.ActionInvoker
 import org.helix.api.message.MapMessages
 import org.helix.api.message.Messages
 import org.helix.api.player.OnlinePlayer
+import org.helix.api.storage.AddonStorage
+import org.helix.api.storage.InMemoryAddonStorage
 
 /**
  * Node facilities handed to an addon on enable.
@@ -14,6 +16,17 @@ import org.helix.api.player.OnlinePlayer
 interface AddonContext {
     /** Directory the addon may persist data in, created before enable. */
     val dataDirectory: Path
+
+    /**
+     * Persistent document store for this addon.
+     *
+     * Backed by files or the shared PostgreSQL database depending on the
+     * node's storage mode — the addon code is identical either way. Prefer
+     * this over writing into [dataDirectory] directly.
+     *
+     * @return the addon-scoped storage.
+     */
+    fun storage(): AddonStorage = InMemoryAddonStorage()
 
     /** Invoker for calling any registered action from the addon. */
     val actions: ActionInvoker

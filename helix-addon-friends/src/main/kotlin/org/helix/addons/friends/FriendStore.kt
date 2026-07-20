@@ -1,22 +1,21 @@
 package org.helix.addons.friends
 
-import java.nio.file.Files
-import java.nio.file.Path
 import kotlinx.serialization.json.Json
+import org.helix.api.storage.AddonStorage
 
 /**
- * JSON-file backed friendship persistence.
+ * Friendship persistence backed by the addon's document storage.
  *
- * @property file the `friends.json` path.
+ * @property storage addon-scoped document store.
  */
-class FriendStore(private val file: Path) {
+class FriendStore(private val storage: AddonStorage) {
     private val json = Json { prettyPrint = true }
     private val friendships = mutableSetOf<Set<String>>()
     private val requests = mutableMapOf<String, MutableSet<String>>()
 
     init {
-        if (Files.exists(file)) {
-            val document = json.decodeFromString<FriendDocument>(Files.readString(file))
+        storage.read(DOCUMENT)?.let { raw ->
+            val document = json.decodeFromString<FriendDocument>(raw)
             document.friendships.forEach { friendships += it.toSet() }
             document.requests.forEach { (to, from) -> requests[to] = from.toMutableSet() }
         }
@@ -135,9 +134,8 @@ class FriendStore(private val file: Path) {
     }
 
     private fun persist() {
-        Files.createDirectories(file.parent)
-        Files.writeString(
-            file,
+        storage.write(
+            DOCUMENT,
             json.encodeToString(
                 FriendDocument(
                     friendships = friendships.map { it.toList().sorted() },
@@ -145,5 +143,10 @@ class FriendStore(private val file: Path) {
                 ),
             ),
         )
+    }
+
+    private companion object {
+        /** Document key holding the friendship state. */
+        const val DOCUMENT = "friends"
     }
 }

@@ -1,11 +1,11 @@
 package org.helix.addons.permissions
 
-import java.nio.file.Files
-import java.nio.file.Path
 import kotlinx.serialization.json.Json
+import org.helix.api.storage.AddonStorage
 
 /**
- * JSON-file backed permission storage with the resolution logic.
+ * Permission storage (with the resolution logic) backed by the addon's
+ * document storage.
  *
  * Precedence, highest first: personal user permissions, then the user's
  * groups by descending weight, each group followed by its inherited
@@ -13,16 +13,16 @@ import kotlinx.serialization.json.Json
  * negation (`-node`) beats a grant. Players without groups belong to all
  * `default` groups.
  *
- * @property file the `permissions.json` path.
+ * @property storage addon-scoped document store.
  */
-class PermissionStore(private val file: Path) {
+class PermissionStore(private val storage: AddonStorage) {
     private val json = Json { prettyPrint = true }
     private val groups = linkedMapOf<String, PermissionGroup>()
     private val users = linkedMapOf<String, PermissionUser>()
 
     init {
-        if (Files.exists(file)) {
-            val document = json.decodeFromString<PermissionDocument>(Files.readString(file))
+        storage.read(DOCUMENT)?.let { raw ->
+            val document = json.decodeFromString<PermissionDocument>(raw)
             document.groups.forEach { groups[it.name] = it }
             document.users.forEach { users[it.name] = it }
         }
@@ -165,10 +165,11 @@ class PermissionStore(private val file: Path) {
     }
 
     private fun persist() {
-        Files.createDirectories(file.parent)
-        Files.writeString(
-            file,
-            json.encodeToString(PermissionDocument(groups.values.toList(), users.values.toList())),
-        )
+        storage.write(DOCUMENT, json.encodeToString(PermissionDocument(groups.values.toList(), users.values.toList())))
+    }
+
+    private companion object {
+        /** Document key holding groups and users. */
+        const val DOCUMENT = "permissions"
     }
 }

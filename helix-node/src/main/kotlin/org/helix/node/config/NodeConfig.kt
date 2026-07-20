@@ -5,10 +5,12 @@ package org.helix.node.config
  *
  * @property control settings of the control API and dashboard.
  * @property docker settings of the docker execution backend.
+ * @property storage settings of the addon storage backend.
  */
 data class NodeConfig(
     val control: ControlSettings = ControlSettings(),
     val docker: DockerSettings = DockerSettings(),
+    val storage: StorageSettings = StorageSettings(),
 ) {
     /**
      * Control API settings.
@@ -33,4 +35,28 @@ data class NodeConfig(
         val network: String = "helix",
         val image: String = "eclipse-temurin:24-jre",
     )
+
+    /**
+     * Addon storage settings.
+     *
+     * @property mode `json` (files per addon) or `postgres` (shared db).
+     * @property url JDBC url, for example `jdbc:postgresql://host:5432/helix`.
+     * @property user database user.
+     * @property password database password.
+     * @property poolSize maximum pooled connections.
+     */
+    data class StorageSettings(
+        val mode: String = "json",
+        val url: String = "jdbc:postgresql://127.0.0.1:5432/helix",
+        val user: String = "helix",
+        val password: String = "helix",
+        val poolSize: Int = 8,
+    ) {
+        /**
+         * Whether the postgres backend is selected.
+         *
+         * @return `true` for `postgres` mode.
+         */
+        fun isPostgres(): Boolean = mode.equals("postgres", ignoreCase = true)
+    }
 }

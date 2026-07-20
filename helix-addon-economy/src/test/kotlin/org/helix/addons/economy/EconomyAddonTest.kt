@@ -53,9 +53,9 @@ class EconomyAddonTest {
 
     @Test
     fun `balances persist across instances`() {
-        val file = createTempDirectory("economy").resolve("balances.json")
-        BalanceStore(file).add("steve", 250)
+        val storage = org.helix.api.storage.InMemoryAddonStorage()
+        BalanceStore(storage).add("steve", 250)
 
-        assertEquals(250, BalanceStore(file).balance("Steve"))
+        assertEquals(250, BalanceStore(storage).balance("Steve"))
     }
 }

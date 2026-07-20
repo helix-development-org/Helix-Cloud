@@ -23,7 +23,7 @@ class TablistAddonTest {
 
         assertEquals("&6Mein Netzwerk\nZeile2", context.bridgeValues["tablist.header"])
 
-        val second = org.helix.addon.sdk.testing.RecordingAddonContext(directory)
+        val second = org.helix.addon.sdk.testing.RecordingAddonContext(directory, context.storage)
         TablistAddon().onEnable(second)
         assertEquals("&6Mein Netzwerk\nZeile2", second.bridgeValues["tablist.header"])
     }

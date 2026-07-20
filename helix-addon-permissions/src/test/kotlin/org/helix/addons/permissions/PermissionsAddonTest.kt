@@ -130,12 +130,12 @@ class PermissionsAddonTest {
 
     @Test
     fun `store persists across instances`() {
-        val file = createTempDirectory("perms").resolve("permissions.json")
-        val first = PermissionStore(file)
+        val storage = org.helix.api.storage.InMemoryAddonStorage()
+        val first = PermissionStore(storage)
         first.saveGroup(PermissionGroup("vip", weight = 5, permissions = listOf("helix.vip")))
         first.saveUser(PermissionUser("steve", groups = listOf("vip")))
 
-        val second = PermissionStore(file)
+        val second = PermissionStore(storage)
 
         assertTrue(second.has("steve", "helix.vip"))
         assertEquals(5, second.group("vip")?.weight)

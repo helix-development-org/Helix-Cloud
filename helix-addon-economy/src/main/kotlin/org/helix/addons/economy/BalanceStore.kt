@@ -1,21 +1,20 @@
 package org.helix.addons.economy
 
-import java.nio.file.Files
-import java.nio.file.Path
 import kotlinx.serialization.json.Json
+import org.helix.api.storage.AddonStorage
 
 /**
- * JSON-file backed coin balances.
+ * Coin balances backed by the addon's document storage.
  *
- * @property file the `balances.json` path.
+ * @property storage addon-scoped document store.
  */
-class BalanceStore(private val file: Path) {
+class BalanceStore(private val storage: AddonStorage) {
     private val json = Json { prettyPrint = true }
     private val balances = linkedMapOf<String, Long>()
 
     init {
-        if (Files.exists(file)) {
-            json.decodeFromString<Map<String, Long>>(Files.readString(file))
+        storage.read(DOCUMENT)?.let { raw ->
+            json.decodeFromString<Map<String, Long>>(raw)
                 .forEach { (name, amount) -> balances[name] = amount }
         }
     }
@@ -86,7 +85,11 @@ class BalanceStore(private val file: Path) {
     }
 
     private fun persist() {
-        Files.createDirectories(file.parent)
-        Files.writeString(file, json.encodeToString(balances.toMap()))
+        storage.write(DOCUMENT, json.encodeToString(balances.toMap()))
+    }
+
+    private companion object {
+        /** Document key holding the balances map. */
+        const val DOCUMENT = "balances"
     }
 }

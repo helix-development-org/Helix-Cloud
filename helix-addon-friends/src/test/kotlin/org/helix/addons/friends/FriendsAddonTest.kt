@@ -73,11 +73,11 @@ class FriendsAddonTest {
 
     @Test
     fun `store persists across instances`() {
-        val file = createTempDirectory("friends").resolve("friends.json")
-        val first = FriendStore(file)
+        val storage = org.helix.api.storage.InMemoryAddonStorage()
+        val first = FriendStore(storage)
         first.request("steve", "alex")
         first.accept("alex", "steve")
 
-        assertTrue(FriendStore(file).areFriends("Steve", "Alex"))
+        assertTrue(FriendStore(storage).areFriends("Steve", "Alex"))
     }
 }

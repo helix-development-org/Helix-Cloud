@@ -5,6 +5,21 @@
 > (Meilensteine `v1.0.0`…`v1.9.0` → `v0.1.0`…`v0.10.0`). `1.0.0` kommt,
 > wenn die Plattform wirklich stabil und feature-complete ist.
 
+## 0.14.0 — 2026-07-20
+
+### Zentraler Storage-Provider (JSON oder PostgreSQL)
+- Addons speichern über einen einheitlichen Dokument-Store
+  `context.storage()` statt selbst Dateien zu schreiben. Der Node wählt
+  das Backend zentral über `node.toml [storage] mode = json | postgres`.
+- `json` (Default): eine `<key>.json`-Datei je Dokument im Addon-Daten-
+  ordner (rückwärtskompatibel zu den bisherigen Dateien).
+- `postgres`: alle Addons teilen sich eine Tabelle `addon_storage
+  (addon_id, doc_key, value)` in einer gepoolten Datenbank (HikariCP).
+- Alle Addon-Daten laufen darüber: Bans, Economy, Friends, Permissions,
+  Warns, Chat/Tablist/Discord-Config und die Messages. Gegen echtes
+  PostgreSQL 16 verifiziert (schreiben, lesen, Neustart-Persistenz).
+- Neue API: `AddonStorage` + `context.storage()`.
+
 ## 0.13.0 — 2026-07-20
 
 ### Instant statt Polling (Latenz)

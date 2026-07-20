@@ -42,7 +42,7 @@ class DiscordBotAddon : AddonBase() {
      * configured.
      */
     override fun enable() {
-        config = DiscordConfig.load(configFile())
+        config = DiscordConfig.load(context.storage())
         val msg = context.messages(DiscordCommandHandler.DEFAULT_MESSAGES)
         handler = DiscordCommandHandler(context.actions, { config }, msg)
         context.registerNotificationListener { category, message ->
@@ -56,7 +56,7 @@ class DiscordBotAddon : AddonBase() {
                 "connected: ${kordRef.get() != null}",
                 "channel: ${config.channelId.ifBlank { "-" }}",
                 "notification categories: ${config.notificationCategories.joinToString()}",
-                "config: ${configFile()}",
+                "storage document: discord",
             )
         }
         action("discord.send", "Sends a message to the Discord channel.", "discord.send <text...>") { invocation ->
@@ -72,7 +72,7 @@ class DiscordBotAddon : AddonBase() {
         }
         action("discord.reload", "Reloads discord.json and reconnects the bot.", "discord.reload") {
             stopBot()
-            config = DiscordConfig.load(configFile())
+            config = DiscordConfig.load(context.storage())
             startBot()
             ActionResult.ok("reloaded — configured: ${config.configured()}")
         }
@@ -109,7 +109,7 @@ class DiscordBotAddon : AddonBase() {
         }.toMap()
         /** Parses a comma-separated override into a clean list, or null. */
         fun list(key: String) = overrides[key]?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() }
-        val current = DiscordConfig.load(configFile())
+        val current = DiscordConfig.load(context.storage())
         val updated = current.copy(
             botToken = overrides["token"]?.takeIf { it.isNotBlank() } ?: current.botToken,
             channelId = overrides["channel"] ?: current.channelId,
@@ -117,7 +117,7 @@ class DiscordBotAddon : AddonBase() {
             notificationCategories = list("categories") ?: current.notificationCategories,
             adminUserIds = list("admins") ?: current.adminUserIds,
         )
-        DiscordConfig.save(configFile(), updated)
+        DiscordConfig.save(context.storage(), updated)
         stopBot()
         config = updated
         startBot()
@@ -187,5 +187,4 @@ class DiscordBotAddon : AddonBase() {
         context.publishNotification("discord", message)
     }
 
-    private fun configFile() = context.dataDirectory.resolve("discord.json")
 }

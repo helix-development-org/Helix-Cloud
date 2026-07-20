@@ -13,6 +13,8 @@ import org.helix.api.addon.NotificationListener
 import org.helix.api.addon.PermissionResolver
 import org.helix.api.addon.PlayerListener
 import org.helix.api.player.OnlinePlayer
+import org.helix.api.storage.AddonStorage
+import org.helix.api.storage.InMemoryAddonStorage
 
 /**
  * In-memory [AddonContext] for addon unit tests.
@@ -22,7 +24,10 @@ import org.helix.api.player.OnlinePlayer
  *
  * @property dataDirectory directory handed to the addon.
  */
-class RecordingAddonContext(override val dataDirectory: Path) : AddonContext {
+class RecordingAddonContext(
+    override val dataDirectory: Path,
+    private val storageBackend: AddonStorage = InMemoryAddonStorage(),
+) : AddonContext {
     /** Registered actions by name. */
     val handlers = linkedMapOf<String, Pair<ActionDescriptor, ActionHandler>>()
 
@@ -58,6 +63,11 @@ class RecordingAddonContext(override val dataDirectory: Path) : AddonContext {
 
     /** Players reported as online. */
     val online = mutableListOf<OnlinePlayer>()
+
+    /** Stable storage returned by [storage]. */
+    val storage: AddonStorage get() = storageBackend
+
+    override fun storage(): AddonStorage = storageBackend
 
     override val actions: ActionInvoker = object : ActionInvoker {
         override fun invoke(invocation: ActionInvocation): ActionResult {

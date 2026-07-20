@@ -36,6 +36,9 @@ import org.helix.node.services.ProcessServiceExecutor
 import org.helix.node.services.ServiceManager
 import org.helix.node.services.WorkspacePreparer
 import org.helix.node.services.docker.DockerServiceExecutor
+import org.helix.node.storage.JsonStorageProvider
+import org.helix.node.storage.PostgresStorageProvider
+import org.helix.node.storage.StorageProvider
 import org.helix.node.tasks.TaskStore
 import org.helix.node.versions.ServerJarProvider
 import org.helix.node.versions.VersionCatalog
@@ -121,6 +124,10 @@ class HelixNode(
     /** Configurable message bundles of addons. */
     val messages: MessageRegistry = MessageRegistry()
 
+    /** Backend for addon document storage (files or PostgreSQL). */
+    val storageProvider: StorageProvider =
+        if (config.storage.isPostgres()) PostgresStorageProvider(config.storage) else JsonStorageProvider()
+
     /** Installed addons. */
     val addonManager: AddonManager = AddonManager(
         paths.addons,
@@ -133,6 +140,7 @@ class HelixNode(
         notifications,
         dashboardPanels,
         messages,
+        storageProvider,
     )
 
     private val overviewService = PlatformOverviewService(version(), taskStore, manager)
@@ -234,6 +242,7 @@ class HelixNode(
             stopServicesQuietly()
             addonManager.disableAll()
             controlServer.stop()
+            runCatching { storageProvider.close() }
             exitProcess(0)
         }, "helix-shutdown").start()
     }

@@ -30,7 +30,18 @@ token = "dev-token-change-me"  # Bearer-Token für API, Dashboard und Bridges
 [docker]
 network = "helix"              # Docker-Netzwerk aller Helix-Container
 image = "eclipse-temurin:24-jre"  # Basis-Image für Service-Container
+
+[storage]
+mode = "json"          # "json" (Dateien) oder "postgres"
+url = "jdbc:postgresql://127.0.0.1:5432/helix"
+user = "helix"
+password = "helix"
+poolSize = 8
 ```
+
+Im `postgres`-Modus speichern **alle** Addons ihre Daten in der
+geteilten Tabelle `addon_storage(addon_id, doc_key, value)` statt in
+Dateien — praktisch fürs Netzwerk-weite/zentrale Speichern.
 
 ## `config/versions.toml`
 

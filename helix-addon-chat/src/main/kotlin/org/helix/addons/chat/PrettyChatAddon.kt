@@ -1,6 +1,5 @@
 package org.helix.addons.chat
 
-import java.nio.file.Files
 import kotlinx.serialization.json.Json
 import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionResult
@@ -93,12 +92,10 @@ class PrettyChatAddon : AddonBase() {
         )
     }
 
-    private fun load(): ChatConfig {
-        val file = context.dataDirectory.resolve("chat.json")
-        return if (Files.exists(file)) json.decodeFromString(Files.readString(file)) else ChatConfig()
-    }
+    private fun load(): ChatConfig =
+        context.storage().read("chat")?.let { json.decodeFromString(it) } ?: ChatConfig()
 
     private fun save() {
-        Files.writeString(context.dataDirectory.resolve("chat.json"), json.encodeToString(config))
+        context.storage().write("chat", json.encodeToString(config))
     }
 }

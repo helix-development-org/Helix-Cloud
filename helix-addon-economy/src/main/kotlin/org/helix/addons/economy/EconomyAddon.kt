@@ -22,7 +22,7 @@ class EconomyAddon : AddonBase() {
      * Registers the player commands and admin actions.
      */
     override fun enable() {
-        store = BalanceStore(context.dataDirectory.resolve("balances.json"))
+        store = BalanceStore(context.storage())
         msg = context.messages(
             mapOf(
                 "balance" to "&6Your balance: &f{balance} coins",

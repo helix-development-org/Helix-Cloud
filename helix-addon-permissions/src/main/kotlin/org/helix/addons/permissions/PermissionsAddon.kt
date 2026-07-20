@@ -20,7 +20,7 @@ class PermissionsAddon : AddonBase() {
      * Registers the resolver and all `perm.*` actions.
      */
     override fun enable() {
-        store = PermissionStore(context.dataDirectory.resolve("permissions.json"))
+        store = PermissionStore(context.storage())
         if (store.group("default") == null) {
             store.saveGroup(PermissionGroup(name = "default", default = true))
         }

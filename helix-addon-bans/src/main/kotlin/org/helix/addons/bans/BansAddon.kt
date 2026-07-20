@@ -23,7 +23,7 @@ class BansAddon : AddonBase() {
      * Registers the ban actions and the join gate.
      */
     override fun enable() {
-        store = BanStore(context.dataDirectory.resolve("bans.json"))
+        store = BanStore(context.storage())
         msg = context.messages(
             mapOf(
                 "banned" to "&cYou are banned from this network.\n&7Reason: &f{reason}",

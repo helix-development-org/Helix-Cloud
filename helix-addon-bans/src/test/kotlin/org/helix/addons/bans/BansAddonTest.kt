@@ -8,6 +8,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.helix.addon.sdk.testing.RecordingAddonContext
+import org.helix.api.storage.InMemoryAddonStorage
 import org.helix.api.action.ActionResult
 import org.helix.api.proxy.JoinRequest
 
@@ -63,7 +64,7 @@ class BansAddonTest {
     @Test
     fun `expired temp ban no longer blocks`() {
         var now = 1_000L
-        val store = BanStore(createTempDirectory("bans").resolve("bans.json"), clock = { now })
+        val store = BanStore(InMemoryAddonStorage(), clock = { now })
         store.set("steve", "bye", durationMs = 60_000)
 
         assertEquals("bye", store.activeBan("steve")?.reason)
@@ -74,10 +75,10 @@ class BansAddonTest {
 
     @Test
     fun `store persists across instances`() {
-        val file = createTempDirectory("bans").resolve("bans.json")
-        BanStore(file).set("steve", "griefing")
+        val storage = InMemoryAddonStorage()
+        BanStore(storage).set("steve", "griefing")
 
-        assertEquals("griefing", BanStore(file).activeBan("Steve")?.reason)
+        assertEquals("griefing", BanStore(storage).activeBan("Steve")?.reason)
     }
 
     @Test

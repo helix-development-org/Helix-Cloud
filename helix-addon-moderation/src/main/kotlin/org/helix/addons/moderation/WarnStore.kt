@@ -1,25 +1,24 @@
 package org.helix.addons.moderation
 
-import java.nio.file.Files
-import java.nio.file.Path
 import kotlinx.serialization.json.Json
+import org.helix.api.storage.AddonStorage
 
 /**
- * JSON-file backed warn history.
+ * Warn history backed by the addon's document storage.
  *
- * @property file the `warns.json` path.
+ * @property storage addon-scoped document store.
  * @property clock epoch millis source, injectable for tests.
  */
 class WarnStore(
-    private val file: Path,
+    private val storage: AddonStorage,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val json = Json { prettyPrint = true }
     private val warns = mutableListOf<WarnEntry>()
 
     init {
-        if (Files.exists(file)) {
-            warns += json.decodeFromString<List<WarnEntry>>(Files.readString(file))
+        storage.read(DOCUMENT)?.let { raw ->
+            warns += json.decodeFromString<List<WarnEntry>>(raw)
         }
     }
 
@@ -35,8 +34,7 @@ class WarnStore(
     fun warn(player: String, by: String, reason: String): WarnEntry {
         val entry = WarnEntry(player.lowercase(), by, reason, clock())
         warns += entry
-        Files.createDirectories(file.parent)
-        Files.writeString(file, json.encodeToString(warns.toList()))
+        storage.write(DOCUMENT, json.encodeToString(warns.toList()))
         return entry
     }
 
@@ -49,4 +47,9 @@ class WarnStore(
     @Synchronized
     fun warnsOf(player: String): List<WarnEntry> =
         warns.filter { it.player == player.lowercase() }.sortedByDescending { it.atEpochMs }
+
+    private companion object {
+        /** Document key holding the warn history. */
+        const val DOCUMENT = "warns"
+    }
 }

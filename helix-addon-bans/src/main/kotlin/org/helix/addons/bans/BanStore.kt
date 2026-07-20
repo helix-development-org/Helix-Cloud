@@ -1,26 +1,25 @@
 package org.helix.addons.bans
 
-import java.nio.file.Files
-import java.nio.file.Path
 import kotlinx.serialization.json.Json
+import org.helix.api.storage.AddonStorage
 
 /**
- * JSON-file backed ban persistence in the addon data directory.
+ * Ban persistence backed by the addon's document storage (files or
+ * PostgreSQL, depending on the node's storage mode).
  *
- * @property file the `bans.json` path.
+ * @property storage addon-scoped document store.
  * @property clock epoch millis source, injectable for tests.
  */
 class BanStore(
-    private val file: Path,
+    private val storage: AddonStorage,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val json = Json { prettyPrint = true }
     private val bans = linkedMapOf<String, BanEntry>()
 
     init {
-        if (Files.exists(file)) {
-            json.decodeFromString<List<BanEntry>>(Files.readString(file))
-                .forEach { bans[it.player] = it }
+        storage.read(DOCUMENT)?.let { raw ->
+            json.decodeFromString<List<BanEntry>>(raw).forEach { bans[it.player] = it }
         }
     }
 
@@ -95,7 +94,11 @@ class BanStore(
     }
 
     private fun persist() {
-        Files.createDirectories(file.parent)
-        Files.writeString(file, json.encodeToString(bans.values.toList()))
+        storage.write(DOCUMENT, json.encodeToString(bans.values.toList()))
+    }
+
+    private companion object {
+        /** Document key holding the ban list. */
+        const val DOCUMENT = "bans"
     }
 }

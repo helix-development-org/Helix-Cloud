@@ -209,6 +209,29 @@ Referenz-Implementierungen in diesem Repo:
 Verwaltung über CLI/REST/Dashboard: `addon.list`, `addon.enable <id>`,
 `addon.disable <id>`.
 
+## Daten speichern (JSON oder Postgres)
+
+Addons speichern über `context.storage()` — einen Dokument-Store, dessen
+Backend der Node zentral wählt (`node.toml [storage] mode`). Im
+`json`-Modus wird pro Key eine Datei im Addon-Datenordner geschrieben, im
+`postgres`-Modus landet alles in der geteilten DB-Tabelle. Der Addon-Code
+ist in beiden Fällen identisch.
+
+```kotlin
+class MyStore(private val storage: org.helix.api.storage.AddonStorage) {
+    fun load(): List<Entry> =
+        storage.read("entries")?.let { Json.decodeFromString(it) } ?: emptyList()
+    fun save(entries: List<Entry>) =
+        storage.write("entries", Json.encodeToString(entries))
+}
+
+// im Addon:
+val store = MyStore(context.storage())
+```
+
+`AddonStorage` bietet `read(key)`, `write(key, value)`, `delete(key)` und
+`keys()`. Für Tests gibt es `InMemoryAddonStorage`.
+
 ## Konfigurierbare Nachrichten
 
 Alle player-facing Texte eines Addons sollen einstellbar sein. Dafür

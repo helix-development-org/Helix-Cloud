@@ -1,32 +1,32 @@
 package org.helix.node.messages
 
-import java.nio.file.Files
-import java.nio.file.Path
 import kotlinx.serialization.json.Json
 import org.helix.api.message.Messages
 import org.helix.api.message.applyPlaceholders
+import org.helix.api.storage.AddonStorage
 
 /**
- * An addon's configurable messages, persisted as `messages.json` in its
- * data directory.
+ * An addon's configurable messages, persisted through the addon's document
+ * storage (files or PostgreSQL) under the `messages` key.
  *
- * On construction the defaults seed the file: missing keys are added and
+ * On construction the defaults seed storage: missing keys are added and
  * persisted, existing values are kept. Reads always reflect the current
  * (possibly dashboard-edited) values.
  *
- * @property file the `messages.json` path.
+ * @property storage addon-scoped document store.
  * @property defaults default templates keyed by message key.
  */
 class MessageBundle(
-    private val file: Path,
+    private val storage: AddonStorage,
     private val defaults: Map<String, String>,
 ) : Messages {
     private val json = Json { prettyPrint = true }
     private val values = linkedMapOf<String, String>()
 
     init {
-        if (Files.exists(file)) {
-            runCatching { json.decodeFromString<Map<String, String>>(Files.readString(file)) }
+        val existing = storage.read(DOCUMENT)
+        existing?.let { raw ->
+            runCatching { json.decodeFromString<Map<String, String>>(raw) }
                 .getOrDefault(emptyMap())
                 .forEach { (key, value) -> values[key] = value }
         }
@@ -37,7 +37,7 @@ class MessageBundle(
                 changed = true
             }
         }
-        if (changed || Files.notExists(file)) {
+        if (changed || existing == null) {
             persist()
         }
     }
@@ -110,7 +110,11 @@ class MessageBundle(
     }
 
     private fun persist() {
-        Files.createDirectories(file.parent)
-        Files.writeString(file, json.encodeToString(values.toMap()))
+        storage.write(DOCUMENT, json.encodeToString(values.toMap()))
+    }
+
+    private companion object {
+        /** Document key holding the message map. */
+        const val DOCUMENT = "messages"
     }
 }

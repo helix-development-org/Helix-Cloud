@@ -21,7 +21,7 @@ class ModerationAddon : AddonBase() {
      * Registers the moderation player commands.
      */
     override fun enable() {
-        store = WarnStore(context.dataDirectory.resolve("warns.json"))
+        store = WarnStore(context.storage())
         msg = context.messages(
             mapOf(
                 "kick.default" to "Kicked by a moderator.",

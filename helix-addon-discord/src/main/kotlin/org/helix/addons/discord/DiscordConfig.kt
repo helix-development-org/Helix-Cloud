@@ -1,13 +1,12 @@
 package org.helix.addons.discord
 
-import java.nio.file.Files
-import java.nio.file.Path
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.helix.api.storage.AddonStorage
 
 /**
- * Configuration of the Discord bot, persisted as `discord.json` in the
- * addon data directory.
+ * Configuration of the Discord bot, persisted through the addon's document
+ * storage under the `discord` key.
  *
  * @property botToken Discord bot token; blank keeps the bot idle.
  * @property channelId channel the bot listens in and posts to.
@@ -38,31 +37,33 @@ data class DiscordConfig(
             encodeDefaults = true
         }
 
+        /** Storage document key holding the configuration. */
+        private const val DOCUMENT = "discord"
+
         /**
          * Loads the configuration, writing defaults on first use.
          *
-         * @param file path of `discord.json`.
+         * @param storage addon-scoped document store.
          * @return the effective configuration.
          */
-        fun load(file: Path): DiscordConfig {
-            if (Files.notExists(file)) {
+        fun load(storage: AddonStorage): DiscordConfig {
+            val raw = storage.read(DOCUMENT)
+            if (raw == null) {
                 val defaults = DiscordConfig()
-                Files.createDirectories(file.parent)
-                Files.writeString(file, json.encodeToString(defaults))
+                storage.write(DOCUMENT, json.encodeToString(defaults))
                 return defaults
             }
-            return json.decodeFromString(Files.readString(file))
+            return json.decodeFromString(raw)
         }
 
         /**
-         * Writes the configuration to disk.
+         * Persists the configuration.
          *
-         * @param file path of `discord.json`.
+         * @param storage addon-scoped document store.
          * @param config configuration to persist.
          */
-        fun save(file: Path, config: DiscordConfig) {
-            Files.createDirectories(file.parent)
-            Files.writeString(file, json.encodeToString(config))
+        fun save(storage: AddonStorage, config: DiscordConfig) {
+            storage.write(DOCUMENT, json.encodeToString(config))
         }
     }
 }
