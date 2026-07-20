@@ -17,6 +17,8 @@ import org.helix.node.control.ControlDependencies
 import org.helix.node.control.ControlServer
 import org.helix.node.display.BridgeValueStore
 import org.helix.node.display.DisplayResolverRegistry
+import org.helix.node.events.EventLog
+import org.helix.node.logging.LogBuffer
 import org.helix.node.gates.JoinGateRegistry
 import org.helix.node.gates.PermissionResolverRegistry
 import org.helix.node.notifications.NotificationBus
@@ -42,9 +44,15 @@ import org.slf4j.LoggerFactory
  *
  * @property dataDirectory the `Helix/` data directory root.
  */
-class HelixNode(private val dataDirectory: Path) {
+class HelixNode(
+    private val dataDirectory: Path,
+    private val logBuffer: LogBuffer = LogBuffer(),
+) {
     private val logger = LoggerFactory.getLogger(HelixNode::class.java)
     private val stopping = AtomicBoolean(false)
+
+    /** Recent node events for the dashboard timeline. */
+    val eventLog: EventLog = EventLog()
 
     /** Data directory layout. */
     val paths: NodePaths = NodePaths(dataDirectory).createAll()
@@ -74,6 +82,7 @@ class HelixNode(private val dataDirectory: Path) {
             ExecutorType.DOCKER to DockerServiceExecutor(config.docker),
         ),
         environmentProvider = ::bridgeEnvironment,
+        eventSink = { category, level, message -> eventLog.record(category, message, level) },
     )
 
     /** Proxy routing state. */
@@ -133,6 +142,8 @@ class HelixNode(private val dataDirectory: Path) {
             playerRegistry = playerRegistry,
             displayResolvers = displayResolvers,
             bridgeValues = bridgeValues,
+            logBuffer = logBuffer,
+            eventLog = eventLog,
         ),
     )
 
@@ -153,9 +164,11 @@ class HelixNode(private val dataDirectory: Path) {
             shutdown = ::shutdown,
             commandQueue = commandQueue,
             playerRegistry = playerRegistry,
+            eventSink = { category, level, message -> eventLog.record(category, message, level) },
         ).registerAll(registry)
         AddonActions(addonManager).registerAll(registry)
         addonManager.loadAll()
+        registerEventSources()
         controlServer.start()
         manager.onServiceTerminated { service: ManagedService ->
             if (service.task.environment.proxy) {
@@ -215,6 +228,26 @@ class HelixNode(private val dataDirectory: Path) {
         ) {
             Thread.sleep(100)
         }
+    }
+
+    private fun registerEventSources() {
+        playerRegistry.register(
+            "__events__",
+            /** Records player join/leave into the event log. */
+            object : org.helix.api.addon.PlayerListener {
+                override fun onJoin(player: org.helix.api.player.OnlinePlayer) {
+                    eventLog.record("player", "${player.name} joined the network")
+                }
+
+                override fun onLeave(player: org.helix.api.player.OnlinePlayer) {
+                    eventLog.record("player", "${player.name} left the network")
+                }
+            },
+        )
+        notifications.register("__events__") { category, message ->
+            eventLog.record(category, message.replace(Regex("&[0-9a-fk-orA-FK-OR]"), ""))
+        }
+        eventLog.record("node", "Node started (version ${version()})")
     }
 
     private fun bridgeEnvironment(service: ManagedService): Map<String, String> {

@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.7.0 — 2026-07-20
+
+### Komplett neues Web-Dashboard
+- Neu gestaltetes, modernes UI: Icon-Sidebar mit Gruppen, Topbar mit
+  Live-Verbindungsstatus, Stat-Tiles, Cards, Statusbadges, Player-Bars,
+  Toggle-Switches, segmentierte Filter, Light/Dark — self-contained
+  (keine externen Assets).
+- Neue Seiten: **Proxy** (Maintenance-Schalter, Proxy-Liste,
+  Backend-Routing mit aufgelösten Adressen), **Events** (Timeline mit
+  Kategorie-Filter), **Logs** (Live-Terminal mit Suche und Pause),
+  **Settings** (Node-Infos, Token kopieren, Action-Konsole + Action-Liste).
+- Overview mit Live-Aktivität und Service-Health, Tasks/Services/Addons
+  überarbeitet.
+
+### Neue Observability-Endpoints
+- `GET /logs` — Node-Log über einen Ringpuffer, der `stdout`/`stderr`
+  mitschneidet (erfasst auch Library-Ausgaben).
+- `GET /events` — Event-Timeline aus Service-Lifecycle, Player-Join/Leave,
+  Moderations-Notifications, Proxy- und Task-Änderungen.
+- `GET /proxy` und `POST /proxy/maintenance` — Proxy-Übersicht und
+  Maintenance-Steuerung.
+
 ## 0.6.3 — 2026-07-19
 
 ### Fix: Velocity startet nicht („Your configuration is invalid")

@@ -32,14 +32,17 @@ import org.helix.api.player.PlayerEvent
 import org.helix.api.proxy.JoinRequest
 import org.helix.api.proxy.PermissionCheckRequest
 import org.helix.api.proxy.PermissionDecision
+import org.helix.api.service.ServiceState
 import org.helix.api.task.TaskDefinition
 import org.helix.node.actions.PlayerCommandService
 import org.helix.node.addons.AddonManager
 import org.helix.node.config.NodeConfig
 import org.helix.node.display.BridgeValueStore
 import org.helix.node.display.DisplayResolverRegistry
+import org.helix.node.events.EventLog
 import org.helix.node.gates.JoinGateRegistry
 import org.helix.node.gates.PermissionResolverRegistry
+import org.helix.node.logging.LogBuffer
 import org.helix.node.players.PlayerRegistry
 import org.helix.node.platform.PlatformOverviewService
 import org.helix.node.proxy.ProxyCommandQueue
@@ -77,6 +80,8 @@ data class ControlDependencies(
     val playerRegistry: PlayerRegistry = PlayerRegistry(),
     val displayResolvers: DisplayResolverRegistry = DisplayResolverRegistry(),
     val bridgeValues: BridgeValueStore = BridgeValueStore(),
+    val logBuffer: LogBuffer = LogBuffer(),
+    val eventLog: EventLog = EventLog(),
 ) {
     /** Player command execution shared by the internal routes. */
     val playerCommands: PlayerCommandService = PlayerCommandService(registry, permissionResolvers)
@@ -118,6 +123,8 @@ fun Application.controlModule(dependencies: ControlDependencies) {
                 platformRoutes(dependencies)
                 taskRoutes(dependencies)
                 serviceRoutes(dependencies)
+                proxyRoutes(dependencies)
+                observabilityRoutes(dependencies)
                 actionRoutes(dependencies)
                 addonRoutes(dependencies)
                 internalRoutes(dependencies)
@@ -129,6 +136,60 @@ fun Application.controlModule(dependencies: ControlDependencies) {
 private fun io.ktor.server.routing.Route.platformRoutes(dependencies: ControlDependencies) {
     get("/platform/overview") {
         call.respond(dependencies.overviewService.overview())
+    }
+}
+
+private fun io.ktor.server.routing.Route.observabilityRoutes(dependencies: ControlDependencies) {
+    get("/logs") {
+        val tail = call.request.queryParameters["tail"]?.toIntOrNull() ?: 300
+        call.respond(LogsResponse(dependencies.logBuffer.tail(tail)))
+    }
+    get("/events") {
+        val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 200
+        call.respond(dependencies.eventLog.recent(limit))
+    }
+}
+
+private fun io.ktor.server.routing.Route.proxyRoutes(dependencies: ControlDependencies) {
+    get("/proxy") {
+        val services = dependencies.manager.managedServices()
+        val proxies = services.filter { it.task.environment.proxy }.map {
+            ProxySummary(
+                id = it.id,
+                state = it.state.name,
+                executor = it.task.executor.name,
+                port = it.port,
+                onlinePlayers = it.onlinePlayers,
+                maxPlayers = it.maxPlayers,
+            )
+        }
+        val referenceProxy = proxies.firstOrNull()?.id ?: ""
+        val routed = dependencies.routing.snapshot(referenceProxy).backends.associateBy { it.serviceId }
+        val backends = services
+            .filter { !it.task.environment.proxy && it.state == ServiceState.RUNNING }
+            .map { backend ->
+                val route = routed[backend.id]
+                ProxyBackendView(
+                    id = backend.id,
+                    task = backend.task.name,
+                    state = backend.state.name,
+                    host = route?.host ?: "127.0.0.1",
+                    port = route?.port ?: backend.port,
+                    onlinePlayers = backend.onlinePlayers,
+                    fallbackEligible = backend.task.fallbackEligible,
+                )
+            }
+        call.respond(ProxyView(dependencies.routing.maintenance, proxies, backends))
+    }
+    post("/proxy/maintenance") {
+        val request = call.receive<MaintenanceRequest>()
+        dependencies.routing.maintenance = request.enabled
+        dependencies.eventLog.record(
+            "proxy",
+            if (request.enabled) "Maintenance enabled" else "Maintenance disabled",
+            if (request.enabled) "warn" else "info",
+        )
+        call.respond(MessageResponse("maintenance ${if (request.enabled) "enabled" else "disabled"}"))
     }
 }
 

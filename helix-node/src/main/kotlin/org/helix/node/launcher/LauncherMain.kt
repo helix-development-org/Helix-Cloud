@@ -1,6 +1,7 @@
 package org.helix.node.launcher
 
 import java.nio.file.Path
+import org.helix.node.logging.LogCapture
 
 /**
  * Entry point of the single `Launcher.jar` artifact.
@@ -16,8 +17,9 @@ object LauncherMain {
      */
     @JvmStatic
     fun main(args: Array<String>) {
+        val logBuffer = LogCapture.install()
         val dataDirectory = HelixDirectoryInitializer(Path.of("Helix")).initialize()
-        val node = HelixNode(dataDirectory)
+        val node = HelixNode(dataDirectory, logBuffer)
         node.start()
         node.runCli()
     }

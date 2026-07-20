@@ -29,6 +29,7 @@ class ServiceManager(
     private val executors: Map<ExecutorType, ServiceExecutor>,
     private val environmentProvider: (ManagedService) -> Map<String, String> = { emptyMap() },
     private val clock: () -> Long = System::currentTimeMillis,
+    private val eventSink: (category: String, level: String, message: String) -> Unit = { _, _, _ -> },
 ) {
     private val logger = LoggerFactory.getLogger(ServiceManager::class.java)
     private val services = linkedMapOf<String, ManagedService>()
@@ -187,6 +188,7 @@ class ServiceManager(
         if (managed.state == ServiceState.STARTING) {
             managed.state = ServiceState.RUNNING
             logger.info("Service {} is now RUNNING", managed.id)
+            eventSink("service", "info", "${managed.id} is now running")
         }
         managed.emptySinceEpochMs = when {
             report.onlinePlayers > 0 -> null
@@ -216,6 +218,7 @@ class ServiceManager(
         managed.handle = handle
         handle.onExit { exitCode -> onExit(managed, exitCode) }
         logger.info("Started {} on port {} via {}", managed.id, managed.port, task.executor)
+        eventSink("service", "info", "Started ${managed.id} on port ${managed.port} via ${task.executor}")
         return managed.toInfo()
     }
 
@@ -242,8 +245,10 @@ class ServiceManager(
                 exitCode,
                 managed.lastLogs.joinToString("\n").ifBlank { "(no output captured)" },
             )
+            eventSink("service", "error", "${managed.id} failed with exit code $exitCode")
         } else {
             logger.info("Service {} terminated with exit code {} ({})", managed.id, exitCode, managed.state)
+            eventSink("service", "info", "${managed.id} stopped")
         }
         if (!managed.task.staticServices) {
             workspacePreparer.deleteRecursively(managed.workspace)

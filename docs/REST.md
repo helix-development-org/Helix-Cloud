@@ -11,6 +11,10 @@ Das Dashboard unter `/` ist statisch und nutzt dieselbe API.
 | Methode | Pfad | Beschreibung |
 |---|---|---|
 | GET | `/platform/overview` | Aggregierte Zähler (Services, Player, Version) |
+| GET | `/logs?tail=300` | Node-Log (Ringpuffer über stdout/stderr-Capture) |
+| GET | `/events?limit=200` | Event-Timeline (neueste zuerst): Service-Lifecycle, Player, Moderation, Proxy, Tasks |
+| GET | `/proxy` | Proxy-Übersicht: Maintenance, Proxies, Backend-Routing |
+| POST | `/proxy/maintenance` | Maintenance schalten — Body `{"enabled": true}` |
 
 ## Tasks
 

@@ -58,6 +58,8 @@ class ControlServerTest {
     )
     private val routing = ProxyRoutingService(manager)
     private val registry = ActionRegistry()
+    private val eventLog = org.helix.node.events.EventLog()
+    private val logBuffer = org.helix.node.logging.LogBuffer().apply { add("[main] INFO boot line") }
     private val dependencies = ControlDependencies(
         token = "secret",
         registry = registry,
@@ -66,6 +68,8 @@ class ControlServerTest {
         routing = routing,
         overviewService = PlatformOverviewService("1.0.0", taskStore, manager),
         addonManager = AddonManager(paths.addons, registry),
+        logBuffer = logBuffer,
+        eventLog = eventLog,
     )
 
     init {
@@ -233,6 +237,34 @@ class ControlServerTest {
             setBody(org.helix.api.proxy.PermissionCheckRequest("alex", "helix.maintenance.bypass"))
         }.body()
         assertEquals(false, deniedPerm.allowed)
+    }
+
+    @Test
+    fun `logs events and proxy views are served`() = testApplication {
+        val client = apiClient()
+        eventLog.record("service", "Lobby-1 started")
+
+        val logs: LogsResponse = client.get("/api/v1/logs") { bearerAuth("secret") }.body()
+        assertTrue(logs.lines.any { it.contains("boot line") })
+
+        val events: List<org.helix.node.events.Event> = client.get("/api/v1/events") { bearerAuth("secret") }.body()
+        assertEquals("Lobby-1 started", events.first().message)
+
+        client.put("/api/v1/tasks/Lobby") {
+            bearerAuth("secret"); contentType(ContentType.Application.Json); setBody(lobby)
+        }
+        client.post("/api/v1/tasks/Lobby/services") { bearerAuth("secret") }
+        manager.handleHeartbeat(HeartbeatReport("Lobby-1", 4, 100))
+
+        val proxyOff: ProxyView = client.get("/api/v1/proxy") { bearerAuth("secret") }.body()
+        assertEquals(false, proxyOff.maintenance)
+        assertEquals("Lobby-1", proxyOff.backends.single().id)
+
+        client.post("/api/v1/proxy/maintenance") {
+            bearerAuth("secret"); contentType(ContentType.Application.Json); setBody(MaintenanceRequest(true))
+        }
+        val proxyOn: ProxyView = client.get("/api/v1/proxy") { bearerAuth("secret") }.body()
+        assertTrue(proxyOn.maintenance)
     }
 
     @Test

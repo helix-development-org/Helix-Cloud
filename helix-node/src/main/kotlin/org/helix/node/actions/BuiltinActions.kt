@@ -41,6 +41,7 @@ class BuiltinActions(
     private val shutdown: () -> Unit,
     private val commandQueue: ProxyCommandQueue = ProxyCommandQueue(),
     private val playerRegistry: PlayerRegistry = PlayerRegistry(),
+    private val eventSink: (category: String, level: String, message: String) -> Unit = { _, _, _ -> },
 ) {
     /**
      * Registers every built-in action.
@@ -113,6 +114,7 @@ class BuiltinActions(
                 return@register ActionResult.error("task $name still has active services")
             }
             if (taskStore.delete(name)) {
+                eventSink("task", "info", "Deleted task $name")
                 ActionResult.ok("deleted task $name")
             } else {
                 ActionResult.error("unknown task: $name")
@@ -159,10 +161,12 @@ class BuiltinActions(
                 null -> ActionResult.ok("maintenance: ${if (routing.maintenance) "on" else "off"}")
                 "on" -> {
                     routing.maintenance = true
+                    eventSink("proxy", "warn", "Maintenance enabled")
                     ActionResult.ok("maintenance enabled")
                 }
                 "off" -> {
                     routing.maintenance = false
+                    eventSink("proxy", "info", "Maintenance disabled")
                     ActionResult.ok("maintenance disabled")
                 }
                 else -> ActionResult.error("usage: proxy.maintenance [on|off]")
@@ -275,6 +279,7 @@ class BuiltinActions(
         )
         taskStore.save(task)
         Files.createDirectories(paths.templates.resolve(name))
+        eventSink("task", "info", "Created task ${task.name} (${task.environment} ${task.version})")
         return ActionResult.ok(
             "created task ${task.name} (${task.environment} ${task.version}, executor=${task.executor})",
             "template directory: templates/${task.name}",
