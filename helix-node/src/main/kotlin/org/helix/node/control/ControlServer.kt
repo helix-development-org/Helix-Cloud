@@ -44,6 +44,7 @@ import org.helix.node.events.EventLog
 import org.helix.node.gates.JoinGateRegistry
 import org.helix.node.gates.PermissionResolverRegistry
 import org.helix.node.logging.LogBuffer
+import org.helix.node.messages.MessageRegistry
 import org.helix.node.players.PlayerRegistry
 import org.helix.node.platform.PlatformOverviewService
 import org.helix.node.proxy.ProxyCommandQueue
@@ -84,6 +85,7 @@ data class ControlDependencies(
     val logBuffer: LogBuffer = LogBuffer(),
     val eventLog: EventLog = EventLog(),
     val dashboardPanels: DashboardPanelRegistry = DashboardPanelRegistry(),
+    val messages: MessageRegistry = MessageRegistry(),
 ) {
     /** Player command execution shared by the internal routes. */
     val playerCommands: PlayerCommandService = PlayerCommandService(registry, permissionResolvers)
@@ -128,6 +130,7 @@ fun Application.controlModule(dependencies: ControlDependencies) {
                 proxyRoutes(dependencies)
                 observabilityRoutes(dependencies)
                 panelRoutes(dependencies)
+                messageRoutes(dependencies)
                 actionRoutes(dependencies)
                 addonRoutes(dependencies)
                 internalRoutes(dependencies)
@@ -163,6 +166,25 @@ private fun io.ktor.server.routing.Route.panelRoutes(dependencies: ControlDepend
             call.respond(HttpStatusCode.NotFound, ErrorResponse("unknown panel"))
         } else {
             call.respond(panel)
+        }
+    }
+}
+
+private fun io.ktor.server.routing.Route.messageRoutes(dependencies: ControlDependencies) {
+    get("/messages") {
+        call.respond(dependencies.messages.all())
+    }
+    post("/messages") {
+        val update = call.receive<MessageUpdate>()
+        val ok = if (update.reset) {
+            dependencies.messages.reset(update.addonId, update.key)
+        } else {
+            dependencies.messages.set(update.addonId, update.key, update.value)
+        }
+        if (ok) {
+            call.respond(MessageResponse("updated ${update.addonId}.${update.key}"))
+        } else {
+            call.respond(HttpStatusCode.NotFound, ErrorResponse("unknown message ${update.addonId}.${update.key}"))
         }
     }
 }

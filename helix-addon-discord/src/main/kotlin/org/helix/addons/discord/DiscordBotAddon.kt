@@ -64,7 +64,8 @@ class DiscordBotAddon : AddonBase() {
      */
     override fun enable() {
         config = DiscordConfig.load(configFile())
-        handler = DiscordCommandHandler(context.actions) { config }
+        val msg = context.messages(DiscordCommandHandler.DEFAULT_MESSAGES)
+        handler = DiscordCommandHandler(context.actions, { config }, msg)
         context.registerNotificationListener { category, message ->
             if (category in config.notificationCategories) {
                 sendToChannel(handler.stripColors(message))

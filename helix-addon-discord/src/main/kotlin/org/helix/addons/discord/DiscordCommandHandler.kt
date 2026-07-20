@@ -3,6 +3,8 @@ package org.helix.addons.discord
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionInvoker
 import org.helix.api.action.ActionSource
+import org.helix.api.message.MapMessages
+import org.helix.api.message.Messages
 
 /**
  * Kord-free command logic of the Discord bot, unit-testable without a
@@ -17,10 +19,12 @@ import org.helix.api.action.ActionSource
  *
  * @property actions action entry point of the node.
  * @property config supplies the current configuration.
+ * @property messages configurable reply templates.
  */
 class DiscordCommandHandler(
     private val actions: ActionInvoker,
     private val config: () -> DiscordConfig,
+    private val messages: Messages = MapMessages(DEFAULT_MESSAGES),
 ) {
     /**
      * Handles one Discord message.
@@ -62,7 +66,7 @@ class DiscordCommandHandler(
 
     private fun runAction(authorId: String, tokens: List<String>, current: DiscordConfig): String {
         if (authorId !in current.adminUserIds) {
-            return "You are not allowed to run actions."
+            return messages.raw("run.denied")
         }
         val action = tokens.firstOrNull() ?: return "Usage: ${current.commandPrefix}run <action> [args...]"
         return reply(
@@ -83,4 +87,12 @@ class DiscordCommandHandler(
 
     private fun codeBlock(lines: List<String>): String =
         "```\n${lines.joinToString("\n")}\n```"
+
+    companion object {
+        /** Default configurable reply templates of the Discord bot. */
+        val DEFAULT_MESSAGES = mapOf(
+            "run.denied" to "You are not allowed to run actions.",
+            "unavailable" to "Command is currently unavailable.",
+        )
+    }
 }

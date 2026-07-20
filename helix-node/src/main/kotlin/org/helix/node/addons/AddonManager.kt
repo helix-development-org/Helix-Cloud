@@ -22,6 +22,7 @@ import org.helix.api.addon.JoinGate
 import org.helix.api.addon.NotificationListener
 import org.helix.api.addon.PermissionResolver
 import org.helix.api.addon.PlayerListener
+import org.helix.api.message.Messages
 import org.helix.api.player.OnlinePlayer
 import org.helix.api.proxy.PermissionCheckRequest
 import org.helix.node.actions.ActionRegistry
@@ -30,6 +31,8 @@ import org.helix.node.display.BridgeValueStore
 import org.helix.node.display.DisplayResolverRegistry
 import org.helix.node.gates.JoinGateRegistry
 import org.helix.node.gates.PermissionResolverRegistry
+import org.helix.node.messages.MessageBundle
+import org.helix.node.messages.MessageRegistry
 import org.helix.node.notifications.NotificationBus
 import org.helix.node.players.PlayerRegistry
 import org.slf4j.LoggerFactory
@@ -51,6 +54,7 @@ import org.slf4j.LoggerFactory
  * @property bridgeValues global values bridges poll.
  * @property notifications notification bus between addons.
  * @property dashboardPanels dashboard pages contributed by addons.
+ * @property messages configurable message bundles of addons.
  */
 class AddonManager(
     private val directory: Path,
@@ -62,6 +66,7 @@ class AddonManager(
     private val bridgeValues: BridgeValueStore = BridgeValueStore(),
     private val notifications: NotificationBus = NotificationBus(),
     private val dashboardPanels: DashboardPanelRegistry = DashboardPanelRegistry(),
+    private val messages: MessageRegistry = MessageRegistry(),
 ) {
     private val logger = LoggerFactory.getLogger(AddonManager::class.java)
     private val json = Json { ignoreUnknownKeys = true }
@@ -245,6 +250,7 @@ class AddonManager(
         bridgeValues.unpublishOwner(id)
         notifications.unregisterOwner(id)
         dashboardPanels.unregisterOwner(id)
+        messages.unregisterOwner(id)
     }
 
     private fun extractedJarPath(manifest: AddonManifest): Path =
@@ -295,6 +301,12 @@ class AddonManager(
 
         override fun registerDashboardPanel(panel: DashboardPanel) {
             dashboardPanels.register(record.manifest.id, panel)
+        }
+
+        override fun messages(defaults: Map<String, String>): Messages {
+            val bundle = MessageBundle(dataDirectory.resolve("messages.json"), defaults)
+            messages.register(record.manifest.id, bundle)
+            return bundle
         }
 
         override fun registerNotificationListener(listener: NotificationListener) {

@@ -17,7 +17,7 @@ class DiscordAddonTest {
         channelId = "123",
         adminUserIds = listOf("42"),
     )
-    private val handler = DiscordCommandHandler(context.actions) { config }
+    private val handler = DiscordCommandHandler(context.actions, { config })
 
     init {
         context.registerAction(ActionDescriptor("platform.overview", "overview", "platform.overview")) {

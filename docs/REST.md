@@ -15,6 +15,9 @@ Das Dashboard unter `/` ist statisch und nutzt dieselbe API.
 | GET | `/events?limit=200` | Event-Timeline (neueste zuerst): Service-Lifecycle, Player, Moderation, Proxy, Tasks |
 | GET | `/proxy` | Proxy-Übersicht: Maintenance, Proxies, Backend-Routing |
 | POST | `/proxy/maintenance` | Maintenance schalten — Body `{"enabled": true}` |
+| GET | `/panels` / `/panels/{id}` | Addon-Dashboard-Seiten (Metadaten / HTML) |
+| GET | `/messages` | Alle konfigurierbaren Addon-Nachrichten (addonId → key → template) |
+| POST | `/messages` | Nachricht setzen/zurücksetzen — Body `{addonId, key, value}` oder `{addonId, key, reset:true}` |
 
 ## Tasks
 

@@ -187,6 +187,32 @@ Referenz-Implementierungen in diesem Repo:
 Verwaltung über CLI/REST/Dashboard: `addon.list`, `addon.enable <id>`,
 `addon.disable <id>`.
 
+## Konfigurierbare Nachrichten
+
+Alle player-facing Texte eines Addons sollen einstellbar sein. Dafür
+deklariert das Addon einmalig Default-Templates; die Node persistiert sie
+in `Helix/addons/data/<addon>/messages.json` und macht sie über die
+Dashboard-Seite **Messages** editierbar. Änderungen wirken sofort (kein
+Neustart). Templates nutzen `{platzhalter}` und `&`-Farbcodes.
+
+```kotlin
+class MyAddon : AddonBase() {
+    private lateinit var msg: org.helix.api.message.Messages
+    override fun enable() {
+        msg = context.messages(mapOf(
+            "welcome" to "&aWelcome, &f{player}&a!",
+        ))
+        // ...
+        val text = msg.format("welcome", "player" to name)  // liest immer den aktuellen Wert
+    }
+}
+```
+
+Neue Keys in einer neuen Addon-Version werden beim Start ergänzt, ohne
+bereits geänderte Werte zu überschreiben. Über die REST-API:
+`GET /messages`, `POST /messages {addonId,key,value}` bzw.
+`{addonId,key,reset:true}`.
+
 ## Eigene Dashboard-Seite beisteuern
 
 Ein Addon kann eine eigene Seite ins Webpanel bringen. Die Seite ist ein

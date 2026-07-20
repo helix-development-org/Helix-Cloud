@@ -20,6 +20,7 @@ import org.helix.node.display.BridgeValueStore
 import org.helix.node.display.DisplayResolverRegistry
 import org.helix.node.events.EventLog
 import org.helix.node.logging.LogBuffer
+import org.helix.node.messages.MessageRegistry
 import org.helix.node.gates.JoinGateRegistry
 import org.helix.node.gates.PermissionResolverRegistry
 import org.helix.node.notifications.NotificationBus
@@ -113,6 +114,9 @@ class HelixNode(
     /** Dashboard pages contributed by addons. */
     val dashboardPanels: DashboardPanelRegistry = DashboardPanelRegistry()
 
+    /** Configurable message bundles of addons. */
+    val messages: MessageRegistry = MessageRegistry()
+
     /** Installed addons. */
     val addonManager: AddonManager = AddonManager(
         paths.addons,
@@ -124,6 +128,7 @@ class HelixNode(
         bridgeValues,
         notifications,
         dashboardPanels,
+        messages,
     )
 
     private val overviewService = PlatformOverviewService(version(), taskStore, manager)
@@ -150,6 +155,7 @@ class HelixNode(
             logBuffer = logBuffer,
             eventLog = eventLog,
             dashboardPanels = dashboardPanels,
+            messages = messages,
         ),
     )
 

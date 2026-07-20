@@ -105,12 +105,23 @@ class BalanceStore(private val file: Path) {
  */
 class EconomyAddon : AddonBase() {
     private lateinit var store: BalanceStore
+    private lateinit var msg: org.helix.api.message.Messages
 
     /**
      * Registers the player commands and admin actions.
      */
     override fun enable() {
         store = BalanceStore(context.dataDirectory.resolve("balances.json"))
+        msg = context.messages(
+            mapOf(
+                "balance" to "&6Your balance: &f{balance} coins",
+                "pay.sent" to "&6You sent &f{amount} coins &6to {target}.",
+                "pay.received" to "&6{sender} sent you &f{amount} coins&6.",
+                "error.self" to "&cYou cannot pay yourself.",
+                "error.funds" to "&cYou do not have enough coins.",
+                "error.usage" to "&cUsage: /pay <player> <amount>",
+            ),
+        )
         context.registerAction(
             ActionDescriptor(
                 name = "balance",
@@ -121,7 +132,7 @@ class EconomyAddon : AddonBase() {
         ) { invocation ->
             val executor = invocation.arguments.firstOrNull()
                 ?: return@registerAction ActionResult.error("missing executing player")
-            ActionResult.ok("&6Your balance: &f${store.balance(executor)} coins")
+            ActionResult.ok(msg.format("balance", "balance" to store.balance(executor).toString()))
         }
         context.registerAction(
             ActionDescriptor(
@@ -163,24 +174,24 @@ class EconomyAddon : AddonBase() {
         val executor = invocation.arguments.getOrNull(0)
             ?: return ActionResult.error("missing executing player")
         val target = invocation.arguments.getOrNull(1)
-            ?: return ActionResult.error("Usage: /pay <player> <amount>")
+            ?: return ActionResult.error(msg.format("error.usage"))
         val amount = invocation.arguments.getOrNull(2)?.toLongOrNull()
-            ?: return ActionResult.error("Usage: /pay <player> <amount>")
+            ?: return ActionResult.error(msg.format("error.usage"))
         if (executor.equals(target, ignoreCase = true)) {
-            return ActionResult.error("You cannot pay yourself.")
+            return ActionResult.error(msg.format("error.self"))
         }
         return try {
             store.transfer(executor, target, amount)
             context.actions.invoke(
                 ActionInvocation(
                     "player.message",
-                    listOf(target, "&6$executor sent you &f$amount coins&6."),
+                    listOf(target, msg.format("pay.received", "sender" to executor, "amount" to amount.toString())),
                     ActionSource.ADDON,
                 ),
             )
-            ActionResult.ok("&6You sent &f$amount coins &6to $target.")
+            ActionResult.ok(msg.format("pay.sent", "amount" to amount.toString(), "target" to target))
         } catch (failure: IllegalArgumentException) {
-            ActionResult.error("&c${failure.message}")
+            ActionResult.error(msg.format("error.funds"))
         }
     }
 

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.10.0 — 2026-07-20
+
+### Konfigurierbare Addon-Nachrichten
+- Neue Infrastruktur: Addons deklarieren ihre Texte über
+  `AddonContext.messages(defaults)`; persistiert pro Addon in
+  `Helix/addons/data/<addon>/messages.json`, live editierbar, Änderungen
+  wirken ohne Neustart. Neue Keys werden bei Updates ergänzt, ohne
+  geänderte Werte zu überschreiben.
+- Neue Dashboard-Seite **Messages**: alle Nachrichten aller Addons an
+  einem Ort bearbeiten (Save/Reset), inkl. Platzhalter- und Farbcode-Hilfe.
+- Endpoints `GET /messages` und `POST /messages`.
+- Alle player-facing Texte auf das System umgestellt: Friends (18),
+  Moderation (8), Economy (6), Team Utils (6), Bans (4), Discord (2) —
+  44 einstellbare Nachrichten. (Chat-Format und Tablist-Header/-Footer
+  waren bereits über eigene Actions konfigurierbar.)
+
 ## 0.9.0 — 2026-07-20
 
 ### Addon-Seiten im Dashboard

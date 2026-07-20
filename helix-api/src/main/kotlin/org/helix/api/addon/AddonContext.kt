@@ -4,6 +4,8 @@ import java.nio.file.Path
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionHandler
 import org.helix.api.action.ActionInvoker
+import org.helix.api.message.MapMessages
+import org.helix.api.message.Messages
 import org.helix.api.player.OnlinePlayer
 
 /**
@@ -123,4 +125,18 @@ interface AddonContext {
      */
     fun registerNotificationListener(listener: NotificationListener) {
     }
+
+    /**
+     * Declares the addon's configurable message templates.
+     *
+     * The defaults seed `data/<addon>/messages.json` on first use (missing
+     * keys are added, existing values kept). The returned [Messages] reads
+     * the current values, so dashboard edits take effect immediately. Call
+     * once on enable and keep the returned handle.
+     *
+     * @param defaults message key to default template, `{placeholder}`
+     *   markers and `&` color codes allowed.
+     * @return a live message accessor.
+     */
+    fun messages(defaults: Map<String, String>): Messages = MapMessages(defaults)
 }

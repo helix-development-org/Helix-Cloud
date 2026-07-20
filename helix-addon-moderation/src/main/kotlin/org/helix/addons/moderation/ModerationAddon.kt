@@ -82,12 +82,25 @@ class WarnStore(
  */
 class ModerationAddon : AddonBase() {
     private lateinit var store: WarnStore
+    private lateinit var msg: org.helix.api.message.Messages
 
     /**
      * Registers the moderation player commands.
      */
     override fun enable() {
         store = WarnStore(context.dataDirectory.resolve("warns.json"))
+        msg = context.messages(
+            mapOf(
+                "kick.default" to "Kicked by a moderator.",
+                "kick.reason" to "{reason} &7(by {moderator})",
+                "kick.confirm" to "&7Kicked &f{target}&7.",
+                "kick.notify" to "&c[Kick] &f{target} &7by {moderator}: {reason}",
+                "warn.player" to "&cYou have been warned: &f{reason}",
+                "warn.confirm" to "&7Warned &f{target}&7: {reason} ({total} total)",
+                "warn.notify" to "&e[Warn] &f{target} &7by {moderator}: {reason} ({total} total)",
+                "announce.format" to "&c&l[Announcement] &r&f{text}",
+            ),
+        )
         playerCommand(
             "kick",
             "Kicks a player from the network.",
@@ -95,11 +108,11 @@ class ModerationAddon : AddonBase() {
             "helix.mod.kick",
         ) { executor, args ->
             val target = args.firstOrNull() ?: return@playerCommand usage("/kick <player> [reason...]")
-            val reason = args.drop(1).joinToString(" ").ifBlank { "Kicked by a moderator." }
-            val result = invoke("player.kick", target, "$reason &7(by $executor)")
+            val reason = args.drop(1).joinToString(" ").ifBlank { msg.format("kick.default") }
+            val result = invoke("player.kick", target, msg.format("kick.reason", "reason" to reason, "moderator" to executor))
             if (result.success) {
-                context.publishNotification("moderation", "&c[Kick] &f$target &7by $executor: $reason")
-                ActionResult.ok("&7Kicked &f$target&7.")
+                context.publishNotification("moderation", msg.format("kick.notify", "target" to target, "moderator" to executor, "reason" to reason))
+                ActionResult.ok(msg.format("kick.confirm", "target" to target))
             } else {
                 result
             }
@@ -113,10 +126,10 @@ class ModerationAddon : AddonBase() {
             val target = args.firstOrNull() ?: return@playerCommand usage("/warn <player> <reason...>")
             val reason = args.drop(1).joinToString(" ").ifBlank { return@playerCommand usage("/warn <player> <reason...>") }
             store.warn(target, executor, reason)
-            invoke("player.message", target, "&cYou have been warned: &f$reason")
+            invoke("player.message", target, msg.format("warn.player", "reason" to reason))
             val total = store.warnsOf(target).size
-            context.publishNotification("moderation", "&e[Warn] &f$target &7by $executor: $reason ($total total)")
-            ActionResult.ok("&7Warned &f$target&7: $reason ($total total)")
+            context.publishNotification("moderation", msg.format("warn.notify", "target" to target, "moderator" to executor, "reason" to reason, "total" to total.toString()))
+            ActionResult.ok(msg.format("warn.confirm", "target" to target, "reason" to reason, "total" to total.toString()))
         }
         playerCommand(
             "warns",
@@ -144,7 +157,7 @@ class ModerationAddon : AddonBase() {
             if (text.isBlank()) {
                 usage("/announce <text...>")
             } else {
-                invoke("player.broadcast", "&c[Announcement] &f$text")
+                invoke("player.broadcast", msg.format("announce.format", "text" to text))
             }
         }
         playerCommand(

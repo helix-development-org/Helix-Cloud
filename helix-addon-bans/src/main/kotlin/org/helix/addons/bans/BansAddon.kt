@@ -4,6 +4,7 @@ import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
 import org.helix.api.action.ActionSource
+import org.helix.api.message.Messages
 import org.helix.api.proxy.JoinDecision
 
 /**
@@ -16,12 +17,21 @@ import org.helix.api.proxy.JoinDecision
  */
 class BansAddon : AddonBase() {
     private lateinit var store: BanStore
+    private lateinit var msg: Messages
 
     /**
      * Registers the ban actions and the join gate.
      */
     override fun enable() {
         store = BanStore(context.dataDirectory.resolve("bans.json"))
+        msg = context.messages(
+            mapOf(
+                "banned" to "&cYou are banned from this network.\n&7Reason: &f{reason}",
+                "banned.temp" to "&cYou are banned from this network.\n&7Reason: &f{reason}\n&7Expires in &f{time}",
+                "notify.set" to "&c[Ban] &f{player} &7was banned: {reason} ({expiry})",
+                "notify.pardon" to "&a[Ban] &f{player} &7was pardoned.",
+            ),
+        )
         context.registerJoinGate { request ->
             store.activeBan(request.name)
                 ?.let { JoinDecision.deny(banMessage(it)) }
@@ -36,7 +46,7 @@ class BansAddon : AddonBase() {
             val player = invocation.arguments.firstOrNull()
                 ?: return@action ActionResult.error("usage: ban.pardon <player>")
             if (store.pardon(player)) {
-                context.publishNotification("moderation", "&c[Ban] &f$player &7was pardoned.")
+                context.publishNotification("moderation", msg.format("notify.pardon", "player" to player))
                 ActionResult.ok("pardoned $player")
             } else {
                 ActionResult.error("no ban for $player")
@@ -76,9 +86,12 @@ class BansAddon : AddonBase() {
         val durationMs = durationToken?.let(BanDuration::parseMillis)
         val reason = arguments.drop(if (durationToken != null) 2 else 1)
             .joinToString(" ")
-            .ifBlank { "You are banned from this network." }
+            .ifBlank { "misconduct" }
         val entry = store.set(player, reason, durationMs)
-        context.publishNotification("moderation", "&c[Ban] &7${describe(entry)}")
+        context.publishNotification(
+            "moderation",
+            msg.format("notify.set", "player" to entry.player, "reason" to reason, "expiry" to expiryText(entry)),
+        )
         val kick = context.actions.invoke(
             ActionInvocation(
                 action = "player.kick",
@@ -92,17 +105,14 @@ class BansAddon : AddonBase() {
         )
     }
 
-    private fun describe(entry: BanEntry): String {
-        val expiry = entry.expiresAtEpochMs
-            ?.let { "expires in ${BanDuration.format(it - System.currentTimeMillis())}" }
-            ?: "permanent"
-        return "${entry.player} — ${entry.reason} ($expiry)"
-    }
+    private fun describe(entry: BanEntry): String =
+        "${entry.player} — ${entry.reason} (${expiryText(entry)})"
 
-    private fun banMessage(entry: BanEntry): String {
-        val expiry = entry.expiresAtEpochMs
-            ?.let { " (expires in ${BanDuration.format(it - System.currentTimeMillis())})" }
-            ?: ""
-        return "You are banned: ${entry.reason}$expiry"
-    }
+    private fun expiryText(entry: BanEntry): String = entry.expiresAtEpochMs
+        ?.let { "expires in ${BanDuration.format(it - System.currentTimeMillis())}" }
+        ?: "permanent"
+
+    private fun banMessage(entry: BanEntry): String = entry.expiresAtEpochMs
+        ?.let { msg.format("banned.temp", "reason" to entry.reason, "time" to BanDuration.format(it - System.currentTimeMillis())) }
+        ?: msg.format("banned", "reason" to entry.reason)
 }

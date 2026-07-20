@@ -21,10 +21,22 @@ import org.helix.api.player.OnlinePlayer
  * sees moderation activity live in chat.
  */
 class TeamUtilsAddon : AddonBase() {
+    private lateinit var msg: org.helix.api.message.Messages
+
     /**
      * Registers the team commands and the join/leave notifications.
      */
     override fun enable() {
+        msg = context.messages(
+            mapOf(
+                "chat" to "&b[Team] &f{sender}&7: &f{message}",
+                "empty" to "&7No team members online.",
+                "list" to "&bOnline team: &f{members}",
+                "notify" to "&b[Team] &f{text}",
+                "join" to "&b[Team] &f{player} &7is now &aonline&7.",
+                "leave" to "&b[Team] &f{player} &7is now &8offline&7.",
+            ),
+        )
         context.registerAction(
             ActionDescriptor(
                 name = "tc",
@@ -40,8 +52,8 @@ class TeamUtilsAddon : AddonBase() {
             if (message.isBlank()) {
                 ActionResult.error("Usage: /tc <message...>")
             } else {
-                val delivered = notifyTeam("&b[Team] &f$executor&7: &f$message")
-                if (delivered == 0) ActionResult.ok("&7No team members online.") else ActionResult.ok()
+                val delivered = notifyTeam(msg.format("chat", "sender" to executor, "message" to message))
+                if (delivered == 0) ActionResult.ok(msg.format("empty")) else ActionResult.ok()
             }
         }
         context.registerAction(
@@ -55,9 +67,9 @@ class TeamUtilsAddon : AddonBase() {
         ) {
             val members = onlineTeamMembers()
             if (members.isEmpty()) {
-                ActionResult.ok("&7No team members online.")
+                ActionResult.ok(msg.format("empty"))
             } else {
-                ActionResult.ok("&bOnline team: &f${members.joinToString { it.name }}")
+                ActionResult.ok(msg.format("list", "members" to members.joinToString { it.name }))
             }
         }
         action(
@@ -69,7 +81,7 @@ class TeamUtilsAddon : AddonBase() {
             if (text.isBlank()) {
                 ActionResult.error("usage: team.notify <text...>")
             } else {
-                val delivered = notifyTeam("&b[Team] &f$text")
+                val delivered = notifyTeam(msg.format("notify", "text" to text))
                 ActionResult.ok("notified $delivered team members")
             }
         }
@@ -83,13 +95,13 @@ class TeamUtilsAddon : AddonBase() {
             object : PlayerListener {
                 override fun onJoin(player: OnlinePlayer) {
                     if (context.hasPermission(player.name, TEAM_PERMISSION)) {
-                        notifyTeam("&b[Team] &f${player.name} &7is now &aonline&7.", exclude = player.name)
+                        notifyTeam(msg.format("join", "player" to player.name), exclude = player.name)
                     }
                 }
 
                 override fun onLeave(player: OnlinePlayer) {
                     if (context.hasPermission(player.name, TEAM_PERMISSION)) {
-                        notifyTeam("&b[Team] &f${player.name} &7is now &8offline&7.", exclude = player.name)
+                        notifyTeam(msg.format("leave", "player" to player.name), exclude = player.name)
                     }
                 }
             },
