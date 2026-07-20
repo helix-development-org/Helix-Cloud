@@ -5,6 +5,15 @@
 > (Meilensteine `v1.0.0`…`v1.9.0` → `v0.1.0`…`v0.10.0`). `1.0.0` kommt,
 > wenn die Plattform wirklich stabil und feature-complete ist.
 
+## 0.12.0 — 2026-07-20
+
+### Aufräumen der Codebase
+- Konvention: genau eine Klasse/Objekt/Interface pro Datei — alle
+  Multi-Typ-Dateien aufgeteilt (API-DTOs, Node-Services, Control-DTOs,
+  Addon-Models/Stores, Bridge-Helper, Test-Fakes), Dateinamen = Typname.
+- Ungenutzte Imports entfernt, kleinere Formatierung; keine Verhaltens-
+  oder API-Änderung.
+
 ## 0.11.0 — 2026-07-20
 
 ### Addon-API vollständig aus Java nutzbar

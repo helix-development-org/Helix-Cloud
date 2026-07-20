@@ -14,30 +14,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionResult
-
-/**
- * Bot configuration exposed to the dashboard with the token masked.
- *
- * @property channelId configured channel id.
- * @property commandPrefix command prefix.
- * @property notificationCategories forwarded notification categories.
- * @property adminUserIds ids allowed to use `!run`.
- * @property tokenSet whether a bot token is stored.
- * @property connected whether the bot is currently connected.
- */
-@Serializable
-data class DiscordPublicConfig(
-    val channelId: String,
-    val commandPrefix: String,
-    val notificationCategories: List<String>,
-    val adminUserIds: List<String>,
-    val tokenSet: Boolean,
-    val connected: Boolean,
-)
 
 /**
  * Discord bot addon built on Kord.

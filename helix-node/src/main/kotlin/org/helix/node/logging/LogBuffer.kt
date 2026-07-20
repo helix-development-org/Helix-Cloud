@@ -1,10 +1,5 @@
 package org.helix.node.logging
 
-import java.io.ByteArrayOutputStream
-import java.io.OutputStream
-import java.io.PrintStream
-import kotlin.text.Charsets.UTF_8
-
 /**
  * In-memory ring buffer of the node's most recent log lines.
  *
@@ -38,82 +33,4 @@ class LogBuffer(private val capacity: Int = 2000) {
      */
     @Synchronized
     fun tail(limit: Int): List<String> = lines.toList().takeLast(limit)
-}
-
-/**
- * Output stream that forwards everything to [origin] and mirrors complete
- * lines into a [LogBuffer].
- *
- * @property origin the real stream to keep writing to.
- * @property buffer the buffer receiving completed lines.
- */
-class CapturingOutputStream(
-    private val origin: OutputStream,
-    private val buffer: LogBuffer,
-) : OutputStream() {
-    private val line = ByteArrayOutputStream(256)
-
-    /**
-     * Writes one byte through and captures line boundaries.
-     *
-     * @param b the byte to write.
-     */
-    @Synchronized
-    override fun write(b: Int) {
-        origin.write(b)
-        capture(b)
-    }
-
-    /**
-     * Writes a byte range through and captures line boundaries.
-     *
-     * @param b source bytes.
-     * @param off start offset.
-     * @param len number of bytes.
-     */
-    @Synchronized
-    override fun write(b: ByteArray, off: Int, len: Int) {
-        origin.write(b, off, len)
-        for (index in off until off + len) {
-            capture(b[index].toInt() and 0xFF)
-        }
-    }
-
-    /** Flushes the underlying stream. */
-    override fun flush() = origin.flush()
-
-    private fun capture(byte: Int) {
-        when (byte) {
-            NEWLINE -> {
-                buffer.add(line.toString(UTF_8))
-                line.reset()
-            }
-            CARRIAGE_RETURN -> Unit
-            else -> line.write(byte)
-        }
-    }
-
-    private companion object {
-        const val NEWLINE = 10
-        const val CARRIAGE_RETURN = 13
-    }
-}
-
-/**
- * Installs the log capture, teeing standard output and error into a shared
- * [LogBuffer].
- */
-object LogCapture {
-    /**
-     * Redirects `System.out` and `System.err` through capturing streams.
-     *
-     * @param capacity maximum number of retained lines.
-     * @return the buffer receiving all output.
-     */
-    fun install(capacity: Int = 2000): LogBuffer {
-        val buffer = LogBuffer(capacity)
-        System.setOut(PrintStream(CapturingOutputStream(System.out, buffer), true, UTF_8))
-        System.setErr(PrintStream(CapturingOutputStream(System.err, buffer), true, UTF_8))
-        return buffer
-    }
 }

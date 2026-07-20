@@ -1,22 +1,9 @@
 package org.helix.addons.tablist
 
 import java.nio.file.Files
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionResult
-
-/**
- * Persisted tab list configuration.
- *
- * @property header header text, `&` colors and `\n` line breaks.
- * @property footer footer text.
- */
-@Serializable
-data class TablistConfig(
-    val header: String = "&6Helix-Cloud",
-    val footer: String = "&7{online}&8/&7{max} players",
-)
 
 /**
  * Tab list addon.

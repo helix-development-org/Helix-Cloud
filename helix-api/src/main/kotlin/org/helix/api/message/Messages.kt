@@ -39,29 +39,3 @@ interface Messages {
      */
     fun raw(key: String): String
 }
-
-/**
- * Substitutes `{name}` placeholders in a template.
- *
- * @param template the message template.
- * @param params placeholder name to value pairs.
- * @return the template with every `{name}` replaced.
- */
-fun applyPlaceholders(template: String, params: Array<out Pair<String, String>>): String {
-    var result = template
-    params.forEach { (name, value) -> result = result.replace("{$name}", value) }
-    return result
-}
-
-/**
- * [Messages] backed by a fixed map, used as the default when no node
- * persistence is available (for example in tests).
- *
- * @property values message key to template.
- */
-class MapMessages(private val values: Map<String, String>) : Messages {
-    override fun format(key: String, vararg params: Pair<String, String>): String =
-        applyPlaceholders(values[key] ?: key, params)
-
-    override fun raw(key: String): String = values[key] ?: key
-}

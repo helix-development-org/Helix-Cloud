@@ -1,41 +1,10 @@
 package org.helix.addons.chat
 
 import java.nio.file.Files
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionResult
 import org.helix.api.display.DisplayProfile
-
-/**
- * A prefix rule: players with the permission get the prefix and color.
- *
- * Rules are evaluated in list order; the first matching rule wins, so the
- * most important rank belongs at the top.
- *
- * @property permission permission node identifying the rank.
- * @property prefix chat/tab prefix with `&` colors, for example `&cAdmin &f`.
- * @property color name color code, for example `&c`.
- */
-@Serializable
-data class PrefixRule(
-    val permission: String,
-    val prefix: String,
-    val color: String = "&f",
-)
-
-/**
- * Persisted chat configuration.
- *
- * @property format chat line format with `{prefix}`, `{color}`, `{name}`,
- *   `{suffix}` and `{message}` placeholders.
- * @property rules prefix rules, first match wins.
- */
-@Serializable
-data class ChatConfig(
-    val format: String = "{prefix}{color}{name} &8» &f{message}",
-    val rules: List<PrefixRule> = emptyList(),
-)
 
 /**
  * Pretty chat addon.

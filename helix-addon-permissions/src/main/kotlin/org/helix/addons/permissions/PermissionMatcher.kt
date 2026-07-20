@@ -1,52 +1,5 @@
 package org.helix.addons.permissions
 
-import kotlinx.serialization.Serializable
-
-/**
- * A permission group.
- *
- * @property name unique group name, lowercase.
- * @property weight precedence — higher-weight groups win conflicts.
- * @property default whether players without groups belong to this group.
- * @property permissions permission nodes; `*` and `prefix.*` wildcards,
- *   `-node` negates.
- * @property parents names of inherited groups.
- */
-@Serializable
-data class PermissionGroup(
-    val name: String,
-    val weight: Int = 0,
-    val default: Boolean = false,
-    val permissions: List<String> = emptyList(),
-    val parents: List<String> = emptyList(),
-)
-
-/**
- * A player's permission profile.
- *
- * @property name player name, lowercase.
- * @property groups group memberships.
- * @property permissions personal permission nodes, highest precedence.
- */
-@Serializable
-data class PermissionUser(
-    val name: String,
-    val groups: List<String> = emptyList(),
-    val permissions: List<String> = emptyList(),
-)
-
-/**
- * Root document persisted as `permissions.json`.
- *
- * @property groups all groups.
- * @property users all users with explicit data.
- */
-@Serializable
-data class PermissionDocument(
-    val groups: List<PermissionGroup> = emptyList(),
-    val users: List<PermissionUser> = emptyList(),
-)
-
 /**
  * Matching rules for permission nodes.
  */

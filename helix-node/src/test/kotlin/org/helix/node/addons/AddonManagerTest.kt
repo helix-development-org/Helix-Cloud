@@ -11,35 +11,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionInvocation
-import org.helix.api.action.ActionResult
-import org.helix.api.addon.AddonContext
 import org.helix.api.addon.AddonState
-import org.helix.api.addon.HelixAddon
 import org.helix.node.actions.ActionRegistry
-
-/**
- * Test addon resolved through the parent classloader.
- */
-class TestAddon : HelixAddon {
-    override fun onEnable(context: AddonContext) {
-        context.registerAction(ActionDescriptor("test.ping", "ping", "test.ping")) {
-            ActionResult.ok("pong from ${context.dataDirectory.fileName}")
-        }
-    }
-}
-
-/**
- * Second test addon registering a distinct action, for reload tests.
- */
-class SecondTestAddon : HelixAddon {
-    override fun onEnable(context: AddonContext) {
-        context.registerAction(ActionDescriptor("test.pong", "pong", "test.pong")) {
-            ActionResult.ok("pong")
-        }
-    }
-}
 
 class AddonManagerTest {
     private val directory = createTempDirectory("addons")

@@ -2,20 +2,7 @@ package org.helix.addons.friends
 
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-
-/**
- * Persisted friendship state.
- *
- * @property friendships symmetric pairs, each stored once, names lowercase.
- * @property requests pending requests as `to` → set of `from` names.
- */
-@Serializable
-data class FriendDocument(
-    val friendships: List<List<String>> = emptyList(),
-    val requests: Map<String, Set<String>> = emptyMap(),
-)
 
 /**
  * JSON-file backed friendship persistence.
