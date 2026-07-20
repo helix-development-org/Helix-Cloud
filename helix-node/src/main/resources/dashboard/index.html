@@ -263,10 +263,28 @@ td .muted { color: var(--ink-3); }
   <div class="login-card">
     <div class="brand"><div class="brand-mark">H</div><div class="brand-name">Helix<small>Cloud</small></div></div>
     <h1>Welcome back</h1>
-    <p>Sign in with your control token</p>
-    <input id="login-token" type="password" placeholder="Control token" autocomplete="off">
-    <button class="btn" id="login-btn">Sign in</button>
+
+    <div id="login-step-name">
+      <p>Sign in with your Minecraft account</p>
+      <input id="login-name" placeholder="Minecraft name" autocomplete="off">
+      <button class="btn" id="login-name-btn">Send login code</button>
+    </div>
+
+    <div id="login-step-code" class="hidden">
+      <p>Enter the code sent to <b id="login-who"></b> in-game</p>
+      <input id="login-code" placeholder="6-digit code" inputmode="numeric" autocomplete="off">
+      <button class="btn" id="login-code-btn">Sign in</button>
+      <button class="btn subtle" id="login-back-btn" style="width:100%;justify-content:center;margin-top:8px">Use a different name</button>
+    </div>
+
+    <div id="login-step-token" class="hidden">
+      <p>Sign in with the admin control token</p>
+      <input id="login-token" type="password" placeholder="Control token" autocomplete="off">
+      <button class="btn" id="login-token-btn">Sign in</button>
+    </div>
+
     <div class="login-err" id="login-err"></div>
+    <div style="text-align:center;margin-top:14px"><a href="#" id="login-toggle" style="color:var(--ink-3);font-size:12.5px;text-decoration:none">Use admin token instead</a></div>
   </div>
 </div>
 
@@ -346,19 +364,73 @@ function uptime(ms) { if (!ms) return "—"; const s = Math.floor((Date.now()-ms
 function playerBar(on, max) { const pct = max > 0 ? Math.min(100, (on/max)*100) : 0; return `<div class="playercell"><span class="n">${on}/${max}</span><div class="bar" title="${on}/${max}"><i style="width:${pct}%"></i></div></div>`; }
 
 /* ---------- auth ---------- */
-function showLogin() { stop(); $("#app").classList.add("hidden"); $("#login").classList.remove("hidden"); }
-async function tryLogin(t) {
+let identity = null;
+function loginStep(step) {
+  ["name", "code", "token"].forEach(s => $("#login-step-" + s).classList.toggle("hidden", s !== step));
+  $("#login-err").textContent = "";
+}
+function showLogin() {
+  stop(); $("#app").classList.add("hidden"); $("#login").classList.remove("hidden");
+  loginStep("name"); $("#login-toggle").textContent = "Use admin token instead";
+}
+async function establishSession(t) {
   token = t;
-  const ov = await api("/platform/overview");
+  identity = await api("/auth/me");
   localStorage.setItem("helix.token", token);
   $("#login").classList.add("hidden"); $("#app").classList.remove("hidden");
-  $("#ver-chip").textContent = "v" + ov.version;
+  try { const ov = await api("/platform/overview"); $("#ver-chip").textContent = "v" + ov.version; } catch (e) { $("#ver-chip").textContent = "—"; }
   try { panels = await api("/panels"); } catch (e) { panels = []; }
+  if (!allowedView(view)) view = firstAllowedView();
   buildNav(); render();
 }
-$("#login-btn").onclick = async () => { try { $("#login-err").textContent = ""; await tryLogin($("#login-token").value.trim()); } catch (e) { $("#login-err").textContent = "Sign in failed — check your token"; } };
-$("#login-token").onkeydown = e => { if (e.key === "Enter") $("#login-btn").click(); };
-$("#logout-btn").onclick = () => { localStorage.removeItem("helix.token"); token = ""; showLogin(); };
+function allowedView(v) {
+  if (!identity) return false;
+  if (v.startsWith("panel:")) return panels.some(p => p.id === v.slice(6));
+  if (v.startsWith("task:")) return identity.admin || identity.views.includes("tasks");
+  return identity.admin || identity.views.includes(v);
+}
+function firstAllowedView() {
+  const v = (identity && identity.views[0]);
+  if (v) return v;
+  return panels.length ? "panel:" + panels[0].id : "overview";
+}
+/* step 1 — request an in-game code */
+$("#login-name-btn").onclick = async () => {
+  const name = $("#login-name").value.trim();
+  if (!name) { $("#login-err").textContent = "Enter your Minecraft name"; return; }
+  try {
+    $("#login-err").textContent = ""; loadbar(true);
+    const r = await api("/auth/request-code", { method: "POST", body: JSON.stringify({ name }) });
+    $("#login-who").textContent = name; loginStep("code"); $("#login-code").focus();
+    toast(r.message || "Code sent");
+  } catch (e) { $("#login-err").textContent = e.message; } finally { loadbar(false); }
+};
+/* step 2 — verify the code */
+$("#login-code-btn").onclick = async () => {
+  const name = $("#login-name").value.trim(), code = $("#login-code").value.trim();
+  if (!code) { $("#login-err").textContent = "Enter the code from in-game"; return; }
+  try {
+    $("#login-err").textContent = ""; loadbar(true);
+    const res = await api("/auth/verify", { method: "POST", body: JSON.stringify({ name, code }) });
+    identity = res.identity; await establishSession(res.token);
+  } catch (e) { $("#login-err").textContent = e.message; } finally { loadbar(false); }
+};
+$("#login-back-btn").onclick = () => { $("#login-code").value = ""; loginStep("name"); };
+/* admin token fallback */
+$("#login-token-btn").onclick = async () => {
+  try { $("#login-err").textContent = ""; await establishSession($("#login-token").value.trim()); }
+  catch (e) { $("#login-err").textContent = "Sign in failed — check the token"; }
+};
+$("#login-toggle").onclick = e => {
+  e.preventDefault();
+  const onToken = !$("#login-step-token").classList.contains("hidden");
+  loginStep(onToken ? "name" : "token");
+  $("#login-toggle").textContent = onToken ? "Use admin token instead" : "Use Minecraft account instead";
+};
+$("#login-name").onkeydown = e => { if (e.key === "Enter") $("#login-name-btn").click(); };
+$("#login-code").onkeydown = e => { if (e.key === "Enter") $("#login-code-btn").click(); };
+$("#login-token").onkeydown = e => { if (e.key === "Enter") $("#login-token-btn").click(); };
+$("#logout-btn").onclick = async () => { try { await api("/auth/logout", { method: "POST" }); } catch (e) {} localStorage.removeItem("helix.token"); token = ""; identity = null; showLogin(); };
 
 /* ---------- theme ---------- */
 function applyTheme(t) {
@@ -371,7 +443,10 @@ applyTheme(localStorage.getItem("helix.theme") || (matchMedia("(prefers-color-sc
 
 /* ---------- nav ---------- */
 function buildNav() {
-  let html = NAV.map(n => n.group
+  const visible = NAV.filter(n => n.group || allowedView(n.id));
+  // drop group headers that have no visible item following them
+  const pruned = visible.filter((n, i) => !n.group || (visible[i + 1] && !visible[i + 1].group));
+  let html = pruned.map(n => n.group
     ? `<div class="nav-group">${n.label || n.group}</div>`
     : `<button class="nav-btn" data-view="${n.id}">${svg(n.icon, "ico")}<span>${n.label}</span><span class="tag hidden" id="tag-${n.id}"></span></button>`
   ).join("");
@@ -389,6 +464,7 @@ function setTag(id, val) { const el = $("#tag-" + id); if (!el) return; if (val 
 function stop() { if (timer) { clearInterval(timer); timer = null; } }
 async function render() {
   stop();
+  if (!allowedView(view)) view = firstAllowedView();
   document.querySelectorAll(".nav-btn[data-view]").forEach(b => b.classList.toggle("active", b.dataset.view === view));
   if (view.startsWith("panel:")) {
     const p = panels.find(x => x.id === view.slice(6));
@@ -905,7 +981,7 @@ async function showLogsModal(id) {
 function closeLogsModal() { clearInterval(window._mlogTimer); closeModal(); }
 
 /* ---------- boot ---------- */
-(async () => { if (!token) return showLogin(); try { await tryLogin(token); } catch (e) { showLogin(); } })();
+(async () => { if (!token) return showLogin(); try { await establishSession(token); } catch (e) { showLogin(); } })();
 </script>
 </body>
 </html>

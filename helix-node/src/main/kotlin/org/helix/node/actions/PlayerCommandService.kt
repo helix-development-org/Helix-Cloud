@@ -6,22 +6,22 @@ import org.helix.api.action.ActionResult
 import org.helix.api.action.ActionSource
 import org.helix.api.action.PlayerCommandRequest
 import org.helix.api.proxy.PermissionCheckRequest
-import org.helix.node.gates.PermissionResolverRegistry
+import org.helix.node.gates.PermissionService
 
 /**
  * Executes player commands forwarded by proxy bridges.
  *
  * A player command is an action whose descriptor has `playerCommand`
  * set. The service checks the descriptor's permission (when present)
- * against the aggregated permission resolvers and invokes the action with
- * the player name as first argument.
+ * against the permission service and invokes the action with the player
+ * name as first argument.
  *
  * @property registry action registry.
- * @property permissions aggregated permission resolvers.
+ * @property permissions node-wide permission service.
  */
 class PlayerCommandService(
     private val registry: ActionRegistry,
-    private val permissions: PermissionResolverRegistry,
+    private val permissions: PermissionService,
 ) {
     /**
      * Lists all player-command actions.
@@ -41,7 +41,7 @@ class PlayerCommandService(
         val descriptor = commands().firstOrNull { it.name == request.command }
             ?: return ActionResult.error("unknown command: ${request.command}")
         val required = descriptor.permission
-        if (required != null && !permissions.evaluate(PermissionCheckRequest(request.player, required))) {
+        if (required != null && !permissions.check(PermissionCheckRequest(request.player, required))) {
             return ActionResult.error("You do not have permission to do that.")
         }
         return registry.invoke(

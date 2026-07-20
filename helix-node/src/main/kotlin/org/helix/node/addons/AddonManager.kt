@@ -31,7 +31,10 @@ import org.helix.node.dashboard.DashboardPanelRegistry
 import org.helix.node.display.BridgeValueStore
 import org.helix.node.display.DisplayResolverRegistry
 import org.helix.node.gates.JoinGateRegistry
+import org.helix.node.gates.NativePermissionCache
+import org.helix.node.gates.NativePermissionProvider
 import org.helix.node.gates.PermissionResolverRegistry
+import org.helix.node.gates.PermissionService
 import org.helix.node.messages.MessageBundle
 import org.helix.node.messages.MessageRegistry
 import org.helix.node.notifications.NotificationBus
@@ -52,6 +55,7 @@ import org.slf4j.LoggerFactory
  * @property registry action registry addons register into.
  * @property joinGates join gate registry addons register into.
  * @property permissionResolvers permission registry addons register into.
+ * @property permissionService node-wide permission decisions (addon or native).
  * @property playerRegistry online players and player event fan-out.
  * @property displayResolvers display profile registry addons register into.
  * @property bridgeValues global values bridges poll.
@@ -66,6 +70,8 @@ class AddonManager(
     private val registry: ActionRegistry,
     private val joinGates: JoinGateRegistry = JoinGateRegistry(),
     private val permissionResolvers: PermissionResolverRegistry = PermissionResolverRegistry(),
+    private val permissionService: PermissionService =
+        PermissionService(permissionResolvers, NativePermissionProvider(NativePermissionCache())),
     private val playerRegistry: PlayerRegistry = PlayerRegistry(),
     private val displayResolvers: DisplayResolverRegistry = DisplayResolverRegistry(),
     private val bridgeValues: BridgeValueStore = BridgeValueStore(),
@@ -292,7 +298,7 @@ class AddonManager(
         }
 
         override fun hasPermission(player: String, permission: String): Boolean =
-            permissionResolvers.evaluate(PermissionCheckRequest(player, permission))
+            permissionService.check(PermissionCheckRequest(player, permission))
 
         override fun onlinePlayers(): List<OnlinePlayer> = playerRegistry.online()
 

@@ -16,7 +16,10 @@ import org.helix.node.actions.ActionRegistry
 import org.helix.node.actions.PlayerCommandService
 import org.helix.node.display.BridgeValueStore
 import org.helix.node.display.DisplayResolverRegistry
+import org.helix.node.gates.NativePermissionCache
+import org.helix.node.gates.NativePermissionProvider
 import org.helix.node.gates.PermissionResolverRegistry
+import org.helix.node.gates.PermissionService
 
 class PlayerPlatformTest {
     private val registry = PlayerRegistry(clock = { 42L })
@@ -74,7 +77,10 @@ class PlayerPlatformTest {
         actions.register(ActionDescriptor("secret.internal", "internal", "secret.internal")) {
             ActionResult.ok()
         }
-        val service = PlayerCommandService(actions, permissions)
+        val service = PlayerCommandService(
+            actions,
+            PermissionService(permissions, NativePermissionProvider(NativePermissionCache())),
+        )
 
         assertEquals(listOf("kick"), service.commands().map { it.name })
         assertTrue(service.execute(PlayerCommandRequest("steve", "kick", listOf("griefer"))).success)

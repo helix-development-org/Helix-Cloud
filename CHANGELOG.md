@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.18.0 — 2026-07-20
+
+### Web-Panel-Login per Minecraft-Account
+- Der Panel-Login ersetzt das reine Token-Feld durch einen Minecraft-Login:
+  Name eingeben → ein Code wird dem Spieler **ingame** zugeschickt → Code im
+  Panel eingeben → Session. Neue Endpunkte `POST /auth/request-code`,
+  `POST /auth/verify` (öffentlich) sowie `GET /auth/me`, `POST /auth/logout`.
+- Session-Tokens (In-Memory, TTL konfigurierbar) neben dem statischen
+  Admin-Token, das als Notlogin/Bootstrap und für Bridges/Wrapper gültig bleibt.
+- **Permission-gated & feature-scoped**: Login erfordert `helix.panel.login`;
+  jede View und jede Addon-Seite ist über `helix.panel.<view>` bzw.
+  `helix.panel.addon.<id>` abgesichert. Das Panel zeigt nur erlaubte
+  Bereiche; der Server erzwingt sie zusätzlich (`403`). `/internal/*` ist
+  ausschließlich dem Admin-Token vorbehalten.
+
+### Permissions unabhängig vom Addon (`PermissionProvider`)
+- Neuer `PermissionProvider`-Contract und ein zentraler `PermissionService`:
+  Permissions hängen nicht mehr am Permission-Addon.
+- **Default = natives MC-Permission-System** — die Proxy-Bridge wertet die vom
+  Node über `GET /internal/permission-nodes` gemeldeten Nodes beim Join via
+  `player.hasPermission` aus und meldet sie; die Node cached sie pro Spieler.
+- Ein aktives Permission-Addon **überschreibt** den Default vollständig. Damit
+  läuft das gesamte Netzwerk auch ohne Permission-Addon.
+
 ## 0.17.0 — 2026-07-20
 
 ### Audit-Log in der Datenbank

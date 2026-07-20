@@ -26,7 +26,10 @@ import org.helix.node.events.EventLog
 import org.helix.node.logging.LogBuffer
 import org.helix.node.messages.MessageRegistry
 import org.helix.node.gates.JoinGateRegistry
+import org.helix.node.gates.NativePermissionCache
+import org.helix.node.gates.NativePermissionProvider
 import org.helix.node.gates.PermissionResolverRegistry
+import org.helix.node.gates.PermissionService
 import org.helix.node.notifications.NotificationBus
 import org.helix.node.platform.PlatformOverviewService
 import org.helix.node.players.PlayerRegistry
@@ -128,6 +131,13 @@ class HelixNode(
     /** Aggregated permission resolvers of all addons. */
     val permissionResolvers: PermissionResolverRegistry = PermissionResolverRegistry()
 
+    /** Per-player Minecraft-native permission snapshots reported by bridges. */
+    val nativePermissions: NativePermissionCache = NativePermissionCache()
+
+    /** Node-wide permission decisions: addon resolvers override the native default. */
+    val permissionService: PermissionService =
+        PermissionService(permissionResolvers, NativePermissionProvider(nativePermissions))
+
     /** Online players and player event fan-out. */
     val playerRegistry: PlayerRegistry = PlayerRegistry()
 
@@ -156,6 +166,7 @@ class HelixNode(
         registry,
         joinGates,
         permissionResolvers,
+        permissionService,
         playerRegistry,
         displayResolvers,
         bridgeValues,
@@ -186,6 +197,8 @@ class HelixNode(
             joinGates = joinGates,
             commandQueue = commandQueue,
             permissionResolvers = permissionResolvers,
+            nativePermissions = nativePermissions,
+            permissionService = permissionService,
             playerRegistry = playerRegistry,
             displayResolvers = displayResolvers,
             bridgeValues = bridgeValues,
@@ -195,6 +208,10 @@ class HelixNode(
             messages = messages,
             proxyEvents = proxyEvents,
             audit = audit,
+            loginPermission = config.control.loginPermission,
+            codeTtlSeconds = config.control.codeTtlSeconds,
+            sessionTtlSeconds = config.control.sessionTtlSeconds,
+            loginMessage = config.control.loginMessage,
         ),
     )
 

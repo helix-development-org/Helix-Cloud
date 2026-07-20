@@ -8,7 +8,6 @@ import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
-import io.ktor.server.auth.UserIdPrincipal
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.bearer
 import io.ktor.server.auth.principal
@@ -22,6 +21,7 @@ import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
+import io.ktor.server.routing.RoutingContext
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
@@ -32,6 +32,10 @@ import kotlinx.serialization.json.Json
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionSource
 import org.helix.api.action.PlayerCommandRequest
+import org.helix.node.control.auth.LoginRequest
+import org.helix.node.control.auth.PanelAuthService
+import org.helix.node.control.auth.PanelPrincipal
+import org.helix.node.control.auth.VerifyRequest
 import org.helix.api.bridge.HeartbeatReport
 import org.helix.api.player.PlayerEvent
 import org.helix.api.proxy.JoinRequest
@@ -72,7 +76,7 @@ fun Application.controlModule(dependencies: ControlDependencies) {
     install(Authentication) {
         bearer("helix") {
             authenticate { credential ->
-                if (credential.token == dependencies.token) UserIdPrincipal("helix") else null
+                dependencies.panelAuth.authenticate(credential.token)
             }
         }
     }
@@ -81,7 +85,7 @@ fun Application.controlModule(dependencies: ControlDependencies) {
         val path = call.request.path()
         if (path.startsWith("/api/") && !path.startsWith("/api/v1/internal/poll")) {
             val status = call.response.status()?.value ?: 0
-            val actor = call.principal<UserIdPrincipal>()?.name ?: "anonymous"
+            val actor = call.principal<PanelPrincipal>()?.name ?: "anonymous"
             val outcome = when {
                 status == 401 || status == 403 -> "denied"
                 status in 200..399 -> "ok"
@@ -99,8 +103,12 @@ fun Application.controlModule(dependencies: ControlDependencies) {
         staticResources("/", "dashboard") {
             default("index.html")
         }
+        route("/api/v1") {
+            publicAuthRoutes(dependencies)
+        }
         authenticate("helix") {
             route("/api/v1") {
+                sessionRoutes(dependencies)
                 platformRoutes(dependencies)
                 taskRoutes(dependencies)
                 serviceRoutes(dependencies)
@@ -116,22 +124,99 @@ fun Application.controlModule(dependencies: ControlDependencies) {
     }
 }
 
+/**
+ * Ensures the caller holds a permission node, else answers `403`.
+ *
+ * @param dependencies control API dependencies.
+ * @param node the required permission node.
+ * @return `true` if authorized; `false` after a `403` was written.
+ */
+private suspend fun RoutingContext.authorize(dependencies: ControlDependencies, node: String): Boolean {
+    val principal = call.principal<PanelPrincipal>()
+    if (principal != null && dependencies.panelAuth.grants(principal, node)) {
+        return true
+    }
+    call.respond(HttpStatusCode.Forbidden, ErrorResponse("missing permission: $node"))
+    return false
+}
+
+/**
+ * Ensures the caller authenticated with the static admin token, else `403`.
+ *
+ * Internal machine routes (bridges, wrappers) require the admin token; a
+ * player session must never reach them.
+ *
+ * @param dependencies control API dependencies.
+ * @return `true` if the caller is the admin token; `false` after a `403`.
+ */
+private suspend fun RoutingContext.requireAdmin(dependencies: ControlDependencies): Boolean {
+    if (call.principal<PanelPrincipal>()?.admin == true) {
+        return true
+    }
+    call.respond(HttpStatusCode.Forbidden, ErrorResponse("admin token required"))
+    return false
+}
+
+/**
+ * The permission nodes bridges evaluate natively on join.
+ *
+ * These are the nodes the node actually checks — the login permission, every
+ * dashboard view, each addon panel and the maintenance bypass — so the
+ * Minecraft-native default can answer them without a permission addon.
+ *
+ * @param dependencies control API dependencies.
+ * @return the distinct permission nodes to evaluate.
+ */
+private fun knownPermissionNodes(dependencies: ControlDependencies): List<String> = buildList {
+    add(dependencies.loginPermission)
+    addAll(PanelAuthService.VIEW_NODES.values)
+    dependencies.dashboardPanels.list().forEach { add(PanelAuthService.panelNode(it.id)) }
+    add("helix.maintenance.bypass")
+}.distinct()
+
+private fun io.ktor.server.routing.Route.publicAuthRoutes(dependencies: ControlDependencies) {
+    post("/auth/request-code") {
+        val request = call.receive<LoginRequest>()
+        call.respond(dependencies.panelAuth.requestCode(request.name))
+    }
+    post("/auth/verify") {
+        val request = call.receive<VerifyRequest>()
+        call.respond(dependencies.panelAuth.verify(request.name, request.code))
+    }
+}
+
+private fun io.ktor.server.routing.Route.sessionRoutes(dependencies: ControlDependencies) {
+    get("/auth/me") {
+        val principal = call.principal<PanelPrincipal>()!!
+        call.respond(dependencies.panelAuth.identity(principal))
+    }
+    post("/auth/logout") {
+        val header = call.request.headers[HttpHeaders.Authorization].orEmpty()
+        dependencies.panelAuth.logout(header.removePrefix("Bearer ").trim())
+        call.respond(MessageResponse("signed out"))
+    }
+}
+
 private fun io.ktor.server.routing.Route.platformRoutes(dependencies: ControlDependencies) {
     get("/platform/overview") {
+        if (!authorize(dependencies, "helix.panel.overview")) return@get
         call.respond(dependencies.overviewService.overview())
     }
 }
 
 private fun io.ktor.server.routing.Route.observabilityRoutes(dependencies: ControlDependencies) {
     get("/logs") {
+        if (!authorize(dependencies, "helix.panel.logs")) return@get
         val tail = call.request.queryParameters["tail"]?.toIntOrNull() ?: 300
         call.respond(LogsResponse(dependencies.logBuffer.tail(tail)))
     }
     get("/events") {
+        if (!authorize(dependencies, "helix.panel.events")) return@get
         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 200
         call.respond(dependencies.eventLog.recent(limit))
     }
     get("/audit") {
+        if (!authorize(dependencies, "helix.panel.audit")) return@get
         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 300
         val category = call.request.queryParameters["category"]
         call.respond(dependencies.audit.recent(limit, category))
@@ -140,10 +225,16 @@ private fun io.ktor.server.routing.Route.observabilityRoutes(dependencies: Contr
 
 private fun io.ktor.server.routing.Route.panelRoutes(dependencies: ControlDependencies) {
     get("/panels") {
-        call.respond(dependencies.dashboardPanels.list())
+        val principal = call.principal<PanelPrincipal>()!!
+        val visible = dependencies.dashboardPanels.list().filter {
+            dependencies.panelAuth.grants(principal, PanelAuthService.panelNode(it.id))
+        }
+        call.respond(visible)
     }
     get("/panels/{id}") {
-        val panel = dependencies.dashboardPanels.find(call.parameters["id"].orEmpty())
+        val id = call.parameters["id"].orEmpty()
+        if (!authorize(dependencies, PanelAuthService.panelNode(id))) return@get
+        val panel = dependencies.dashboardPanels.find(id)
         if (panel == null) {
             call.respond(HttpStatusCode.NotFound, ErrorResponse("unknown panel"))
         } else {
@@ -154,9 +245,11 @@ private fun io.ktor.server.routing.Route.panelRoutes(dependencies: ControlDepend
 
 private fun io.ktor.server.routing.Route.messageRoutes(dependencies: ControlDependencies) {
     get("/messages") {
+        if (!authorize(dependencies, "helix.panel.messages")) return@get
         call.respond(dependencies.messages.all())
     }
     post("/messages") {
+        if (!authorize(dependencies, "helix.panel.messages")) return@post
         val update = call.receive<MessageUpdate>()
         val ok = if (update.reset) {
             dependencies.messages.reset(update.addonId, update.key)
@@ -173,6 +266,7 @@ private fun io.ktor.server.routing.Route.messageRoutes(dependencies: ControlDepe
 
 private fun io.ktor.server.routing.Route.proxyRoutes(dependencies: ControlDependencies) {
     get("/proxy") {
+        if (!authorize(dependencies, "helix.panel.proxy")) return@get
         val services = dependencies.manager.managedServices()
         val proxies = services.filter { it.task.environment.proxy }.map {
             ProxySummary(
@@ -203,6 +297,7 @@ private fun io.ktor.server.routing.Route.proxyRoutes(dependencies: ControlDepend
         call.respond(ProxyView(dependencies.routing.maintenance, proxies, backends))
     }
     post("/proxy/maintenance") {
+        if (!authorize(dependencies, "helix.panel.proxy")) return@post
         val request = call.receive<MaintenanceRequest>()
         dependencies.routing.maintenance = request.enabled
         dependencies.proxyEvents.bumpRouting()
@@ -217,9 +312,11 @@ private fun io.ktor.server.routing.Route.proxyRoutes(dependencies: ControlDepend
 
 private fun io.ktor.server.routing.Route.taskRoutes(dependencies: ControlDependencies) {
     get("/tasks") {
+        if (!authorize(dependencies, "helix.panel.tasks")) return@get
         call.respond(dependencies.taskStore.all())
     }
     get("/tasks/{name}") {
+        if (!authorize(dependencies, "helix.panel.tasks")) return@get
         val task = dependencies.taskStore.find(call.parameters["name"].orEmpty())
         if (task == null) {
             call.respond(HttpStatusCode.NotFound, ErrorResponse("unknown task"))
@@ -228,12 +325,14 @@ private fun io.ktor.server.routing.Route.taskRoutes(dependencies: ControlDepende
         }
     }
     put("/tasks/{name}") {
+        if (!authorize(dependencies, "helix.panel.tasks")) return@put
         val task = call.receive<TaskDefinition>()
         require(task.name == call.parameters["name"]) { "task name must match the url" }
         dependencies.taskStore.save(task)
         call.respond(task)
     }
     delete("/tasks/{name}") {
+        if (!authorize(dependencies, "helix.panel.tasks")) return@delete
         val name = call.parameters["name"].orEmpty()
         require(dependencies.manager.activeCount(name) == 0) { "task $name still has active services" }
         if (dependencies.taskStore.delete(name)) {
@@ -243,6 +342,7 @@ private fun io.ktor.server.routing.Route.taskRoutes(dependencies: ControlDepende
         }
     }
     post("/tasks/{name}/services") {
+        if (!authorize(dependencies, "helix.panel.tasks")) return@post
         val info = dependencies.manager.startService(call.parameters["name"].orEmpty())
         call.respond(HttpStatusCode.Created, info)
     }
@@ -250,9 +350,11 @@ private fun io.ktor.server.routing.Route.taskRoutes(dependencies: ControlDepende
 
 private fun io.ktor.server.routing.Route.serviceRoutes(dependencies: ControlDependencies) {
     get("/services") {
+        if (!authorize(dependencies, "helix.panel.services")) return@get
         call.respond(dependencies.manager.services())
     }
     get("/services/{id}") {
+        if (!authorize(dependencies, "helix.panel.services")) return@get
         val info = dependencies.manager.find(call.parameters["id"].orEmpty())?.toInfo()
         if (info == null) {
             call.respond(HttpStatusCode.NotFound, ErrorResponse("unknown service"))
@@ -261,6 +363,7 @@ private fun io.ktor.server.routing.Route.serviceRoutes(dependencies: ControlDepe
         }
     }
     post("/services/{id}/stop") {
+        if (!authorize(dependencies, "helix.panel.services")) return@post
         val id = call.parameters["id"].orEmpty()
         if (dependencies.manager.stopService(id)) {
             call.respond(MessageResponse("stopping $id"))
@@ -269,6 +372,7 @@ private fun io.ktor.server.routing.Route.serviceRoutes(dependencies: ControlDepe
         }
     }
     post("/services/{id}/kill") {
+        if (!authorize(dependencies, "helix.panel.services")) return@post
         val id = call.parameters["id"].orEmpty()
         if (dependencies.manager.killService(id)) {
             call.respond(MessageResponse("killed $id"))
@@ -277,6 +381,7 @@ private fun io.ktor.server.routing.Route.serviceRoutes(dependencies: ControlDepe
         }
     }
     get("/services/{id}/logs") {
+        if (!authorize(dependencies, "helix.panel.services")) return@get
         val tail = call.request.queryParameters["tail"]?.toIntOrNull() ?: 50
         call.respond(LogsResponse(dependencies.manager.logs(call.parameters["id"].orEmpty(), tail)))
     }
@@ -294,9 +399,11 @@ private fun io.ktor.server.routing.Route.actionRoutes(dependencies: ControlDepen
 
 private fun io.ktor.server.routing.Route.addonRoutes(dependencies: ControlDependencies) {
     get("/addons") {
+        if (!authorize(dependencies, "helix.panel.addons")) return@get
         call.respond(dependencies.addonManager.addons())
     }
     post("/addons/{id}/enable") {
+        if (!authorize(dependencies, "helix.panel.addons")) return@post
         val id = call.parameters["id"].orEmpty()
         if (dependencies.addonManager.enable(id)) {
             call.respond(MessageResponse("enabled $id"))
@@ -305,6 +412,7 @@ private fun io.ktor.server.routing.Route.addonRoutes(dependencies: ControlDepend
         }
     }
     post("/addons/{id}/disable") {
+        if (!authorize(dependencies, "helix.panel.addons")) return@post
         val id = call.parameters["id"].orEmpty()
         if (dependencies.addonManager.disable(id)) {
             call.respond(MessageResponse("disabled $id"))
@@ -316,6 +424,7 @@ private fun io.ktor.server.routing.Route.addonRoutes(dependencies: ControlDepend
 
 private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDependencies) {
     post("/internal/heartbeat") {
+        if (!requireAdmin(dependencies)) return@post
         val report = call.receive<HeartbeatReport>()
         if (dependencies.manager.handleHeartbeat(report)) {
             call.respond(MessageResponse("ok"))
@@ -324,18 +433,22 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
         }
     }
     get("/internal/routing") {
+        if (!requireAdmin(dependencies)) return@get
         val proxyServiceId = call.request.queryParameters["proxyServiceId"].orEmpty()
         call.respond(dependencies.routing.snapshot(proxyServiceId))
     }
     post("/internal/join-check") {
+        if (!requireAdmin(dependencies)) return@post
         val request = call.receive<JoinRequest>()
         call.respond(dependencies.joinGates.evaluate(request))
     }
     get("/internal/commands") {
+        if (!requireAdmin(dependencies)) return@get
         val proxyServiceId = call.request.queryParameters["proxyServiceId"].orEmpty()
         call.respond(dependencies.commandQueue.drain(proxyServiceId))
     }
     get("/internal/poll") {
+        if (!requireAdmin(dependencies)) return@get
         val proxyServiceId = call.request.queryParameters["proxyServiceId"].orEmpty()
         val seenRouting = call.request.queryParameters["routingVersion"]?.toIntOrNull() ?: -1
         val seenCatalog = call.request.queryParameters["commandCatalogVersion"]?.toIntOrNull() ?: -1
@@ -354,32 +467,47 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
         }
     }
     post("/internal/permission-check") {
+        if (!requireAdmin(dependencies)) return@post
         val request = call.receive<PermissionCheckRequest>()
-        call.respond(PermissionDecision(dependencies.permissionResolvers.evaluate(request)))
+        call.respond(PermissionDecision(dependencies.permissionService.check(request)))
+    }
+    get("/internal/permission-nodes") {
+        if (!requireAdmin(dependencies)) return@get
+        call.respond(knownPermissionNodes(dependencies))
     }
     post("/internal/player-event") {
+        if (!requireAdmin(dependencies)) return@post
         val event = call.receive<PlayerEvent>()
         if (dependencies.playerRegistry.handle(event)) {
+            when (event.type) {
+                "join" -> dependencies.nativePermissions.update(event.name, event.permissions)
+                "leave" -> dependencies.nativePermissions.clear(event.name)
+            }
             call.respond(MessageResponse("ok"))
         } else {
             call.respond(HttpStatusCode.BadRequest, ErrorResponse("unknown event type: ${event.type}"))
         }
     }
     get("/internal/players") {
+        if (!requireAdmin(dependencies)) return@get
         call.respond(dependencies.playerRegistry.online())
     }
     get("/internal/player-commands") {
+        if (!requireAdmin(dependencies)) return@get
         call.respond(dependencies.playerCommands.commands())
     }
     post("/internal/player-command") {
+        if (!requireAdmin(dependencies)) return@post
         val request = call.receive<PlayerCommandRequest>()
         call.respond(dependencies.playerCommands.execute(request))
     }
     post("/internal/display") {
+        if (!requireAdmin(dependencies)) return@post
         val request = call.receive<JoinRequest>()
         call.respond(dependencies.displayResolvers.resolve(request.name))
     }
     get("/internal/bridge-values") {
+        if (!requireAdmin(dependencies)) return@get
         val serviceId = call.request.queryParameters["serviceId"]
         val task = serviceId?.let { dependencies.manager.find(it)?.task }
         val values = if (task == null) {

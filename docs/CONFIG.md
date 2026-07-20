@@ -25,7 +25,11 @@ Helix/
 [control]
 host = "127.0.0.1"        # Bind-Interface der Control-API + Dashboard
 port = 8080
-token = "dev-token-change-me"  # Bearer-Token für API, Dashboard und Bridges
+token = "dev-token-change-me"  # Admin-Token: voller Zugriff, Bridges/Wrapper, Panel-Notlogin
+loginPermission = "helix.panel.login"  # Permission für den Web-Panel-Login per MC-Account
+codeTtlSeconds = 300      # Gültigkeit des ingame zugeschickten Login-Codes
+sessionTtlSeconds = 86400 # Gültigkeit einer Web-Session
+loginMessage = "§b§lHelix §r§7» §fYour panel login code is §b{code}§7."  # {code} wird ersetzt
 
 [docker]
 network = "helix"              # Docker-Netzwerk aller Helix-Container
@@ -42,6 +46,21 @@ poolSize = 8
 Im `postgres`-Modus speichern **alle** Addons ihre Daten in der
 geteilten Tabelle `addon_storage(addon_id, doc_key, value)` statt in
 Dateien — praktisch fürs Netzwerk-weite/zentrale Speichern.
+
+### Web-Panel-Login & Permissions
+
+Der Panel-Login läuft über den Minecraft-Account: Name eingeben → Code
+ingame erhalten → Code eingeben. Voraussetzung ist `helix.panel.login`.
+Welche Views/Panels sichtbar sind, steuern Permissions:
+
+- Views: `helix.panel.overview|tasks|services|proxy|events|logs|audit|addons|messages|settings`
+- Addon-Seiten: `helix.panel.addon.<panelId>`
+- Wildcard: `helix.panel.*` schaltet alles frei
+
+Ohne Permission-Addon entscheidet das **native MC-System** (OP bzw.
+`hasPermission`, z.B. via LuckPerms auf dem Proxy). Ist das Permission-Addon
+aktiv, ist es allein maßgeblich. Das statische `control.token` bleibt als
+Admin-/Notlogin mit vollem Zugriff gültig.
 
 ## `config/versions.toml`
 

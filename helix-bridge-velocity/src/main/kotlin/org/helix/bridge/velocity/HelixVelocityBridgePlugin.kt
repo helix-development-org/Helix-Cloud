@@ -53,6 +53,9 @@ class HelixVelocityBridgePlugin @Inject constructor(
     private var heartbeatTask: ScheduledTask? = null
 
     @Volatile
+    private var permissionNodes: List<String>? = null
+
+    @Volatile
     private var polling = false
     private var pollThread: Thread? = null
 
@@ -146,7 +149,25 @@ class HelixVelocityBridgePlugin @Inject constructor(
      */
     @Subscribe
     fun onPostLogin(event: PostLoginEvent) {
-        reportPlayerEvent("join", event.player.username, event.player.uniqueId.toString())
+        val granted = permissionNodes().filter { event.player.hasPermission(it) }
+        reportPlayerEvent("join", event.player.username, event.player.uniqueId.toString(), granted)
+    }
+
+    /**
+     * The Helix permission nodes to evaluate natively, fetched once and cached.
+     *
+     * @return the nodes advertised by the node, or empty on failure.
+     */
+    private fun permissionNodes(): List<String> {
+        permissionNodes?.let { return it }
+        val httpClient = client ?: return emptyList()
+        val nodes = runCatching {
+            httpClient.getJson("/api/v1/internal/permission-nodes")
+                ?.let { json.decodeFromString<List<String>>(it) }
+        }.onFailure { logger.warn("Helix permission-node fetch failed: {}", it.message) }
+            .getOrNull() ?: emptyList()
+        permissionNodes = nodes
+        return nodes
     }
 
     /**
@@ -159,7 +180,12 @@ class HelixVelocityBridgePlugin @Inject constructor(
         reportPlayerEvent("leave", event.player.username, event.player.uniqueId.toString())
     }
 
-    private fun reportPlayerEvent(type: String, name: String, uuid: String) {
+    private fun reportPlayerEvent(
+        type: String,
+        name: String,
+        uuid: String,
+        permissions: List<String> = emptyList(),
+    ) {
         val activeSettings = settings ?: return
         val httpClient = client ?: return
         runCatching {
@@ -168,6 +194,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
                 name = name,
                 uuid = uuid,
                 proxyServiceId = activeSettings.serviceId,
+                permissions = permissions,
             )
             httpClient.postJson("/api/v1/internal/player-event", json.encodeToString(event))
         }.onFailure { logger.warn("Helix player event failed: {}", it.message) }

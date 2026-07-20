@@ -10,12 +10,20 @@ import org.slf4j.LoggerFactory
  * Aggregates all permission resolvers registered by addons.
  *
  * A permission is granted when any resolver grants it. A resolver that
- * throws is skipped. Without any registered resolver every check is
- * denied.
+ * throws is skipped. Whether any resolver is registered decides — via
+ * [PermissionService] — whether addons or the Minecraft-native default
+ * governs permissions.
  */
 class PermissionResolverRegistry {
     private val logger = LoggerFactory.getLogger(PermissionResolverRegistry::class.java)
     private val resolvers = ConcurrentHashMap<String, CopyOnWriteArrayList<PermissionResolver>>()
+
+    /**
+     * Whether any addon has registered a permission resolver.
+     *
+     * @return `true` if at least one resolver is active.
+     */
+    fun hasOverrides(): Boolean = resolvers.values.any { it.isNotEmpty() }
 
     /**
      * Registers a resolver under an owner id.

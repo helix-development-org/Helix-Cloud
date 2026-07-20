@@ -31,6 +31,12 @@ class NodeConfigLoader {
                 host = toml.getString("control.host") ?: defaults.control.host,
                 port = toml.getLong("control.port")?.toInt() ?: defaults.control.port,
                 token = toml.getString("control.token") ?: defaults.control.token,
+                loginPermission = toml.getString("control.loginPermission")
+                    ?: defaults.control.loginPermission,
+                codeTtlSeconds = toml.getLong("control.codeTtlSeconds") ?: defaults.control.codeTtlSeconds,
+                sessionTtlSeconds = toml.getLong("control.sessionTtlSeconds")
+                    ?: defaults.control.sessionTtlSeconds,
+                loginMessage = toml.getString("control.loginMessage") ?: defaults.control.loginMessage,
             ),
             docker = NodeConfig.DockerSettings(
                 network = toml.getString("docker.network") ?: defaults.docker.network,

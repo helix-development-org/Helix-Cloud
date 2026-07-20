@@ -1,10 +1,28 @@
 # REST-API-Referenz
 
 Basis-URL: `http://<host>:<port>/api/v1` (Default `127.0.0.1:8080`).
-Alle Endpunkte erfordern `Authorization: Bearer <token>` aus
-`config/node.toml`; ohne Token antwortet die API mit `401`.
+Alle Endpunkte (außer `/auth/request-code` und `/auth/verify`) erfordern
+`Authorization: Bearer <token>`; ohne gültiges Token antwortet die API mit
+`401`. Ein Token ist entweder das statische `control.token` (voller
+Admin-Zugriff, auch von Bridges/Wrapper genutzt) oder ein per Minecraft-Login
+ausgestelltes Session-Token. Für ein Session-Token wird jede Aktion zusätzlich
+gegen die Permissions des Spielers geprüft (`403` bei fehlender Permission);
+`/internal/*` ist ausschließlich dem Admin-Token vorbehalten.
 
 Das Dashboard unter `/` ist statisch und nutzt dieselbe API.
+
+## Auth (Web-Panel-Login per Minecraft-Account)
+
+| Methode | Pfad | Beschreibung |
+|---|---|---|
+| POST | `/auth/request-code` | **Öffentlich.** Body `{"name": "<mcname>"}`. Prüft, ob der Spieler online ist und `helix.panel.login` besitzt, generiert einen Code und schickt ihn ihm ingame. |
+| POST | `/auth/verify` | **Öffentlich.** Body `{"name", "code"}`. Prüft den Code und liefert `{token, identity}` — das Session-Token für alle weiteren Aufrufe. |
+| GET | `/auth/me` | Der eingeloggte Aufrufer: `{name, admin, views}` (erlaubte Dashboard-Views). |
+| POST | `/auth/logout` | Invalidiert das aktuelle Session-Token. |
+
+Login-Ablauf: MC-Name eingeben → Code ingame erhalten → Code eingeben →
+Session-Token. Die sichtbaren Views/Panels richten sich nach den Permissions
+(`helix.panel.<view>`, `helix.panel.addon.<id>`). Das Admin-Token darf alles.
 
 ## Platform
 
@@ -67,8 +85,9 @@ alles, was die Konsole kann.
 | POST | `/internal/join-check` | Join-Gate: `{name, uuid?}` → `{allowed, message?}` (wertet alle Addon-Gates aus) |
 | GET | `/internal/commands?proxyServiceId=<id>` | Pending Proxy-Commands (z.B. Kicks), werden beim Abruf konsumiert |
 | GET | `/internal/poll?proxyServiceId=<id>&routingVersion=<n>&commandCatalogVersion=<n>` | **Long-Poll**: kehrt sofort zurück, sobald Commands anstehen oder Routing/Command-Katalog sich ändern (instant push für Proxies) |
-| POST | `/internal/permission-check` | Permission-Frage: `{name, permission, uuid?}` → `{allowed}` (erteilt, sobald ein Resolver erteilt) |
-| POST | `/internal/player-event` | Join/Leave vom Proxy: `{type, name, uuid?, proxyServiceId}` |
+| POST | `/internal/permission-check` | Permission-Frage: `{name, permission, uuid?}` → `{allowed}` (Addon-Resolver überschreiben, sonst natives MC-System) |
+| GET | `/internal/permission-nodes` | Liste der Permission-Nodes, die die Bridge beim Join nativ via `hasPermission` auswerten soll |
+| POST | `/internal/player-event` | Join/Leave vom Proxy: `{type, name, uuid?, proxyServiceId, permissions?}` — `permissions` = nativ erteilte Nodes beim Join |
 | GET | `/internal/players` | alle Online-Spieler des Netzwerks |
 | GET | `/internal/player-commands` | Actions mit `playerCommand=true`, die Proxies als Commands registrieren |
 | POST | `/internal/player-command` | Spieler-Command ausführen: `{player, command, arguments}` → ActionResult (Permission wird geprüft) |

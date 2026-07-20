@@ -1,14 +1,20 @@
 package org.helix.node.control
 
+import org.helix.api.action.ActionInvocation
+import org.helix.api.action.ActionSource
 import org.helix.node.actions.ActionRegistry
 import org.helix.node.actions.PlayerCommandService
 import org.helix.node.addons.AddonManager
+import org.helix.node.control.auth.PanelAuthService
 import org.helix.node.dashboard.DashboardPanelRegistry
 import org.helix.node.display.BridgeValueStore
 import org.helix.node.display.DisplayResolverRegistry
 import org.helix.node.events.EventLog
 import org.helix.node.gates.JoinGateRegistry
+import org.helix.node.gates.NativePermissionCache
+import org.helix.node.gates.NativePermissionProvider
 import org.helix.node.gates.PermissionResolverRegistry
+import org.helix.node.gates.PermissionService
 import org.helix.node.logging.LogBuffer
 import org.helix.node.audit.AuditLog
 import org.helix.node.messages.MessageRegistry
@@ -33,6 +39,12 @@ import org.helix.node.tasks.TaskStore
  * @property joinGates aggregated join gates of all addons.
  * @property commandQueue pending commands for proxy bridges.
  * @property permissionResolvers aggregated permission resolvers of all addons.
+ * @property nativePermissions per-player Minecraft-native permission snapshots.
+ * @property permissionService node-wide permission decisions (addon or native).
+ * @property loginPermission permission required to sign in to the web panel.
+ * @property codeTtlSeconds lifetime of an in-game login code.
+ * @property sessionTtlSeconds lifetime of a web session.
+ * @property loginMessage in-game message template (`{code}` substituted).
  */
 data class ControlDependencies(
     val token: String,
@@ -45,6 +57,9 @@ data class ControlDependencies(
     val joinGates: JoinGateRegistry = JoinGateRegistry(),
     val commandQueue: ProxyCommandQueue = ProxyCommandQueue(),
     val permissionResolvers: PermissionResolverRegistry = PermissionResolverRegistry(),
+    val nativePermissions: NativePermissionCache = NativePermissionCache(),
+    val permissionService: PermissionService =
+        PermissionService(permissionResolvers, NativePermissionProvider(nativePermissions)),
     val playerRegistry: PlayerRegistry = PlayerRegistry(),
     val displayResolvers: DisplayResolverRegistry = DisplayResolverRegistry(),
     val bridgeValues: BridgeValueStore = BridgeValueStore(),
@@ -54,7 +69,31 @@ data class ControlDependencies(
     val messages: MessageRegistry = MessageRegistry(),
     val proxyEvents: ProxyEventHub = ProxyEventHub(),
     val audit: AuditLog = AuditLog(java.nio.file.Path.of("audit.jsonl")),
+    val loginPermission: String = "helix.panel.login",
+    val codeTtlSeconds: Long = 300,
+    val sessionTtlSeconds: Long = 86_400,
+    val loginMessage: String = "§b§lHelix §r§7» §fYour panel login code is §b{code}§7.",
 ) {
     /** Player command execution shared by the internal routes. */
-    val playerCommands: PlayerCommandService = PlayerCommandService(registry, permissionResolvers)
+    val playerCommands: PlayerCommandService = PlayerCommandService(registry, permissionService)
+
+    /** Web-panel Minecraft-account login and per-view authorization. */
+    val panelAuth: PanelAuthService = PanelAuthService(
+        adminToken = token,
+        loginPermission = loginPermission,
+        loginMessage = loginMessage,
+        codeTtlMs = codeTtlSeconds * 1000,
+        sessionTtlMs = sessionTtlSeconds * 1000,
+        players = playerRegistry,
+        permissions = permissionService,
+        deliver = { name, text ->
+            registry.invoke(
+                ActionInvocation(
+                    action = "player.message",
+                    arguments = listOf(name, text),
+                    source = ActionSource.SYSTEM,
+                ),
+            ).success
+        },
+    )
 }

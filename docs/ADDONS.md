@@ -71,10 +71,13 @@ context.registerJoinGate { request ->
 ```
 
 - `context.registerPermissionResolver { request -> ... }` — Permission-
-  Fragen beantworten: Bridges (z.B. Maintenance-Bypass) und andere Addons
-  fragen die Node über `POST /internal/permission-check`; eine Permission
-  gilt als erteilt, sobald ein Resolver sie erteilt. Ohne registrierten
-  Resolver wird jede Frage verneint.
+  Fragen beantworten. **Permissions hängen nicht vom Addon ab:** die Node
+  löst jede Frage über den `PermissionService` auf. Ist **kein** Resolver
+  registriert, entscheidet der Default — das **native MC-Permission-System**
+  (die Proxy-Bridge wertet die relevanten Nodes beim Join via
+  `player.hasPermission` aus und meldet sie). Sobald ein Addon einen Resolver
+  registriert, **überschreibt** es den Default vollständig und ist allein
+  maßgeblich. Damit läuft das gesamte Netzwerk auch ohne Permission-Addon.
 
 ```kotlin
 context.registerPermissionResolver { request ->
@@ -82,8 +85,8 @@ context.registerPermissionResolver { request ->
 }
 ```
 
-- `context.hasPermission(player, permission)` — fragt die aggregierten
-  Resolver (z.B. das Permission-Addon) direkt.
+- `context.hasPermission(player, permission)` — fragt den `PermissionService`
+  (Addon-Resolver falls vorhanden, sonst nativ).
 - `context.onlinePlayers()` — alle Spieler im Netzwerk (die Proxies melden
   Join/Leave an die Node).
 - `context.registerPlayerListener(listener)` — netzwerkweite
