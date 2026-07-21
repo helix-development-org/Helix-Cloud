@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.23.0 — 2026-07-21
+
+### Player-Verwaltung im Panel
+- Neue Dashboard-Seite **Players** (Permission `helix.panel.players`): alle
+  Online-Spieler mit UUID, Proxy und Online-Dauer, plus Aktionen **Message**,
+  **Kick** und **Ban** (Dauer + Grund) direkt aus dem Web.
+- Neue gated Routen `GET /players` und `POST /players/{name}/message|kick|ban`,
+  die serverseitig die bestehenden Actions (`player.message`, `player.kick`,
+  `ban.set`) aufrufen — kein direkter Zugriff auf `/actions` nötig.
+
 ## 0.22.0 — 2026-07-21
 
 ### Interaktive Service-Konsole

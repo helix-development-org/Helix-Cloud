@@ -59,6 +59,17 @@ Session-Token. Die sichtbaren Views/Panels richten sich nach den Permissions
 | GET | `/services/{id}/logs?tail=50` | neueste Log-Zeilen |
 | POST | `/services/{id}/command` | Konsolenbefehl an den Service senden — Body `{"command": "say hi"}` (nur Prozess-Executor; wird auditiert) |
 
+## Players
+
+Erfordert Permission `helix.panel.players`.
+
+| Methode | Pfad | Beschreibung |
+|---|---|---|
+| GET | `/players` | Alle Online-Spieler (`name`, `uuid`, `proxyServiceId`, `joinedAtEpochMs`) |
+| POST | `/players/{name}/message` | Nachricht senden — Body `{"value": "..."}` |
+| POST | `/players/{name}/kick` | Kicken — Body `{"value": "reason"}` (Grund optional) |
+| POST | `/players/{name}/ban` | Bannen (Bans-Addon) — Body `{"value": "reason", "duration": "7d"}` (`duration` leer = permanent) |
+
 ## Actions
 
 | Methode | Pfad | Beschreibung |

@@ -330,6 +330,7 @@ const NAV = [
   { id: "overview", label: "Overview", icon: '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>' },
   { id: "tasks", label: "Tasks", icon: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>' },
   { id: "services", label: "Services", icon: '<rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/>' },
+  { id: "players", label: "Players", icon: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>' },
   { id: "proxy", label: "Proxy", icon: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>' },
   { group: "Observability" },
   { id: "events", label: "Events", icon: '<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>' },
@@ -492,6 +493,7 @@ const VIEWS = {
   overview: { title: "Overview", interval: 4000, draw: drawOverview },
   tasks: { title: "Tasks", interval: 5000, draw: drawTasks },
   services: { title: "Services", interval: 3000, draw: drawServices },
+  players: { title: "Players", interval: 5000, draw: drawPlayers },
   proxy: { title: "Proxy", interval: 3000, draw: drawProxy },
   events: { title: "Events", interval: 4000, draw: drawEvents },
   logs: { title: "Logs", interval: 2000, draw: drawLogs },
@@ -565,6 +567,37 @@ async function drawServices() {
   $("#view").innerHTML = `<div class="card">
     <div class="card-head"><h2>Services</h2><div class="sub">${services.length} total</div></div>
     <div class="table-wrap">${servicesTable(services, true)}</div></div>`;
+}
+
+async function drawPlayers() {
+  const players = await api("/players");
+  $("#view").innerHTML = `<div class="card">
+    <div class="card-head"><h2>Players</h2><div class="sub">${players.length} online</div></div>
+    <div class="table-wrap">${players.length ? `<table><thead><tr><th>Name</th><th>UUID</th><th>Proxy</th><th>Online</th><th></th></tr></thead><tbody>${
+      players.map(p => `<tr>
+        <td><strong>${esc(p.name)}</strong></td>
+        <td class="mono muted">${esc(p.uuid || "—")}</td>
+        <td class="mono muted">${esc(p.proxyServiceId || "—")}</td>
+        <td><span class="muted">${uptime(p.joinedAtEpochMs)}</span></td>
+        <td><div class="row-actions">
+          <button class="btn sm ghost" onclick="playerAct('${esc(p.name)}','message')">Message</button>
+          <button class="btn sm subtle" onclick="playerAct('${esc(p.name)}','kick')">Kick</button>
+          <button class="btn sm danger" onclick="playerAct('${esc(p.name)}','ban')">Ban</button></div></td>
+      </tr>`).join("")
+    }</tbody></table>` : emptyState("No players online", "Players appear here once they join through a proxy")}</div></div>`;
+}
+async function playerAct(name, op) {
+  let body = {};
+  if (op === "message") { const t = prompt(`Message to ${name}:`); if (!t) return; body = { value: t }; }
+  else if (op === "kick") { const r = prompt(`Kick ${name} — reason (optional):`, ""); if (r === null) return; body = { value: r }; }
+  else if (op === "ban") {
+    const d = prompt(`Ban ${name} — duration (e.g. 7d, 12h; empty = permanent):`, ""); if (d === null) return;
+    const r = prompt(`Ban ${name} — reason:`, ""); if (r === null) return;
+    body = { value: r, duration: d };
+  }
+  try { const res = await api(`/players/${encodeURIComponent(name)}/${op}`, { method: "POST", body: JSON.stringify(body) });
+    toast((res.lines && res.lines[0]) || (res.success ? "Done" : "Failed")); if (view === "players") drawPlayers(); }
+  catch (e) { toast(e.message); }
 }
 
 async function drawTasks() {

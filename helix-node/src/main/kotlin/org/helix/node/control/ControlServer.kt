@@ -112,6 +112,7 @@ fun Application.controlModule(dependencies: ControlDependencies) {
                 platformRoutes(dependencies)
                 taskRoutes(dependencies)
                 serviceRoutes(dependencies)
+                playerRoutes(dependencies)
                 proxyRoutes(dependencies)
                 observabilityRoutes(dependencies)
                 panelRoutes(dependencies)
@@ -410,6 +411,44 @@ private fun io.ktor.server.routing.Route.serviceRoutes(dependencies: ControlDepe
         }
     }
 }
+
+private fun io.ktor.server.routing.Route.playerRoutes(dependencies: ControlDependencies) {
+    get("/players") {
+        if (!authorize(dependencies, "helix.panel.players")) return@get
+        call.respond(dependencies.playerRegistry.online())
+    }
+    post("/players/{name}/message") {
+        if (!authorize(dependencies, "helix.panel.players")) return@post
+        val name = call.parameters["name"].orEmpty()
+        val text = call.receive<PlayerActionRequest>().value
+        require(text.isNotBlank()) { "message must not be empty" }
+        call.respond(dependencies.registry.invoke(playerAction("player.message", name, text)))
+    }
+    post("/players/{name}/kick") {
+        if (!authorize(dependencies, "helix.panel.players")) return@post
+        val name = call.parameters["name"].orEmpty()
+        val reason = call.receive<PlayerActionRequest>().value
+        call.respond(dependencies.registry.invoke(playerAction("player.kick", name, reason)))
+    }
+    post("/players/{name}/ban") {
+        if (!authorize(dependencies, "helix.panel.players")) return@post
+        val name = call.parameters["name"].orEmpty()
+        val request = call.receive<PlayerActionRequest>()
+        val arguments = buildList {
+            add(name)
+            request.duration?.takeIf { it.isNotBlank() }?.let { add(it) }
+            if (request.value.isNotBlank()) add(request.value)
+        }
+        call.respond(dependencies.registry.invoke(ActionInvocation("ban.set", arguments, ActionSource.REST)))
+    }
+}
+
+private fun playerAction(action: String, player: String, value: String): ActionInvocation =
+    ActionInvocation(
+        action = action,
+        arguments = if (value.isBlank()) listOf(player) else listOf(player, value),
+        source = ActionSource.REST,
+    )
 
 private fun io.ktor.server.routing.Route.actionRoutes(dependencies: ControlDependencies) {
     get("/actions") {

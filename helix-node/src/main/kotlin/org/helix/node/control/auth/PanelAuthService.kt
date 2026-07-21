@@ -179,6 +179,7 @@ class PanelAuthService(
             "overview" to "helix.panel.overview",
             "tasks" to "helix.panel.tasks",
             "services" to "helix.panel.services",
+            "players" to "helix.panel.players",
             "proxy" to "helix.panel.proxy",
             "events" to "helix.panel.events",
             "logs" to "helix.panel.logs",
