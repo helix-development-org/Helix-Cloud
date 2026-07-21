@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.22.0 — 2026-07-21
+
+### Interaktive Service-Konsole
+- Neue Konsole pro Service im Dashboard: das Logs-Fenster hat jetzt eine
+  Eingabezeile — Befehle (z.B. `say hi`, `list`) werden an die Server-Konsole
+  gesendet, die Ausgabe erscheint sofort in den Logs.
+- Node schreibt den Befehl in den stdin des Wrapper-Prozesses (den der Server
+  erbt): neues `ServiceHandle.sendCommand`, `ServiceManager.sendCommand`, Route
+  `POST /services/{id}/command` (Permission `helix.panel.services`, auditiert).
+- Prozess-Executor voll unterstützt; Docker-Services antworten (noch) mit
+  „console not supported" (stdin-Anbindung folgt separat).
+
 ## 0.21.0 — 2026-07-21
 
 ### MongoDB als Storage-Backend

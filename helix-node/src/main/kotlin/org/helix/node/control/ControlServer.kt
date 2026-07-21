@@ -390,6 +390,25 @@ private fun io.ktor.server.routing.Route.serviceRoutes(dependencies: ControlDepe
         val tail = call.request.queryParameters["tail"]?.toIntOrNull() ?: 50
         call.respond(LogsResponse(dependencies.manager.logs(call.parameters["id"].orEmpty(), tail)))
     }
+    post("/services/{id}/command") {
+        if (!authorize(dependencies, "helix.panel.services")) return@post
+        val id = call.parameters["id"].orEmpty()
+        val command = call.receive<ServiceCommandRequest>().command
+        require(command.isNotBlank()) { "command must not be empty" }
+        if (dependencies.manager.sendCommand(id, command)) {
+            dependencies.audit.record(
+                "console",
+                call.principal<PanelPrincipal>()?.name ?: "anonymous",
+                "$id » $command",
+            )
+            call.respond(MessageResponse("sent to $id"))
+        } else {
+            call.respond(
+                HttpStatusCode.NotFound,
+                ErrorResponse("service not accepting console input (running process service required): $id"),
+            )
+        }
+    }
 }
 
 private fun io.ktor.server.routing.Route.actionRoutes(dependencies: ControlDependencies) {

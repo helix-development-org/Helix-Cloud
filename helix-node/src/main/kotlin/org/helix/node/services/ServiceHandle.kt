@@ -31,4 +31,13 @@ interface ServiceHandle {
      * @return the log lines, oldest first.
      */
     fun logs(tail: Int): List<String>
+
+    /**
+     * Sends a console command line to the service's standard input.
+     *
+     * @param line the command, without a trailing newline.
+     * @return `true` if the line was delivered; `false` when the executor does
+     *  not support console input or the service is not running.
+     */
+    fun sendCommand(line: String): Boolean = false
 }

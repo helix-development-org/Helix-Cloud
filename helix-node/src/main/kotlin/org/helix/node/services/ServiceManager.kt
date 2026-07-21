@@ -168,6 +168,16 @@ class ServiceManager(
         ?: emptyList()
 
     /**
+     * Sends a console command line to a running service.
+     *
+     * @param id the service id.
+     * @param line the command, without a trailing newline.
+     * @return `true` if delivered to the service's console.
+     */
+    fun sendCommand(id: String, line: String): Boolean =
+        find(id)?.handle?.sendCommand(line) ?: false
+
+    /**
      * Applies a bridge heartbeat.
      *
      * The first heartbeat moves the service to `RUNNING`; player counts feed

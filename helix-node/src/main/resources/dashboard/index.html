@@ -217,6 +217,9 @@ td .muted { color: var(--ink-3); }
 .logview .l-err { color: #ff8a8a; }
 .logview .l-info { color: #7fd6a5; }
 .logview .l-dim { color: #5a6675; }
+.console-bar { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); background: #11161d; }
+.console-bar .console-prompt { color: var(--good); font-family: var(--mono); font-weight: 700; }
+.console-bar input { flex: 1; background: #0c1015; border: 1px solid var(--line-strong); color: #dbe3ec; font-size: 12.5px; }
 
 /* ---------- modal ---------- */
 .backdrop { position: fixed; inset: 0; background: rgba(8,11,16,.6); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; z-index: 60; padding: 20px; animation: fade .15s; }
@@ -971,11 +974,20 @@ function taskModal() {
   };
 }
 async function showLogsModal(id) {
-  $("#modal-root").innerHTML = `<div class="backdrop" id="bd"><div class="modal wide"><div class="modal-head"><h2>Logs — ${esc(id)}</h2></div>
-    <div class="logview" id="mlogs" style="height:60vh;margin:0">loading…</div>
+  $("#modal-root").innerHTML = `<div class="backdrop" id="bd"><div class="modal wide"><div class="modal-head"><h2>Console — ${esc(id)}</h2></div>
+    <div class="logview" id="mlogs" style="height:56vh;margin:0">loading…</div>
+    <div class="console-bar"><span class="console-prompt">&gt;</span><input class="mono" id="mcmd" placeholder="type a command and press Enter (e.g. say hello, list)" autocomplete="off"><button class="btn sm" id="mcmd-send">Send</button></div>
     <div class="modal-foot"><button class="btn subtle" onclick="closeLogsModal()">Close</button></div></div></div>`;
   $("#bd").onclick = e => { if (e.target.id === "bd") closeLogsModal(); };
   const load = async () => { try { const l = await api(`/services/${id}/logs?tail=300`); const b = $("#mlogs"); if (!b) return; const bottom = b.scrollHeight-b.scrollTop-b.clientHeight < 40; b.innerHTML = (l.lines.length ? l.lines : ["(no output)"]).map(x => { let c="l-dim"; if(/ERROR/.test(x))c="l-err"; else if(/WARN/.test(x))c="l-warn"; else if(/INFO/.test(x))c="l-info"; return `<div class="${c}">${esc(x)}</div>`; }).join(""); if (bottom) b.scrollTop = b.scrollHeight; } catch (e) {} };
+  const send = async () => {
+    const inp = $("#mcmd"); const cmd = inp.value.trim(); if (!cmd) return;
+    try { await api(`/services/${id}/command`, { method: "POST", body: JSON.stringify({ command: cmd }) }); inp.value = ""; setTimeout(load, 200); }
+    catch (e) { toast(e.message); }
+  };
+  $("#mcmd-send").onclick = send;
+  $("#mcmd").onkeydown = e => { if (e.key === "Enter") send(); };
+  $("#mcmd").focus();
   window._mlogTimer = setInterval(load, 2000); load();
 }
 function closeLogsModal() { clearInterval(window._mlogTimer); closeModal(); }
