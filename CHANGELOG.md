@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.26.0 — 2026-07-21
+
+### Security-Härtung
+- **HTTPS/TLS** für Control-API und Dashboard: `control.tlsKeystore` (PKCS12)
+  setzen → der Server läuft über HTTPS statt HTTP.
+- **Login-Rate-Limiting**: `POST /auth/request-code` ist pro Spieler auf einen
+  Code alle 30 s begrenzt (Verify bleibt bei max. 5 Versuchen pro Code) —
+  schützt vor Code-Spam an Spieler und Brute-Force.
+
 ## 0.25.0 — 2026-07-21
 
 ### Geplante Aufgaben (Scheduler)

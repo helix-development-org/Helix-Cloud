@@ -15,6 +15,9 @@ import io.ktor.server.request.httpMethod
 import io.ktor.server.request.path
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
+import io.ktor.server.engine.sslConnector
+import java.io.FileInputStream
+import java.security.KeyStore
 import io.ktor.server.http.content.staticResources
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
@@ -643,13 +646,44 @@ class ControlServer(
     private var engine: EmbeddedServer<*, *>? = null
 
     /**
-     * Starts the server without blocking.
+     * Starts the server without blocking, over HTTPS when a keystore is
+     * configured, otherwise HTTP.
      */
     fun start() {
-        engine = embeddedServer(Netty, port = settings.port, host = settings.host) {
+        engine = if (settings.isTls()) startTls() else startPlain()
+        logger.info(
+            "Control API listening on {}://{}:{}",
+            if (settings.isTls()) "https" else "http",
+            settings.host,
+            settings.port,
+        )
+    }
+
+    private fun startPlain(): EmbeddedServer<*, *> =
+        embeddedServer(Netty, port = settings.port, host = settings.host) {
             controlModule(dependencies)
         }.start(wait = false)
-        logger.info("Control API listening on http://{}:{}", settings.host, settings.port)
+
+    private fun startTls(): EmbeddedServer<*, *> {
+        val password = settings.tlsKeystorePassword.toCharArray()
+        val keyStore = KeyStore.getInstance("PKCS12").apply {
+            FileInputStream(settings.tlsKeystore).use { load(it, password) }
+        }
+        return embeddedServer(
+            Netty,
+            configure = {
+                sslConnector(
+                    keyStore = keyStore,
+                    keyAlias = settings.tlsKeyAlias,
+                    keyStorePassword = { password },
+                    privateKeyPassword = { password },
+                ) {
+                    port = settings.port
+                    host = settings.host
+                }
+            },
+            module = { controlModule(dependencies) },
+        ).start(wait = false)
     }
 
     /**

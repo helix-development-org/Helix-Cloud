@@ -30,6 +30,9 @@ loginPermission = "helix.panel.login"  # Permission für den Web-Panel-Login per
 codeTtlSeconds = 300      # Gültigkeit des ingame zugeschickten Login-Codes
 sessionTtlSeconds = 86400 # Gültigkeit einer Web-Session
 loginMessage = "§b§lHelix §r§7» §fYour panel login code is §b{code}§7."  # {code} wird ersetzt
+tlsKeystore = ""          # Pfad zu einem PKCS12-Keystore → aktiviert HTTPS
+tlsKeystorePassword = ""  # Passwort des Keystores/Privatschlüssels
+tlsKeyAlias = "helix"     # Alias des Schlüssels im Keystore
 
 [docker]
 network = "helix"              # Docker-Netzwerk aller Helix-Container
@@ -70,6 +73,12 @@ Ohne Permission-Addon entscheidet das **native MC-System** (OP bzw.
 `hasPermission`, z.B. via LuckPerms auf dem Proxy). Ist das Permission-Addon
 aktiv, ist es allein maßgeblich. Das statische `control.token` bleibt als
 Admin-/Notlogin mit vollem Zugriff gültig.
+
+Härtung: `POST /auth/request-code` ist pro Spieler auf einen Code alle 30 s
+begrenzt, Verify-Versuche pro Code auf 5. Für den Remote-Betrieb `tlsKeystore`
+setzen (HTTPS) — ein PKCS12-Keystore lässt sich mit
+`keytool -genkeypair -alias helix -keyalg RSA -storetype PKCS12 -keystore helix.p12`
+erzeugen. `/internal/*` bleibt ausschließlich dem Admin-Token vorbehalten.
 
 ### Disconnect-Screens
 

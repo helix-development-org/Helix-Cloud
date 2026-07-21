@@ -37,6 +37,10 @@ class NodeConfigLoader {
                 sessionTtlSeconds = toml.getLong("control.sessionTtlSeconds")
                     ?: defaults.control.sessionTtlSeconds,
                 loginMessage = toml.getString("control.loginMessage") ?: defaults.control.loginMessage,
+                tlsKeystore = toml.getString("control.tlsKeystore") ?: defaults.control.tlsKeystore,
+                tlsKeystorePassword = toml.getString("control.tlsKeystorePassword")
+                    ?: defaults.control.tlsKeystorePassword,
+                tlsKeyAlias = toml.getString("control.tlsKeyAlias") ?: defaults.control.tlsKeyAlias,
             ),
             docker = NodeConfig.DockerSettings(
                 network = toml.getString("docker.network") ?: defaults.docker.network,

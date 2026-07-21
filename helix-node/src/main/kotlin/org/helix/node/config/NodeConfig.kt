@@ -36,6 +36,10 @@ data class NodeConfig(
      * @property sessionTtlSeconds how long a web session stays valid.
      * @property loginMessage in-game message sent with the login code;
      *  `{code}` is replaced with the generated code.
+     * @property tlsKeystore path to a PKCS12 keystore; when set, the control API
+     *  and dashboard are served over HTTPS.
+     * @property tlsKeystorePassword password of the keystore and private key.
+     * @property tlsKeyAlias alias of the key inside the keystore.
      */
     data class ControlSettings(
         val host: String = "127.0.0.1",
@@ -45,7 +49,17 @@ data class NodeConfig(
         val codeTtlSeconds: Long = 300,
         val sessionTtlSeconds: Long = 86_400,
         val loginMessage: String = "§b§lHelix §r§7» §fYour panel login code is §b{code}§7. It expires in 5 minutes.",
-    )
+        val tlsKeystore: String = "",
+        val tlsKeystorePassword: String = "",
+        val tlsKeyAlias: String = "helix",
+    ) {
+        /**
+         * Whether HTTPS is enabled (a PKCS12 keystore path is configured).
+         *
+         * @return `true` when TLS should be used.
+         */
+        fun isTls(): Boolean = tlsKeystore.isNotBlank()
+    }
 
     /**
      * Docker execution settings.

@@ -42,6 +42,7 @@ class PanelAuthService(
     private val random = SecureRandom()
     private val pending = ConcurrentHashMap<String, PendingLogin>()
     private val sessions = ConcurrentHashMap<String, PanelSession>()
+    private val lastCodeAt = ConcurrentHashMap<String, Long>()
 
     /**
      * Issues a login code for an online, permitted player and sends it in-game.
@@ -60,6 +61,12 @@ class PanelAuthService(
         require(grantsPermission(player.name, loginPermission)) {
             "player ${player.name} is not allowed to access the panel"
         }
+        val now = clock()
+        val previous = lastCodeAt[player.name.lowercase()]
+        require(previous == null || now - previous >= CODE_COOLDOWN_MS) {
+            "please wait a moment before requesting another code"
+        }
+        lastCodeAt[player.name.lowercase()] = now
         val code = "%06d".format(random.nextInt(1_000_000))
         pending[player.name.lowercase()] = PendingLogin(
             name = player.name,
@@ -173,6 +180,9 @@ class PanelAuthService(
     companion object {
         /** Maximum wrong-code attempts before a code is invalidated. */
         private const val MAX_ATTEMPTS = 5
+
+        /** Minimum delay between login-code requests for the same player. */
+        private const val CODE_COOLDOWN_MS = 30_000L
 
         /** View id to permission node for every built-in dashboard view. */
         val VIEW_NODES: Map<String, String> = linkedMapOf(
