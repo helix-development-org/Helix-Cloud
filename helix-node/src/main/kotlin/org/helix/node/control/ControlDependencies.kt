@@ -22,6 +22,7 @@ import org.helix.node.audit.AuditLog
 import org.helix.node.messages.MessageRegistry
 import org.helix.node.platform.MetricsHistory
 import org.helix.node.platform.PlatformOverviewService
+import org.helix.node.scheduler.JobScheduler
 import org.helix.node.players.PlayerRegistry
 import org.helix.node.proxy.ProxyCommandQueue
 import org.helix.node.proxy.ProxyEventHub
@@ -51,6 +52,7 @@ import org.helix.node.tasks.TaskStore
  * @property networkName network display name (`{network}` in disconnect screens).
  * @property proxyScreens configurable proxy-level disconnect screens.
  * @property metrics bounded history of network metric samples for graphs.
+ * @property jobScheduler recurring scheduled jobs.
  */
 data class ControlDependencies(
     val token: String,
@@ -82,6 +84,10 @@ data class ControlDependencies(
     val networkName: String = "our network",
     val proxyScreens: Messages = MapMessages(emptyMap()),
     val metrics: MetricsHistory = MetricsHistory(),
+    val jobScheduler: JobScheduler = JobScheduler(
+        org.helix.node.storage.JsonStorageProvider().forAddon("scheduler", java.nio.file.Path.of("scheduler")),
+        registry,
+    ),
 ) {
     /** Player command execution shared by the internal routes. */
     val playerCommands: PlayerCommandService = PlayerCommandService(registry, permissionService)

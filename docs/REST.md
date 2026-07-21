@@ -60,6 +60,18 @@ Session-Token. Die sichtbaren Views/Panels richten sich nach den Permissions
 | GET | `/services/{id}/logs?tail=50` | neueste Log-Zeilen |
 | POST | `/services/{id}/command` | Konsolenbefehl an den Service senden — Body `{"command": "say hi"}` (nur Prozess-Executor; wird auditiert) |
 
+## Schedules
+
+Erfordert Permission `helix.panel.schedules`. Jobs führen eine beliebige Action
+per Intervall (`everyMinutes`) oder täglich (`dailyAt` = `HH:mm`) aus.
+
+| Methode | Pfad | Beschreibung |
+|---|---|---|
+| GET | `/schedules` | Alle Jobs |
+| POST | `/schedules` | Job anlegen/ändern — Body `{id, action, arguments[], everyMinutes, dailyAt, enabled}` |
+| DELETE | `/schedules/{id}` | Job löschen |
+| POST | `/schedules/{id}/run` | Job sofort ausführen |
+
 ## Players
 
 Erfordert Permission `helix.panel.players`.

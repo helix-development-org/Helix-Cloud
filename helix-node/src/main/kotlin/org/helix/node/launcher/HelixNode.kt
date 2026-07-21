@@ -33,6 +33,7 @@ import org.helix.api.platform.MetricSample
 import org.helix.api.service.ServiceState
 import org.helix.node.platform.MetricsHistory
 import org.helix.node.platform.PlatformOverviewService
+import org.helix.node.scheduler.JobScheduler
 import org.helix.node.players.PlayerRegistry
 import org.helix.node.proxy.ProxyCommandQueue
 import org.helix.node.proxy.ProxyEventHub
@@ -191,6 +192,13 @@ class HelixNode(
 
     /** Bounded history of network metrics for the dashboard graphs. */
     val metrics: MetricsHistory = MetricsHistory()
+
+    /** Recurring scheduled jobs (announcements, maintenance toggles, …). */
+    val jobScheduler: JobScheduler = JobScheduler(
+        storage = storageProvider.forAddon("scheduler", paths.root.resolve("scheduler")),
+        actions = registry,
+        eventSink = ::recordEvent,
+    )
     private val autoScaler = AutoScaler(taskStore, manager)
     private val scheduler = Executors.newSingleThreadScheduledExecutor { runnable ->
         Thread(runnable, "helix-autoscaler").apply { isDaemon = true }
@@ -226,6 +234,7 @@ class HelixNode(
             networkName = config.network.name,
             proxyScreens = proxyScreens,
             metrics = metrics,
+            jobScheduler = jobScheduler,
         ),
     )
 
@@ -273,6 +282,12 @@ class HelixNode(
             { runCatching(::sampleMetrics).onFailure { logger.error("metrics sample failed", it) } },
             METRICS_PERIOD_SECONDS,
             METRICS_PERIOD_SECONDS,
+            TimeUnit.SECONDS,
+        )
+        scheduler.scheduleAtFixedRate(
+            { runCatching(jobScheduler::tick).onFailure { logger.error("job scheduler tick failed", it) } },
+            JOB_PERIOD_SECONDS,
+            JOB_PERIOD_SECONDS,
             TimeUnit.SECONDS,
         )
         Runtime.getRuntime().addShutdownHook(Thread { stopServicesQuietly() })
@@ -405,6 +420,9 @@ class HelixNode(
 
         /** Seconds between network metric samples. */
         const val METRICS_PERIOD_SECONDS = 15L
+
+        /** Seconds between scheduled-job evaluations. */
+        const val JOB_PERIOD_SECONDS = 20L
 
         /** Maximum milliseconds to wait for services during shutdown. */
         const val SHUTDOWN_WAIT_MILLIS = 15_000L

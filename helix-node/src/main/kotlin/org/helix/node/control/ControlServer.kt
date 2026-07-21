@@ -36,6 +36,7 @@ import org.helix.node.control.auth.LoginRequest
 import org.helix.node.control.auth.PanelAuthService
 import org.helix.node.control.auth.PanelPrincipal
 import org.helix.node.control.auth.VerifyRequest
+import org.helix.node.scheduler.ScheduledJob
 import org.helix.api.bridge.HeartbeatReport
 import org.helix.api.player.PlayerEvent
 import org.helix.api.proxy.JoinRequest
@@ -117,6 +118,7 @@ fun Application.controlModule(dependencies: ControlDependencies) {
                 observabilityRoutes(dependencies)
                 panelRoutes(dependencies)
                 messageRoutes(dependencies)
+                scheduleRoutes(dependencies)
                 actionRoutes(dependencies)
                 addonRoutes(dependencies)
                 internalRoutes(dependencies)
@@ -413,6 +415,40 @@ private fun io.ktor.server.routing.Route.serviceRoutes(dependencies: ControlDepe
                 HttpStatusCode.NotFound,
                 ErrorResponse("service not accepting console input (running process service required): $id"),
             )
+        }
+    }
+}
+
+private fun io.ktor.server.routing.Route.scheduleRoutes(dependencies: ControlDependencies) {
+    get("/schedules") {
+        if (!authorize(dependencies, "helix.panel.schedules")) return@get
+        call.respond(dependencies.jobScheduler.all())
+    }
+    post("/schedules") {
+        if (!authorize(dependencies, "helix.panel.schedules")) return@post
+        val job = call.receive<ScheduledJob>()
+        require(job.id.isNotBlank()) { "job id must not be empty" }
+        require(job.action.isNotBlank()) { "job action must not be empty" }
+        require(job.everyMinutes > 0 || job.dailyAt != null) { "set everyMinutes or dailyAt" }
+        dependencies.jobScheduler.save(job)
+        call.respond(job)
+    }
+    delete("/schedules/{id}") {
+        if (!authorize(dependencies, "helix.panel.schedules")) return@delete
+        val id = call.parameters["id"].orEmpty()
+        if (dependencies.jobScheduler.delete(id)) {
+            call.respond(MessageResponse("deleted $id"))
+        } else {
+            call.respond(HttpStatusCode.NotFound, ErrorResponse("unknown job: $id"))
+        }
+    }
+    post("/schedules/{id}/run") {
+        if (!authorize(dependencies, "helix.panel.schedules")) return@post
+        val id = call.parameters["id"].orEmpty()
+        if (dependencies.jobScheduler.runNow(id)) {
+            call.respond(MessageResponse("ran $id"))
+        } else {
+            call.respond(HttpStatusCode.NotFound, ErrorResponse("unknown job: $id"))
         }
     }
 }

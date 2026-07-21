@@ -185,6 +185,7 @@ class PanelAuthService(
             "logs" to "helix.panel.logs",
             "audit" to "helix.panel.audit",
             "addons" to "helix.panel.addons",
+            "schedules" to "helix.panel.schedules",
             "messages" to "helix.panel.messages",
             "settings" to "helix.panel.settings",
         )

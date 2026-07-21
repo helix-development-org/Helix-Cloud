@@ -343,6 +343,7 @@ const NAV = [
   { id: "audit", label: "Audit", icon: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>' },
   { group: "System" },
   { id: "addons", label: "Addons", icon: '<path d="M20 7h-4V3H8v4H4v14h16V7z"/><path d="M9 12h6M12 9v6"/>' },
+  { id: "schedules", label: "Schedules", icon: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>' },
   { id: "messages", label: "Messages", icon: '<path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><path d="M7 9h10M7 13h6"/>' },
   { id: "settings", label: "Settings", icon: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-2.7 1.1V21a2 2 0 01-4 0v-.1A1.6 1.6 0 007 19.4a1.6 1.6 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.6 1.6 0 00-1.1-2.7H1a2 2 0 010-4h.1A1.6 1.6 0 002.6 7a1.6 1.6 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.6 1.6 0 001.8.3H7a1.6 1.6 0 001-1.5V1a2 2 0 014 0v.1a1.6 1.6 0 001 1.5 1.6 1.6 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.6 1.6 0 00-.3 1.8V7a1.6 1.6 0 001.5 1H21a2 2 0 010 4h-.1a1.6 1.6 0 00-1.5 1z"/>' },
 ];
@@ -504,6 +505,7 @@ const VIEWS = {
   logs: { title: "Logs", interval: 2000, draw: drawLogs },
   audit: { title: "Audit", interval: 5000, draw: drawAudit },
   addons: { title: "Addons", interval: 6000, draw: drawAddons },
+  schedules: { title: "Schedules", interval: 0, draw: drawSchedules },
   messages: { title: "Messages", interval: 0, draw: drawMessages },
   settings: { title: "Settings", interval: 0, draw: drawSettings },
 };
@@ -904,6 +906,51 @@ async function drawSettings() {
 
 function emptyState(big, sub) { return `<div class="empty"><div class="big">${esc(big)}</div>${sub ? `<div>${esc(sub)}</div>` : ""}</div>`; }
 function go(v) { view = v; render(); }
+
+async function drawSchedules() {
+  const jobs = await api("/schedules");
+  const rows = jobs.length ? `<table><thead><tr><th>ID</th><th>Action</th><th>Schedule</th><th>On</th><th></th></tr></thead><tbody>${
+    jobs.map(j => `<tr>
+      <td><strong>${esc(j.id)}</strong></td>
+      <td class="mono">${esc(j.action)} ${esc((j.arguments||[]).join(" "))}</td>
+      <td>${j.everyMinutes > 0 ? `every ${j.everyMinutes}m` : (j.dailyAt ? `daily ${esc(j.dailyAt)}` : "—")}</td>
+      <td>${j.enabled ? badge("ENABLED") : badge("DISABLED")}</td>
+      <td><div class="row-actions">
+        <button class="btn sm ghost" onclick="schedRun('${esc(j.id)}')">Run now</button>
+        <button class="btn sm danger" onclick="schedDel('${esc(j.id)}')">Delete</button></div></td>
+    </tr>`).join("")
+  }</tbody></table>` : emptyState("No scheduled jobs", "Add one below — e.g. broadcast every 30 minutes");
+  $("#view").innerHTML = `
+    <div class="card">
+      <div class="card-head"><h2>Scheduled jobs</h2><div class="sub">${jobs.length} configured · runs any action on a timer</div></div>
+      <div class="table-wrap">${rows}</div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>New job</h2></div>
+      <div class="modal-body"><div class="form-grid">
+        <div class="field"><label>ID</label><input id="j-id" placeholder="daily-restart"></div>
+        <div class="field"><label>Action</label><input id="j-action" placeholder="player.broadcast"></div>
+        <div class="field wide"><label>Arguments (space-separated)</label><input id="j-args" placeholder="&cServer restarts soon!"></div>
+        <div class="field"><label>Every N minutes (0 = off)</label><input id="j-every" type="number" value="0" min="0"></div>
+        <div class="field"><label>Daily at (HH:mm, optional)</label><input id="j-daily" placeholder="04:00"></div>
+      </div></div>
+      <div class="modal-foot" style="border:0;background:none;padding:4px 2px">
+        <button class="btn" id="j-create">Create job</button>
+      </div>
+    </div>`;
+  $("#j-create").onclick = async () => {
+    const id = $("#j-id").value.trim(), action = $("#j-action").value.trim();
+    if (!id || !action) return toast("ID and action are required");
+    const args = $("#j-args").value.trim() ? $("#j-args").value.trim().split(/\s+/) : [];
+    const every = parseInt($("#j-every").value) || 0;
+    const daily = $("#j-daily").value.trim() || null;
+    if (every <= 0 && !daily) return toast("Set an interval or a daily time");
+    try { await api("/schedules", { method: "POST", body: JSON.stringify({ id, action, arguments: args, everyMinutes: every, dailyAt: daily, enabled: true }) });
+      toast("Created " + id); drawSchedules(); } catch (e) { toast(e.message); }
+  };
+}
+async function schedRun(id) { try { await api(`/schedules/${encodeURIComponent(id)}/run`, { method: "POST" }); toast("Ran " + id); } catch (e) { toast(e.message); } }
+async function schedDel(id) { if (!confirm(`Delete job ${id}?`)) return; try { await api(`/schedules/${encodeURIComponent(id)}`, { method: "DELETE" }); toast("Deleted " + id); drawSchedules(); } catch (e) { toast(e.message); } }
 
 async function drawMessages() {
   const all = await api("/messages");

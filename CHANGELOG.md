@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.25.0 — 2026-07-21
+
+### Geplante Aufgaben (Scheduler)
+- Neuer Job-Scheduler: führt beliebige Actions per **Intervall**
+  (`everyMinutes`) oder **täglich** (`dailyAt = HH:mm`) aus — z.B. Announcements
+  (`player.broadcast`), Wartung schalten (`proxy.maintenance`) usw.
+- Jobs werden über den zentralen Storage persistiert (überleben Neustarts,
+  funktionieren in allen Storage-Modi) und in der neuen Panel-Seite
+  **Schedules** verwaltet (Permission `helix.panel.schedules`); jeder Job kann
+  mit „Run now" sofort ausgelöst werden.
+- Routen `GET/POST /schedules`, `DELETE /schedules/{id}`, `POST /schedules/{id}/run`.
+
 ## 0.24.0 — 2026-07-21
 
 ### Metrik-Historie & Graphen
