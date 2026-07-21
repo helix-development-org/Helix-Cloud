@@ -208,6 +208,11 @@ private fun io.ktor.server.routing.Route.platformRoutes(dependencies: ControlDep
         if (!authorize(dependencies, "helix.panel.overview")) return@get
         call.respond(dependencies.overviewService.overview())
     }
+    get("/metrics") {
+        if (!authorize(dependencies, "helix.panel.overview")) return@get
+        val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 240
+        call.respond(dependencies.metrics.recent(limit))
+    }
 }
 
 private fun io.ktor.server.routing.Route.observabilityRoutes(dependencies: ControlDependencies) {

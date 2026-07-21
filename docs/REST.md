@@ -29,6 +29,7 @@ Session-Token. Die sichtbaren Views/Panels richten sich nach den Permissions
 | Methode | Pfad | Beschreibung |
 |---|---|---|
 | GET | `/platform/overview` | Aggregierte Zähler (Services, Player, Version) |
+| GET | `/metrics?limit=240` | Metrik-Historie (Zeitreihe): `epochMs`, `onlinePlayers`, `maxPlayers`, `servicesRunning`, `servicesTotal`, `avgTps` — 15s-Intervall, In-Memory-Ringpuffer |
 | GET | `/logs?tail=300` | Node-Log (Ringpuffer über stdout/stderr-Capture) |
 | GET | `/events?limit=200` | Event-Timeline (neueste zuerst): Service-Lifecycle, Player, Moderation, Proxy, Tasks |
 | GET | `/audit?limit=300&category=<cat>` | Vollständiger Audit-Log: jeder HTTP-Request, jede Action, Auth-Versuche, Lifecycle (persistiert in `audit.jsonl` bzw. bei `storage.mode = "postgres"`/`"mongodb"` in `audit_log`) |

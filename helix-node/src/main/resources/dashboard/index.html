@@ -220,6 +220,11 @@ td .muted { color: var(--ink-3); }
 .console-bar { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); background: #11161d; }
 .console-bar .console-prompt { color: var(--good); font-family: var(--mono); font-weight: 700; }
 .console-bar input { flex: 1; background: #0c1015; border: 1px solid var(--line-strong); color: #dbe3ec; font-size: 12.5px; }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; padding: 4px 2px; }
+.chart { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.chart-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+.chart-val { font-size: 18px; font-weight: 650; }
+.spark { width: 100%; height: 44px; display: block; }
 
 /* ---------- modal ---------- */
 .backdrop { position: fixed; inset: 0; background: rgba(8,11,16,.6); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; z-index: 60; padding: 20px; animation: fade .15s; }
@@ -503,10 +508,33 @@ const VIEWS = {
   settings: { title: "Settings", interval: 0, draw: drawSettings },
 };
 
+function sparkline(samples, accessor, color) {
+  const vals = samples.map(accessor);
+  if (vals.length < 2) return `<div class="muted" style="padding:22px 4px;font-size:12px">Collecting data…</div>`;
+  const max = Math.max(1, ...vals), min = Math.min(0, ...vals), span = (max - min) || 1;
+  const W = 100, H = 34, n = vals.length;
+  const x = i => (i / (n - 1)) * W;
+  const y = v => H - ((v - min) / span) * (H - 3) - 1.5;
+  const pts = vals.map((v, i) => `${x(i).toFixed(2)},${y(v).toFixed(2)}`);
+  const line = pts.map((p, i) => (i ? "L" : "M") + p).join(" ");
+  const area = `M0,${H} L` + pts.join(" L") + ` L${W},${H} Z`;
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <path d="${area}" fill="${color}" fill-opacity="0.13"/>
+    <path d="${line}" fill="none" stroke="${color}" stroke-width="1.4" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
+}
+function metricChart(label, value, samples, accessor, color) {
+  return `<div class="chart">
+    <div class="chart-head"><span class="t-label">${label}</span><span class="chart-val">${value}</span></div>
+    ${sparkline(samples, accessor, color)}
+  </div>`;
+}
 async function drawOverview() {
-  const [ov, services, events, proxy] = await Promise.all([
-    api("/platform/overview"), api("/services"), api("/events?limit=8"), api("/proxy"),
+  const [ov, services, events, proxy, metrics] = await Promise.all([
+    api("/platform/overview"), api("/services"), api("/events?limit=8"), api("/proxy"), api("/metrics?limit=240").catch(() => []),
   ]);
+  const last = metrics[metrics.length - 1] || {};
+  const hasTps = metrics.some(m => m.avgTps != null);
   setTag("services", ov.servicesRunning); setTag("tasks", ov.taskCount);
   const running = services.filter(s => s.state === "RUNNING").length;
   const failed = services.filter(s => s.state === "FAILED").length;
@@ -529,6 +557,14 @@ async function drawOverview() {
         <div class="t-top"><span class="t-label">Network</span><span class="t-ico">${svg('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>')}</span></div>
         <div class="t-value" style="font-size:20px;padding-top:6px">${proxy.maintenance ? '<span class="badge b-warn">Maintenance</span>' : '<span class="badge b-running">Operational</span>'}</div>
         <div class="t-sub">${proxy.proxies.length} prox${proxy.proxies.length===1?'y':'ies'} · ${proxy.backends.length} backends</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Trends</h2><div class="sub">last ${metrics.length} samples · 15s interval</div></div>
+      <div class="charts">
+        ${metricChart("Players online", ov.onlinePlayers, metrics, m => m.onlinePlayers, "var(--accent)")}
+        ${metricChart("Services running", ov.servicesRunning, metrics, m => m.servicesRunning, "#7fd6a5")}
+        ${hasTps ? metricChart("Avg TPS", (last.avgTps != null ? last.avgTps.toFixed(1) : "—"), metrics, m => m.avgTps || 0, "#e6b455") : ""}
       </div>
     </div>
     <div class="grid-2">

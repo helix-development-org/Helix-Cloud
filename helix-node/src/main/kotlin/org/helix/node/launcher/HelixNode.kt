@@ -29,6 +29,9 @@ import org.helix.node.gates.NativePermissionProvider
 import org.helix.node.gates.PermissionResolverRegistry
 import org.helix.node.gates.PermissionService
 import org.helix.node.notifications.NotificationBus
+import org.helix.api.platform.MetricSample
+import org.helix.api.service.ServiceState
+import org.helix.node.platform.MetricsHistory
 import org.helix.node.platform.PlatformOverviewService
 import org.helix.node.players.PlayerRegistry
 import org.helix.node.proxy.ProxyCommandQueue
@@ -185,6 +188,9 @@ class HelixNode(
     )
 
     private val overviewService = PlatformOverviewService(version(), taskStore, manager)
+
+    /** Bounded history of network metrics for the dashboard graphs. */
+    val metrics: MetricsHistory = MetricsHistory()
     private val autoScaler = AutoScaler(taskStore, manager)
     private val scheduler = Executors.newSingleThreadScheduledExecutor { runnable ->
         Thread(runnable, "helix-autoscaler").apply { isDaemon = true }
@@ -219,6 +225,7 @@ class HelixNode(
             loginMessage = config.control.loginMessage,
             networkName = config.network.name,
             proxyScreens = proxyScreens,
+            metrics = metrics,
         ),
     )
 
@@ -260,6 +267,12 @@ class HelixNode(
             { runCatching(autoScaler::tick).onFailure { logger.error("scaler tick failed", it) } },
             SCALER_INITIAL_DELAY_SECONDS,
             SCALER_PERIOD_SECONDS,
+            TimeUnit.SECONDS,
+        )
+        scheduler.scheduleAtFixedRate(
+            { runCatching(::sampleMetrics).onFailure { logger.error("metrics sample failed", it) } },
+            METRICS_PERIOD_SECONDS,
+            METRICS_PERIOD_SECONDS,
             TimeUnit.SECONDS,
         )
         Runtime.getRuntime().addShutdownHook(Thread { stopServicesQuietly() })
@@ -365,12 +378,33 @@ class HelixNode(
     private fun version(): String =
         HelixNode::class.java.`package`.implementationVersion ?: "dev"
 
+    /** Records one network metric sample from the current live state. */
+    private fun sampleMetrics() {
+        val overview = overviewService.overview()
+        val tpsValues = manager.managedServices()
+            .filter { !it.task.environment.proxy && it.state == ServiceState.RUNNING }
+            .mapNotNull { it.tps }
+        metrics.record(
+            MetricSample(
+                epochMs = System.currentTimeMillis(),
+                onlinePlayers = overview.onlinePlayers,
+                maxPlayers = overview.maxPlayers,
+                servicesRunning = overview.servicesRunning,
+                servicesTotal = overview.servicesTotal,
+                avgTps = if (tpsValues.isEmpty()) null else tpsValues.average(),
+            ),
+        )
+    }
+
     private companion object {
         /** Seconds before the first auto-scaler pass. */
         const val SCALER_INITIAL_DELAY_SECONDS = 3L
 
         /** Seconds between auto-scaler passes. */
         const val SCALER_PERIOD_SECONDS = 5L
+
+        /** Seconds between network metric samples. */
+        const val METRICS_PERIOD_SECONDS = 15L
 
         /** Maximum milliseconds to wait for services during shutdown. */
         const val SHUTDOWN_WAIT_MILLIS = 15_000L

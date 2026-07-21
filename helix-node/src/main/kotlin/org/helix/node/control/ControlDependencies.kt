@@ -20,6 +20,7 @@ import org.helix.node.gates.PermissionService
 import org.helix.node.logging.LogBuffer
 import org.helix.node.audit.AuditLog
 import org.helix.node.messages.MessageRegistry
+import org.helix.node.platform.MetricsHistory
 import org.helix.node.platform.PlatformOverviewService
 import org.helix.node.players.PlayerRegistry
 import org.helix.node.proxy.ProxyCommandQueue
@@ -49,6 +50,7 @@ import org.helix.node.tasks.TaskStore
  * @property loginMessage in-game message template (`{code}` substituted).
  * @property networkName network display name (`{network}` in disconnect screens).
  * @property proxyScreens configurable proxy-level disconnect screens.
+ * @property metrics bounded history of network metric samples for graphs.
  */
 data class ControlDependencies(
     val token: String,
@@ -79,6 +81,7 @@ data class ControlDependencies(
     val loginMessage: String = "§b§lHelix §r§7» §fYour panel login code is §b{code}§7.",
     val networkName: String = "our network",
     val proxyScreens: Messages = MapMessages(emptyMap()),
+    val metrics: MetricsHistory = MetricsHistory(),
 ) {
     /** Player command execution shared by the internal routes. */
     val playerCommands: PlayerCommandService = PlayerCommandService(registry, permissionService)

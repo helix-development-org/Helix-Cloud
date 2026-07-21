@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.24.0 — 2026-07-21
+
+### Metrik-Historie & Graphen
+- Die Node sampelt alle 15 s Netzwerk-Metriken (Online-Player, Slots, laufende/
+  gesamte Services, durchschnittliche TPS) in einen In-Memory-Ringpuffer
+  (~12 h) und liefert sie über `GET /metrics?limit=` (Permission
+  `helix.panel.overview`).
+- Die Overview-Seite zeigt jetzt einen **Trends**-Bereich mit Sparkline-
+  Graphen (Players, Services, Avg TPS) statt nur Live-Zahlen.
+
 ## 0.23.0 — 2026-07-21
 
 ### Player-Verwaltung im Panel
