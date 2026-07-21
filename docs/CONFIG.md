@@ -36,10 +36,11 @@ network = "helix"              # Docker-Netzwerk aller Helix-Container
 image = "eclipse-temurin:24-jre"  # Basis-Image für Service-Container
 
 [storage]
-mode = "json"          # "json" (Dateien) oder "postgres"
-url = "jdbc:postgresql://127.0.0.1:5432/helix"
-user = "helix"
+mode = "json"          # "json" (Dateien), "postgres" oder "mongodb"
+url = "jdbc:postgresql://127.0.0.1:5432/helix"   # bzw. "mongodb://user:pass@host:27017"
+user = "helix"         # postgres (bei mongodb bevorzugt in der URI)
 password = "helix"
+database = "helix"     # Datenbankname (mongodb)
 poolSize = 8
 
 [network]
@@ -48,7 +49,12 @@ name = "our network"   # Anzeigename, {network}-Placeholder in Disconnect-Screen
 
 Im `postgres`-Modus speichern **alle** Addons ihre Daten in der
 geteilten Tabelle `addon_storage(addon_id, doc_key, value)` statt in
-Dateien — praktisch fürs Netzwerk-weite/zentrale Speichern.
+Dateien — praktisch fürs Netzwerk-weite/zentrale Speichern. Im
+`mongodb`-Modus liegt dasselbe in der Collection `addon_storage` (Dokumente
+mit zusammengesetztem `_id` `{a: addonId, k: docKey}`). In beiden zentralen
+Modi wird zusätzlich der **Audit-Log** in der DB gespeichert
+(`audit_log`-Tabelle bzw. -Collection); die Node öffnet dafür genau einen
+gemeinsamen Pool/Client, der von Storage und Audit geteilt wird.
 
 ### Web-Panel-Login & Permissions
 

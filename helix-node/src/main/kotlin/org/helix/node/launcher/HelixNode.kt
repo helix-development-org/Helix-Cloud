@@ -9,10 +9,7 @@ import org.helix.api.execution.ExecutorType
 import org.helix.node.actions.ActionRegistry
 import org.helix.node.actions.BuiltinActions
 import org.helix.node.addons.AddonActions
-import com.zaxxer.hikari.HikariDataSource
 import org.helix.node.audit.AuditLog
-import org.helix.node.audit.FileAuditSink
-import org.helix.node.audit.PostgresAuditSink
 import org.helix.node.addons.AddonManager
 import org.helix.node.cli.NodeCli
 import org.helix.node.config.NodeConfig
@@ -44,9 +41,7 @@ import org.helix.node.services.ProcessServiceExecutor
 import org.helix.node.services.ServiceManager
 import org.helix.node.services.WorkspacePreparer
 import org.helix.node.services.docker.DockerServiceExecutor
-import org.helix.node.storage.JsonStorageProvider
-import org.helix.node.storage.PostgresPool
-import org.helix.node.storage.PostgresStorageProvider
+import org.helix.node.storage.StorageBackend
 import org.helix.node.storage.StorageProvider
 import org.helix.node.tasks.TaskStore
 import org.helix.node.versions.ServerJarProvider
@@ -76,21 +71,14 @@ class HelixNode(
     val config: NodeConfig = NodeConfigLoader().load(dataDirectory)
 
     /**
-     * Shared PostgreSQL connection pool, or `null` when file storage is used.
-     *
-     * Owned here and shared by both the addon storage provider and the audit
-     * log so `postgres` mode uses a single pool.
+     * The selected storage backend (file, PostgreSQL or MongoDB). Owns the
+     * shared database resource used by both addon storage and the audit log.
      */
-    private val dbPool: HikariDataSource? =
-        if (config.storage.isPostgres()) PostgresPool.create(config.storage) else null
+    private val storageBackend: StorageBackend =
+        StorageBackend.create(config.storage, paths.root.resolve("audit/audit.jsonl"))
 
-    /** Complete, durable audit trail. */
-    val audit: AuditLog =
-        if (dbPool != null) {
-            AuditLog(PostgresAuditSink(dbPool))
-        } else {
-            AuditLog(FileAuditSink(paths.root.resolve("audit/audit.jsonl")))
-        }
+    /** Complete, durable audit trail (file, PostgreSQL or MongoDB). */
+    val audit: AuditLog = AuditLog(storageBackend.auditSink)
 
     /** Configured tasks. */
     val taskStore: TaskStore = TaskStore(paths.tasks)
@@ -158,8 +146,7 @@ class HelixNode(
     val messages: MessageRegistry = MessageRegistry()
 
     /** Backend for addon document storage (files or PostgreSQL). */
-    val storageProvider: StorageProvider =
-        if (dbPool != null) PostgresStorageProvider(dbPool) else JsonStorageProvider()
+    val storageProvider: StorageProvider = storageBackend.storageProvider
 
     /**
      * Configurable, panel-editable proxy-level disconnect screens (maintenance,
@@ -306,7 +293,7 @@ class HelixNode(
             addonManager.disableAll()
             controlServer.stop()
             runCatching { storageProvider.close() }
-            runCatching { dbPool?.close() }
+            runCatching { storageBackend.close() }
             exitProcess(0)
         }, "helix-shutdown").start()
     }

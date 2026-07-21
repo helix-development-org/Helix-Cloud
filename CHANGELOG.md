@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.21.0 — 2026-07-21
+
+### MongoDB als Storage-Backend
+- Neuer Storage-Modus `mongodb` neben `json` und `postgres`
+  (`[storage] mode = "mongodb"`, `url`, `database`). Addon-Storage liegt in
+  der Collection `addon_storage` (Dokumente mit zusammengesetztem `_id`
+  `{a: addonId, k: docKey}`), der Audit-Log in der Collection `audit_log`.
+- Wie bei postgres öffnet die Node genau **einen** gemeinsamen MongoDB-Client,
+  den Addon-Storage und Audit-Log teilen; er wird beim Shutdown geschlossen.
+- Backend-Auswahl in einer `StorageBackend`-Abstraktion gebündelt (ersetzt die
+  bisherige postgres-spezifische Verdrahtung): sie besitzt die DB-Ressource und
+  liefert `StorageProvider` + Audit-`AuditSink` für den gewählten Modus.
+
 ## 0.20.0 — 2026-07-21
 
 ### Schönere, konfigurierbare Disconnect-Screens

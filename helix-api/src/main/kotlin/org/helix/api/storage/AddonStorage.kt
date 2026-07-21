@@ -5,8 +5,8 @@ package org.helix.api.storage
  *
  * Each entry is a key mapped to a serialized value (typically JSON the
  * addon produces itself). The backend is chosen centrally by the node —
- * plain files or the shared PostgreSQL database — so an addon stores the
- * same way regardless of the network's storage mode.
+ * plain files, the shared PostgreSQL database or the shared MongoDB database —
+ * so an addon stores the same way regardless of the network's storage mode.
  */
 interface AddonStorage {
     /**

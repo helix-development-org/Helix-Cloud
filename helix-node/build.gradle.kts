@@ -13,6 +13,7 @@ dependencies {
     implementation("org.tomlj:tomlj:1.1.1")
     implementation("com.zaxxer:HikariCP:5.1.0")
     runtimeOnly("org.postgresql:postgresql:42.7.5")
+    implementation("org.mongodb:mongodb-driver-sync:5.2.1")
     implementation("io.ktor:ktor-server-core-jvm:3.5.1")
     implementation("io.ktor:ktor-server-netty-jvm:3.5.1")
     implementation("io.ktor:ktor-server-auth-jvm:3.5.1")

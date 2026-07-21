@@ -61,10 +61,14 @@ data class NodeConfig(
     /**
      * Addon storage settings.
      *
-     * @property mode `json` (files per addon) or `postgres` (shared db).
-     * @property url JDBC url, for example `jdbc:postgresql://host:5432/helix`.
-     * @property user database user.
-     * @property password database password.
+     * @property mode `json` (files per addon), `postgres` or `mongodb`
+     *  (shared central database for addon storage and the audit log).
+     * @property url connection string: a JDBC url for `postgres`
+     *  (`jdbc:postgresql://host:5432/helix`) or a MongoDB connection string for
+     *  `mongodb` (`mongodb://user:pass@host:27017`).
+     * @property user database user (postgres; for mongodb prefer the URI).
+     * @property password database password (postgres; for mongodb prefer the URI).
+     * @property database database name used by `mongodb`.
      * @property poolSize maximum pooled connections.
      */
     data class StorageSettings(
@@ -72,6 +76,7 @@ data class NodeConfig(
         val url: String = "jdbc:postgresql://127.0.0.1:5432/helix",
         val user: String = "helix",
         val password: String = "helix",
+        val database: String = "helix",
         val poolSize: Int = 8,
     ) {
         /**
@@ -80,5 +85,12 @@ data class NodeConfig(
          * @return `true` for `postgres` mode.
          */
         fun isPostgres(): Boolean = mode.equals("postgres", ignoreCase = true)
+
+        /**
+         * Whether the MongoDB backend is selected.
+         *
+         * @return `true` for `mongodb` mode.
+         */
+        fun isMongo(): Boolean = mode.equals("mongodb", ignoreCase = true) || mode.equals("mongo", ignoreCase = true)
     }
 }

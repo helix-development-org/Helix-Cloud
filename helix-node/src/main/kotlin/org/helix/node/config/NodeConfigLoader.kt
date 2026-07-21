@@ -47,6 +47,7 @@ class NodeConfigLoader {
                 url = toml.getString("storage.url") ?: defaults.storage.url,
                 user = toml.getString("storage.user") ?: defaults.storage.user,
                 password = toml.getString("storage.password") ?: defaults.storage.password,
+                database = toml.getString("storage.database") ?: defaults.storage.database,
                 poolSize = toml.getLong("storage.poolSize")?.toInt() ?: defaults.storage.poolSize,
             ),
             network = NodeConfig.NetworkSettings(
