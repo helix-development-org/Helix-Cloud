@@ -24,6 +24,7 @@ import org.helix.node.display.BridgeValueStore
 import org.helix.node.display.DisplayResolverRegistry
 import org.helix.node.events.EventLog
 import org.helix.node.logging.LogBuffer
+import org.helix.node.messages.MessageBundle
 import org.helix.node.messages.MessageRegistry
 import org.helix.node.gates.JoinGateRegistry
 import org.helix.node.gates.NativePermissionCache
@@ -160,6 +161,23 @@ class HelixNode(
     val storageProvider: StorageProvider =
         if (dbPool != null) PostgresStorageProvider(dbPool) else JsonStorageProvider()
 
+    /**
+     * Configurable, panel-editable proxy-level disconnect screens (maintenance,
+     * network full). Registered as the `proxy` message bundle so they appear on
+     * the dashboard Messages page and persist like any other storage.
+     */
+    val proxyScreens: MessageBundle = MessageBundle(
+        storageProvider.forAddon("proxy", paths.root.resolve("proxy")),
+        linkedMapOf(
+            "maintenance" to "<red><bold>Maintenance</bold>\n" +
+                "<gray>{network} is currently under maintenance.\n" +
+                "<gray>Please check back soon.",
+            "server_full" to "<red><bold>Network Full</bold>\n" +
+                "<gray>{network} is full right now <dark_gray>(<white>{online}<gray>/<white>{max}<dark_gray>)\n" +
+                "<gray>Please try again in a moment.",
+        ),
+    ).also { messages.register("proxy", it) }
+
     /** Installed addons. */
     val addonManager: AddonManager = AddonManager(
         paths.addons,
@@ -212,6 +230,8 @@ class HelixNode(
             codeTtlSeconds = config.control.codeTtlSeconds,
             sessionTtlSeconds = config.control.sessionTtlSeconds,
             loginMessage = config.control.loginMessage,
+            networkName = config.network.name,
+            proxyScreens = proxyScreens,
         ),
     )
 

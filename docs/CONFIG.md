@@ -41,6 +41,9 @@ url = "jdbc:postgresql://127.0.0.1:5432/helix"
 user = "helix"
 password = "helix"
 poolSize = 8
+
+[network]
+name = "our network"   # Anzeigename, {network}-Placeholder in Disconnect-Screens
 ```
 
 Im `postgres`-Modus speichern **alle** Addons ihre Daten in der
@@ -61,6 +64,22 @@ Ohne Permission-Addon entscheidet das **native MC-System** (OP bzw.
 `hasPermission`, z.B. via LuckPerms auf dem Proxy). Ist das Permission-Addon
 aktiv, ist es allein maßgeblich. Das statische `control.token` bleibt als
 Admin-/Notlogin mit vollem Zugriff gültig.
+
+### Disconnect-Screens
+
+Alle Trennungs-Screens sind im Web-Panel unter **Messages** editierbar,
+**mehrzeilig** und im **MiniMessage**-Format (Farbverläufe `<gradient:…>`,
+Hex `<#rrggbb>`, `<bold>` …); Legacy-`&`-Codes werden weiterhin unterstützt.
+Verteilung:
+
+- **Ban** (permanent/temporär) → Addon `helix.bans`, Keys `banned` / `banned.temp`
+- **Kick** → Addon `helix.moderation`, Key `kick.screen`
+- **Maintenance / Voll** → Bundle `proxy`, Keys `maintenance` / `server_full`
+
+Universelle Placeholder (auf jedem Screen verfügbar — vom Proxy gefüllt):
+`{player}`, `{network}`, `{server}`, `{online}`, `{max}`, `{date}`, `{time}`.
+Domänen-Placeholder: Ban → `{reason}`, `{remaining}`, `{expiry}`, `{duration}`;
+Kick → `{reason}`, `{moderator}`. Nicht belegte Placeholder bleiben leer/roh.
 
 ## `config/versions.toml`
 

@@ -440,7 +440,13 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
     get("/internal/routing") {
         if (!requireAdmin(dependencies)) return@get
         val proxyServiceId = call.request.queryParameters["proxyServiceId"].orEmpty()
-        call.respond(dependencies.routing.snapshot(proxyServiceId))
+        call.respond(
+            dependencies.routing.snapshot(proxyServiceId).copy(
+                networkName = dependencies.networkName,
+                maintenanceScreen = dependencies.proxyScreens.raw("maintenance"),
+                serverFullScreen = dependencies.proxyScreens.raw("server_full"),
+            ),
+        )
     }
     post("/internal/join-check") {
         if (!requireAdmin(dependencies)) return@post

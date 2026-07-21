@@ -26,8 +26,20 @@ class BansAddon : AddonBase() {
         store = BanStore(context.storage())
         msg = context.messages(
             mapOf(
-                "banned" to "&cYou are banned from this network.\n&7Reason: &f{reason}",
-                "banned.temp" to "&cYou are banned from this network.\n&7Reason: &f{reason}\n&7Expires in &f{time}",
+                // Disconnect screens — MiniMessage, multi-line. Placeholders:
+                // {player} {reason} {remaining} {expiry} {duration} {staff} {network} {date} {time}
+                "banned" to (
+                    "<red><bold>You are banned</bold>\n" +
+                        "<gray>from {network}\n \n" +
+                        "<gray>Reason: <white>{reason}"
+                    ),
+                "banned.temp" to (
+                    "<red><bold>You are temporarily banned</bold>\n" +
+                        "<gray>from {network}\n \n" +
+                        "<gray>Reason: <white>{reason}\n" +
+                        "<gray>Time left: <yellow>{remaining}\n" +
+                        "<gray>Expires: <white>{expiry}"
+                    ),
                 "notify.set" to "&c[Ban] &f{player} &7was banned: {reason} ({expiry})",
                 "notify.pardon" to "&a[Ban] &f{player} &7was pardoned.",
             ),
@@ -145,7 +157,31 @@ class BansAddon : AddonBase() {
         ?.let { "expires in ${BanDuration.format(it - System.currentTimeMillis())}" }
         ?: "permanent"
 
-    private fun banMessage(entry: BanEntry): String = entry.expiresAtEpochMs
-        ?.let { msg.format("banned.temp", "reason" to entry.reason, "time" to BanDuration.format(it - System.currentTimeMillis())) }
-        ?: msg.format("banned", "reason" to entry.reason)
+    private fun banMessage(entry: BanEntry): String {
+        val expiresAt = entry.expiresAtEpochMs
+        return if (expiresAt != null) {
+            msg.format(
+                "banned.temp",
+                "player" to entry.player,
+                "reason" to entry.reason,
+                "remaining" to BanDuration.format(expiresAt - System.currentTimeMillis()),
+                "time" to BanDuration.format(expiresAt - System.currentTimeMillis()),
+                "duration" to BanDuration.format(expiresAt - entry.createdAtEpochMs),
+                "expiry" to formatDate(expiresAt),
+            )
+        } else {
+            msg.format(
+                "banned",
+                "player" to entry.player,
+                "reason" to entry.reason,
+                "duration" to "permanent",
+                "expiry" to "never",
+            )
+        }
+    }
+
+    private fun formatDate(epochMs: Long): String =
+        java.time.Instant.ofEpochMilli(epochMs)
+            .atZone(java.time.ZoneId.systemDefault())
+            .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
 }

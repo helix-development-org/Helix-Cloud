@@ -25,7 +25,13 @@ class ModerationAddon : AddonBase() {
         msg = context.messages(
             mapOf(
                 "kick.default" to "Kicked by a moderator.",
-                "kick.reason" to "{reason} &7(by {moderator})",
+                // Kick disconnect screen — MiniMessage, multi-line. Placeholders:
+                // {reason} {moderator} {staff} {player} {network} {date} {time}
+                "kick.screen" to (
+                    "<red><bold>You were kicked</bold>\n \n" +
+                        "<gray>Reason: <white>{reason}\n" +
+                        "<gray>By: <white>{moderator}"
+                    ),
                 "kick.confirm" to "&7Kicked &f{target}&7.",
                 "kick.notify" to "&c[Kick] &f{target} &7by {moderator}: {reason}",
                 "warn.player" to "&cYou have been warned: &f{reason}",
@@ -42,7 +48,14 @@ class ModerationAddon : AddonBase() {
         ) { executor, args ->
             val target = args.firstOrNull() ?: return@playerCommand usage("/kick <player> [reason...]")
             val reason = args.drop(1).joinToString(" ").ifBlank { msg.format("kick.default") }
-            val result = invoke("player.kick", target, msg.format("kick.reason", "reason" to reason, "moderator" to executor))
+            val screen = msg.format(
+                "kick.screen",
+                "reason" to reason,
+                "moderator" to executor,
+                "staff" to executor,
+                "player" to target,
+            )
+            val result = invoke("player.kick", target, screen)
             if (result.success) {
                 context.publishNotification("moderation", msg.format("kick.notify", "target" to target, "moderator" to executor, "reason" to reason))
                 ActionResult.ok(msg.format("kick.confirm", "target" to target))

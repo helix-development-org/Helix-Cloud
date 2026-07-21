@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.serialization.json.Json
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.minimessage.MiniMessage
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.bridge.HeartbeatReport
@@ -45,6 +46,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
     private val logger: Logger,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
+    private val miniMessage = MiniMessage.miniMessage()
     private val maintenance = AtomicBoolean(false)
     private val registeredPlayerCommands = ConcurrentHashMap.newKeySet<String>()
     private var settings: BridgeSettings? = null
@@ -54,6 +56,15 @@ class HelixVelocityBridgePlugin @Inject constructor(
 
     @Volatile
     private var permissionNodes: List<String>? = null
+
+    @Volatile
+    private var networkName: String = ""
+
+    @Volatile
+    private var maintenanceScreen: String = ""
+
+    @Volatile
+    private var serverFullScreen: String = ""
 
     @Volatile
     private var polling = false
@@ -213,23 +224,29 @@ class HelixVelocityBridgePlugin @Inject constructor(
     fun onLogin(event: LoginEvent) {
         val activeSettings = settings ?: return
         val httpClient = client ?: return
-        val decision = runCatching {
-            val request = JoinRequest(
-                name = event.player.username,
-                uuid = event.player.uniqueId.toString(),
+        val name = event.player.username
+        if (proxy.playerCount >= proxy.configuration.showMaxPlayers &&
+            !hasPermission(name, "helix.maintenance.bypass")
+        ) {
+            event.result = ResultedEvent.ComponentResult.denied(
+                screen(serverFullScreen.ifBlank { "The network is full." }, ctxFor(name)),
             )
+            return
+        }
+        val decision = runCatching {
+            val request = JoinRequest(name = name, uuid = event.player.uniqueId.toString())
             httpClient.postJsonForBody(
                 "/api/v1/internal/join-check",
                 json.encodeToString(request),
             )?.let { json.decodeFromString<JoinDecision>(it) }
         }.onFailure {
-            logger.warn("Helix join gate failed for {} ({}): fail-open", event.player.username, it.message)
+            logger.warn("Helix join gate failed for {} ({}): fail-open", name, it.message)
         }.getOrNull() ?: return
         if (!decision.allowed) {
             event.result = ResultedEvent.ComponentResult.denied(
-                Component.text(decision.message ?: "You may not join this network."),
+                screen(decision.message ?: "You may not join this network.", ctxFor(name)),
             )
-            logger.info("Denied join of {} via {}: {}", event.player.username, activeSettings.serviceId, decision.message)
+            logger.info("Denied join of {} via {}: {}", name, activeSettings.serviceId, decision.message)
         }
     }
 
@@ -241,8 +258,11 @@ class HelixVelocityBridgePlugin @Inject constructor(
      */
     @Subscribe
     fun onChooseInitialServer(event: PlayerChooseInitialServerEvent) {
-        if (maintenance.get() && !hasPermission(event.player.username, "helix.maintenance.bypass")) {
-            event.player.disconnect(Component.text("The network is under maintenance."))
+        val name = event.player.username
+        if (maintenance.get() && !hasPermission(name, "helix.maintenance.bypass")) {
+            event.player.disconnect(
+                screen(maintenanceScreen.ifBlank { "The network is under maintenance." }, ctxFor(name)),
+            )
             return
         }
         registry?.fallback()?.let(event::setInitialServer)
@@ -306,6 +326,9 @@ class HelixVelocityBridgePlugin @Inject constructor(
             val snapshot = json.decodeFromString<RoutingSnapshot>(body)
             registry.sync(snapshot)
             maintenance.set(snapshot.maintenance)
+            networkName = snapshot.networkName
+            maintenanceScreen = snapshot.maintenanceScreen
+            serverFullScreen = snapshot.serverFullScreen
         }.onFailure { logger.warn("Helix routing sync failed: {}", it.message) }
     }
 
@@ -372,14 +395,16 @@ class HelixVelocityBridgePlugin @Inject constructor(
     private fun executeCommand(command: ProxyCommand) {
         when (command.type) {
             "kick" -> proxy.getPlayer(command.player).ifPresent { player ->
-                player.disconnect(Component.text(command.reason ?: "You were kicked from the network."))
+                player.disconnect(
+                    screen(command.reason ?: "You were kicked from the network.", ctxFor(command.player)),
+                )
                 logger.info("Kicked {} ({})", command.player, command.reason ?: "no reason")
             }
             "message" -> proxy.getPlayer(command.player).ifPresent { player ->
-                player.sendMessage(colored(command.reason ?: ""))
+                player.sendMessage(screen(command.reason ?: "", ctxFor(command.player)))
             }
             "broadcast" -> proxy.allPlayers.forEach { player ->
-                player.sendMessage(colored(command.reason ?: ""))
+                player.sendMessage(screen(command.reason ?: "", ctxFor(player.username)))
             }
             else -> logger.warn("Unknown proxy command type: {}", command.type)
         }
@@ -388,8 +413,82 @@ class HelixVelocityBridgePlugin @Inject constructor(
     private fun colored(text: String): Component =
         LegacyComponentSerializer.legacyAmpersand().deserialize(text)
 
+    /**
+     * Translates legacy `&`/`§` color codes to MiniMessage tags so templates
+     * may freely mix both styles.
+     *
+     * @param text the raw text.
+     * @return text with legacy codes rewritten as MiniMessage tags.
+     */
+    private fun legacyToMini(text: String): String {
+        val builder = StringBuilder(text.length)
+        var i = 0
+        while (i < text.length) {
+            val c = text[i]
+            val tag = if ((c == '&' || c == '§') && i + 1 < text.length) {
+                LEGACY_TAGS[text[i + 1].lowercaseChar()]
+            } else {
+                null
+            }
+            if (tag != null) {
+                builder.append(tag)
+                i += 2
+            } else {
+                builder.append(c)
+                i++
+            }
+        }
+        return builder.toString()
+    }
+
+    /**
+     * Universal placeholder values every disconnect screen and message can use.
+     *
+     * @param player the affected player name.
+     * @return placeholder name → value (proxy-level; domain values are already
+     *  substituted by the addon that produced the text).
+     */
+    private fun ctxFor(player: String): Map<String, String> {
+        val now = java.time.LocalDateTime.now()
+        return mapOf(
+            "player" to player,
+            "network" to networkName.ifBlank { "the network" },
+            "server" to (proxy.getPlayer(player).flatMap { it.currentServer }
+                .map { it.serverInfo.name }.orElse("")),
+            "online" to proxy.playerCount.toString(),
+            "max" to proxy.configuration.showMaxPlayers.toString(),
+            "date" to now.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")),
+            "time" to now.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")),
+        )
+    }
+
+    /**
+     * Renders a disconnect/message screen: fills the universal placeholders,
+     * supports multiple lines and both MiniMessage tags and legacy `&` codes.
+     *
+     * @param template the raw screen template.
+     * @param ctx universal placeholder values.
+     * @return the rendered component.
+     */
+    private fun screen(template: String, ctx: Map<String, String>): Component {
+        var text = template
+        ctx.forEach { (key, value) -> text = text.replace("{$key}", value) }
+        text = text.replace("\\n", "\n")
+        return miniMessage.deserialize(legacyToMini(text))
+    }
+
     private companion object {
         /** Delay before reconnecting the poll loop after a failure. */
         const val RECONNECT_DELAY_MS = 1_000L
+
+        /** Legacy `&`/`§` code → MiniMessage tag. */
+        val LEGACY_TAGS: Map<Char, String> = mapOf(
+            '0' to "<black>", '1' to "<dark_blue>", '2' to "<dark_green>", '3' to "<dark_aqua>",
+            '4' to "<dark_red>", '5' to "<dark_purple>", '6' to "<gold>", '7' to "<gray>",
+            '8' to "<dark_gray>", '9' to "<blue>", 'a' to "<green>", 'b' to "<aqua>",
+            'c' to "<red>", 'd' to "<light_purple>", 'e' to "<yellow>", 'f' to "<white>",
+            'k' to "<obfuscated>", 'l' to "<bold>", 'm' to "<strikethrough>",
+            'n' to "<underlined>", 'o' to "<italic>", 'r' to "<reset>",
+        )
     }
 }

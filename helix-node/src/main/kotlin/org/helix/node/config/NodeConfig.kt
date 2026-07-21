@@ -6,12 +6,23 @@ package org.helix.node.config
  * @property control settings of the control API and dashboard.
  * @property docker settings of the docker execution backend.
  * @property storage settings of the addon storage backend.
+ * @property network display settings of the network as a whole.
  */
 data class NodeConfig(
     val control: ControlSettings = ControlSettings(),
     val docker: DockerSettings = DockerSettings(),
     val storage: StorageSettings = StorageSettings(),
+    val network: NetworkSettings = NetworkSettings(),
 ) {
+    /**
+     * Network-wide display settings.
+     *
+     * @property name display name used in disconnect screens (`{network}`).
+     */
+    data class NetworkSettings(
+        val name: String = "our network",
+    )
+
     /**
      * Control API settings.
      *

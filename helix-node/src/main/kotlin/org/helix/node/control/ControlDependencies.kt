@@ -2,6 +2,8 @@ package org.helix.node.control
 
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionSource
+import org.helix.api.message.MapMessages
+import org.helix.api.message.Messages
 import org.helix.node.actions.ActionRegistry
 import org.helix.node.actions.PlayerCommandService
 import org.helix.node.addons.AddonManager
@@ -45,6 +47,8 @@ import org.helix.node.tasks.TaskStore
  * @property codeTtlSeconds lifetime of an in-game login code.
  * @property sessionTtlSeconds lifetime of a web session.
  * @property loginMessage in-game message template (`{code}` substituted).
+ * @property networkName network display name (`{network}` in disconnect screens).
+ * @property proxyScreens configurable proxy-level disconnect screens.
  */
 data class ControlDependencies(
     val token: String,
@@ -73,6 +77,8 @@ data class ControlDependencies(
     val codeTtlSeconds: Long = 300,
     val sessionTtlSeconds: Long = 86_400,
     val loginMessage: String = "§b§lHelix §r§7» §fYour panel login code is §b{code}§7.",
+    val networkName: String = "our network",
+    val proxyScreens: Messages = MapMessages(emptyMap()),
 ) {
     /** Player command execution shared by the internal routes. */
     val playerCommands: PlayerCommandService = PlayerCommandService(registry, permissionService)

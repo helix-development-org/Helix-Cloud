@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.20.0 — 2026-07-21
+
+### Schönere, konfigurierbare Disconnect-Screens
+- Alle Trennungs-Screens (Ban permanent/temporär, Kick, Maintenance, Netzwerk
+  voll) sind jetzt im Web-Panel (Messages-Seite) **mehrzeilig** editierbar und
+  im **MiniMessage**-Format — Farbverläufe (`<gradient>`), Hex-Farben,
+  `<bold>` usw.; Legacy-`&`-Codes bleiben unterstützt.
+- Universelle Placeholder auf **jedem** Screen (`{player}`, `{network}`,
+  `{server}`, `{online}`, `{max}`, `{date}`, `{time}`) plus domänenspezifische
+  (`{reason}`, `{remaining}`, `{expiry}`, `{duration}`, `{moderator}`).
+- Verteilt pro Addon: Ban-Screens im Bans-Addon (`banned`/`banned.temp`),
+  Kick-Screen im Moderation-Addon (`kick.screen`); Proxy-Screens
+  (`maintenance`/`server_full`) im neuen node-eigenen `proxy`-Bundle.
+- Neuer `[network] name`-Config-Wert für den `{network}`-Placeholder.
+- Velocity-Bridge rendert Screens via MiniMessage (multi-line), inkl. neuem
+  „Netzwerk voll"-Screen; die Messages-Seite nutzt jetzt mehrzeilige Textfelder.
+
 ## 0.19.0 — 2026-07-20
 
 ### In-Game-Commands
