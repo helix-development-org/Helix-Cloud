@@ -66,6 +66,14 @@ export interface MetricSample {
   servicesRunning: number
   servicesTotal: number
   avgTps: number | null
+  avgApiMs: number | null
+}
+export interface ApiStats {
+  avgMs: number
+  p95Ms: number
+  requestsPerMinute: number
+  errorRate: number
+  totalRequests: number
 }
 export interface ServiceInfo {
   id: string

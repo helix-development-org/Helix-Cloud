@@ -85,10 +85,12 @@ fun Application.controlModule(dependencies: ControlDependencies) {
         }
     }
     intercept(ApplicationCallPipeline.Monitoring) {
+        val startNanos = System.nanoTime()
         proceed()
         val path = call.request.path()
         if (path.startsWith("/api/") && !path.startsWith("/api/v1/internal/poll")) {
             val status = call.response.status()?.value ?: 0
+            dependencies.apiMetrics.record((System.nanoTime() - startNanos) / 1_000_000.0, status)
             val actor = call.principal<PanelPrincipal>()?.name ?: "anonymous"
             val outcome = when {
                 status == 401 || status == 403 -> "denied"
@@ -217,6 +219,10 @@ private fun io.ktor.server.routing.Route.platformRoutes(dependencies: ControlDep
         if (!authorize(dependencies, "helix.panel.overview")) return@get
         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 240
         call.respond(dependencies.metrics.recent(limit))
+    }
+    get("/api-stats") {
+        if (!authorize(dependencies, "helix.panel.overview")) return@get
+        call.respond(dependencies.apiMetrics.snapshot())
     }
 }
 

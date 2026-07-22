@@ -98,6 +98,14 @@ function panelCss(p: Palette): string {
   .badge.neutral{background:var(--surface-2);color:var(--ink-3)}
   .chip,.tag{display:inline-flex;align-items:center;border-radius:6px;padding:2px 8px;font-size:11.5px;
     background:var(--surface-2);color:var(--ink-2);margin-right:6px}
+  .chip button,.tag button{background:none;border:0;color:inherit;cursor:pointer;margin-left:5px;font-size:13px;opacity:.7}
+  .chip button:hover{opacity:1}
+  .hidden{display:none!important}
+  .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);display:grid;place-items:center;z-index:50;padding:20px}
+  .modal{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);width:100%;max-width:440px;
+    box-shadow:0 24px 60px rgba(0,0,0,.45);overflow:hidden}
+  .checkbox{display:flex;align-items:center;gap:8px;color:var(--ink-2);font-size:13px}
+  .checkbox input{width:auto}
   `
 }
 

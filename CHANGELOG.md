@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.28.0 — 2026-07-22
+
+### API-Performance-Metriken im Dashboard
+- Die Node misst jede Control-API-Antwortzeit und liefert über `GET /api-stats`
+  ein rollierendes Fenster: **Ø-Antwortzeit**, **p95**, **Requests/min** und
+  **Fehlerrate**. Die durchschnittliche Antwortzeit fließt zusätzlich als
+  `avgApiMs` in die Metrik-Zeitreihe.
+- Die Overview-Seite zeigt jetzt eine **API-performance**-Karte (avg/p95/
+  req-min/error-rate) und einen Latenz-Trendgraphen.
+
+### Permission-Panel: User-Verwaltung & Gruppen-Modal
+- Das Permissions-Panel listet nun **alle Users** mit ihren Gruppen und
+  Permission-Zählern; „Manage" öffnet den Editor (Gruppen zuweisen/entfernen,
+  persönliche Permissions grant/revoke).
+- Gruppen werden über ein **Modal** angelegt (Name, Weight, Default-Flag) statt
+  über `prompt()`. Panels haben dafür wiederverwendbare Modal-Styles.
+
 ## 0.27.3 — 2026-07-22
 
 ### Fix: Dashboard-Build (`buildDashboard`) bricht ohne TTY ab

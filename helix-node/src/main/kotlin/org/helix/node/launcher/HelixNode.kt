@@ -31,6 +31,7 @@ import org.helix.node.gates.PermissionService
 import org.helix.node.notifications.NotificationBus
 import org.helix.api.platform.MetricSample
 import org.helix.api.service.ServiceState
+import org.helix.node.platform.ApiMetrics
 import org.helix.node.platform.MetricsHistory
 import org.helix.node.platform.PlatformOverviewService
 import org.helix.node.scheduler.JobScheduler
@@ -193,6 +194,9 @@ class HelixNode(
     /** Bounded history of network metrics for the dashboard graphs. */
     val metrics: MetricsHistory = MetricsHistory()
 
+    /** Rolling control-API performance stats (avg/p95 response time, rate). */
+    val apiMetrics: ApiMetrics = ApiMetrics()
+
     /** Recurring scheduled jobs (announcements, maintenance toggles, …). */
     val jobScheduler: JobScheduler = JobScheduler(
         storage = storageProvider.forAddon("scheduler", paths.root.resolve("scheduler")),
@@ -234,6 +238,7 @@ class HelixNode(
             networkName = config.network.name,
             proxyScreens = proxyScreens,
             metrics = metrics,
+            apiMetrics = apiMetrics,
             jobScheduler = jobScheduler,
         ),
     )
@@ -407,6 +412,7 @@ class HelixNode(
                 servicesRunning = overview.servicesRunning,
                 servicesTotal = overview.servicesTotal,
                 avgTps = if (tpsValues.isEmpty()) null else tpsValues.average(),
+                avgApiMs = apiMetrics.recentAverageMs(),
             ),
         )
     }

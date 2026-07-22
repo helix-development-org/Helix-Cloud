@@ -20,6 +20,7 @@ import org.helix.node.gates.PermissionService
 import org.helix.node.logging.LogBuffer
 import org.helix.node.audit.AuditLog
 import org.helix.node.messages.MessageRegistry
+import org.helix.node.platform.ApiMetrics
 import org.helix.node.platform.MetricsHistory
 import org.helix.node.platform.PlatformOverviewService
 import org.helix.node.scheduler.JobScheduler
@@ -52,6 +53,7 @@ import org.helix.node.tasks.TaskStore
  * @property networkName network display name (`{network}` in disconnect screens).
  * @property proxyScreens configurable proxy-level disconnect screens.
  * @property metrics bounded history of network metric samples for graphs.
+ * @property apiMetrics rolling control-API performance stats.
  * @property jobScheduler recurring scheduled jobs.
  */
 data class ControlDependencies(
@@ -84,6 +86,7 @@ data class ControlDependencies(
     val networkName: String = "our network",
     val proxyScreens: Messages = MapMessages(emptyMap()),
     val metrics: MetricsHistory = MetricsHistory(),
+    val apiMetrics: ApiMetrics = ApiMetrics(),
     val jobScheduler: JobScheduler = JobScheduler(
         org.helix.node.storage.JsonStorageProvider().forAddon("scheduler", java.nio.file.Path.of("scheduler")),
         registry,

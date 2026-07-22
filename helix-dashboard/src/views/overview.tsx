@@ -1,5 +1,5 @@
-import { Server, Users, Network, ListChecks } from "lucide-react"
-import { api, type EventEntry, type MetricSample, type Overview, type ProxyView, type ServiceInfo } from "@/lib/api"
+import { Server, Users, Network, ListChecks, Gauge } from "lucide-react"
+import { api, type ApiStats, type EventEntry, type MetricSample, type Overview, type ProxyView, type ServiceInfo } from "@/lib/api"
 import { usePoll } from "@/lib/use-poll"
 import { ago } from "@/lib/format"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,19 +9,21 @@ import { MetricChart } from "@/components/metric-chart"
 /** Overview: stat tiles, trend charts and recent activity. */
 export function OverviewView() {
   const { data } = usePoll(async () => {
-    const [ov, services, events, proxy, metrics] = await Promise.all([
+    const [ov, services, events, proxy, metrics, apiStats] = await Promise.all([
       api<Overview>("/platform/overview"),
       api<ServiceInfo[]>("/services"),
       api<EventEntry[]>("/events?limit=8"),
       api<ProxyView>("/proxy"),
       api<MetricSample[]>("/metrics?limit=240").catch(() => [] as MetricSample[]),
+      api<ApiStats>("/api-stats").catch(() => null),
     ])
-    return { ov, services, events, proxy, metrics }
+    return { ov, services, events, proxy, metrics, apiStats }
   }, 5000)
 
   if (!data) return <div className="text-sm text-muted-foreground">Loading…</div>
-  const { ov, events, proxy, metrics } = data
+  const { ov, events, proxy, metrics, apiStats } = data
   const hasTps = metrics.some((m) => m.avgTps != null)
+  const hasApi = metrics.some((m) => m.avgApiMs != null)
 
   return (
     <div className="flex flex-col gap-5">
@@ -47,8 +49,25 @@ export function OverviewView() {
               <MetricChart samples={metrics} dataKey="avgTps" color="var(--chart-3)" />
             </ChartBox>
           )}
+          {hasApi && (
+            <ChartBox label="API response (ms)" value={metrics.at(-1)?.avgApiMs?.toFixed(1) ?? "—"}>
+              <MetricChart samples={metrics} dataKey="avgApiMs" color="var(--chart-4)" />
+            </ChartBox>
+          )}
         </CardContent>
       </Card>
+
+      {apiStats && (
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Gauge className="size-4" /> API performance</CardTitle></CardHeader>
+          <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Metric label="Avg response" value={`${apiStats.avgMs} ms`} />
+            <Metric label="p95 response" value={`${apiStats.p95Ms} ms`} />
+            <Metric label="Requests / min" value={apiStats.requestsPerMinute.toString()} />
+            <Metric label="Error rate" value={`${apiStats.errorRate}%`} tone={apiStats.errorRate > 5 ? "bad" : undefined} />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader><CardTitle>Recent activity</CardTitle></CardHeader>
@@ -77,6 +96,15 @@ function Tile({ label, value, sub, icon, accent }: { label: string; value: React
         <div className="text-xs text-muted-foreground">{sub}</div>
       </CardContent>
     </Card>
+  )
+}
+
+function Metric({ label, value, tone }: { label: string; value: string; tone?: "bad" }) {
+  return (
+    <div className="rounded-lg border bg-secondary/30 p-3">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className={"mt-1 text-xl font-semibold " + (tone === "bad" ? "text-destructive" : "")}>{value}</div>
+    </div>
   )
 }
 

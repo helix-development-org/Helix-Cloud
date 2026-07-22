@@ -4,10 +4,29 @@
 </div>
 
 <div class="card">
-  <div class="card-head"><h2>Player</h2><div class="sub">inspect and edit a player's groups &amp; permissions</div></div>
-  <div class="card-body">
+  <div class="card-head"><h2>Users</h2><div class="sub">everyone with explicit groups or permissions</div></div>
+  <div id="users"><div class="empty">loading…</div></div>
+  <div class="card-body" style="border-top:1px solid var(--line)">
+    <label>Manage any player (also new ones)</label>
     <div class="row"><input id="user-name" placeholder="Player name" style="max-width:280px"><button class="btn subtle" id="user-load">Load</button></div>
     <div id="user-detail" style="margin-top:14px"></div>
+  </div>
+</div>
+
+<div id="group-modal" class="backdrop hidden">
+  <div class="modal">
+    <div class="card-head"><h2>New group</h2></div>
+    <div class="card-body">
+      <div class="field"><label>Name</label><input id="g-name" placeholder="admin" autocomplete="off"></div>
+      <div class="grid c2" style="margin-top:12px">
+        <div class="field"><label>Weight (higher wins conflicts)</label><input id="g-weight" type="number" value="0"></div>
+        <div class="field"><label>Default</label><label class="checkbox"><input type="checkbox" id="g-default"> assign to every player</label></div>
+      </div>
+      <div class="row" style="margin-top:16px;justify-content:flex-end">
+        <button class="btn subtle" id="g-cancel">Cancel</button>
+        <button class="btn" id="g-create">Create group</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -20,11 +39,12 @@ async function load() {
   const res = await Helix.action("perm.export");
   try { doc = JSON.parse(res.lines[0] || "{}"); } catch (e) { doc = { groups: [], users: [] }; }
   renderGroups();
+  renderUsers();
 }
 
 function renderGroups() {
   const box = document.getElementById("groups");
-  if (!doc.groups.length) { box.innerHTML = '<div class="empty">No groups yet</div>'; return; }
+  if (!doc.groups.length) { box.innerHTML = '<div class="empty">No groups yet — create one</div>'; return; }
   const sorted = [...doc.groups].sort((a, b) => (b.weight||0) - (a.weight||0));
   box.innerHTML = `<table><thead><tr><th>Group</th><th>Weight</th><th>Default</th><th>Parents</th><th>Permissions</th><th></th></tr></thead><tbody>${
     sorted.map(g => `<tr>
@@ -62,11 +82,41 @@ function bindEditors() {
   box.querySelectorAll("[data-rmparent]").forEach(b => b.onclick = async () => { const [g,p]=b.dataset.rmparent.split("|"); await Helix.action("perm.group.removeparent", g, p); load(); });
 }
 
-document.getElementById("new-group").onclick = async () => {
-  const name = prompt("Group name?"); if (!name) return;
-  const weight = prompt("Weight (higher wins conflicts)?", "0") || "0";
-  const r = await Helix.action("perm.group.create", name, "weight=" + weight);
-  Helix.toast(r.lines[0] || "created"); load();
+function renderUsers() {
+  const box = document.getElementById("users");
+  const users = doc.users || [];
+  if (!users.length) { box.innerHTML = '<div class="empty">No users with explicit assignments yet</div>'; return; }
+  box.innerHTML = `<table><thead><tr><th>Player</th><th>Groups</th><th>Permissions</th><th></th></tr></thead><tbody>${
+    users.map(u => `<tr>
+      <td><strong>${esc(u.name)}</strong></td>
+      <td>${(u.groups||[]).length ? (u.groups||[]).map(g=>`<span class="tag">${esc(g)}</span>`).join(" ") : '<span class="muted">defaults</span>'}</td>
+      <td>${(u.permissions||[]).length ? `<span class="tag">${(u.permissions||[]).length} nodes</span>` : '<span class="muted">—</span>'}</td>
+      <td style="text-align:right"><button class="btn sm subtle" data-manage="${esc(u.name)}">Manage</button></td>
+    </tr>`).join("")
+  }</tbody></table>`;
+  box.querySelectorAll("[data-manage]").forEach(b => b.onclick = () => { document.getElementById("user-name").value = b.dataset.manage; loadUser(); });
+}
+
+/* group creation modal */
+const modal = document.getElementById("group-modal");
+document.getElementById("new-group").onclick = () => {
+  document.getElementById("g-name").value = "";
+  document.getElementById("g-weight").value = "0";
+  document.getElementById("g-default").checked = false;
+  modal.classList.remove("hidden");
+  document.getElementById("g-name").focus();
+};
+document.getElementById("g-cancel").onclick = () => modal.classList.add("hidden");
+modal.onclick = e => { if (e.target === modal) modal.classList.add("hidden"); };
+document.getElementById("g-create").onclick = async () => {
+  const name = document.getElementById("g-name").value.trim();
+  if (!name) return Helix.toast("Group name is required");
+  const weight = document.getElementById("g-weight").value.trim() || "0";
+  const def = document.getElementById("g-default").checked;
+  const r = await Helix.action("perm.group.create", name, "weight=" + weight, "default=" + def);
+  Helix.toast(r.lines[0] || "created");
+  modal.classList.add("hidden");
+  load();
 };
 
 async function loadUser() {
@@ -76,6 +126,7 @@ async function loadUser() {
   const defaults = doc.groups.filter(g => g.default).map(g => g.name);
   const groups = u.groups.length ? u.groups : defaults;
   document.getElementById("user-detail").innerHTML = `
+    <div class="card" style="margin:0"><div class="card-head"><h2>${esc(u.name)}</h2></div><div class="card-body">
     <div class="grid c2">
       <div class="field"><label>Groups${u.groups.length ? "" : " (defaults)"}</label>
         <div>${groups.map(g=>`<span class="chip">${esc(g)}${u.groups.length?`<button data-ug="${esc(g)}">×</button>`:""}</span>`).join("") || '<span class="muted">none</span>'}</div>
@@ -83,7 +134,7 @@ async function loadUser() {
       <div class="field"><label>Personal permissions</label>
         <div>${(u.permissions||[]).map(p=>`<span class="chip">${esc(p)}<button data-up="${esc(p)}">×</button></span>`).join("") || '<span class="muted">none</span>'}</div>
         <div class="row" style="margin-top:8px"><input id="up-in" placeholder="node or -node" style="max-width:240px"><button class="btn sm" id="up-btn">Grant</button></div></div>
-    </div>`;
+    </div></div></div>`;
   const uname = u.name;
   document.getElementById("ug-btn").onclick = async () => { await Helix.action("perm.user.addgroup", uname, document.getElementById("ug-add").value); document.getElementById("user-name").value = uname; loadUser(); };
   document.getElementById("up-btn").onclick = async () => { const v = document.getElementById("up-in").value.trim(); if(!v) return; await Helix.action("perm.user.grant", uname, v); document.getElementById("user-name").value = uname; loadUser(); };
