@@ -11,6 +11,8 @@ import org.helix.node.actions.BuiltinActions
 import org.helix.node.addons.AddonActions
 import org.helix.api.message.GlobalPlaceholders
 import org.helix.node.audit.AuditLog
+import org.helix.node.backup.BackupActions
+import org.helix.node.backup.BackupService
 import org.helix.node.control.auth.PanelAuthService
 import org.helix.node.addons.AddonManager
 import org.helix.node.cli.NodeCli
@@ -234,6 +236,13 @@ class HelixNode(
     /** Rolling control-API performance stats (avg/p95 response time, rate). */
     val apiMetrics: ApiMetrics = ApiMetrics()
 
+    /** Workspace backups of static services. */
+    val backups: BackupService = BackupService(
+        backupsDir = paths.backups,
+        staticServicesDir = paths.servicesStatic,
+        isActive = { serviceId -> manager.find(serviceId)?.active() == true },
+    )
+
     /** Recurring scheduled jobs (announcements, maintenance toggles, …). */
     val jobScheduler: JobScheduler = JobScheduler(
         storage = storageProvider.forAddon("scheduler", paths.root.resolve("scheduler")),
@@ -284,6 +293,7 @@ class HelixNode(
                 }
             },
             jobScheduler = jobScheduler,
+            backups = backups,
         ),
     )
 
@@ -308,6 +318,7 @@ class HelixNode(
             proxyEvents = proxyEvents,
         ).registerAll(registry)
         AddonActions(addonManager).registerAll(registry)
+        BackupActions(backups).registerAll(registry)
         addonManager.loadAll()
         registerEventSources()
         refreshNetworkPlaceholders()

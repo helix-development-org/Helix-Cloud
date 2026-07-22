@@ -73,6 +73,20 @@ per Intervall (`everyMinutes`) oder täglich (`dailyAt` = `HH:mm`) aus.
 | DELETE | `/schedules/{id}` | Job löschen |
 | POST | `/schedules/{id}/run` | Job sofort ausführen |
 
+## Backups
+
+Erfordert Permission `helix.panel.backups`. Backups sichern statische
+Service-Workspaces als Zip (`Helix/backups/<serviceId>/`), Retention 10 pro
+Service. Restore nur bei gestopptem Service. Per Scheduler automatisierbar
+(Action `backup.create <serviceId>`).
+
+| Methode | Pfad | Beschreibung |
+|---|---|---|
+| GET | `/backups` | Workspaces (mit running-Status) + alle Archive |
+| POST | `/services/{id}/backups` | Backup erstellen → `201` mit BackupInfo |
+| POST | `/backups/{serviceId}/{file}/restore` | Backup zurückspielen (Service muss gestoppt sein) |
+| DELETE | `/backups/{serviceId}/{file}` | Archiv löschen |
+
 ## Players
 
 Erfordert Permission `helix.panel.players`.

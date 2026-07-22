@@ -30,13 +30,16 @@ class NodePaths(val root: Path) {
     /** Installed HXA addons. */
     val addons: Path = root.resolve("addons")
 
+    /** Workspace backups, one directory per service. */
+    val backups: Path = root.resolve("backups")
+
     /**
      * Creates all directories.
      *
      * @return this instance for chaining.
      */
     fun createAll(): NodePaths {
-        listOf(config, tasks, templates, servicesStatic, servicesTemp, cache, addons)
+        listOf(config, tasks, templates, servicesStatic, servicesTemp, cache, addons, backups)
             .forEach(Files::createDirectories)
         return this
     }

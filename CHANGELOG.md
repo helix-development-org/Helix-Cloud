@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.33.0 — 2026-07-22
+
+### Backups & Snapshots
+- Statische Service-Workspaces lassen sich als Zip sichern
+  (`Helix/backups/<serviceId>/<timestamp>.zip`), Retention 10 pro Service.
+- **Restore** spielt ein Archiv in den (gestoppten) Workspace zurück und
+  ersetzt dessen Inhalt; Zip-Slip-geschützt. Restore ist blockiert, solange
+  der Service läuft.
+- Neue Panel-Seite **Backups** (Permission `helix.panel.backups`): Erstellen,
+  Wiederherstellen, Löschen; laufende Services sind markiert.
+- Actions `backup.create/list/restore/delete` — damit per **Scheduler**
+  automatisierbar (z.B. Job `backup.create Lobby-1` täglich 04:00).
+- Routen: `GET /backups`, `POST /services/{id}/backups`,
+  `POST /backups/{serviceId}/{file}/restore`, `DELETE /backups/{serviceId}/{file}`.
+
 ## 0.32.3 — 2026-07-22
 
 ### Fix: Dashboard-Updates ohne Force-Reload

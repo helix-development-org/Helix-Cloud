@@ -136,6 +136,7 @@ fun Application.controlModule(dependencies: ControlDependencies) {
                 panelRoutes(dependencies)
                 messageRoutes(dependencies)
                 scheduleRoutes(dependencies)
+                backupRoutes(dependencies)
                 actionRoutes(dependencies)
                 addonRoutes(dependencies)
                 internalRoutes(dependencies)
@@ -471,6 +472,51 @@ private fun io.ktor.server.routing.Route.scheduleRoutes(dependencies: ControlDep
             call.respond(MessageResponse("ran $id"))
         } else {
             call.respond(HttpStatusCode.NotFound, ErrorResponse("unknown job: $id"))
+        }
+    }
+}
+
+private fun io.ktor.server.routing.Route.backupRoutes(dependencies: ControlDependencies) {
+    get("/backups") {
+        if (!authorize(dependencies, "helix.panel.backups")) return@get
+        call.respond(
+            org.helix.node.backup.BackupsOverview(
+                workspaces = dependencies.backups.workspaces(),
+                backups = dependencies.backups.list(),
+            ),
+        )
+    }
+    post("/services/{id}/backups") {
+        if (!authorize(dependencies, "helix.panel.backups")) return@post
+        val id = call.parameters["id"].orEmpty()
+        val info = dependencies.backups.create(id)
+        dependencies.audit.record(
+            "backup",
+            call.principal<PanelPrincipal>()?.name ?: "anonymous",
+            "created ${info.fileName} for $id",
+        )
+        call.respond(HttpStatusCode.Created, info)
+    }
+    post("/backups/{serviceId}/{file}/restore") {
+        if (!authorize(dependencies, "helix.panel.backups")) return@post
+        val serviceId = call.parameters["serviceId"].orEmpty()
+        val file = call.parameters["file"].orEmpty()
+        dependencies.backups.restore(serviceId, file)
+        dependencies.audit.record(
+            "backup",
+            call.principal<PanelPrincipal>()?.name ?: "anonymous",
+            "restored $file into $serviceId",
+        )
+        call.respond(MessageResponse("restored $file into $serviceId"))
+    }
+    delete("/backups/{serviceId}/{file}") {
+        if (!authorize(dependencies, "helix.panel.backups")) return@delete
+        val serviceId = call.parameters["serviceId"].orEmpty()
+        val file = call.parameters["file"].orEmpty()
+        if (dependencies.backups.delete(serviceId, file)) {
+            call.respond(MessageResponse("deleted $serviceId/$file"))
+        } else {
+            call.respond(HttpStatusCode.NotFound, ErrorResponse("unknown backup: $serviceId/$file"))
         }
     }
 }

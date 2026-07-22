@@ -19,6 +19,7 @@ import org.helix.node.gates.PermissionResolverRegistry
 import org.helix.node.gates.PermissionService
 import org.helix.node.logging.LogBuffer
 import org.helix.node.audit.AuditLog
+import org.helix.node.backup.BackupService
 import org.helix.node.messages.MessageRegistry
 import org.helix.node.platform.ApiMetrics
 import org.helix.node.platform.MetricsHistory
@@ -59,6 +60,7 @@ import org.helix.node.tasks.TaskStore
  *  owning addon id (lets the node refresh derived state such as the global
  *  `{prefix}`).
  * @property jobScheduler recurring scheduled jobs.
+ * @property backups workspace backups of static services.
  */
 data class ControlDependencies(
     val token: String,
@@ -92,6 +94,10 @@ data class ControlDependencies(
     val metrics: MetricsHistory = MetricsHistory(),
     val apiMetrics: ApiMetrics = ApiMetrics(),
     val onMessagesChanged: (addonId: String) -> Unit = {},
+    val backups: BackupService = BackupService(
+        java.nio.file.Path.of("backups"),
+        java.nio.file.Path.of("services/static"),
+    ),
     val jobScheduler: JobScheduler = JobScheduler(
         org.helix.node.storage.JsonStorageProvider().forAddon("scheduler", java.nio.file.Path.of("scheduler")),
         registry,

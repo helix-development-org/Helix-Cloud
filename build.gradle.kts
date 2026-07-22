@@ -9,7 +9,7 @@ plugins {
 
 allprojects {
     group = "org.helix"
-    version = "0.32.3"
+    version = "0.33.0"
 
     repositories {
         mavenCentral()
