@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.27.1 — 2026-07-22
+
+### Fix: Addon-Panels im neuen Dashboard
+- Die Addon-Seiten (bans, economy, permissions, tablist, chat, discord) waren
+  im React-Dashboard kaputt. Ursache lag im Host-`AddonPanelView`, nicht in den
+  Panels: das Bridge-Runtime wurde **nach** dem Panel-Script injiziert (also war
+  `Helix` beim Ausführen undefiniert), `Helix.ready`/`Helix.toast` fehlten, die
+  Panel-CSS-Klassen (`card`, `btn`, `badge`, …) wurden nicht bereitgestellt und
+  `prompt()` scheiterte an fehlendem `allow-modals`.
+- Behoben zentral im Host: Runtime wird **vor** dem Panel-HTML geladen und
+  bietet `Helix.action/ready/toast`; ein vollständiges, an shadcn angelehntes
+  Panel-Stylesheet (Light/Dark passend zum Dashboard) wird injiziert; die
+  iframe-Sandbox erlaubt jetzt Modals. Alle sechs Panels laufen damit ohne
+  Änderung an den Addons wieder korrekt.
+
 ## 0.27.0 — 2026-07-22
 
 ### Dashboard-Rewrite auf React + shadcn/ui
