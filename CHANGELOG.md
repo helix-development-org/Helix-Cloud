@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.32.3 — 2026-07-22
+
+### Fix: Dashboard-Updates ohne Force-Reload
+- Nach Node-Updates zeigte der Browser teils das alte Dashboard, bis man
+  force-reloadete: die `index.html` wurde ohne Cache-Header ausgeliefert und
+  referenzierte ein veraltetes Bundle.
+- Jetzt: `Cache-Control: no-cache` für die Seite (revalidiert bei jedem
+  Aufruf) und `immutable` (1 Jahr) für die content-gehashten Assets — Updates
+  erscheinen sofort, Assets bleiben maximal gecacht.
+
 ## 0.32.2 — 2026-07-22
 
 ### Fix: First-Start generiert vollständige Configs

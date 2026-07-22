@@ -23,6 +23,7 @@ import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.request.receive
+import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.routing.RoutingContext
 import io.ktor.server.routing.delete
@@ -82,6 +83,17 @@ fun Application.controlModule(dependencies: ControlDependencies) {
             authenticate { credential ->
                 dependencies.panelAuth.authenticate(credential.token)
             }
+        }
+    }
+    intercept(ApplicationCallPipeline.Plugins) {
+        // The SPA entry must revalidate after node updates (it references the
+        // content-hashed bundle); the hashed assets themselves never change.
+        val path = call.request.path()
+        when {
+            path == "/" || path == "/index.html" ->
+                call.response.header(HttpHeaders.CacheControl, "no-cache")
+            path.startsWith("/assets/") ->
+                call.response.header(HttpHeaders.CacheControl, "public, max-age=31536000, immutable")
         }
     }
     intercept(ApplicationCallPipeline.Monitoring) {
