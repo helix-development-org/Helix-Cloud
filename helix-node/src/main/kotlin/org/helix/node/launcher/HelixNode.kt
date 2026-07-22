@@ -13,6 +13,7 @@ import org.helix.api.message.GlobalPlaceholders
 import org.helix.node.audit.AuditLog
 import org.helix.node.backup.BackupActions
 import org.helix.node.backup.BackupService
+import org.helix.node.files.FileManagerService
 import org.helix.node.control.auth.PanelAuthService
 import org.helix.node.addons.AddonManager
 import org.helix.node.cli.NodeCli
@@ -243,6 +244,10 @@ class HelixNode(
         isActive = { serviceId -> manager.find(serviceId)?.active() == true },
     )
 
+    /** File manager over service workspaces and templates. */
+    val files: FileManagerService =
+        FileManagerService(paths.servicesStatic, paths.servicesTemp, paths.templates)
+
     /** Recurring scheduled jobs (announcements, maintenance toggles, …). */
     val jobScheduler: JobScheduler = JobScheduler(
         storage = storageProvider.forAddon("scheduler", paths.root.resolve("scheduler")),
@@ -294,6 +299,7 @@ class HelixNode(
             },
             jobScheduler = jobScheduler,
             backups = backups,
+            files = files,
         ),
     )
 

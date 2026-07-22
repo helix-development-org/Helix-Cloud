@@ -20,6 +20,7 @@ import org.helix.node.gates.PermissionService
 import org.helix.node.logging.LogBuffer
 import org.helix.node.audit.AuditLog
 import org.helix.node.backup.BackupService
+import org.helix.node.files.FileManagerService
 import org.helix.node.messages.MessageRegistry
 import org.helix.node.platform.ApiMetrics
 import org.helix.node.platform.MetricsHistory
@@ -61,6 +62,7 @@ import org.helix.node.tasks.TaskStore
  *  `{prefix}`).
  * @property jobScheduler recurring scheduled jobs.
  * @property backups workspace backups of static services.
+ * @property files file manager over workspaces and templates.
  */
 data class ControlDependencies(
     val token: String,
@@ -97,6 +99,11 @@ data class ControlDependencies(
     val backups: BackupService = BackupService(
         java.nio.file.Path.of("backups"),
         java.nio.file.Path.of("services/static"),
+    ),
+    val files: FileManagerService = FileManagerService(
+        java.nio.file.Path.of("services/static"),
+        java.nio.file.Path.of("services/temp"),
+        java.nio.file.Path.of("templates"),
     ),
     val jobScheduler: JobScheduler = JobScheduler(
         org.helix.node.storage.JsonStorageProvider().forAddon("scheduler", java.nio.file.Path.of("scheduler")),

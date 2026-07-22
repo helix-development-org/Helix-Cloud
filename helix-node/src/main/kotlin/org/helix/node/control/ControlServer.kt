@@ -137,6 +137,7 @@ fun Application.controlModule(dependencies: ControlDependencies) {
                 messageRoutes(dependencies)
                 scheduleRoutes(dependencies)
                 backupRoutes(dependencies)
+                fileRoutes(dependencies)
                 actionRoutes(dependencies)
                 addonRoutes(dependencies)
                 internalRoutes(dependencies)
@@ -517,6 +518,51 @@ private fun io.ktor.server.routing.Route.backupRoutes(dependencies: ControlDepen
             call.respond(MessageResponse("deleted $serviceId/$file"))
         } else {
             call.respond(HttpStatusCode.NotFound, ErrorResponse("unknown backup: $serviceId/$file"))
+        }
+    }
+}
+
+private fun io.ktor.server.routing.Route.fileRoutes(dependencies: ControlDependencies) {
+    get("/files/roots") {
+        if (!authorize(dependencies, "helix.panel.files")) return@get
+        call.respond(dependencies.files.roots())
+    }
+    get("/files/list") {
+        if (!authorize(dependencies, "helix.panel.files")) return@get
+        val root = call.request.queryParameters["root"].orEmpty()
+        val path = call.request.queryParameters["path"].orEmpty()
+        call.respond(dependencies.files.list(root, path))
+    }
+    get("/files/content") {
+        if (!authorize(dependencies, "helix.panel.files")) return@get
+        val root = call.request.queryParameters["root"].orEmpty()
+        val path = call.request.queryParameters["path"].orEmpty()
+        call.respond(dependencies.files.read(root, path))
+    }
+    put("/files/content") {
+        if (!authorize(dependencies, "helix.panel.files")) return@put
+        val request = call.receive<org.helix.node.files.FileWriteRequest>()
+        dependencies.files.write(request.root, request.path, request.content)
+        dependencies.audit.record(
+            "files",
+            call.principal<PanelPrincipal>()?.name ?: "anonymous",
+            "wrote ${request.root}/${request.path}",
+        )
+        call.respond(MessageResponse("saved ${request.path}"))
+    }
+    delete("/files") {
+        if (!authorize(dependencies, "helix.panel.files")) return@delete
+        val root = call.request.queryParameters["root"].orEmpty()
+        val path = call.request.queryParameters["path"].orEmpty()
+        if (dependencies.files.delete(root, path)) {
+            dependencies.audit.record(
+                "files",
+                call.principal<PanelPrincipal>()?.name ?: "anonymous",
+                "deleted $root/$path",
+            )
+            call.respond(MessageResponse("deleted $path"))
+        } else {
+            call.respond(HttpStatusCode.NotFound, ErrorResponse("not found: $path"))
         }
     }
 }

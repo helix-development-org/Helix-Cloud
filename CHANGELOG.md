@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.34.0 — 2026-07-22
+
+### Datei-Manager
+- Neue Panel-Seite **Files** (Permission `helix.panel.files`): Workspace- und
+  Template-Dateien browsen (Breadcrumb), Textdateien direkt im Panel
+  editieren (bis 1 MiB) und Dateien/Ordner löschen.
+- Roots: `static:<serviceId>`, `temp:<serviceId>`, `template:<name>`. Alle
+  Pfade sind strikt auf ihren Root begrenzt — Traversal-Versuche (`..`,
+  manipulierte Root-Ids) werden mit `400` abgelehnt (getestet).
+- Schreib- und Löschoperationen landen im Audit-Log.
+- Routen: `GET /files/roots|list|content`, `PUT /files/content`,
+  `DELETE /files`.
+
 ## 0.33.0 — 2026-07-22
 
 ### Backups & Snapshots

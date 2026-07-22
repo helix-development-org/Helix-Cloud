@@ -87,6 +87,20 @@ Service. Restore nur bei gestopptem Service. Per Scheduler automatisierbar
 | POST | `/backups/{serviceId}/{file}/restore` | Backup zurückspielen (Service muss gestoppt sein) |
 | DELETE | `/backups/{serviceId}/{file}` | Archiv löschen |
 
+## Files
+
+Erfordert Permission `helix.panel.files`. Roots: `static:<serviceId>`,
+`temp:<serviceId>`, `template:<name>`. Pfade sind auf den Root beschränkt
+(Traversal → `400`); editierbar bis 1 MiB; Schreiben/Löschen wird auditiert.
+
+| Methode | Pfad | Beschreibung |
+|---|---|---|
+| GET | `/files/roots` | verfügbare Roots |
+| GET | `/files/list?root=&path=` | Verzeichnis-Listing (Ordner zuerst) |
+| GET | `/files/content?root=&path=` | Textinhalt einer Datei |
+| PUT | `/files/content` | Datei schreiben — Body `{root, path, content}` |
+| DELETE | `/files?root=&path=` | Datei/Ordner (rekursiv) löschen |
+
 ## Players
 
 Erfordert Permission `helix.panel.players`.
