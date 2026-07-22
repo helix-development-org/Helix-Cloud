@@ -80,5 +80,15 @@ tasks.named<Jar>("jar") {
         into("helix-internal/bridges")
         rename { "HelixVelocityBridge.jar" }
     }
+    // Apache-2.0 attribution ships with every binary distribution; unique
+    // names avoid being shadowed by dependency LICENSE/NOTICE entries.
+    from(rootProject.layout.projectDirectory.file("LICENSE")) {
+        into("META-INF")
+        rename { "LICENSE-HelixCloud" }
+    }
+    from(rootProject.layout.projectDirectory.file("NOTICE")) {
+        into("META-INF")
+        rename { "NOTICE-HelixCloud" }
+    }
     exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
 }

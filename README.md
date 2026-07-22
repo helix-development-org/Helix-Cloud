@@ -50,3 +50,15 @@ helix> service.list
 - [Konfiguration](docs/CONFIG.md) — node.toml, versions.toml, Task-Referenz
 - [REST-API](docs/REST.md) — Control-API-Endpunkte
 - [Addons](docs/ADDONS.md) — eigene Addons entwickeln
+
+## Lizenz & Urheberschaft
+
+Helix-Cloud ist Open Source unter der **Apache License 2.0** — siehe
+[LICENSE](LICENSE). Copyright © 2026 **Tytoss**.
+
+Das bedeutet: Nutzung, Änderung und Weitergabe sind erlaubt, aber die
+[NOTICE](NOTICE)-Datei und der Copyright-Hinweis **müssen erhalten bleiben**,
+Änderungen müssen als solche gekennzeichnet werden, und der Name
+„Helix-Cloud" darf **nicht** für abgeleitete Projekte verwendet werden
+(Apache 2.0, §6). Forks sind willkommen — unter eigenem Namen und mit
+Verweis auf dieses Projekt als Ursprung.
