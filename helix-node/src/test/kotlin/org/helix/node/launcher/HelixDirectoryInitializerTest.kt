@@ -23,6 +23,18 @@ class HelixDirectoryInitializerTest {
     }
 
     @Test
+    fun `generated node toml matches the code defaults exactly`() {
+        val root = createTempDirectory("helix").resolve("Helix")
+        HelixDirectoryInitializer(root).initialize()
+
+        // Loading the generated file must yield the built-in defaults — this
+        // guards against the template drifting from NodeConfig.
+        val loaded = org.helix.node.config.NodeConfigLoader().load(root)
+
+        assertEquals(org.helix.node.config.NodeConfig(), loaded)
+    }
+
+    @Test
     fun `never overwrites existing configuration`() {
         val root = createTempDirectory("helix").resolve("Helix")
         val initializer = HelixDirectoryInitializer(root)

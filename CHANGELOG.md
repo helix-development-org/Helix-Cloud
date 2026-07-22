@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.32.2 — 2026-07-22
+
+### Fix: First-Start generiert vollständige Configs
+- Die beim ersten Start erzeugte `config/node.toml` war auf dem Stand von
+  v0.1 (nur `[control]` mit host/port/token). Jetzt wird sie **vollständig
+  und kommentiert** generiert: Login/TLS-Keys, `[docker]`, `[storage]`
+  (json/postgres/mongodb) und `[network]`.
+- Neuer Drift-Schutz-Test: die generierte Datei muss beim Laden exakt die
+  Code-Defaults ergeben — das Template kann nicht mehr unbemerkt veralten.
+- `versions.toml`-Template dokumentiert jetzt den optionalen `url`-Override.
+- Alle übrigen Generatoren geprüft und vollständig: Task-TOMLs (alle Felder,
+  Roundtrip-getestet), `wrapper.properties`, Paper-Defaults, `velocity.toml`.
+
 ## 0.32.1 — 2026-07-22
 
 ### Netzwerk-Name im Panel editierbar

@@ -42,15 +42,40 @@ class HelixDirectoryInitializer(private val root: Path) {
         val DEFAULT_FILES = mapOf(
             "config/node.toml" to """
                 # Helix-Cloud node configuration.
+                # Every key is optional; missing keys fall back to these defaults.
 
                 [control]
-                host = "127.0.0.1"
+                host = "127.0.0.1"                     # bind interface of control API + dashboard
                 port = 8080
-                token = "dev-token-change-me"
+                token = "dev-token-change-me"          # admin token: full access, bridges/wrappers, panel emergency login
+                loginPermission = "helix.panel.login"  # permission required for the panel Minecraft login
+                codeTtlSeconds = 300                   # validity of the in-game login code
+                sessionTtlSeconds = 86400              # validity of a web session
+                loginMessage = "§b§lHelix §r§7» §fYour panel login code is §b{code}§7. It expires in 5 minutes."
+                tlsKeystore = ""                       # path to a PKCS12 keystore -> enables HTTPS
+                tlsKeystorePassword = ""
+                tlsKeyAlias = "helix"
+
+                [docker]
+                network = "helix"                      # docker network joined by all Helix containers
+                image = "eclipse-temurin:24-jre"       # base image for service containers
+
+                [storage]
+                mode = "json"                          # "json" (files), "postgres" or "mongodb"
+                url = "jdbc:postgresql://127.0.0.1:5432/helix"  # or "mongodb://user:pass@host:27017"
+                user = "helix"                         # postgres (for mongodb prefer the URI)
+                password = "helix"
+                database = "helix"                     # database name (mongodb)
+                poolSize = 8
+
+                [network]
+                name = "our network"                   # initial display name ({network}); editable in the panel afterwards
             """.trimIndent() + "\n",
             "config/versions.toml" to """
                 # Maps environment + version to a download source.
                 # New server versions are configuration, not code.
+                # Jars resolve via the PaperMC Fill API; an optional
+                # url = "https://..." per entry overrides the download.
 
                 [[paper]]
                 version = "1.21.11"
