@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.27.2 — 2026-07-22
+
+### Fix: Web-Konsole auch für Docker-Services
+- Die interaktive Konsole funktionierte nur für Prozess-Services (stdin des
+  Wrapper-Prozesses). Docker-Container haben keinen erreichbaren stdin.
+- Neuer, einheitlicher Weg: der Wrapper liest Konsolenbefehle aus der Datei
+  `console.in` im Workspace und leitet sie an den Server-stdin weiter
+  (`ConsoleForwarder`). Beide Executors hängen Befehle an diese Datei an; da der
+  Docker-Workspace bind-gemountet ist (`/helix`), funktioniert das ohne
+  `docker exec`/`attach`. Konsole läuft jetzt identisch für Prozess **und**
+  Docker.
+
 ## 0.27.1 — 2026-07-22
 
 ### Fix: Addon-Panels im neuen Dashboard

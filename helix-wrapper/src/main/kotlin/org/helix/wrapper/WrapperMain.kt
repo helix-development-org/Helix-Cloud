@@ -21,7 +21,7 @@ object WrapperMain {
     fun main(args: Array<String>) {
         val config = WrapperConfig.load(Path.of("wrapper.properties"))
         println("[helix-wrapper] starting service ${config.serviceId} (${config.serverJar})")
-        val exitCode = ServerProcessRunner().run(config.command())
+        val exitCode = ServerProcessRunner().run(config.command(), Path.of("console.in"))
         println("[helix-wrapper] service ${config.serviceId} exited with code $exitCode")
         exitProcess(exitCode)
     }

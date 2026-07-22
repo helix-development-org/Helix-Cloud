@@ -1,5 +1,7 @@
 package org.helix.node.services.docker
 
+import java.nio.file.Path
+import org.helix.node.services.ConsoleInput
 import org.helix.node.services.ServiceHandle
 
 /**
@@ -10,10 +12,13 @@ import org.helix.node.services.ServiceHandle
  *
  * @property containerName name of the container.
  * @property runner CLI runner.
+ * @property workspace host workspace bind-mounted into the container, used to
+ *  deliver console input via the shared `console.in` file.
  */
 class DockerServiceHandle(
     val containerName: String,
     private val runner: CommandRunner,
+    private val workspace: Path,
 ) : ServiceHandle {
     @Volatile
     private var finalLogs: List<String>? = null
@@ -67,6 +72,20 @@ class DockerServiceHandle(
      */
     override fun logs(tail: Int): List<String> =
         finalLogs?.takeLast(tail) ?: fetchLogs(tail)
+
+    /**
+     * Appends a command to the workspace `console.in`; the wrapper inside the
+     * container tails the bind-mounted file and forwards it to the server.
+     *
+     * @param line the command, without a trailing newline.
+     * @return `true` if written while the container is running.
+     */
+    override fun sendCommand(line: String): Boolean {
+        if (!alive) {
+            return false
+        }
+        return ConsoleInput.append(workspace.resolve("console.in"), line)
+    }
 
     private fun fetchLogs(tail: Int): List<String> =
         runner.run(listOf("docker", "logs", "--tail", tail.toString(), containerName))

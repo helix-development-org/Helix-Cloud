@@ -416,7 +416,7 @@ private fun io.ktor.server.routing.Route.serviceRoutes(dependencies: ControlDepe
         } else {
             call.respond(
                 HttpStatusCode.NotFound,
-                ErrorResponse("service not accepting console input (running process service required): $id"),
+                ErrorResponse("service not running: $id"),
             )
         }
     }

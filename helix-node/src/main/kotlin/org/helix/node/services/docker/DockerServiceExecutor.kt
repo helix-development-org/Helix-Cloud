@@ -70,7 +70,7 @@ class DockerServiceExecutor(
             "docker run for ${spec.serviceId} failed (${result.exitCode}): ${result.output.trim()}"
         }
         logger.info("Started container {} for {}", name, spec.serviceId)
-        return DockerServiceHandle(name, runner)
+        return DockerServiceHandle(name, runner, spec.workspace)
     }
 
     private fun ensureNetwork() {

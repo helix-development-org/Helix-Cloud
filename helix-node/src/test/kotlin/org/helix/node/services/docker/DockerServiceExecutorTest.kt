@@ -93,7 +93,7 @@ class DockerServiceExecutorTest {
                 else -> CommandResult(0, "")
             }
         }
-        val handle = DockerServiceHandle("helix-lobby-1", runner)
+        val handle = DockerServiceHandle("helix-lobby-1", runner, java.nio.file.Path.of("/tmp/helix-test"))
 
         handle.onExit { code ->
             observed = code
@@ -117,7 +117,7 @@ class DockerServiceExecutorTest {
                 else -> CommandResult(0, "")
             }
         }
-        val handle = DockerServiceHandle("helix-lobby-1", runner)
+        val handle = DockerServiceHandle("helix-lobby-1", runner, java.nio.file.Path.of("/tmp/helix-test"))
 
         assertEquals(listOf("line1", "line2"), handle.logs(10))
         assertTrue(handle.alive)

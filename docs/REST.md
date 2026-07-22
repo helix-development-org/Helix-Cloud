@@ -58,7 +58,7 @@ Session-Token. Die sichtbaren Views/Panels richten sich nach den Permissions
 | POST | `/services/{id}/stop` | graceful stop |
 | POST | `/services/{id}/kill` | sofort beenden |
 | GET | `/services/{id}/logs?tail=50` | neueste Log-Zeilen |
-| POST | `/services/{id}/command` | Konsolenbefehl an den Service senden — Body `{"command": "say hi"}` (nur Prozess-Executor; wird auditiert) |
+| POST | `/services/{id}/command` | Konsolenbefehl an den Service senden — Body `{"command": "say hi"}` (Prozess **und** Docker; wird auditiert) |
 
 ## Schedules
 

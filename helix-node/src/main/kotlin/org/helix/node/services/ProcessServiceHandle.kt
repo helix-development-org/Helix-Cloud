@@ -1,7 +1,6 @@
 package org.helix.node.services
 
 import java.io.IOException
-import java.io.Writer
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -15,9 +14,6 @@ class ProcessServiceHandle(
     private val process: Process,
     private val logFile: Path,
 ) : ServiceHandle {
-    /** Live pipe to the wrapper's (and thus the server's) stdin. */
-    private val stdin: Writer by lazy { process.outputStream.bufferedWriter() }
-
     /** Whether the wrapper process is still running. */
     override val alive: Boolean
         get() = process.isAlive
@@ -59,24 +55,17 @@ class ProcessServiceHandle(
     }
 
     /**
-     * Writes a command line to the wrapper's stdin, which the server inherits.
+     * Appends a command line to the workspace `console.in` file, which the
+     * wrapper forwards into the server console.
      *
      * @param line the command, without a trailing newline.
-     * @return `true` if delivered; `false` when the process has exited or the
-     *  pipe is closed.
+     * @return `true` if written; `false` when the process has exited.
      */
     @Synchronized
     override fun sendCommand(line: String): Boolean {
         if (!process.isAlive) {
             return false
         }
-        return try {
-            stdin.write(line)
-            stdin.write("\n")
-            stdin.flush()
-            true
-        } catch (_: IOException) {
-            false
-        }
+        return ConsoleInput.append(logFile.resolveSibling("console.in"), line)
     }
 }
