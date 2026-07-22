@@ -50,7 +50,8 @@ import org.helix.node.tasks.TaskStore
  * @property codeTtlSeconds lifetime of an in-game login code.
  * @property sessionTtlSeconds lifetime of a web session.
  * @property loginMessage in-game message template (`{code}` substituted).
- * @property networkName network display name (`{network}` in disconnect screens).
+ * @property networkName provider of the network display name (`{network}`),
+ *  panel-editable at runtime.
  * @property proxyScreens configurable proxy-level disconnect screens.
  * @property metrics bounded history of network metric samples for graphs.
  * @property apiMetrics rolling control-API performance stats.
@@ -86,7 +87,7 @@ data class ControlDependencies(
     val codeTtlSeconds: Long = 300,
     val sessionTtlSeconds: Long = 86_400,
     val loginMessage: String = "§b§lHelix §r§7» §fYour panel login code is §b{code}§7.",
-    val networkName: String = "our network",
+    val networkName: () -> String = { "our network" },
     val proxyScreens: Messages = MapMessages(emptyMap()),
     val metrics: MetricsHistory = MetricsHistory(),
     val apiMetrics: ApiMetrics = ApiMetrics(),

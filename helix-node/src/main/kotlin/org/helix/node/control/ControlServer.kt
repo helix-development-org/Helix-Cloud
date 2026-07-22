@@ -551,7 +551,7 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
         val proxyServiceId = call.request.queryParameters["proxyServiceId"].orEmpty()
         call.respond(
             dependencies.routing.snapshot(proxyServiceId).copy(
-                networkName = dependencies.networkName,
+                networkName = dependencies.networkName(),
                 maintenanceScreen = dependencies.proxyScreens.raw("maintenance"),
                 serverFullScreen = dependencies.proxyScreens.raw("server_full"),
             ),

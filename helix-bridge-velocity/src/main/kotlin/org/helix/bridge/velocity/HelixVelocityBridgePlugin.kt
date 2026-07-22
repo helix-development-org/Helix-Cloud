@@ -393,6 +393,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
                 runCatching { json.decodeFromString<MotdData>(raw) }.getOrNull()
             }
             networkPrefix = values["network.prefix"] ?: ""
+            values["network.name"]?.takeIf { it.isNotBlank() }?.let { networkName = it }
         }.onFailure { logger.warn("Helix bridge value sync failed: {}", it.message) }
     }
 

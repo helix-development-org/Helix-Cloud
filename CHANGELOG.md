@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.32.1 — 2026-07-22
+
+### Netzwerk-Name im Panel editierbar
+- Der `{network}`-Placeholder war bisher nur über `node.toml` setzbar und beim
+  Boot eingefroren. Jetzt ist der Netzwerk-Name — wie der Prefix — im
+  Dashboard unter **Settings → Network** editierbar (persistiert, Änderung
+  greift sofort; `node.toml` liefert nur noch den Startwert).
+- Sofortige Propagation: Namensänderung weckt die Proxies (Routing-Snapshot),
+  zusätzlich `network.name` als Bridge-Value; `{network}` funktioniert damit
+  auch in der Tablist auf Paper.
+
 ## 0.32.0 — 2026-07-22
 
 ### Globaler Prefix & MiniMessage überall

@@ -31,22 +31,22 @@ export function SettingsView({ identity, version }: { identity: Identity; versio
   )
 }
 
-/** Editor for the global {prefix} placeholder usable in every message. */
+/** Editor for the global network name ({network}) and prefix ({prefix}). */
 function NetworkPrefixCard() {
-  const [prefix, setPrefix] = useState<string | null>(null)
+  const [values, setValues] = useState<{ name: string; prefix: string } | null>(null)
 
   useEffect(() => {
     api<Record<string, Record<string, string>>>("/messages")
-      .then((all) => setPrefix(all["network"]?.["prefix"] ?? ""))
-      .catch(() => setPrefix(null))
+      .then((all) => setValues({ name: all["network"]?.["name"] ?? "", prefix: all["network"]?.["prefix"] ?? "" }))
+      .catch(() => setValues(null))
   }, [])
 
-  if (prefix === null) return null
+  if (values === null) return null
 
-  const save = async () => {
+  const save = async (key: "name" | "prefix") => {
     try {
-      await api("/messages", { method: "POST", body: { addonId: "network", key: "prefix", value: prefix } })
-      toast.success("Network prefix saved — usable as {prefix} in every message")
+      await api("/messages", { method: "POST", body: { addonId: "network", key, value: values[key] } })
+      toast.success(`Network ${key} saved — usable as {${key === "name" ? "network" : "prefix"}} everywhere`)
     } catch (e) {
       toast.error((e as Error).message)
     }
@@ -55,16 +55,29 @@ function NetworkPrefixCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Network prefix</CardTitle>
+        <CardTitle>Network</CardTitle>
         <div className="text-sm text-muted-foreground">
-          Available as <code className="rounded bg-secondary px-1">{"{prefix}"}</code> in every configurable message,
-          MOTD, tablist and disconnect screen. MiniMessage and &amp; codes supported.
+          Available as <code className="rounded bg-secondary px-1">{"{network}"}</code> and{" "}
+          <code className="rounded bg-secondary px-1">{"{prefix}"}</code> in every configurable message,
+          MOTD, tablist and disconnect screen. MiniMessage and &amp; codes supported; changes apply instantly.
         </div>
       </CardHeader>
-      <CardContent className="flex items-center gap-3">
-        <Input className="font-mono text-xs" value={prefix} onChange={(e) => setPrefix(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && save()} placeholder="<gradient:#8b5cf6:#38bdf8><bold>Helix</bold></gradient> »" />
-        <Button size="sm" onClick={save}>Save</Button>
+      <CardContent className="flex flex-col gap-3">
+        <div className="flex items-center gap-3">
+          <span className="w-16 shrink-0 text-xs text-muted-foreground">Name</span>
+          <Input className="font-mono text-xs" value={values.name}
+            onChange={(e) => setValues({ ...values, name: e.target.value })}
+            onKeyDown={(e) => e.key === "Enter" && save("name")} placeholder="MythicMC" />
+          <Button size="sm" onClick={() => save("name")}>Save</Button>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="w-16 shrink-0 text-xs text-muted-foreground">Prefix</span>
+          <Input className="font-mono text-xs" value={values.prefix}
+            onChange={(e) => setValues({ ...values, prefix: e.target.value })}
+            onKeyDown={(e) => e.key === "Enter" && save("prefix")}
+            placeholder="<gradient:#8b5cf6:#38bdf8><bold>Helix</bold></gradient> »" />
+          <Button size="sm" onClick={() => save("prefix")}>Save</Button>
+        </div>
       </CardContent>
     </Card>
   )

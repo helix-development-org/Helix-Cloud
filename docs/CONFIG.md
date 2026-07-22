@@ -47,7 +47,7 @@ database = "helix"     # Datenbankname (mongodb)
 poolSize = 8
 
 [network]
-name = "our network"   # Anzeigename, {network}-Placeholder in Disconnect-Screens
+name = "our network"   # Startwert des Anzeigenamens ({network}); danach im Panel editierbar
 ```
 
 Im `postgres`-Modus speichern **alle** Addons ihre Daten in der
@@ -95,10 +95,11 @@ Universelle Placeholder (auf jedem Screen verfügbar — vom Proxy gefüllt):
 `{player}`, `{network}`, `{server}`, `{online}`, `{max}`, `{date}`, `{time}`,
 `{prefix}` (globaler Netzwerk-Prefix).
 
-### Globaler Prefix
+### Netzwerk-Name & globaler Prefix
 
-Im Dashboard unter **Settings → Network prefix** einstellbar (persistiert über
-den zentralen Storage, Änderung greift sofort). Als `{prefix}` verfügbar in
+Beides im Dashboard unter **Settings → Network** einstellbar (persistiert über
+den zentralen Storage, Änderungen greifen sofort — der Name aus `node.toml`
+ist nur der Startwert). Als `{network}` bzw. `{prefix}` verfügbar in
 **jeder** konfigurierbaren Nachricht (alle Addon-Messages), in MOTD, Tablist
 und Disconnect-Screens. Ausnahme: im Chat-Format bezeichnet `{prefix}`
 weiterhin den Rang-Prefix des Spielers. Alle Texte werden einheitlich über

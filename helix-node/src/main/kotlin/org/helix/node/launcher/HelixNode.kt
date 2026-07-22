@@ -180,6 +180,7 @@ class HelixNode(
         storageProvider.forAddon("network", paths.root.resolve("network")),
         linkedMapOf(
             "prefix" to "<gradient:#8b5cf6:#38bdf8><bold>Helix</bold></gradient> <dark_gray>»</dark_gray>",
+            "name" to config.network.name,
         ),
     ).also { messages.register("network", it) }
 
@@ -189,9 +190,11 @@ class HelixNode(
      */
     fun refreshNetworkPlaceholders() {
         val prefix = networkMessages.raw("prefix")
+        val name = networkMessages.raw("name")
         GlobalPlaceholders.set("prefix", prefix)
-        GlobalPlaceholders.set("network", config.network.name)
+        GlobalPlaceholders.set("network", name)
         bridgeValues.publish("network", "network.prefix", prefix)
+        bridgeValues.publish("network", "network.name", name)
     }
 
     /** Installed addons. */
@@ -269,13 +272,15 @@ class HelixNode(
             codeTtlSeconds = config.control.codeTtlSeconds,
             sessionTtlSeconds = config.control.sessionTtlSeconds,
             loginMessage = config.control.loginMessage,
-            networkName = config.network.name,
+            networkName = { networkMessages.raw("name") },
             proxyScreens = proxyScreens,
             metrics = metrics,
             apiMetrics = apiMetrics,
             onMessagesChanged = { addonId ->
                 if (addonId == "network") {
                     refreshNetworkPlaceholders()
+                    // the display name rides on the routing snapshot — wake proxies
+                    proxyEvents.bumpRouting()
                 }
             },
             jobScheduler = jobScheduler,

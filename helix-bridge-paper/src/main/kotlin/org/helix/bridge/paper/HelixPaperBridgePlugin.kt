@@ -201,6 +201,7 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         .replace("{online}", server.onlinePlayers.size.toString())
         .replace("{max}", server.maxPlayers.toString())
         .replace("{prefix}", bridgeValues["network.prefix"] ?: "")
+        .replace("{network}", bridgeValues["network.name"] ?: "")
 
     private fun refreshDisplay(client: NodeHttpClient, playerName: String) {
         runCatching {
