@@ -32,7 +32,14 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
 
     @Volatile
     private var bridgeValues: Map<String, String> = emptyMap()
+
+    @Volatile
+    private var tablist: TablistData? = null
+
+    @Volatile
+    private var lastFrameIndex: Int = -1
     private var heartbeatTask: BukkitTask? = null
+    private var animationTask: BukkitTask? = null
     private var client: NodeHttpClient? = null
     private var settings: BridgeSettings? = null
     private var pollCounter = 0
@@ -56,6 +63,12 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
             INITIAL_DELAY_TICKS,
             PERIOD_TICKS,
         )
+        animationTask = server.scheduler.runTaskTimerAsynchronously(
+            this,
+            Runnable { animateTablist() },
+            ANIMATION_PERIOD_TICKS,
+            ANIMATION_PERIOD_TICKS,
+        )
         logger.info("Helix bridge enabled for ${loaded.serviceId} → ${loaded.controlUrl}")
     }
 
@@ -65,6 +78,8 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     override fun onDisable() {
         heartbeatTask?.cancel()
         heartbeatTask = null
+        animationTask?.cancel()
+        animationTask = null
     }
 
     /**
@@ -132,21 +147,50 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         runCatching {
             client.getJson("/api/v1/internal/bridge-values?serviceId=${settings.serviceId}")?.let { body ->
                 bridgeValues = json.decodeFromString<Map<String, String>>(body)
+                tablist = bridgeValues["tablist.config"]?.let { raw ->
+                    runCatching { json.decodeFromString<TablistData>(raw) }.getOrNull()
+                }
             }
         }.onFailure { logger.warning("Helix bridge value sync failed: ${it.message}") }
     }
 
     private fun applyTablist() {
-        val header = bridgeValues["tablist.header"]
-        val footer = bridgeValues["tablist.footer"]
-        if (header == null && footer == null) {
-            return
+        val config = tablist
+        val header: String
+        val footer: String
+        if (config != null) {
+            val index = config.frameIndexAt(System.currentTimeMillis())
+            lastFrameIndex = index
+            header = config.headerAt(index)
+            footer = config.footerAt(index)
+        } else {
+            // Fallback for older tablist addons publishing only the two keys.
+            header = bridgeValues["tablist.header"] ?: ""
+            footer = bridgeValues["tablist.footer"] ?: ""
+            if (header.isEmpty() && footer.isEmpty()) {
+                return
+            }
         }
         server.onlinePlayers.forEach { player ->
             player.sendPlayerListHeaderAndFooter(
-                colored(placeholders(header ?: "")),
-                colored(placeholders(footer ?: "")),
+                colored(placeholders(header)),
+                colored(placeholders(footer)),
             )
+        }
+    }
+
+    /**
+     * Advances the tab list animation: re-applies header/footer whenever the
+     * time-based frame index changed. Static tab lists (one frame) are left
+     * to the regular pulse.
+     */
+    private fun animateTablist() {
+        val config = tablist ?: return
+        if (config.frameCount() <= 1) {
+            return
+        }
+        if (config.frameIndexAt(System.currentTimeMillis()) != lastFrameIndex) {
+            applyTablist()
         }
     }
 
@@ -237,5 +281,8 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
 
         /** Sync cycles between full display profile refreshes (30 s). */
         const val DISPLAY_REFRESH_CYCLES = 6
+
+        /** Ticks between tab list animation checks (250 ms). */
+        const val ANIMATION_PERIOD_TICKS = 5L
     }
 }

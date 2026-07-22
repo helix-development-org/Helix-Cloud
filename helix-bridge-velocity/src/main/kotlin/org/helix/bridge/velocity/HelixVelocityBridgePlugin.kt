@@ -328,8 +328,9 @@ class HelixVelocityBridgePlugin @Inject constructor(
             "network" to networkName.ifBlank { "the network" },
         )
         val builder = event.ping.asBuilder()
-        if (profile.line1.isNotBlank() || profile.line2.isNotBlank()) {
-            builder.description(screen(listOf(profile.line1, profile.line2).filter { it.isNotBlank() }.joinToString("\n"), ctx))
+        val frame = profile.frameAt(System.currentTimeMillis())
+        if (frame.line1.isNotBlank() || frame.line2.isNotBlank()) {
+            builder.description(screen(listOf(frame.line1, frame.line2).filter { it.isNotBlank() }.joinToString("\n"), ctx))
         }
         if (profile.onlinePlayers >= 0) {
             builder.onlinePlayers(profile.onlinePlayers)

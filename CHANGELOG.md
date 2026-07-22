@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.31.0 — 2026-07-22
+
+### Animierte Tablist & animierte MOTD
+- **Tablist**: Header/Footer bestehen jetzt aus beliebig vielen **Frames**
+  (max. 20) mit konfigurierbarem Intervall (min. 250 ms). Die Paper-Bridge
+  animiert zeitbasiert (eigener 250-ms-Task, wendet nur bei Frame-Wechsel an);
+  statische Tablists verhalten sich wie bisher. Neue Action
+  `tablist.import <json>`; Panel mit Frame-Editor und **animierter Preview**.
+- **MOTD**: Beide Profile (normal/maintenance) unterstützen **Frames** für die
+  beiden Zeilen (max. 20, Intervall min. 500 ms). Die Velocity-Bridge wählt
+  beim Server-List-Ping zeitbasiert den aktiven Frame — wiederholtes
+  Refreshen der Serverliste zeigt die Animation. Neue Action
+  `motd.import <json>`; Panel mit Frame-Editor pro Profil und animierter
+  Preview.
+- Publiziert als `tablist.config`/`motd.config`; alte Bridges/Configs bleiben
+  kompatibel (Basisfelder = Frame 1).
+
 ## 0.30.0 — 2026-07-22
 
 ### MOTD-Addon

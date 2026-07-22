@@ -15,6 +15,10 @@ import kotlinx.serialization.Serializable
  * @property versionText text shown instead of the version name; empty keeps
  *  the proxy default.
  * @property hover lines shown when hovering the player count.
+ * @property frames animation frames for the two lines; empty means the single
+ *  frame `[line1/line2]`. With more than one frame the server-list entry is
+ *  animated: each ping shows the frame active at that moment.
+ * @property frameIntervalMs milliseconds between animation frames.
  */
 @Serializable
 data class MotdProfile(
@@ -24,4 +28,13 @@ data class MotdProfile(
     val onlinePlayers: Int = -1,
     val versionText: String = "",
     val hover: List<String> = emptyList(),
-)
+    val frames: List<MotdFrame> = emptyList(),
+    val frameIntervalMs: Long = 3000,
+) {
+    /**
+     * Effective animation frames (falls back to the base lines).
+     *
+     * @return at least one frame.
+     */
+    fun effectiveFrames(): List<MotdFrame> = frames.ifEmpty { listOf(MotdFrame(line1, line2)) }
+}

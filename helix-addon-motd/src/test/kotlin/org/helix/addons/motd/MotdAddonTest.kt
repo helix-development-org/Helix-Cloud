@@ -90,4 +90,27 @@ class MotdAddonTest {
         val config = json.decodeFromString<MotdConfig>(exported)
         assertEquals("&cDown for maintenance", config.maintenance.line1)
     }
+
+    @Test
+    fun `import replaces profiles with animation frames`() {
+        val payload = """
+            {"normal":{"frames":[{"line1":"&6A","line2":"one"},{"line1":"&6B","line2":"two"}],
+             "frameIntervalMs":100,"onlinePlayers":-1,"maxPlayers":-1},
+             "maintenance":{"line1":"&cDown","line2":""}}
+        """.trimIndent().replace("\n", " ")
+
+        assertTrue(context.run("motd.import", payload).success)
+
+        val published = json.decodeFromString<MotdConfig>(context.bridgeValues.getValue("motd.config"))
+        assertEquals(2, published.normal.frames.size)
+        // interval clamped to the minimum, base lines synced to frame 0
+        assertEquals(500, published.normal.frameIntervalMs)
+        assertEquals("&6A", published.normal.line1)
+        assertEquals(1, published.maintenance.effectiveFrames().size)
+    }
+
+    @Test
+    fun `import rejects invalid json`() {
+        assertFalse(context.run("motd.import", "{oops").success)
+    }
 }

@@ -1,44 +1,86 @@
 <div class="card">
-  <div class="card-head"><h2>Tab list</h2><div class="sub">&amp; color codes · \n line breaks · placeholders {online} {max}</div></div>
+  <div class="card-head"><h2>Tab list</h2>
+    <div class="sub">&amp; color codes · \n line breaks · {online} {max} · multiple frames = animated</div>
+    <div class="right"><button class="btn sm subtle" id="add-frame">+ Frame</button></div>
+  </div>
   <div class="card-body">
-    <div class="grid c2">
-      <div class="field"><label>Header</label><textarea id="header" rows="4" style="font-family:var(--mono)"></textarea></div>
-      <div class="field"><label>Footer</label><textarea id="footer" rows="4" style="font-family:var(--mono)"></textarea></div>
+    <div id="frames"></div>
+    <div class="row" style="margin-top:14px">
+      <div class="field" style="max-width:220px"><label>Frame interval (ms, min 250)</label><input type="number" id="interval" value="1000" min="250" step="250"></div>
+      <button class="btn" id="save" style="align-self:flex-end">Save</button>
     </div>
-    <div class="row" style="margin-top:14px"><button class="btn" id="save">Save</button><span class="muted" id="hint"></span></div>
   </div>
 </div>
 <div class="card">
-  <div class="card-head"><h2>Preview</h2></div>
+  <div class="card-head"><h2>Preview</h2><div class="sub">animates at the configured interval</div></div>
   <div class="card-body"><div id="preview" style="background:var(--surface-2);border-radius:var(--radius-sm);padding:16px;text-align:center;white-space:pre-wrap;line-height:1.7"></div></div>
 </div>
 <script>
 "use strict";
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 const COLORS = { "0":"#000","1":"#00a","2":"#0a0","3":"#0aa","4":"#a00","5":"#a0a","6":"#fa0","7":"#aaa","8":"#555","9":"#55f","a":"#5f5","b":"#5ff","c":"#f55","d":"#f5f","e":"#ff5","f":"#fff" };
+let frames = [{ header: "", footer: "" }];
+let previewTimer = null;
+
 function mc(text) {
   let out = "", color = "var(--ink)";
   const parts = String(text).replace(/\\n/g,"\n").replace(/\{online\}/g,"12").replace(/\{max\}/g,"100").split(/(&[0-9a-fk-or])/i);
   for (const p of parts) { if (/^&[0-9a-f]$/i.test(p)) color = COLORS[p[1].toLowerCase()]; else if (/^&[k-or]$/i.test(p)) {} else if (p) out += `<span style="color:${color}">${esc(p)}</span>`; }
   return out.replace(/\n/g, "<br>");
 }
+
+function render() {
+  document.getElementById("frames").innerHTML = frames.map((f, i) => `
+    <div class="card" style="margin-bottom:12px"><div class="card-head"><h2>Frame ${i + 1}</h2>
+      ${frames.length > 1 ? `<div class="right"><button class="btn sm danger" data-rm="${i}">Remove</button></div>` : ""}</div>
+      <div class="card-body"><div class="grid c2">
+        <div class="field"><label>Header</label><textarea rows="3" style="font-family:var(--mono)" data-i="${i}" data-f="header">${esc(f.header)}</textarea></div>
+        <div class="field"><label>Footer</label><textarea rows="3" style="font-family:var(--mono)" data-i="${i}" data-f="footer">${esc(f.footer)}</textarea></div>
+      </div></div></div>`).join("");
+  document.querySelectorAll("#frames textarea").forEach(t => t.oninput = () => { frames[+t.dataset.i][t.dataset.f] = t.value; });
+  document.querySelectorAll("[data-rm]").forEach(b => b.onclick = () => { frames.splice(+b.dataset.rm, 1); render(); });
+  startPreview();
+}
+
+function startPreview() {
+  clearInterval(previewTimer);
+  let idx = 0;
+  const draw = () => {
+    const f = frames[idx % frames.length] || { header: "", footer: "" };
+    document.getElementById("preview").innerHTML =
+      mc(f.header) + '<br><span style="color:var(--ink-3)">— player list —</span><br>' + mc(f.footer);
+    idx++;
+  };
+  draw();
+  const ms = Math.max(250, parseInt(document.getElementById("interval").value) || 1000);
+  if (frames.length > 1) previewTimer = setInterval(draw, ms);
+}
+
+document.getElementById("add-frame").onclick = () => {
+  if (frames.length >= 20) return Helix.toast("max 20 frames");
+  frames.push({ ...frames[frames.length - 1] });
+  render();
+};
+document.getElementById("interval").onchange = startPreview;
+document.getElementById("save").onclick = async () => {
+  const cfg = {
+    header: frames[0].header, footer: frames[0].footer,
+    headerFrames: frames.map(f => f.header), footerFrames: frames.map(f => f.footer),
+    intervalMs: Math.max(250, parseInt(document.getElementById("interval").value) || 1000),
+  };
+  const r = await Helix.action("tablist.import", JSON.stringify(cfg));
+  Helix.toast(r.lines[0] || (r.success ? "saved" : "failed"));
+};
+
 async function load() {
   const r = await Helix.action("tablist.export");
   let c = {}; try { c = JSON.parse(r.lines[0] || "{}"); } catch (e) {}
-  document.getElementById("header").value = c.header || "";
-  document.getElementById("footer").value = c.footer || "";
-  preview();
+  const headers = (c.headerFrames && c.headerFrames.length) ? c.headerFrames : [c.header || ""];
+  const footers = (c.footerFrames && c.footerFrames.length) ? c.footerFrames : [c.footer || ""];
+  const n = Math.max(headers.length, footers.length);
+  frames = Array.from({ length: n }, (_, i) => ({ header: headers[i % headers.length] || "", footer: footers[i % footers.length] || "" }));
+  document.getElementById("interval").value = c.intervalMs || 1000;
+  render();
 }
-function preview() {
-  document.getElementById("preview").innerHTML = mc(document.getElementById("header").value) + '<br><span style="color:var(--ink-3)">— player list —</span><br>' + mc(document.getElementById("footer").value);
-}
-document.getElementById("header").oninput = preview;
-document.getElementById("footer").oninput = preview;
-document.getElementById("save").onclick = async () => {
-  const h = document.getElementById("header").value, f = document.getElementById("footer").value;
-  await Helix.action("tablist.header", ...h.split(" "));
-  await Helix.action("tablist.footer", ...f.split(" "));
-  Helix.toast("Tab list updated");
-};
 Helix.ready(load);
 </script>

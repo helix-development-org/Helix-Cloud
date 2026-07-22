@@ -1,12 +1,7 @@
-<div class="grid c2">
-  <div class="card" style="margin:0"><div class="card-head"><h2>Normal</h2><div class="sub">served while the network is open</div></div>
-    <div class="card-body" data-profile="normal"></div></div>
-  <div class="card" style="margin:0"><div class="card-head"><h2>Maintenance</h2><div class="sub">served while maintenance mode is on</div></div>
-    <div class="card-body" data-profile="maintenance"></div></div>
-</div>
+<div id="profiles"></div>
 
 <div class="card" style="margin-top:16px">
-  <div class="card-head"><h2>Preview</h2><div class="sub">how the entry looks in the server list ({online}=12 {max}=100)</div></div>
+  <div class="card-head"><h2>Preview</h2><div class="sub">animates at each profile's interval ({online}=12 {max}=100)</div></div>
   <div class="card-body"><div class="grid c2">
     <div><label>Normal</label><div class="motd-prev" id="prev-normal"></div></div>
     <div><label>Maintenance</label><div class="motd-prev" id="prev-maintenance"></div></div>
@@ -16,6 +11,7 @@
 <style>
 .motd-prev{background:#181818;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-family:var(--mono);font-size:13px;line-height:1.6;white-space:pre-wrap;min-height:52px}
 .motd-prev .cnt{float:right;color:#aaa}
+.frame-row{border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px}
 </style>
 
 <script>
@@ -24,10 +20,10 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&l
 const COLORS = { "0":"#000","1":"#00a","2":"#0a0","3":"#0aa","4":"#a00","5":"#a0a","6":"#fa0","7":"#aaa","8":"#555","9":"#55f","a":"#5f5","b":"#5ff","c":"#f55","d":"#f5f","e":"#ff5","f":"#fff" };
 const MINI = { black:"#000",dark_blue:"#00a",dark_green:"#0a0",dark_aqua:"#0aa",dark_red:"#a00",dark_purple:"#a0a",gold:"#fa0",gray:"#aaa",dark_gray:"#555",blue:"#55f",green:"#5f5",aqua:"#5ff",red:"#f55",light_purple:"#f5f",yellow:"#ff5",white:"#fff" };
 let cfg = null;
+const timers = {};
 
 function mc(text) {
   let t = String(text).replace(/\{online\}/g,"12").replace(/\{max\}/g,"100").replace(/\{network\}/g,"MyNetwork");
-  // strip MiniMessage tags but keep named colors as spans, drop gradients to first color
   t = t.replace(/<gradient:([^:>]+)[^>]*>/gi, (m,c)=>`<<c:${c}>>`).replace(/<\/gradient>/gi,"<<r>>");
   t = t.replace(/<#([0-9a-f]{6})>/gi, "<<c:#$1>>");
   t = t.replace(/<(\w+)>/g, (m,name)=> MINI[name.toLowerCase()] ? `<<c:${MINI[name.toLowerCase()]}>>` : (name==="bold"?"<<b>>":name==="reset"?"<<r>>":""));
@@ -48,62 +44,98 @@ function mc(text) {
   return out;
 }
 
-function fields(profile, p) {
-  return `
-    <div class="field"><label>Line 1</label><input class="mono" data-f="line1" value="${esc(p.line1)}"></div>
-    <div class="field" style="margin-top:10px"><label>Line 2</label><input class="mono" data-f="line2" value="${esc(p.line2)}"></div>
-    <div class="grid c2" style="margin-top:10px">
-      <div class="field"><label>Shown online (-1 = real)</label><input type="number" data-f="online" value="${p.onlinePlayers}"></div>
-      <div class="field"><label>Shown max (-1 = real)</label><input type="number" data-f="max" value="${p.maxPlayers}"></div>
-    </div>
-    <div class="field" style="margin-top:10px"><label>Version text (empty = default)</label><input class="mono" data-f="version" value="${esc(p.versionText)}"></div>
-    <div class="field" style="margin-top:10px"><label>Hover lines (player-count tooltip, one per line)</label>
-      <textarea class="mono" rows="3" data-f="hover">${esc((p.hover||[]).join("\n"))}</textarea></div>
-    <div class="row" style="margin-top:12px"><button class="btn" data-save="${profile}">Save ${profile}</button></div>`;
+function frameRows(name, p) {
+  return p.frames.map((f, i) => `
+    <div class="frame-row">
+      <div class="row" style="justify-content:space-between"><span class="muted">Frame ${i + 1}</span>
+        ${p.frames.length > 1 ? `<button class="btn sm danger" data-p="${name}" data-rmf="${i}">Remove</button>` : ""}</div>
+      <div class="field" style="margin-top:6px"><input class="mono" data-p="${name}" data-fi="${i}" data-f="line1" value="${esc(f.line1)}" placeholder="Line 1"></div>
+      <div class="field" style="margin-top:6px"><input class="mono" data-p="${name}" data-fi="${i}" data-f="line2" value="${esc(f.line2)}" placeholder="Line 2"></div>
+    </div>`).join("");
+}
+
+function profileCard(name, p) {
+  return `<div class="card" style="margin-bottom:16px">
+    <div class="card-head"><h2>${name === "normal" ? "Normal" : "Maintenance"}</h2>
+      <div class="sub">${name === "normal" ? "served while the network is open" : "served while maintenance is on"}</div>
+      <div class="right"><button class="btn sm subtle" data-addf="${name}">+ Frame</button></div></div>
+    <div class="card-body">
+      ${frameRows(name, p)}
+      <div class="grid c2" style="margin-top:10px">
+        <div class="field"><label>Frame interval (ms, min 500)</label><input type="number" min="500" step="500" data-p="${name}" data-f="frameIntervalMs" value="${p.frameIntervalMs}"></div>
+        <div class="field"><label>Version text (empty = default)</label><input class="mono" data-p="${name}" data-f="versionText" value="${esc(p.versionText)}"></div>
+        <div class="field"><label>Shown online (-1 = real)</label><input type="number" data-p="${name}" data-f="onlinePlayers" value="${p.onlinePlayers}"></div>
+        <div class="field"><label>Shown max (-1 = real)</label><input type="number" data-p="${name}" data-f="maxPlayers" value="${p.maxPlayers}"></div>
+      </div>
+      <div class="field" style="margin-top:10px"><label>Hover lines (player-count tooltip, one per line)</label>
+        <textarea class="mono" rows="3" data-p="${name}" data-f="hover">${esc((p.hover||[]).join("\n"))}</textarea></div>
+      <div class="row" style="margin-top:12px"><button class="btn" data-save="${name}">Save ${name}</button></div>
+    </div></div>`;
+}
+
+function bind() {
+  document.querySelectorAll("#profiles [data-f]").forEach(el => el.oninput = () => {
+    const p = cfg[el.dataset.p];
+    if (el.dataset.fi !== undefined) p.frames[+el.dataset.fi][el.dataset.f] = el.value;
+    else if (el.dataset.f === "hover") p.hover = el.value.split("\n").map(s=>s.trim()).filter(Boolean);
+    else if (el.type === "number") p[el.dataset.f] = parseInt(el.value) || 0;
+    else p[el.dataset.f] = el.value;
+    if (el.dataset.f === "frameIntervalMs" || el.dataset.fi !== undefined) startPreview(el.dataset.p);
+  });
+  document.querySelectorAll("[data-addf]").forEach(b => b.onclick = () => {
+    const p = cfg[b.dataset.addf];
+    if (p.frames.length >= 20) return Helix.toast("max 20 frames");
+    p.frames.push({ ...p.frames[p.frames.length - 1] });
+    render();
+  });
+  document.querySelectorAll("[data-rmf]").forEach(b => b.onclick = () => {
+    cfg[b.dataset.p].frames.splice(+b.dataset.rmf, 1); render();
+  });
+  document.querySelectorAll("[data-save]").forEach(b => b.onclick = () => save());
 }
 
 function render() {
-  document.querySelectorAll("[data-profile]").forEach(box => {
-    const name = box.dataset.profile;
-    box.innerHTML = fields(name, cfg[name]);
-    box.querySelectorAll("input,textarea").forEach(i => i.oninput = preview);
-    box.querySelector("[data-save]").onclick = () => save(name, box);
-  });
-  preview();
+  document.getElementById("profiles").innerHTML = profileCard("normal", cfg.normal) + profileCard("maintenance", cfg.maintenance);
+  bind();
+  startPreview("normal"); startPreview("maintenance");
 }
 
-function preview() {
-  ["normal","maintenance"].forEach(name => {
-    const box = document.querySelector(`[data-profile="${name}"]`); if (!box) return;
-    const v = f => box.querySelector(`[data-f="${f}"]`).value;
-    const online = v("online") === "-1" ? "12" : v("online"), max = v("max") === "-1" ? "100" : v("max");
-    document.getElementById("prev-" + name).innerHTML =
-      `<span class="cnt">${esc(online)}/${esc(max)}</span>` + mc(v("line1")) + "<br>" + mc(v("line2"));
-  });
+function startPreview(name) {
+  clearInterval(timers[name]);
+  const p = cfg[name];
+  let idx = 0;
+  const draw = () => {
+    const f = p.frames[idx % p.frames.length] || { line1: "", line2: "" };
+    const online = p.onlinePlayers === -1 ? "12" : p.onlinePlayers, max = p.maxPlayers === -1 ? "100" : p.maxPlayers;
+    const el = document.getElementById("prev-" + name);
+    if (el) el.innerHTML = `<span class="cnt">${esc(online)}/${esc(max)}</span>` + mc(f.line1) + "<br>" + mc(f.line2);
+    idx++;
+  };
+  draw();
+  if (p.frames.length > 1) timers[name] = setInterval(draw, Math.max(500, p.frameIntervalMs || 3000));
 }
 
-async function save(name, box) {
-  const v = f => box.querySelector(`[data-f="${f}"]`).value;
-  const calls = [
-    ["line1", v("line1")], ["line2", v("line2")], ["version", v("version")],
-    ["online", v("online")], ["max", v("max")],
-    ["hover", v("hover").split("\n").map(s=>s.trim()).filter(Boolean).join("\\n")],
-  ];
-  for (const [field, value] of calls) {
-    const r = await Helix.action("motd.set", name, field, ...(value === "" ? [""] : value.split(" ")));
-    if (!r.success) return Helix.toast(r.lines[0] || ("failed: " + field));
-  }
-  Helix.toast("Saved " + name + " MOTD");
-  load();
+async function save() {
+  const out = JSON.parse(JSON.stringify(cfg));
+  ["normal","maintenance"].forEach(n => {
+    const p = out[n];
+    p.line1 = p.frames[0]?.line1 || ""; p.line2 = p.frames[0]?.line2 || "";
+    p.frameIntervalMs = Math.max(500, p.frameIntervalMs || 3000);
+  });
+  const r = await Helix.action("motd.import", JSON.stringify(out));
+  Helix.toast(r.lines[0] || (r.success ? "saved" : "failed"));
 }
 
 async function load() {
   const r = await Helix.action("motd.export");
-  try { cfg = JSON.parse(r.lines[0] || "{}"); } catch (e) { cfg = null; }
-  if (!cfg || !cfg.normal) cfg = { normal: {hover:[]}, maintenance: {hover:[]} };
-  cfg.normal = { line1:"", line2:"", onlinePlayers:-1, maxPlayers:-1, versionText:"", hover:[], ...cfg.normal };
-  cfg.maintenance = { line1:"", line2:"", onlinePlayers:-1, maxPlayers:-1, versionText:"", hover:[], ...cfg.maintenance };
+  let c = {}; try { c = JSON.parse(r.lines[0] || "{}"); } catch (e) {}
+  cfg = { normal: normalize(c.normal), maintenance: normalize(c.maintenance) };
   render();
+}
+function normalize(p) {
+  p = { line1:"", line2:"", onlinePlayers:-1, maxPlayers:-1, versionText:"", hover:[], frames:[], frameIntervalMs:3000, ...(p||{}) };
+  if (!p.frames.length) p.frames = [{ line1: p.line1, line2: p.line2 }];
+  return p;
 }
 Helix.ready(load);
 </script>

@@ -46,4 +46,18 @@ class MotdDataTest {
         assertEquals(-1, data.normal.onlinePlayers)
         assertEquals("", data.maintenance.line1)
     }
+
+    @Test
+    fun `frames rotate time-based and fall back to base lines`() {
+        val animated = MotdProfileData(
+            frames = listOf(MotdFrameData("a", "1"), MotdFrameData("b", "2")),
+            frameIntervalMs = 1000,
+        )
+        assertEquals("a", animated.frameAt(0).line1)
+        assertEquals("b", animated.frameAt(1000).line1)
+        assertEquals("a", animated.frameAt(2000).line1)
+
+        val static = MotdProfileData(line1 = "solo", line2 = "line")
+        assertEquals("solo", static.frameAt(123_456).line1)
+    }
 }

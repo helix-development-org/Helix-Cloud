@@ -38,6 +38,28 @@ class MotdAddon : AddonBase() {
         action("motd.export", "Exports the MOTD configuration as JSON (dashboard).", "motd.export") {
             ActionResult.ok(json.encodeToString(config))
         }
+        action(
+            "motd.import",
+            "Replaces the whole MOTD configuration (profiles, frames, interval) from JSON.",
+            "motd.import <json>",
+        ) { invocation ->
+            val raw = invocation.arguments.joinToString(" ")
+            val imported = runCatching { json.decodeFromString<MotdConfig>(raw) }.getOrNull()
+                ?: return@action ActionResult.error("invalid motd JSON")
+            if (imported.normal.frames.size > MAX_FRAMES || imported.maintenance.frames.size > MAX_FRAMES) {
+                return@action ActionResult.error("too many frames (max $MAX_FRAMES)")
+            }
+            config = MotdConfig(
+                normal = sanitize(imported.normal),
+                maintenance = sanitize(imported.maintenance),
+            )
+            save()
+            publish()
+            ActionResult.ok(
+                "motd updated (normal: ${config.normal.effectiveFrames().size} frames, " +
+                    "maintenance: ${config.maintenance.effectiveFrames().size} frames)",
+            )
+        }
         panel(
             "motd",
             "MOTD",
@@ -76,7 +98,23 @@ class MotdAddon : AddonBase() {
     }
 
     private fun describe(profile: MotdProfile): String =
-        "'${profile.line1}' / '${profile.line2}' (online=${profile.onlinePlayers}, max=${profile.maxPlayers})"
+        "'${profile.line1}' / '${profile.line2}' (online=${profile.onlinePlayers}, max=${profile.maxPlayers}, " +
+            "frames=${profile.effectiveFrames().size} @ ${profile.frameIntervalMs}ms)"
+
+    /**
+     * Clamps the interval and keeps the base lines in sync with frame 0.
+     *
+     * @param profile the imported profile.
+     * @return the sanitized profile.
+     */
+    private fun sanitize(profile: MotdProfile): MotdProfile {
+        val first = profile.frames.firstOrNull()
+        return profile.copy(
+            frameIntervalMs = profile.frameIntervalMs.coerceAtLeast(MIN_INTERVAL_MS),
+            line1 = first?.line1 ?: profile.line1,
+            line2 = first?.line2 ?: profile.line2,
+        )
+    }
 
     private fun publish() {
         context.publishBridgeValue("motd.config", json.encodeToString(config))
@@ -87,5 +125,13 @@ class MotdAddon : AddonBase() {
 
     private fun save() {
         context.storage().write("motd", json.encodeToString(config))
+    }
+
+    private companion object {
+        /** Maximum animation frames per profile. */
+        const val MAX_FRAMES = 20
+
+        /** Minimum animation interval between server-list frames. */
+        const val MIN_INTERVAL_MS = 500L
     }
 }
