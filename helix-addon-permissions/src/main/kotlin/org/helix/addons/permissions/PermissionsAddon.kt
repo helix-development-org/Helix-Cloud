@@ -15,6 +15,8 @@ import org.helix.api.action.ActionSource
  * other addons can ask the node — the platform stays permission-agnostic.
  */
 class PermissionsAddon : AddonBase() {
+    /** Export JSON with every field present, so panel code needs no guards. */
+    private val json = Json { encodeDefaults = true }
     private lateinit var store: PermissionStore
     private lateinit var catalog: PermissionCatalog
 
@@ -115,7 +117,7 @@ class PermissionsAddon : AddonBase() {
             "Exports all known permission nodes (core, addons, plugin.yml) as JSON.",
             "perm.catalog",
         ) {
-            ActionResult.ok(Json.encodeToString(catalog.entries()))
+            ActionResult.ok(json.encodeToString(catalog.entries()))
         }
         action("perm.check", "Checks whether a player has a permission.", "perm.check <player> <permission>") { invocation ->
             val (player, permission) = twoArguments(invocation)
@@ -124,7 +126,7 @@ class PermissionsAddon : AddonBase() {
             ActionResult.ok("$player ${if (granted) "HAS" else "does NOT have"} $permission")
         }
         action("perm.export", "Exports all groups and users as JSON (used by the dashboard).", "perm.export") {
-            ActionResult.ok(Json.encodeToString(store.document()))
+            ActionResult.ok(json.encodeToString(store.document()))
         }
         action(
             "permissions",

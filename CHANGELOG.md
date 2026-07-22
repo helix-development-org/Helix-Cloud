@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.29.1 — 2026-07-22
+
+### Fix: Player-Manager im Permissions-Panel
+- Der Player-Manager crashte für jeden User **ohne permanente Gruppen** (der
+  häufigste Fall: jemand hat nur eine Permission): der Export ließ leere
+  Felder weg (`encodeDefaults=false`), das Panel griff ungeschützt auf
+  `u.groups` zu → TypeError, die Detail-Ansicht blieb leer.
+- Doppelt behoben: das Panel normalisiert geladene User (alle Listen existieren
+  immer — funktioniert damit auch gegen alte Addon-Builds), und der Addon-
+  Export schreibt jetzt alle Felder (`encodeDefaults = true`).
+
 ## 0.29.0 — 2026-07-22
 
 ### Permission-Katalog & temporäre Grants

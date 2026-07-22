@@ -142,8 +142,10 @@ document.getElementById("g-create").onclick = async () => {
 async function loadUser() {
   const name = document.getElementById("user-name").value.trim(); if (!name) return;
   await load();
-  const u = (doc.users || []).find(x => x.name.toLowerCase() === name.toLowerCase()) || { name: name.toLowerCase(), groups: [], permissions: [] };
-  const defaults = doc.groups.filter(g => g.default).map(g => g.name);
+  // Export omits empty fields (encodeDefaults=false in older addons) — normalize so every list exists.
+  const found = (doc.users || []).find(x => x.name.toLowerCase() === name.toLowerCase()) || {};
+  const u = { name: name.toLowerCase(), groups: [], permissions: [], timedPermissions: [], timedGroups: [], ...found };
+  const defaults = (doc.groups || []).filter(g => g.default).map(g => g.name);
   const groups = u.groups.length ? u.groups : defaults;
   const now = Date.now();
   const timedGroups = (u.timedGroups||[]).map(t=>`<span class="chip">${esc(t.value)} <span class="muted">(${remaining(t.expiresAtEpochMs-now)})</span><button data-ug="${esc(t.value)}">×</button></span>`).join("");
