@@ -6,7 +6,7 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.json.Json
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
+import net.kyori.adventure.text.minimessage.MiniMessage
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
@@ -16,6 +16,7 @@ import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
 import org.helix.api.bridge.HeartbeatReport
 import org.helix.api.display.DisplayProfile
+import org.helix.api.message.LegacyToMini
 import org.helix.api.proxy.JoinRequest
 
 /**
@@ -28,6 +29,7 @@ import org.helix.api.proxy.JoinRequest
  */
 class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     private val json = Json { ignoreUnknownKeys = true }
+    private val miniMessage = MiniMessage.miniMessage()
     private val displayProfiles = ConcurrentHashMap<String, DisplayProfile>()
 
     @Volatile
@@ -117,7 +119,8 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
                         .replace("{suffix}", profile.suffix)
                         .replace("{color}", profile.color)
                         .replace("{name}", source.name)
-                        .replace("{message}", plainMessage),
+                        // players must not inject MiniMessage tags (e.g. click events)
+                        .replace("{message}", miniMessage.escapeTags(plainMessage)),
                 )
             },
         )
@@ -197,6 +200,7 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     private fun placeholders(text: String): String = text
         .replace("{online}", server.onlinePlayers.size.toString())
         .replace("{max}", server.maxPlayers.toString())
+        .replace("{prefix}", bridgeValues["network.prefix"] ?: "")
 
     private fun refreshDisplay(client: NodeHttpClient, playerName: String) {
         runCatching {
@@ -270,7 +274,7 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     }
 
     private fun colored(text: String): Component =
-        LegacyComponentSerializer.legacyAmpersand().deserialize(text)
+        miniMessage.deserialize(LegacyToMini.translate(text))
 
     private companion object {
         /** Ticks before the first sync (1 second). */

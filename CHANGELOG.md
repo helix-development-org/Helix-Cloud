@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.32.0 — 2026-07-22
+
+### Globaler Prefix & MiniMessage überall
+- Neuer **globaler Netzwerk-Prefix**, einstellbar im Dashboard unter
+  **Settings → Network prefix** (persistiert, Änderung greift sofort).
+- Als `{prefix}`-Placeholder **überall** nutzbar: in jeder konfigurierbaren
+  Addon-Nachricht (automatisch über `Messages.format`), in MOTD, Tablist und
+  allen Disconnect-Screens (Bridge-Kontext + Bridge-Value `network.prefix`).
+  Im Chat-Format bleibt `{prefix}` der Rang-Prefix des Spielers.
+- **MiniMessage einheitlich**: Auch die Paper-Bridge rendert jetzt alle Texte
+  (Chat-Format, Tablist, Player-Command-Antworten auf Velocity) über
+  MiniMessage — Gradienten/Hex funktionieren damit in allen Nachrichten;
+  Legacy-`&`-Codes werden weiterhin übersetzt (geteilter `LegacyToMini` in
+  helix-api). Spieler-Chatnachrichten werden escaped, damit niemand
+  MiniMessage-Tags (z.B. Click-Events) einschleusen kann.
+
 ## 0.31.0 — 2026-07-22
 
 ### Animierte Tablist & animierte MOTD

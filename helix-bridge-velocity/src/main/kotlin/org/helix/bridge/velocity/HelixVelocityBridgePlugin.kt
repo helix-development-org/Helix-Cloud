@@ -25,6 +25,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.bridge.HeartbeatReport
+import org.helix.api.message.LegacyToMini
 import org.helix.api.player.PlayerEvent
 import org.helix.api.proxy.JoinDecision
 import org.helix.api.proxy.JoinRequest
@@ -70,6 +71,9 @@ class HelixVelocityBridgePlugin @Inject constructor(
 
     @Volatile
     private var motd: MotdData? = null
+
+    @Volatile
+    private var networkPrefix: String = ""
 
     @Volatile
     private var polling = false
@@ -326,6 +330,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
             "online" to proxy.playerCount.toString(),
             "max" to proxy.configuration.showMaxPlayers.toString(),
             "network" to networkName.ifBlank { "the network" },
+            "prefix" to networkPrefix,
         )
         val builder = event.ping.asBuilder()
         val frame = profile.frameAt(System.currentTimeMillis())
@@ -368,7 +373,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
         var i = 0
         while (i < text.length) {
             val c = text[i]
-            if (c == '&' && i + 1 < text.length && LEGACY_TAGS.containsKey(text[i + 1].lowercaseChar())) {
+            if (c == '&' && i + 1 < text.length && LegacyToMini.isLegacyCode(text[i + 1])) {
                 builder.append('§').append(text[i + 1])
                 i += 2
             } else {
@@ -387,6 +392,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
             motd = values["motd.config"]?.let { raw ->
                 runCatching { json.decodeFromString<MotdData>(raw) }.getOrNull()
             }
+            networkPrefix = values["network.prefix"] ?: ""
         }.onFailure { logger.warn("Helix bridge value sync failed: {}", it.message) }
     }
 
@@ -471,7 +477,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
         }
         val result = json.decodeFromString<org.helix.api.action.ActionResult>(response)
         result.lines.ifEmpty { listOf(if (result.success) "Done." else "Failed.") }
-            .forEach { line -> player.sendMessage(colored(line)) }
+            .forEach { line -> player.sendMessage(screen(line, ctxFor(player.username))) }
     }
 
     private fun executeCommand(command: ProxyCommand) {
@@ -496,34 +502,6 @@ class HelixVelocityBridgePlugin @Inject constructor(
         LegacyComponentSerializer.legacyAmpersand().deserialize(text)
 
     /**
-     * Translates legacy `&`/`§` color codes to MiniMessage tags so templates
-     * may freely mix both styles.
-     *
-     * @param text the raw text.
-     * @return text with legacy codes rewritten as MiniMessage tags.
-     */
-    private fun legacyToMini(text: String): String {
-        val builder = StringBuilder(text.length)
-        var i = 0
-        while (i < text.length) {
-            val c = text[i]
-            val tag = if ((c == '&' || c == '§') && i + 1 < text.length) {
-                LEGACY_TAGS[text[i + 1].lowercaseChar()]
-            } else {
-                null
-            }
-            if (tag != null) {
-                builder.append(tag)
-                i += 2
-            } else {
-                builder.append(c)
-                i++
-            }
-        }
-        return builder.toString()
-    }
-
-    /**
      * Universal placeholder values every disconnect screen and message can use.
      *
      * @param player the affected player name.
@@ -535,6 +513,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
         return mapOf(
             "player" to player,
             "network" to networkName.ifBlank { "the network" },
+            "prefix" to networkPrefix,
             "server" to (proxy.getPlayer(player).flatMap { it.currentServer }
                 .map { it.serverInfo.name }.orElse("")),
             "online" to proxy.playerCount.toString(),
@@ -556,21 +535,11 @@ class HelixVelocityBridgePlugin @Inject constructor(
         var text = template
         ctx.forEach { (key, value) -> text = text.replace("{$key}", value) }
         text = text.replace("\\n", "\n")
-        return miniMessage.deserialize(legacyToMini(text))
+        return miniMessage.deserialize(LegacyToMini.translate(text))
     }
 
     private companion object {
         /** Delay before reconnecting the poll loop after a failure. */
         const val RECONNECT_DELAY_MS = 1_000L
-
-        /** Legacy `&`/`§` code → MiniMessage tag. */
-        val LEGACY_TAGS: Map<Char, String> = mapOf(
-            '0' to "<black>", '1' to "<dark_blue>", '2' to "<dark_green>", '3' to "<dark_aqua>",
-            '4' to "<dark_red>", '5' to "<dark_purple>", '6' to "<gold>", '7' to "<gray>",
-            '8' to "<dark_gray>", '9' to "<blue>", 'a' to "<green>", 'b' to "<aqua>",
-            'c' to "<red>", 'd' to "<light_purple>", 'e' to "<yellow>", 'f' to "<white>",
-            'k' to "<obfuscated>", 'l' to "<bold>", 'm' to "<strikethrough>",
-            'n' to "<underlined>", 'o' to "<italic>", 'r' to "<reset>",
-        )
     }
 }

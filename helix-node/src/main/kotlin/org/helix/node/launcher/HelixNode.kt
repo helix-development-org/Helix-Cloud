@@ -9,6 +9,7 @@ import org.helix.api.execution.ExecutorType
 import org.helix.node.actions.ActionRegistry
 import org.helix.node.actions.BuiltinActions
 import org.helix.node.addons.AddonActions
+import org.helix.api.message.GlobalPlaceholders
 import org.helix.node.audit.AuditLog
 import org.helix.node.control.auth.PanelAuthService
 import org.helix.node.addons.AddonManager
@@ -171,6 +172,28 @@ class HelixNode(
         ),
     ).also { messages.register("proxy", it) }
 
+    /**
+     * Panel-editable network-wide texts, currently the global `{prefix}`
+     * placeholder usable in every message everywhere.
+     */
+    val networkMessages: MessageBundle = MessageBundle(
+        storageProvider.forAddon("network", paths.root.resolve("network")),
+        linkedMapOf(
+            "prefix" to "<gradient:#8b5cf6:#38bdf8><bold>Helix</bold></gradient> <dark_gray>»</dark_gray>",
+        ),
+    ).also { messages.register("network", it) }
+
+    /**
+     * Re-reads the network texts, refreshes the global placeholders and
+     * republishes them to the bridges.
+     */
+    fun refreshNetworkPlaceholders() {
+        val prefix = networkMessages.raw("prefix")
+        GlobalPlaceholders.set("prefix", prefix)
+        GlobalPlaceholders.set("network", config.network.name)
+        bridgeValues.publish("network", "network.prefix", prefix)
+    }
+
     /** Installed addons. */
     val addonManager: AddonManager = AddonManager(
         paths.addons,
@@ -250,6 +273,11 @@ class HelixNode(
             proxyScreens = proxyScreens,
             metrics = metrics,
             apiMetrics = apiMetrics,
+            onMessagesChanged = { addonId ->
+                if (addonId == "network") {
+                    refreshNetworkPlaceholders()
+                }
+            },
             jobScheduler = jobScheduler,
         ),
     )
@@ -277,6 +305,7 @@ class HelixNode(
         AddonActions(addonManager).registerAll(registry)
         addonManager.loadAll()
         registerEventSources()
+        refreshNetworkPlaceholders()
         controlServer.start()
         manager.onServiceTerminated { service: ManagedService ->
             if (service.task.environment.proxy) {

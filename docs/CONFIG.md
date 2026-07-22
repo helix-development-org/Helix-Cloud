@@ -92,7 +92,17 @@ Verteilung:
 - **Maintenance / Voll** → Bundle `proxy`, Keys `maintenance` / `server_full`
 
 Universelle Placeholder (auf jedem Screen verfügbar — vom Proxy gefüllt):
-`{player}`, `{network}`, `{server}`, `{online}`, `{max}`, `{date}`, `{time}`.
+`{player}`, `{network}`, `{server}`, `{online}`, `{max}`, `{date}`, `{time}`,
+`{prefix}` (globaler Netzwerk-Prefix).
+
+### Globaler Prefix
+
+Im Dashboard unter **Settings → Network prefix** einstellbar (persistiert über
+den zentralen Storage, Änderung greift sofort). Als `{prefix}` verfügbar in
+**jeder** konfigurierbaren Nachricht (alle Addon-Messages), in MOTD, Tablist
+und Disconnect-Screens. Ausnahme: im Chat-Format bezeichnet `{prefix}`
+weiterhin den Rang-Prefix des Spielers. Alle Texte werden einheitlich über
+**MiniMessage** gerendert; Legacy-`&`-Codes bleiben überall unterstützt.
 Domänen-Placeholder: Ban → `{reason}`, `{remaining}`, `{expiry}`, `{duration}`;
 Kick → `{reason}`, `{moderator}`. Nicht belegte Placeholder bleiben leer/roh.
 

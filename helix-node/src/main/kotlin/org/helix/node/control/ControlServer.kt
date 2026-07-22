@@ -279,6 +279,7 @@ private fun io.ktor.server.routing.Route.messageRoutes(dependencies: ControlDepe
             dependencies.messages.set(update.addonId, update.key, update.value)
         }
         if (ok) {
+            dependencies.onMessagesChanged(update.addonId)
             call.respond(MessageResponse("updated ${update.addonId}.${update.key}"))
         } else {
             call.respond(HttpStatusCode.NotFound, ErrorResponse("unknown message ${update.addonId}.${update.key}"))

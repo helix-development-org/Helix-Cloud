@@ -54,6 +54,9 @@ import org.helix.node.tasks.TaskStore
  * @property proxyScreens configurable proxy-level disconnect screens.
  * @property metrics bounded history of network metric samples for graphs.
  * @property apiMetrics rolling control-API performance stats.
+ * @property onMessagesChanged invoked after a message bundle changed, with the
+ *  owning addon id (lets the node refresh derived state such as the global
+ *  `{prefix}`).
  * @property jobScheduler recurring scheduled jobs.
  */
 data class ControlDependencies(
@@ -87,6 +90,7 @@ data class ControlDependencies(
     val proxyScreens: Messages = MapMessages(emptyMap()),
     val metrics: MetricsHistory = MetricsHistory(),
     val apiMetrics: ApiMetrics = ApiMetrics(),
+    val onMessagesChanged: (addonId: String) -> Unit = {},
     val jobScheduler: JobScheduler = JobScheduler(
         org.helix.node.storage.JsonStorageProvider().forAddon("scheduler", java.nio.file.Path.of("scheduler")),
         registry,
