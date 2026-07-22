@@ -29,6 +29,25 @@ application {
     mainClass.set("org.helix.node.launcher.LauncherMain")
 }
 
+// Build the React (shadcn/ui) dashboard and bundle it into the jar resources,
+// so the Launcher keeps serving the dashboard from the classpath.
+val dashboardDir = layout.projectDirectory.dir("../helix-dashboard")
+val buildDashboard by tasks.registering(Exec::class) {
+    workingDir = dashboardDir.asFile
+    commandLine("sh", "-c", "pnpm install --frozen-lockfile && pnpm build")
+    inputs.dir(dashboardDir.dir("src"))
+    inputs.file(dashboardDir.file("package.json"))
+    inputs.file(dashboardDir.file("pnpm-lock.yaml"))
+    inputs.file(dashboardDir.file("index.html"))
+    inputs.file(dashboardDir.file("vite.config.ts"))
+    outputs.dir(dashboardDir.dir("dist"))
+}
+
+tasks.processResources {
+    dependsOn(buildDashboard)
+    from(dashboardDir.dir("dist")) { into("dashboard") }
+}
+
 val wrapperJar = rootProject.project("helix-wrapper").tasks.named<Jar>("jar")
 val paperBridgeJar = rootProject.project("helix-bridge-paper").tasks.named<Jar>("jar")
 val velocityBridgeJar = rootProject.project("helix-bridge-velocity").tasks.named<Jar>("jar")

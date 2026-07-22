@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.27.0 — 2026-07-22
+
+### Dashboard-Rewrite auf React + shadcn/ui
+- Das Web-Dashboard ist komplett neu als **React + Vite + Tailwind +
+  shadcn/ui**-App (`helix-dashboard/`) gebaut — modernes, konsistentes UI mit
+  Sidebar, Cards, Tables, Dialogen, Badges und Recharts-Graphen.
+- Der Gradle-Build von `helix-node` baut das Frontend (`pnpm build`) und
+  bündelt es in die `Launcher.jar`; der Launcher liefert das Dashboard
+  unverändert unter `/` aus (voll selbst-enthalten, keine externen CDNs).
+- Feature-Parität: MC-Account-Login + Admin-Token, permission-gefilterte
+  Navigation, Overview mit Trend-Graphen, Tasks (+ Anlegen), Services mit
+  interaktiver Konsole, Players, Proxy, Events, Logs, Audit, Addons,
+  Schedules, Messages (mehrzeilig), Settings sowie Addon-Panels (iframe +
+  postMessage-Action-Bridge).
+
 ## 0.26.0 — 2026-07-21
 
 ### Security-Härtung

@@ -294,6 +294,7 @@ class ControlServerTest {
         val response = client.get("/")
 
         assertEquals(HttpStatusCode.OK, response.status)
-        assertTrue(response.body<String>().contains("Helix-Cloud"))
+        // The React (shadcn) dashboard mounts into <div id="root">.
+        assertTrue(response.body<String>().contains("id=\"root\""))
     }
 }

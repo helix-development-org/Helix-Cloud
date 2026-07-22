@@ -97,6 +97,18 @@ Plattform-Config (`server.properties`/`velocity.toml`). Details in
    dynamisch, wählt Initial-Server/Fallback und erzwingt Maintenance.
 5. Actions laufen einheitlich über CLI, REST, Dashboard und Addons.
 
+## Dashboard (Frontend)
+
+Das Web-Dashboard ist eine **React + Vite + Tailwind + shadcn/ui**-App im
+Verzeichnis `helix-dashboard/`. Der Gradle-Build von `helix-node` baut sie
+(`pnpm install --frozen-lockfile && pnpm build`) und bündelt das Ergebnis als
+statische Resource unter `dashboard/` in die `Launcher.jar`; Ktor liefert sie
+weiter unter `/` aus. Sie spricht ausschließlich die Control-API unter
+`/api/v1` (gleicher Origin) und ist damit voll selbst-enthalten — keine
+externen CDNs. Lokale Entwicklung: `cd helix-dashboard && pnpm dev` (Vite-Dev-
+Server; API per Proxy oder gegen eine laufende Node). Voraussetzung für den
+Gradle-Build ist ein installiertes `pnpm`.
+
 ## Weitere Referenzen
 
 - [CONFIG.md](CONFIG.md) — alle Konfigurationsdateien und Task-Keys
