@@ -3,5 +3,8 @@
   "name": "Helix Permissions",
   "version": "1.0.0",
   "main": "org.helix.addons.permissions.PermissionsAddon",
-  "description": "Groups with weight, inheritance and default flag, per-user permissions, wildcards and negation."
+  "description": "Groups with weight, inheritance and default flag, per-user permissions, wildcards and negation.",
+  "permissions": [
+    "helix.permissions"
+  ]
 }

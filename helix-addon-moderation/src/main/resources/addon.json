@@ -3,5 +3,11 @@
   "name": "Helix Moderation",
   "version": "1.0.0",
   "main": "org.helix.addons.moderation.ModerationAddon",
-  "description": "Permission-gated kick, warn, warns, announce and tempban commands with warn history."
+  "description": "Permission-gated kick, warn, warns, announce and tempban commands with warn history.",
+  "permissions": [
+    "helix.mod.kick",
+    "helix.mod.warn",
+    "helix.mod.broadcast",
+    "helix.mod.ban"
+  ]
 }

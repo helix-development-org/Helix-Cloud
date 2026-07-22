@@ -3,5 +3,8 @@
   "name": "Helix Team Utils",
   "version": "1.0.0",
   "main": "org.helix.addons.teamutils.TeamUtilsAddon",
-  "description": "Team chat, team join notifications and team member list based on permissions."
+  "description": "Team chat, team join notifications and team member list based on permissions.",
+  "permissions": [
+    "helix.team.member"
+  ]
 }

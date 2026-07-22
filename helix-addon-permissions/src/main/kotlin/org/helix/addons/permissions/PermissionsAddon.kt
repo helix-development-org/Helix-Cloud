@@ -16,12 +16,14 @@ import org.helix.api.action.ActionSource
  */
 class PermissionsAddon : AddonBase() {
     private lateinit var store: PermissionStore
+    private lateinit var catalog: PermissionCatalog
 
     /**
      * Registers the resolver and all `perm.*` actions.
      */
     override fun enable() {
         store = PermissionStore(context.storage())
+        catalog = PermissionCatalog(context)
         if (store.group("default") == null) {
             store.saveGroup(PermissionGroup(name = "default", default = true))
         }
@@ -79,23 +81,41 @@ class PermissionsAddon : AddonBase() {
             val groups = user.groups.ifEmpty {
                 store.allGroups().filter { it.default }.map { "${it.name} (default)" }
             }
+            val now = System.currentTimeMillis()
             ActionResult.ok(
                 "player: ${user.name}",
                 "groups: ${groups.joinToString().ifEmpty { "-" }}",
                 "permissions: ${user.permissions.joinToString().ifEmpty { "-" }}",
+                "timed groups: ${user.timedGroups.joinToString { timed(it, now) }.ifEmpty { "-" }}",
+                "timed permissions: ${user.timedPermissions.joinToString { timed(it, now) }.ifEmpty { "-" }}",
             )
         }
-        action("perm.user.addgroup", "Adds a player to a group.", "perm.user.addgroup <player> <group>") {
+        action(
+            "perm.user.addgroup",
+            "Adds a player to a group, optionally temporary (30m, 12h, 7d).",
+            "perm.user.addgroup <player> <group> [duration]",
+        ) {
             userGroup(it, add = true)
         }
         action("perm.user.removegroup", "Removes a player from a group.", "perm.user.removegroup <player> <group>") {
             userGroup(it, add = false)
         }
-        action("perm.user.grant", "Grants a personal permission.", "perm.user.grant <player> <permission>") {
+        action(
+            "perm.user.grant",
+            "Grants a personal permission, optionally temporary (30m, 12h, 7d).",
+            "perm.user.grant <player> <permission> [duration]",
+        ) {
             userPermission(it, add = true)
         }
         action("perm.user.revoke", "Revokes a personal permission.", "perm.user.revoke <player> <permission>") {
             userPermission(it, add = false)
+        }
+        action(
+            "perm.catalog",
+            "Exports all known permission nodes (core, addons, plugin.yml) as JSON.",
+            "perm.catalog",
+        ) {
+            ActionResult.ok(Json.encodeToString(catalog.entries()))
         }
         action("perm.check", "Checks whether a player has a permission.", "perm.check <player> <permission>") { invocation ->
             val (player, permission) = twoArguments(invocation)
@@ -189,22 +209,79 @@ class PermissionsAddon : AddonBase() {
 
     private fun userGroup(invocation: ActionInvocation, add: Boolean): ActionResult {
         val (player, groupName) = twoArguments(invocation)
-            ?: return ActionResult.error("usage: <player> <group>")
+            ?: return ActionResult.error("usage: <player> <group> [duration]")
         val group = store.group(groupName) ?: return ActionResult.error("unknown group: $groupName")
         val user = store.user(player)
-        val updated = if (add) (user.groups + group.name).distinct() else user.groups - group.name
-        store.saveUser(user.copy(groups = updated))
-        return ActionResult.ok("${user.name} groups: ${updated.joinToString().ifEmpty { "- (defaults apply)" }}")
+        if (!add) {
+            store.saveUser(
+                user.copy(
+                    groups = user.groups - group.name,
+                    timedGroups = user.timedGroups.filter { it.value != group.name },
+                ),
+            )
+            return ActionResult.ok("removed ${user.name} from ${group.name}")
+        }
+        val expiry = expiryOf(invocation.arguments.getOrNull(2))
+            ?: return ActionResult.error("invalid duration: ${invocation.arguments.getOrNull(2)}")
+        return if (expiry > 0) {
+            store.saveUser(
+                user.copy(
+                    timedGroups = user.timedGroups.filter { it.value != group.name } +
+                        TimedGrant(group.name, expiry),
+                ),
+            )
+            ActionResult.ok("${user.name} joined ${group.name} until ${GrantDuration.format(expiry - System.currentTimeMillis())} from now")
+        } else {
+            store.saveUser(user.copy(groups = (user.groups + group.name).distinct()))
+            ActionResult.ok("${user.name} groups: ${(user.groups + group.name).distinct().joinToString()}")
+        }
     }
 
     private fun userPermission(invocation: ActionInvocation, add: Boolean): ActionResult {
         val (player, permission) = twoArguments(invocation)
-            ?: return ActionResult.error("usage: <player> <permission>")
+            ?: return ActionResult.error("usage: <player> <permission> [duration]")
         val user = store.user(player)
-        val updated = if (add) (user.permissions + permission).distinct() else user.permissions - permission
-        store.saveUser(user.copy(permissions = updated))
-        return ActionResult.ok("${user.name} permissions: ${updated.joinToString().ifEmpty { "-" }}")
+        if (!add) {
+            store.saveUser(
+                user.copy(
+                    permissions = user.permissions - permission,
+                    timedPermissions = user.timedPermissions.filter { !it.value.equals(permission, ignoreCase = true) },
+                ),
+            )
+            return ActionResult.ok("revoked $permission from ${user.name}")
+        }
+        val expiry = expiryOf(invocation.arguments.getOrNull(2))
+            ?: return ActionResult.error("invalid duration: ${invocation.arguments.getOrNull(2)}")
+        return if (expiry > 0) {
+            store.saveUser(
+                user.copy(
+                    timedPermissions = user.timedPermissions.filter { !it.value.equals(permission, ignoreCase = true) } +
+                        TimedGrant(permission, expiry),
+                ),
+            )
+            ActionResult.ok("granted $permission to ${user.name} for ${GrantDuration.format(expiry - System.currentTimeMillis())}")
+        } else {
+            store.saveUser(user.copy(permissions = (user.permissions + permission).distinct()))
+            ActionResult.ok("${user.name} permissions: ${(user.permissions + permission).distinct().joinToString()}")
+        }
     }
+
+    /**
+     * Resolves an optional duration token to an absolute expiry.
+     *
+     * @param token the duration argument, or `null`/blank for permanent.
+     * @return epoch millis of expiry, `0` for permanent, `null` for invalid.
+     */
+    private fun expiryOf(token: String?): Long? {
+        if (token.isNullOrBlank()) {
+            return 0
+        }
+        val millis = GrantDuration.parseMillis(token) ?: return null
+        return System.currentTimeMillis() + millis
+    }
+
+    private fun timed(grant: TimedGrant, nowEpochMs: Long): String =
+        "${grant.value} (${GrantDuration.format(grant.expiresAtEpochMs - nowEpochMs)})"
 
     private fun twoArguments(invocation: ActionInvocation): Pair<String, String>? {
         val first = invocation.arguments.getOrNull(0) ?: return null

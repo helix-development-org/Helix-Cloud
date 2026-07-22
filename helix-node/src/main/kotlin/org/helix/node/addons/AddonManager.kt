@@ -64,6 +64,10 @@ import org.slf4j.LoggerFactory
  * @property messages configurable message bundles of addons.
  * @property storageProvider backend for addon document storage.
  * @property taskAddonActive whether an addon is active for a task.
+ * @property corePermissions the platform's own permission nodes, exposed to
+ *  addons through the context (feeds the permission catalog).
+ * @property serviceDirectories directories that may contain service files,
+ *  exposed to addons for plugin scanning.
  */
 class AddonManager(
     private val directory: Path,
@@ -80,6 +84,8 @@ class AddonManager(
     private val messages: MessageRegistry = MessageRegistry(),
     private val storageProvider: StorageProvider = JsonStorageProvider(),
     private val taskAddonActive: (taskName: String, addonId: String) -> Boolean = { _, _ -> true },
+    private val corePermissions: () -> List<String> = { emptyList() },
+    private val serviceDirectories: () -> List<Path> = { emptyList() },
 ) {
     private val logger = LoggerFactory.getLogger(AddonManager::class.java)
     private val json = Json { ignoreUnknownKeys = true }
@@ -301,6 +307,12 @@ class AddonManager(
             permissionService.check(PermissionCheckRequest(player, permission))
 
         override fun onlinePlayers(): List<OnlinePlayer> = playerRegistry.online()
+
+        override fun installedAddons(): List<AddonInfo> = addons()
+
+        override fun corePermissions(): List<String> = this@AddonManager.corePermissions()
+
+        override fun serviceDirectories(): List<Path> = this@AddonManager.serviceDirectories()
 
         override fun registerPlayerListener(listener: PlayerListener) {
             playerRegistry.register(record.manifest.id, listener)

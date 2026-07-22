@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.29.0 — 2026-07-22
+
+### Permission-Katalog & temporäre Grants
+- `addon.json` hat ein neues Feld `permissions`: alle Permission-Nodes, die
+  ein Addon implementiert (deklariert für bans, moderation, teamutils,
+  permissions).
+- Das **Permissions-Addon** baut daraus den netzwerkweiten Katalog: es
+  aggregiert die Manifeste aller installierten Addons, die Core-Permissions
+  der Node und scannt die `plugin.yml` aller Backend-Plugins in den
+  Service-Workspaces/Templates (neue Context-APIs `installedAddons()`,
+  `corePermissions()`, `serviceDirectories()`; Action `perm.catalog`).
+- Im Permissions-Panel sind Grants jetzt **auswählbar** (Katalog-Vorschläge
+  mit Quelle) — ein Freitext-Feld bleibt für unbekannte Nodes erhalten.
+- **Temporäre Vergaben**: persönliche Permissions und Gruppen-Mitgliedschaften
+  können mit Ablauf vergeben werden (`perm.user.grant <player> <node> [7d]`,
+  `perm.user.addgroup <player> <group> [12h]`); abgelaufene Grants werden bei
+  der Auflösung ignoriert und automatisch aufgeräumt. Das Panel zeigt
+  Restlaufzeiten und bietet Dauer-Felder.
+
 ## 0.28.0 — 2026-07-22
 
 ### API-Performance-Metriken im Dashboard

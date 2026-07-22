@@ -1,3 +1,4 @@
+import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.jvm.tasks.Jar
 
 plugins {
@@ -6,6 +7,20 @@ plugins {
 
 dependencies {
     implementation(rootProject.project("helix-addon-sdk"))
+    implementation("org.yaml:snakeyaml:2.3")
+}
+
+// snakeyaml is bundled into the addon jar (plugin.yml catalog scanning); the
+// node only provides helix-api, the sdk and the kotlin runtime.
+tasks.named<Jar>("jar") {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    dependsOn(configurations.runtimeClasspath)
+    from({
+        configurations.runtimeClasspath.get()
+            .filter { it.isFile && it.name.startsWith("snakeyaml") }
+            .map { zipTree(it) }
+    })
+    exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA", "module-info.class")
 }
 
 /**

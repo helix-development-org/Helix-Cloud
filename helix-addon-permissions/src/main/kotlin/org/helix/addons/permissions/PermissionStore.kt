@@ -11,11 +11,17 @@ import org.helix.api.storage.AddonStorage
  * groups by descending weight, each group followed by its inherited
  * parents (depth-first, cycles ignored). At every level an explicit
  * negation (`-node`) beats a grant. Players without groups belong to all
- * `default` groups.
+ * `default` groups. Timed grants (permissions and group memberships with an
+ * expiry) count like their permanent counterparts while active and are
+ * pruned once expired.
  *
  * @property storage addon-scoped document store.
+ * @property clock epoch-millis source, injectable for tests.
  */
-class PermissionStore(private val storage: AddonStorage) {
+class PermissionStore(
+    private val storage: AddonStorage,
+    private val clock: () -> Long = System::currentTimeMillis,
+) {
     private val json = Json { prettyPrint = true }
     private val groups = linkedMapOf<String, PermissionGroup>()
     private val users = linkedMapOf<String, PermissionUser>()
@@ -84,14 +90,25 @@ class PermissionStore(private val storage: AddonStorage) {
         groups.values.sortedWith(compareByDescending<PermissionGroup> { it.weight }.thenBy { it.name })
 
     /**
-     * Looks up a user profile.
+     * Looks up a user profile; expired timed grants are pruned first.
      *
      * @param name player name.
      * @return the profile, or an empty profile for unknown players.
      */
     @Synchronized
-    fun user(name: String): PermissionUser =
-        users[name.lowercase()] ?: PermissionUser(name = name.lowercase())
+    fun user(name: String): PermissionUser {
+        val stored = users[name.lowercase()] ?: return PermissionUser(name = name.lowercase())
+        val now = clock()
+        val pruned = stored.copy(
+            timedPermissions = stored.timedPermissions.filter { it.active(now) },
+            timedGroups = stored.timedGroups.filter { it.active(now) },
+        )
+        if (pruned != stored) {
+            if (pruned.isEmpty()) users.remove(pruned.name) else users[pruned.name] = pruned
+            persist()
+        }
+        return pruned
+    }
 
     /**
      * Creates or replaces a user profile; empty profiles are removed.
@@ -101,7 +118,7 @@ class PermissionStore(private val storage: AddonStorage) {
     @Synchronized
     fun saveUser(user: PermissionUser) {
         val normalized = user.copy(name = user.name.lowercase())
-        if (normalized.groups.isEmpty() && normalized.permissions.isEmpty()) {
+        if (normalized.isEmpty()) {
             users.remove(normalized.name)
         } else {
             users[normalized.name] = normalized
@@ -128,8 +145,10 @@ class PermissionStore(private val storage: AddonStorage) {
     @Synchronized
     fun has(player: String, permission: String): Boolean {
         val profile = user(player)
-        PermissionMatcher.decide(profile.permissions, permission)?.let { return it }
-        val memberships = profile.groups
+        val personal = profile.permissions + profile.timedPermissions.map { it.value }
+        PermissionMatcher.decide(personal, permission)?.let { return it }
+        val memberships = (profile.groups + profile.timedGroups.map { it.value })
+            .distinct()
             .mapNotNull { groups[it] }
             .ifEmpty { groups.values.filter { it.default } }
             .sortedByDescending { it.weight }

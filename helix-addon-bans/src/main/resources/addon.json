@@ -3,5 +3,8 @@
   "name": "Helix Bans",
   "version": "1.0.0",
   "main": "org.helix.addons.bans.BansAddon",
-  "description": "Network bans with temp bans, join gate and kick of online players."
+  "description": "Network bans with temp bans, join gate and kick of online players.",
+  "permissions": [
+    "helix.bans"
+  ]
 }

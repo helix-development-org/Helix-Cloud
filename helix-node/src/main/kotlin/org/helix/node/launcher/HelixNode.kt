@@ -10,6 +10,7 @@ import org.helix.node.actions.ActionRegistry
 import org.helix.node.actions.BuiltinActions
 import org.helix.node.addons.AddonActions
 import org.helix.node.audit.AuditLog
+import org.helix.node.control.auth.PanelAuthService
 import org.helix.node.addons.AddonManager
 import org.helix.node.cli.NodeCli
 import org.helix.node.config.NodeConfig
@@ -187,6 +188,16 @@ class HelixNode(
         taskAddonActive = { taskName, addonId ->
             taskStore.find(taskName)?.isAddonActive(addonId) ?: true
         },
+        corePermissions = {
+            buildList {
+                add(config.control.loginPermission)
+                addAll(PanelAuthService.VIEW_NODES.values)
+                dashboardPanels.list().forEach { add(PanelAuthService.panelNode(it.id)) }
+                add("helix.maintenance.bypass")
+                registry.descriptors().filter { it.playerCommand }.mapNotNull { it.permission }.forEach(::add)
+            }.distinct()
+        },
+        serviceDirectories = { listOf(paths.servicesStatic, paths.servicesTemp, paths.templates) },
     )
 
     private val overviewService = PlatformOverviewService(version(), taskStore, manager)

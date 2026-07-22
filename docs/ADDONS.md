@@ -22,9 +22,20 @@ my-addon.hxa
   "name": "My Addon",
   "version": "1.0.0",
   "main": "org.example.MyAddon",
-  "description": "What it does."
+  "description": "What it does.",
+  "permissions": ["my.addon.use", "my.addon.admin"]
 }
 ```
+
+`permissions` listet **alle Permission-Nodes, die das Addon implementiert**.
+Sie fließen in den netzwerkweiten Permission-Katalog: das Permissions-Addon
+aggregiert die Manifeste aller installierten Addons, die Core-Permissions der
+Node (`context.corePermissions()`) und die `plugin.yml` aller Backend-Plugins
+in den Service-Workspaces/Templates (`context.serviceDirectories()`), und
+bietet sie im Panel als auswählbare Grants an (Action `perm.catalog`).
+Unbekannte Nodes lassen sich weiterhin frei eintippen. Grants können
+**temporär** vergeben werden (`perm.user.grant <player> <node> [30m|12h|7d]`,
+ebenso `perm.user.addgroup`).
 
 ## Minimales Addon
 

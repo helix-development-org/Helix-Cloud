@@ -80,6 +80,31 @@ interface AddonContext {
     fun onlinePlayers(): List<OnlinePlayer> = emptyList()
 
     /**
+     * Lists all installed addons with their manifests, including the
+     * permission nodes each addon declares in its `addon.json`.
+     *
+     * @return snapshots of all installed addons.
+     */
+    fun installedAddons(): List<AddonInfo> = emptyList()
+
+    /**
+     * The permission nodes the platform itself implements (panel views,
+     * panel login, maintenance bypass, player-command permissions).
+     *
+     * @return the node's own permission nodes.
+     */
+    fun corePermissions(): List<String> = emptyList()
+
+    /**
+     * Directories that may contain service files, for example backend
+     * plugin jars in a `plugins` subdirectory — service workspaces and
+     * templates. Used by addons that scan plugin metadata.
+     *
+     * @return existing directories to scan, may be empty.
+     */
+    fun serviceDirectories(): List<Path> = emptyList()
+
+    /**
      * Registers a network-wide player join/leave listener owned by this
      * addon. Removed when the addon is disabled.
      *
