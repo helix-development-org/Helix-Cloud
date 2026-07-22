@@ -241,6 +241,13 @@ Referenz-Implementierungen in diesem Repo:
   `commandPrefix`, `notificationCategories`, `adminUserIds`), danach
   `discord.reload`. Weitere Actions: `discord.status`, `discord.send`.
   Benötigte Bot-Intents im Discord Developer Portal: *Message Content*.
+- `helix-addon-motd` — Server-Liste (MOTD) mit zwei Profilen: **normal** und
+  **maintenance** (bei aktiver Netzwerk-Wartung automatisch). Einstellbar
+  pro Profil: beide Zeilen (MiniMessage/`&`-Codes, `{online}` `{max}`
+  `{network}`), angezeigte Online-/Max-Spielerzahl (`-1` = echt),
+  Version-Text und Hover-Zeilen der Spielerzahl. Actions `motd.set`,
+  `motd.show`, `motd.export`; Panel-Seite **MOTD** mit Live-Preview.
+  Gerendert von der Velocity-Bridge beim Server-List-Ping.
 
 ## Lifecycle
 
@@ -352,7 +359,7 @@ class MyAddon : AddonBase() {
 
 Das Panel erscheint in der Sidebar unter **Extensions** und verschwindet
 wieder, wenn das Addon deaktiviert wird. Mitgelieferte Panels:
-Permissions, Economy, Bans, Chat, Tablist, Discord.
+Permissions, Economy, Bans, Chat, Tablist, Discord, MOTD.
 
 ## Addons zur Laufzeit nachladen
 

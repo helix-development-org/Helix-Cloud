@@ -1,0 +1,109 @@
+<div class="grid c2">
+  <div class="card" style="margin:0"><div class="card-head"><h2>Normal</h2><div class="sub">served while the network is open</div></div>
+    <div class="card-body" data-profile="normal"></div></div>
+  <div class="card" style="margin:0"><div class="card-head"><h2>Maintenance</h2><div class="sub">served while maintenance mode is on</div></div>
+    <div class="card-body" data-profile="maintenance"></div></div>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <div class="card-head"><h2>Preview</h2><div class="sub">how the entry looks in the server list ({online}=12 {max}=100)</div></div>
+  <div class="card-body"><div class="grid c2">
+    <div><label>Normal</label><div class="motd-prev" id="prev-normal"></div></div>
+    <div><label>Maintenance</label><div class="motd-prev" id="prev-maintenance"></div></div>
+  </div></div>
+</div>
+
+<style>
+.motd-prev{background:#181818;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;font-family:var(--mono);font-size:13px;line-height:1.6;white-space:pre-wrap;min-height:52px}
+.motd-prev .cnt{float:right;color:#aaa}
+</style>
+
+<script>
+"use strict";
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const COLORS = { "0":"#000","1":"#00a","2":"#0a0","3":"#0aa","4":"#a00","5":"#a0a","6":"#fa0","7":"#aaa","8":"#555","9":"#55f","a":"#5f5","b":"#5ff","c":"#f55","d":"#f5f","e":"#ff5","f":"#fff" };
+const MINI = { black:"#000",dark_blue:"#00a",dark_green:"#0a0",dark_aqua:"#0aa",dark_red:"#a00",dark_purple:"#a0a",gold:"#fa0",gray:"#aaa",dark_gray:"#555",blue:"#55f",green:"#5f5",aqua:"#5ff",red:"#f55",light_purple:"#f5f",yellow:"#ff5",white:"#fff" };
+let cfg = null;
+
+function mc(text) {
+  let t = String(text).replace(/\{online\}/g,"12").replace(/\{max\}/g,"100").replace(/\{network\}/g,"MyNetwork");
+  // strip MiniMessage tags but keep named colors as spans, drop gradients to first color
+  t = t.replace(/<gradient:([^:>]+)[^>]*>/gi, (m,c)=>`<<c:${c}>>`).replace(/<\/gradient>/gi,"<<r>>");
+  t = t.replace(/<#([0-9a-f]{6})>/gi, "<<c:#$1>>");
+  t = t.replace(/<(\w+)>/g, (m,name)=> MINI[name.toLowerCase()] ? `<<c:${MINI[name.toLowerCase()]}>>` : (name==="bold"?"<<b>>":name==="reset"?"<<r>>":""));
+  t = t.replace(/<\/\w+>/g, "");
+  let out = "", color = "#eee", bold = false;
+  const parts = t.split(/(&[0-9a-fk-or]|<<c:[^>]+>>|<<b>>|<<r>>)/i);
+  for (const p of parts) {
+    if (!p) continue;
+    if (/^&[0-9a-f]$/i.test(p)) { color = COLORS[p[1].toLowerCase()]; continue; }
+    if (/^&l$/i.test(p)) { bold = true; continue; }
+    if (/^&r$/i.test(p)) { color = "#eee"; bold = false; continue; }
+    if (/^&[k-o]$/i.test(p)) continue;
+    if (p.startsWith("<<c:")) { color = p.slice(4,-2); continue; }
+    if (p === "<<b>>") { bold = true; continue; }
+    if (p === "<<r>>") { color = "#eee"; bold = false; continue; }
+    out += `<span style="color:${color}${bold?";font-weight:700":""}">${esc(p)}</span>`;
+  }
+  return out;
+}
+
+function fields(profile, p) {
+  return `
+    <div class="field"><label>Line 1</label><input class="mono" data-f="line1" value="${esc(p.line1)}"></div>
+    <div class="field" style="margin-top:10px"><label>Line 2</label><input class="mono" data-f="line2" value="${esc(p.line2)}"></div>
+    <div class="grid c2" style="margin-top:10px">
+      <div class="field"><label>Shown online (-1 = real)</label><input type="number" data-f="online" value="${p.onlinePlayers}"></div>
+      <div class="field"><label>Shown max (-1 = real)</label><input type="number" data-f="max" value="${p.maxPlayers}"></div>
+    </div>
+    <div class="field" style="margin-top:10px"><label>Version text (empty = default)</label><input class="mono" data-f="version" value="${esc(p.versionText)}"></div>
+    <div class="field" style="margin-top:10px"><label>Hover lines (player-count tooltip, one per line)</label>
+      <textarea class="mono" rows="3" data-f="hover">${esc((p.hover||[]).join("\n"))}</textarea></div>
+    <div class="row" style="margin-top:12px"><button class="btn" data-save="${profile}">Save ${profile}</button></div>`;
+}
+
+function render() {
+  document.querySelectorAll("[data-profile]").forEach(box => {
+    const name = box.dataset.profile;
+    box.innerHTML = fields(name, cfg[name]);
+    box.querySelectorAll("input,textarea").forEach(i => i.oninput = preview);
+    box.querySelector("[data-save]").onclick = () => save(name, box);
+  });
+  preview();
+}
+
+function preview() {
+  ["normal","maintenance"].forEach(name => {
+    const box = document.querySelector(`[data-profile="${name}"]`); if (!box) return;
+    const v = f => box.querySelector(`[data-f="${f}"]`).value;
+    const online = v("online") === "-1" ? "12" : v("online"), max = v("max") === "-1" ? "100" : v("max");
+    document.getElementById("prev-" + name).innerHTML =
+      `<span class="cnt">${esc(online)}/${esc(max)}</span>` + mc(v("line1")) + "<br>" + mc(v("line2"));
+  });
+}
+
+async function save(name, box) {
+  const v = f => box.querySelector(`[data-f="${f}"]`).value;
+  const calls = [
+    ["line1", v("line1")], ["line2", v("line2")], ["version", v("version")],
+    ["online", v("online")], ["max", v("max")],
+    ["hover", v("hover").split("\n").map(s=>s.trim()).filter(Boolean).join("\\n")],
+  ];
+  for (const [field, value] of calls) {
+    const r = await Helix.action("motd.set", name, field, ...(value === "" ? [""] : value.split(" ")));
+    if (!r.success) return Helix.toast(r.lines[0] || ("failed: " + field));
+  }
+  Helix.toast("Saved " + name + " MOTD");
+  load();
+}
+
+async function load() {
+  const r = await Helix.action("motd.export");
+  try { cfg = JSON.parse(r.lines[0] || "{}"); } catch (e) { cfg = null; }
+  if (!cfg || !cfg.normal) cfg = { normal: {hover:[]}, maintenance: {hover:[]} };
+  cfg.normal = { line1:"", line2:"", onlinePlayers:-1, maxPlayers:-1, versionText:"", hover:[], ...cfg.normal };
+  cfg.maintenance = { line1:"", line2:"", onlinePlayers:-1, maxPlayers:-1, versionText:"", hover:[], ...cfg.maintenance };
+  render();
+}
+Helix.ready(load);
+</script>

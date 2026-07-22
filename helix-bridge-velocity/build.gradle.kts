@@ -3,6 +3,10 @@ import org.gradle.jvm.tasks.Jar
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
+plugins {
+    id("org.jetbrains.kotlin.plugin.serialization")
+}
+
 repositories {
     maven {
         name = "papermc"

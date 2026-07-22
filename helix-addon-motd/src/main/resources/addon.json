@@ -1,0 +1,8 @@
+{
+  "id": "helix.motd",
+  "name": "Helix MOTD",
+  "version": "1.0.0",
+  "main": "org.helix.addons.motd.MotdAddon",
+  "description": "Configurable server-list MOTD with a normal and a maintenance profile.",
+  "permissions": []
+}

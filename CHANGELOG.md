@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.30.0 — 2026-07-22
+
+### MOTD-Addon
+- Neues Addon `helix-addon-motd`: Server-Liste (MOTD) mit zwei Profilen —
+  **normal** und **maintenance**. Bei aktiver Netzwerk-Wartung wird
+  automatisch das Wartungs-Profil ausgeliefert.
+- Pro Profil einstellbar (alles über die neue Panel-Seite **MOTD** mit
+  Live-Preview): beide Zeilen (MiniMessage/`&`-Codes, Platzhalter `{online}`
+  `{max}` `{network}`), angezeigte Online-/Max-Spielerzahl (`-1` = echte
+  Werte), Version-Text und die Hover-Zeilen der Spielerzahl.
+- Actions: `motd.set <normal|maintenance> <field> <value...>`, `motd.show`,
+  `motd.export`. Publiziert als Bridge-Value `motd.config`.
+- Die Velocity-Bridge pollt jetzt auch Bridge-Values (5s-Heartbeat) und
+  rendert das passende Profil bei jedem Server-List-Ping; ohne MOTD-Addon
+  bleibt das bisherige Minimal-Verhalten.
+
 ## 0.29.1 — 2026-07-22
 
 ### Fix: Player-Manager im Permissions-Panel

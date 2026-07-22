@@ -13,6 +13,8 @@ import com.velocitypowered.api.event.proxy.ProxyPingEvent
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent
 import com.velocitypowered.api.plugin.Plugin
 import com.velocitypowered.api.proxy.ProxyServer
+import com.velocitypowered.api.proxy.server.ServerPing
+import java.util.UUID
 import com.velocitypowered.api.scheduler.ScheduledTask
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
@@ -67,6 +69,9 @@ class HelixVelocityBridgePlugin @Inject constructor(
     private var serverFullScreen: String = ""
 
     @Volatile
+    private var motd: MotdData? = null
+
+    @Volatile
     private var polling = false
     private var pollThread: Thread? = null
 
@@ -92,7 +97,13 @@ class HelixVelocityBridgePlugin @Inject constructor(
         // routing, player-command registration) is delivered instantly via
         // a long-poll the node answers the moment something changes.
         heartbeatTask = proxy.scheduler
-            .buildTask(this, Runnable { sendHeartbeat(loaded, httpClient) })
+            .buildTask(
+                this,
+                Runnable {
+                    sendHeartbeat(loaded, httpClient)
+                    syncBridgeValues(loaded, httpClient)
+                },
+            )
             .delay(Duration.ofSeconds(1))
             .repeat(Duration.ofSeconds(5))
             .schedule()
@@ -301,11 +312,81 @@ class HelixVelocityBridgePlugin @Inject constructor(
      */
     @Subscribe
     fun onProxyPing(event: ProxyPingEvent) {
-        if (maintenance.get()) {
-            event.ping = event.ping.asBuilder()
-                .description(Component.text("§cMaintenance"))
-                .build()
+        val profile = motd?.let { if (maintenance.get()) it.maintenance else it.normal }
+        if (profile == null) {
+            // No MOTD addon installed — keep the previous minimal behaviour.
+            if (maintenance.get()) {
+                event.ping = event.ping.asBuilder()
+                    .description(Component.text("§cMaintenance"))
+                    .build()
+            }
+            return
         }
+        val ctx = mapOf(
+            "online" to proxy.playerCount.toString(),
+            "max" to proxy.configuration.showMaxPlayers.toString(),
+            "network" to networkName.ifBlank { "the network" },
+        )
+        val builder = event.ping.asBuilder()
+        if (profile.line1.isNotBlank() || profile.line2.isNotBlank()) {
+            builder.description(screen(listOf(profile.line1, profile.line2).filter { it.isNotBlank() }.joinToString("\n"), ctx))
+        }
+        if (profile.onlinePlayers >= 0) {
+            builder.onlinePlayers(profile.onlinePlayers)
+        }
+        if (profile.maxPlayers >= 0) {
+            builder.maximumPlayers(profile.maxPlayers)
+        }
+        if (profile.hover.isNotEmpty()) {
+            builder.clearSamplePlayers()
+            builder.samplePlayers(
+                *profile.hover.map { line ->
+                    ServerPing.SamplePlayer(legacyAmpersandToSection(applyContext(line, ctx)), UUID.randomUUID())
+                }.toTypedArray(),
+            )
+        }
+        if (profile.versionText.isNotBlank()) {
+            builder.version(
+                ServerPing.Version(
+                    event.ping.version.protocol,
+                    legacyAmpersandToSection(applyContext(profile.versionText, ctx)),
+                ),
+            )
+        }
+        event.ping = builder.build()
+    }
+
+    private fun applyContext(template: String, ctx: Map<String, String>): String {
+        var text = template
+        ctx.forEach { (key, value) -> text = text.replace("{$key}", value) }
+        return text
+    }
+
+    private fun legacyAmpersandToSection(text: String): String {
+        val builder = StringBuilder(text.length)
+        var i = 0
+        while (i < text.length) {
+            val c = text[i]
+            if (c == '&' && i + 1 < text.length && LEGACY_TAGS.containsKey(text[i + 1].lowercaseChar())) {
+                builder.append('§').append(text[i + 1])
+                i += 2
+            } else {
+                builder.append(c)
+                i++
+            }
+        }
+        return builder.toString()
+    }
+
+    private fun syncBridgeValues(settings: BridgeSettings, client: NodeHttpClient) {
+        runCatching {
+            val body = client.getJson("/api/v1/internal/bridge-values?serviceId=${settings.serviceId}")
+                ?: return@runCatching
+            val values = json.decodeFromString<Map<String, String>>(body)
+            motd = values["motd.config"]?.let { raw ->
+                runCatching { json.decodeFromString<MotdData>(raw) }.getOrNull()
+            }
+        }.onFailure { logger.warn("Helix bridge value sync failed: {}", it.message) }
     }
 
     private fun sendHeartbeat(settings: BridgeSettings, client: NodeHttpClient) {

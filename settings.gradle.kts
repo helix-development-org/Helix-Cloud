@@ -20,5 +20,6 @@ include(
     "helix-addon-economy",
     "helix-addon-moderation",
     "helix-addon-teamutils",
-    "helix-addon-discord"
+    "helix-addon-discord",
+    "helix-addon-motd"
 )
