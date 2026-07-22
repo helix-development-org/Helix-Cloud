@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.27.3 — 2026-07-22
+
+### Fix: Dashboard-Build (`buildDashboard`) bricht ohne TTY ab
+- Der Gradle-Frontend-Build scheiterte in manchen Umgebungen mit
+  `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY` — pnpm wollte `node_modules`
+  neu aufsetzen und konnte ohne TTY nicht nachfragen.
+- Behoben mit pnpms eigenen, dokumentierten Remedien: `CI=true` im
+  `buildDashboard`-Exec und `confirmModulesPurge: false` in
+  `helix-dashboard/pnpm-workspace.yaml` (voll non-interaktiv).
+
 ## 0.27.2 — 2026-07-22
 
 ### Fix: Web-Konsole auch für Docker-Services

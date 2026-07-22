@@ -34,6 +34,9 @@ application {
 val dashboardDir = layout.projectDirectory.dir("../helix-dashboard")
 val buildDashboard by tasks.registering(Exec::class) {
     workingDir = dashboardDir.asFile
+    // CI=true keeps pnpm fully non-interactive (no node_modules purge prompt,
+    // which aborts without a TTY when invoked from Gradle).
+    environment("CI", "true")
     commandLine("sh", "-c", "pnpm install --frozen-lockfile && pnpm build")
     inputs.dir(dashboardDir.dir("src"))
     inputs.file(dashboardDir.file("package.json"))
