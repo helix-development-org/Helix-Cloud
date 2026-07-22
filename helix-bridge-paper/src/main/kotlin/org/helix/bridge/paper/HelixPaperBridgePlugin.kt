@@ -15,6 +15,7 @@ import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
 import org.helix.api.bridge.HeartbeatReport
+import org.helix.api.bridge.ResourceProbe
 import org.helix.api.display.DisplayProfile
 import org.helix.api.message.LegacyToMini
 import org.helix.api.proxy.JoinRequest
@@ -141,6 +142,9 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
             onlinePlayers = server.onlinePlayers.size,
             maxPlayers = server.maxPlayers,
             tps = server.tps.firstOrNull(),
+            memoryUsedMb = ResourceProbe.memoryUsedMb(),
+            memoryMaxMb = ResourceProbe.memoryMaxMb(),
+            cpuPercent = ResourceProbe.cpuPercent(),
         )
         runCatching { client.postJson("/api/v1/internal/heartbeat", json.encodeToString(report)) }
             .onFailure { logger.warning("Helix heartbeat failed: ${it.message}") }

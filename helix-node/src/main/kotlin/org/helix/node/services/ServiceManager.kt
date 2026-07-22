@@ -195,6 +195,9 @@ class ServiceManager(
             managed.maxPlayers = report.maxPlayers
         }
         managed.tps = report.tps
+        managed.memoryUsedMb = report.memoryUsedMb
+        managed.memoryMaxMb = report.memoryMaxMb
+        managed.cpuPercent = report.cpuPercent
         if (managed.state == ServiceState.STARTING) {
             managed.state = ServiceState.RUNNING
             logger.info("Service {} is now RUNNING", managed.id)

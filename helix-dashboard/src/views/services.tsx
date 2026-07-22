@@ -27,6 +27,7 @@ export function ServicesView() {
           <TableHeader>
             <TableRow>
               <TableHead>Service</TableHead><TableHead>State</TableHead><TableHead>Players</TableHead>
+              <TableHead>RAM</TableHead><TableHead>CPU</TableHead>
               <TableHead>Port</TableHead><TableHead>Executor</TableHead><TableHead>Uptime</TableHead><TableHead />
             </TableRow>
           </TableHeader>
@@ -36,6 +37,17 @@ export function ServicesView() {
                 <TableCell><span className="font-medium">{s.id}</span> <span className="text-xs text-muted-foreground">{s.environment}</span></TableCell>
                 <TableCell><Badge variant={stateVariant(s.state)}>{s.state}</Badge></TableCell>
                 <TableCell className="text-sm">{s.onlinePlayers}/{s.maxPlayers}</TableCell>
+                <TableCell className="text-sm">
+                  {s.memoryUsedMb >= 0 ? (
+                    <span className="flex items-center gap-2">
+                      <span className="font-mono text-xs">{s.memoryUsedMb}/{s.memoryMaxMb} MB</span>
+                      <span className="h-1.5 w-14 overflow-hidden rounded-full bg-secondary">
+                        <span className="block h-full bg-primary" style={{ width: `${Math.min(100, (s.memoryUsedMb / Math.max(1, s.memoryMaxMb)) * 100)}%` }} />
+                      </span>
+                    </span>
+                  ) : <span className="text-muted-foreground">—</span>}
+                </TableCell>
+                <TableCell className="font-mono text-xs">{s.cpuPercent >= 0 ? s.cpuPercent.toFixed(1) + "%" : "—"}</TableCell>
                 <TableCell className="font-mono text-sm">{s.port}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{s.executor}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{uptime(s.startedAtEpochMs)}</TableCell>
@@ -49,7 +61,7 @@ export function ServicesView() {
               </TableRow>
             ))}
             {data && data.length === 0 && (
-              <TableRow><TableCell colSpan={7} className="py-10 text-center text-muted-foreground">No services running — start one from Tasks.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="py-10 text-center text-muted-foreground">No services running — start one from Tasks.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>

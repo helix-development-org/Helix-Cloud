@@ -25,6 +25,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.bridge.HeartbeatReport
+import org.helix.api.bridge.ResourceProbe
 import org.helix.api.message.LegacyToMini
 import org.helix.api.player.PlayerEvent
 import org.helix.api.proxy.JoinDecision
@@ -403,6 +404,9 @@ class HelixVelocityBridgePlugin @Inject constructor(
                 serviceId = settings.serviceId,
                 onlinePlayers = proxy.playerCount,
                 maxPlayers = proxy.configuration.showMaxPlayers,
+                memoryUsedMb = ResourceProbe.memoryUsedMb(),
+                memoryMaxMb = ResourceProbe.memoryMaxMb(),
+                cpuPercent = ResourceProbe.cpuPercent(),
             )
             client.postJson("/api/v1/internal/heartbeat", json.encodeToString(report))
         }.onFailure { logger.warn("Helix heartbeat failed: {}", it.message) }

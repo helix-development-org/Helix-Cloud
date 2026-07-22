@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.35.0 — 2026-07-22
+
+### Per-Service CPU & RAM
+- Die Bridges messen jetzt Ressourcen des Server-JVM (Heap used/max via
+  `Runtime`, Prozess-CPU via `OperatingSystemMXBean`) und melden sie im
+  Heartbeat — identisch für Prozess- und Docker-Services, ohne /proc-Parsing.
+- `HeartbeatReport`/`ServiceInfo` um `memoryUsedMb`, `memoryMaxMb`,
+  `cpuPercent` erweitert (defaulted `-1` → wire-kompatibel mit alten Bridges).
+- Die Services-Tabelle im Panel zeigt **RAM** (used/max mit Auslastungsbalken)
+  und **CPU %** pro Service.
+
 ## 0.34.0 — 2026-07-22
 
 ### Datei-Manager

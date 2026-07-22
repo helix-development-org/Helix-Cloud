@@ -35,6 +35,18 @@ class ManagedService(
     @Volatile
     var tps: Double? = null
 
+    /** JVM heap in use (MB) from the last heartbeat; `-1` if unknown. */
+    @Volatile
+    var memoryUsedMb: Int = -1
+
+    /** Maximum JVM heap (MB) from the last heartbeat; `-1` if unknown. */
+    @Volatile
+    var memoryMaxMb: Int = -1
+
+    /** Process CPU load (percent) from the last heartbeat; `-1` if unknown. */
+    @Volatile
+    var cpuPercent: Double = -1.0
+
     /** Epoch millis of the last start. */
     @Volatile
     var startedAtEpochMs: Long? = null
@@ -82,5 +94,8 @@ class ManagedService(
         onlinePlayers = onlinePlayers,
         maxPlayers = maxPlayers,
         startedAtEpochMs = startedAtEpochMs,
+        memoryUsedMb = memoryUsedMb,
+        memoryMaxMb = memoryMaxMb,
+        cpuPercent = cpuPercent,
     )
 }

@@ -134,7 +134,7 @@ alles, was die Konsole kann.
 
 | Methode | Pfad | Beschreibung |
 |---|---|---|
-| POST | `/internal/heartbeat` | Bridge-Heartbeat `{serviceId, onlinePlayers, maxPlayers, tps?}` |
+| POST | `/internal/heartbeat` | Bridge-Heartbeat `{serviceId, onlinePlayers, maxPlayers, tps?, memoryUsedMb?, memoryMaxMb?, cpuPercent?}` |
 | GET | `/internal/routing?proxyServiceId=<id>` | Routing-Snapshot mit aufgelösten Backend-Adressen |
 | POST | `/internal/join-check` | Join-Gate: `{name, uuid?}` → `{allowed, message?}` (wertet alle Addon-Gates aus) |
 | GET | `/internal/commands?proxyServiceId=<id>` | Pending Proxy-Commands (z.B. Kicks), werden beim Abruf konsumiert |

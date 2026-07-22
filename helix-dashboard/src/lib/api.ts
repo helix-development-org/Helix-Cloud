@@ -86,6 +86,9 @@ export interface ServiceInfo {
   onlinePlayers: number
   maxPlayers: number
   startedAtEpochMs: number | null
+  memoryUsedMb: number
+  memoryMaxMb: number
+  cpuPercent: number
 }
 export interface TaskDefinition {
   name: string

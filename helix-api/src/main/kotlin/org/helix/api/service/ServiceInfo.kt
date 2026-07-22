@@ -17,6 +17,9 @@ import org.helix.api.execution.ExecutorType
  * @property onlinePlayers players currently connected, from heartbeats.
  * @property maxPlayers player slots the service offers.
  * @property startedAtEpochMs epoch millis of the last start, if started.
+ * @property memoryUsedMb JVM heap in use (from heartbeats); `-1` if unknown.
+ * @property memoryMaxMb maximum JVM heap; `-1` if unknown.
+ * @property cpuPercent process CPU load in percent; `-1.0` if unknown.
  */
 @Serializable
 data class ServiceInfo(
@@ -30,4 +33,7 @@ data class ServiceInfo(
     val onlinePlayers: Int = 0,
     val maxPlayers: Int = 0,
     val startedAtEpochMs: Long? = null,
+    val memoryUsedMb: Int = -1,
+    val memoryMaxMb: Int = -1,
+    val cpuPercent: Double = -1.0,
 )

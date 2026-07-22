@@ -11,6 +11,9 @@ import kotlinx.serialization.Serializable
  * @property onlinePlayers players currently connected.
  * @property maxPlayers player slots the server offers.
  * @property tps ticks per second, if the platform exposes them.
+ * @property memoryUsedMb JVM heap in use, in megabytes; `-1` if unknown.
+ * @property memoryMaxMb maximum JVM heap, in megabytes; `-1` if unknown.
+ * @property cpuPercent process CPU load in percent; `-1.0` if unknown.
  */
 @Serializable
 data class HeartbeatReport(
@@ -18,4 +21,7 @@ data class HeartbeatReport(
     val onlinePlayers: Int,
     val maxPlayers: Int,
     val tps: Double? = null,
+    val memoryUsedMb: Int = -1,
+    val memoryMaxMb: Int = -1,
+    val cpuPercent: Double = -1.0,
 )

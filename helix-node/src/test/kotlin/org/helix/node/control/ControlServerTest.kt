@@ -130,12 +130,18 @@ class ControlServerTest {
         val heartbeat = client.post("/api/v1/internal/heartbeat") {
             bearerAuth("secret")
             contentType(ContentType.Application.Json)
-            setBody(HeartbeatReport("Lobby-1", 7, 100))
+            setBody(HeartbeatReport("Lobby-1", 7, 100, memoryUsedMb = 512, memoryMaxMb = 2048, cpuPercent = 12.5))
         }
         assertEquals(HttpStatusCode.OK, heartbeat.status)
 
         val overview: PlatformOverview = client.get("/api/v1/platform/overview") { bearerAuth("secret") }.body()
         assertEquals(7, overview.onlinePlayers)
+
+        // resource metrics from the heartbeat surface on the service snapshot
+        val withResources: ServiceInfo = client.get("/api/v1/services/Lobby-1") { bearerAuth("secret") }.body()
+        assertEquals(512, withResources.memoryUsedMb)
+        assertEquals(2048, withResources.memoryMaxMb)
+        assertEquals(12.5, withResources.cpuPercent)
 
         val snapshot: RoutingSnapshot = client.get("/api/v1/internal/routing?proxyServiceId=x") {
             bearerAuth("secret")
