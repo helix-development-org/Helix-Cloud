@@ -11,6 +11,7 @@ package org.helix.node.logging
  */
 class LogBuffer(private val capacity: Int = 2000) {
     private val lines = ArrayDeque<String>()
+    private var total: Long = 0
 
     /**
      * Appends a line, dropping the oldest when the capacity is reached.
@@ -20,6 +21,7 @@ class LogBuffer(private val capacity: Int = 2000) {
     @Synchronized
     fun add(line: String) {
         lines.addLast(line)
+        total++
         while (lines.size > capacity) {
             lines.removeFirst()
         }
@@ -33,4 +35,24 @@ class LogBuffer(private val capacity: Int = 2000) {
      */
     @Synchronized
     fun tail(limit: Int): List<String> = lines.toList().takeLast(limit)
+
+    /**
+     * Total lines ever appended — the streaming offset.
+     *
+     * @return the monotonically increasing line count.
+     */
+    @Synchronized
+    fun offset(): Long = total
+
+    /**
+     * Lines appended after a previous [offset], for log streaming.
+     *
+     * @param offset the last seen offset.
+     * @return the new lines (bounded by the buffer capacity), oldest first.
+     */
+    @Synchronized
+    fun since(offset: Long): List<String> {
+        val missed = (total - offset).coerceIn(0, lines.size.toLong()).toInt()
+        return lines.toList().takeLast(missed)
+    }
 }

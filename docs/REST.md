@@ -32,6 +32,7 @@ Session-Token. Die sichtbaren Views/Panels richten sich nach den Permissions
 | GET | `/metrics?limit=240` | Metrik-Historie (Zeitreihe): `epochMs`, `onlinePlayers`, `maxPlayers`, `servicesRunning`, `servicesTotal`, `avgTps`, `avgApiMs` — 15s-Intervall, In-Memory-Ringpuffer |
 | GET | `/api-stats` | Control-API-Performance (rollierendes Fenster): `avgMs`, `p95Ms`, `requestsPerMinute`, `errorRate`, `totalRequests` |
 | GET | `/logs?tail=300` | Node-Log (Ringpuffer über stdout/stderr-Capture) |
+| GET | `/logs/stream` | Node-Log als **SSE-Stream** (`text/event-stream`, eine `data:`-Zeile pro Log-Zeile, Keep-Alive-Kommentare) |
 | GET | `/events?limit=200` | Event-Timeline (neueste zuerst): Service-Lifecycle, Player, Moderation, Proxy, Tasks |
 | GET | `/audit?limit=300&category=<cat>` | Vollständiger Audit-Log: jeder HTTP-Request, jede Action, Auth-Versuche, Lifecycle (persistiert in `audit.jsonl` bzw. bei `storage.mode = "postgres"`/`"mongodb"` in `audit_log`) |
 | GET | `/proxy` | Proxy-Übersicht: Maintenance, Proxies, Backend-Routing |
@@ -59,6 +60,7 @@ Session-Token. Die sichtbaren Views/Panels richten sich nach den Permissions
 | POST | `/services/{id}/stop` | graceful stop |
 | POST | `/services/{id}/kill` | sofort beenden |
 | GET | `/services/{id}/logs?tail=50` | neueste Log-Zeilen |
+| GET | `/services/{id}/logs/stream` | Service-Log als **SSE-Stream** (Live-Konsole) |
 | POST | `/services/{id}/command` | Konsolenbefehl an den Service senden — Body `{"command": "say hi"}` (Prozess **und** Docker; wird auditiert) |
 
 ## Schedules

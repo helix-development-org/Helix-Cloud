@@ -23,8 +23,10 @@ import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.request.receive
+import io.ktor.http.ContentType
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondTextWriter
 import io.ktor.server.routing.RoutingContext
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
@@ -201,6 +203,82 @@ private fun knownPermissionNodes(dependencies: ControlDependencies): List<String
         .forEach { add(it) }
 }.distinct()
 
+/** Lines fetched per service-log poll while streaming. */
+private const val STREAM_TAIL = 400
+
+/** Milliseconds between stream polls. */
+private const val STREAM_POLL_MS = 300L
+
+/** Stream polls between keep-alive comments (~15 s). */
+private const val STREAM_KEEPALIVE_POLLS = 50
+
+/**
+ * Responds with a server-sent-event stream and runs the given block with an
+ * emitter that writes one SSE event per log line.
+ *
+ * @param block receives the raw event emitter.
+ */
+private suspend fun RoutingContext.streamSse(block: suspend (suspend (String) -> Unit) -> Unit) {
+    call.response.header(HttpHeaders.CacheControl, "no-cache")
+    call.respondTextWriter(contentType = ContentType.Text.EventStream) {
+        val emit: suspend (String) -> Unit = { raw ->
+            write(raw)
+            flush()
+        }
+        runCatching { block(emit) }
+    }
+}
+
+/**
+ * Emits log lines as SSE `data:` events.
+ *
+ * @param emit the raw event emitter.
+ * @param lines the lines to send.
+ */
+private suspend fun emitLines(emit: suspend (String) -> Unit, lines: List<String>) {
+    lines.forEach { line -> emit("data: ${line.replace("\n", " ")}\n\n") }
+}
+
+/**
+ * Runs a poll loop until the client disconnects, sending keep-alive comments
+ * while idle. The step returns whether it produced output.
+ *
+ * @param emit the raw event emitter, used for keep-alive comments.
+ * @param step polls once; `true` when new lines were emitted.
+ */
+private suspend fun sseLoop(emit: suspend (String) -> Unit, step: suspend () -> Boolean) {
+    var idle = 0
+    while (true) {
+        val produced = step()
+        idle = if (produced) 0 else idle + 1
+        if (idle >= STREAM_KEEPALIVE_POLLS) {
+            idle = 0
+            emit(": keep-alive\n\n")
+        }
+        kotlinx.coroutines.delay(STREAM_POLL_MS)
+    }
+}
+
+/**
+ * Finds the lines in [current] that were appended after [previous], matching
+ * on the previous tail line (rotation falls back to the full window).
+ *
+ * @param previous the last window sent.
+ * @param current the freshly read window.
+ * @return the new lines, oldest first.
+ */
+private fun newLines(previous: List<String>, current: List<String>): List<String> {
+    if (previous.isEmpty()) {
+        return current
+    }
+    if (current == previous) {
+        return emptyList()
+    }
+    val anchor = previous.last()
+    val index = current.lastIndexOf(anchor)
+    return if (index >= 0) current.drop(index + 1) else current
+}
+
 private fun io.ktor.server.routing.Route.publicAuthRoutes(dependencies: ControlDependencies) {
     post("/auth/request-code") {
         val request = call.receive<LoginRequest>()
@@ -245,6 +323,19 @@ private fun io.ktor.server.routing.Route.observabilityRoutes(dependencies: Contr
         if (!authorize(dependencies, "helix.panel.logs")) return@get
         val tail = call.request.queryParameters["tail"]?.toIntOrNull() ?: 300
         call.respond(LogsResponse(dependencies.logBuffer.tail(tail)))
+    }
+    get("/logs/stream") {
+        if (!authorize(dependencies, "helix.panel.logs")) return@get
+        streamSse { emit ->
+            var offset = dependencies.logBuffer.offset()
+            emitLines(emit, dependencies.logBuffer.tail(200))
+            sseLoop(emit) {
+                val lines = dependencies.logBuffer.since(offset)
+                offset = dependencies.logBuffer.offset()
+                emitLines(emit, lines)
+                lines.isNotEmpty()
+            }
+        }
     }
     get("/events") {
         if (!authorize(dependencies, "helix.panel.events")) return@get
@@ -421,6 +512,21 @@ private fun io.ktor.server.routing.Route.serviceRoutes(dependencies: ControlDepe
         if (!authorize(dependencies, "helix.panel.services")) return@get
         val tail = call.request.queryParameters["tail"]?.toIntOrNull() ?: 50
         call.respond(LogsResponse(dependencies.manager.logs(call.parameters["id"].orEmpty(), tail)))
+    }
+    get("/services/{id}/logs/stream") {
+        if (!authorize(dependencies, "helix.panel.services")) return@get
+        val id = call.parameters["id"].orEmpty()
+        streamSse { emit ->
+            var last: List<String> = dependencies.manager.logs(id, STREAM_TAIL)
+            emitLines(emit, last)
+            sseLoop(emit) {
+                val current = dependencies.manager.logs(id, STREAM_TAIL)
+                val fresh = newLines(last, current)
+                last = current
+                emitLines(emit, fresh)
+                fresh.isNotEmpty()
+            }
+        }
     }
     post("/services/{id}/command") {
         if (!authorize(dependencies, "helix.panel.services")) return@post

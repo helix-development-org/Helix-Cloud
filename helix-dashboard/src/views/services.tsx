@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { api, type ServiceInfo } from "@/lib/api"
+import { streamLines } from "@/lib/sse"
 import { usePoll } from "@/lib/use-poll"
 import { stateVariant, uptime } from "@/lib/format"
 import { Badge } from "@/components/ui/badge"
@@ -80,9 +81,17 @@ function ConsoleDialog({ id, onClose }: { id: string; onClose: () => void }) {
     try { const r = await api<{ lines: string[] }>(`/services/${id}/logs?tail=300`); setLines(r.lines) } catch { /* ignore */ }
   }
   useEffect(() => {
-    load()
-    const t = setInterval(load, 2000)
-    return () => clearInterval(t)
+    // live SSE stream; falls back to 2s polling if streaming fails
+    const abort = new AbortController()
+    let poll: ReturnType<typeof setInterval> | null = null
+    streamLines(`/services/${id}/logs/stream`, (line) => {
+      setLines((prev) => [...prev.slice(-999), line])
+    }, abort.signal).catch(() => {
+      if (abort.signal.aborted) return
+      load()
+      poll = setInterval(load, 2000)
+    })
+    return () => { abort.abort(); if (poll) clearInterval(poll) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
   useEffect(() => { boxRef.current?.scrollTo(0, boxRef.current.scrollHeight) }, [lines])

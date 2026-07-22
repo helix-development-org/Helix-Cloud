@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { api, type AuditEntry, type EventEntry } from "@/lib/api"
+import { streamLines } from "@/lib/sse"
 import { usePoll } from "@/lib/use-poll"
 import { ago } from "@/lib/format"
 import { Badge } from "@/components/ui/badge"
@@ -23,15 +24,30 @@ export function EventsView() {
   )
 }
 
-/** Node log tail. */
+/** Node log, streamed live via SSE with a polling fallback. */
 export function LogsView() {
-  const { data } = usePoll(() => api<{ lines: string[] }>("/logs?tail=400"), 2000)
+  const [lines, setLines] = useState<string[]>([])
   const box = useRef<HTMLDivElement>(null)
-  useEffect(() => { box.current?.scrollTo(0, box.current.scrollHeight) }, [data])
+  useEffect(() => {
+    const abort = new AbortController()
+    let poll: ReturnType<typeof setInterval> | null = null
+    const fallback = async () => {
+      try { const r = await api<{ lines: string[] }>("/logs?tail=400"); setLines(r.lines) } catch { /* ignore */ }
+    }
+    streamLines("/logs/stream", (line) => {
+      setLines((prev) => [...prev.slice(-1499), line])
+    }, abort.signal).catch(() => {
+      if (abort.signal.aborted) return
+      fallback()
+      poll = setInterval(fallback, 2000)
+    })
+    return () => { abort.abort(); if (poll) clearInterval(poll) }
+  }, [])
+  useEffect(() => { box.current?.scrollTo(0, box.current.scrollHeight) }, [lines])
   return (
     <Card><CardContent className="p-0">
       <div ref={box} className="h-[70vh] overflow-y-auto rounded-xl bg-black/40 p-4 font-mono text-xs leading-relaxed">
-        {(data?.lines ?? []).map((l, i) => (
+        {lines.map((l, i) => (
           <div key={i} className={l.includes("ERROR") ? "text-destructive" : l.includes("WARN") ? "text-[var(--warning)]" : "text-muted-foreground"}>{l}</div>
         ))}
       </div>

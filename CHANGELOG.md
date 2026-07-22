@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.36.0 — 2026-07-22
+
+### Live-Log-Streaming (SSE)
+- Node-Log und Service-Konsole streamen jetzt live über Server-Sent Events
+  (`GET /logs/stream`, `GET /services/{id}/logs/stream`) statt 2s-Polling —
+  neue Zeilen erscheinen in <500 ms.
+- Implementiert ohne Zusatz-Plugin (`text/event-stream` via Writer);
+  LogBuffer liefert präzise Offsets, Service-Logs werden delta-erkannt;
+  Keep-Alive-Kommentare halten die Verbindung offen.
+- Dashboard (Logs-Seite + Service-Konsole) konsumiert den Stream über
+  fetch/ReadableStream (EventSource kann keine Auth-Header) und fällt bei
+  Fehlern automatisch aufs bisherige Polling zurück.
+
 ## 0.35.0 — 2026-07-22
 
 ### Per-Service CPU & RAM
