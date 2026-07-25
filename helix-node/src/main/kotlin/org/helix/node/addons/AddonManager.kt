@@ -98,7 +98,8 @@ class AddonManager(
     private class LoadedAddon(
         val manifest: AddonManifest,
         val jar: Path,
-        val paperComponent: Path?,
+        val paperComponents: List<Pair<String, Path>>,
+        val velocityComponent: Path?,
         val resourcePack: Path?,
     ) {
         var state: AddonState = AddonState.DISABLED
@@ -169,7 +170,8 @@ class AddonManager(
         val record = LoadedAddon(
             manifest = manifest,
             jar = jarTarget,
-            paperComponent = extractOptional(file, "paper.jar", extractedPath(manifest, "paper.jar")),
+            paperComponents = extractPaperComponents(file, manifest),
+            velocityComponent = extractOptional(file, "velocity.jar", extractedPath(manifest, "velocity.jar")),
             resourcePack = extractOptional(file, "pack.zip", extractedPath(manifest, "pack.zip")),
         )
         loaded[manifest.id] = record
@@ -187,9 +189,22 @@ class AddonManager(
     @Synchronized
     fun paperComponents(taskName: String): List<Pair<String, Path>> =
         loaded.values
-            .filter { it.state == AddonState.ENABLED && it.paperComponent != null }
+            .filter { it.state == AddonState.ENABLED && it.paperComponents.isNotEmpty() }
             .filter { taskAddonActive(taskName, it.manifest.id) }
-            .map { it.manifest.id to it.paperComponent!! }
+            .flatMap { it.paperComponents }
+
+    /**
+     * Velocity-side plugin components of enabled addons active for a task.
+     *
+     * @param taskName the task the workspace belongs to.
+     * @return component key to extracted `velocity.jar` path.
+     */
+    @Synchronized
+    fun velocityComponents(taskName: String): List<Pair<String, Path>> =
+        loaded.values
+            .filter { it.state == AddonState.ENABLED && it.velocityComponent != null }
+            .filter { taskAddonActive(taskName, it.manifest.id) }
+            .map { it.manifest.id to it.velocityComponent!! }
 
     /**
      * The resource pack an addon bundled in its HXA, served publicly by the
@@ -306,6 +321,32 @@ class AddonManager(
         notifications.unregisterOwner(id)
         dashboardPanels.unregisterOwner(id)
         messages.unregisterOwner(id)
+    }
+
+    /**
+     * Extracts the Paper plugin components of an HXA: the main `paper.jar`
+     * (keyed by the addon id) plus any extra plugins under `paper/<name>.jar`
+     * (keyed `<id>-<name>`, e.g. bundled library plugins like packetevents).
+     */
+    private fun extractPaperComponents(file: Path, manifest: AddonManifest): List<Pair<String, Path>> {
+        val components = mutableListOf<Pair<String, Path>>()
+        extractOptional(file, "paper.jar", extractedPath(manifest, "paper.jar"))?.let {
+            components += manifest.id to it
+        }
+        ZipFile(file.toFile()).use { zip ->
+            zip.entries().asSequence()
+                .filter { !it.isDirectory && it.name.startsWith("paper/") && it.name.endsWith(".jar") }
+                .forEach { entry ->
+                    val name = entry.name.removePrefix("paper/").removeSuffix(".jar")
+                    val target = extractedPath(manifest, "paper-$name.jar")
+                    Files.createDirectories(target.parent)
+                    zip.getInputStream(entry).use { stream ->
+                        Files.copy(stream, target, StandardCopyOption.REPLACE_EXISTING)
+                    }
+                    components += "${manifest.id}-$name" to target
+                }
+        }
+        return components
     }
 
     private fun extractOptional(file: Path, entryName: String, target: Path): Path? =

@@ -1,0 +1,86 @@
+<div class="card" style="margin-bottom:16px">
+  <div class="card-head"><h2>IGuard configuration</h2>
+    <div class="sub">saved values distribute to every template &amp; service workspace and hot-reload running services — values with the <span class="badge warn">restart</span> badge only apply after a service restart</div>
+    <div class="right"><button class="btn" id="apply">Apply &amp; Reload</button></div>
+  </div>
+</div>
+<div id="groups"><span class="muted">loading…</span></div>
+
+<style>
+.guard-row{display:flex;align-items:center;gap:12px;padding:6px 0;border-bottom:1px solid var(--line)}
+.guard-row:last-child{border-bottom:0}
+.guard-row .path{flex:1;font-family:var(--mono);font-size:12px;word-break:break-all}
+.guard-row .ctl{display:flex;gap:6px;align-items:center}
+.guard-row input[type=text],.guard-row input[type=number]{width:230px}
+.guard-row input[type=checkbox]{width:auto}
+</style>
+
+<script>
+"use strict";
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const TITLES = { alerts:"Alerts", checks:"Checks", confidence:"Confidence", bans:"Bans", database:"Database",
+  dashboard:"Dashboard", notifications:"Notifications", exemptions:"Exemptions", workers:"Workers",
+  history:"History", sampler:"Sampler", detection:"Detection", sanctions:"Sanctions" };
+let settings = [];
+
+function input(s) {
+  const p = esc(s.path);
+  if (s.type === "boolean") return `<input type="checkbox" data-path="${p}" ${s.value === "true" ? "checked" : ""}>`;
+  if (s.type === "int") return `<input type="number" step="1" data-path="${p}" value="${esc(s.value)}">`;
+  if (s.type === "double") return `<input type="number" step="any" data-path="${p}" value="${esc(s.value)}">`;
+  return `<input type="text" data-path="${p}" value="${esc(s.value)}" title="default: ${esc(s.default)}">`;
+}
+
+function row(s) {
+  return `<div class="guard-row">
+    <span class="path">${esc(s.path)}
+      ${s.static ? '<span class="badge warn">restart</span>' : ""}
+      ${s.overridden ? '<span class="badge good">overridden</span>' : ""}</span>
+    <span class="ctl">${input(s)}
+      <button class="btn sm" data-save="${esc(s.path)}">Save</button>
+      <button class="btn sm subtle" data-reset="${esc(s.path)}">Reset</button></span>
+  </div>`;
+}
+
+function render() {
+  const groups = {};
+  settings.forEach(s => { const g = s.path.split(".")[0]; (groups[g] = groups[g] || []).push(s); });
+  document.getElementById("groups").innerHTML = Object.keys(groups).map(g => `
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-head"><h2>${esc(TITLES[g] || g)}</h2><div class="sub">${groups[g].length} value(s)</div></div>
+      <div class="card-body">${groups[g].map(row).join("")}</div>
+    </div>`).join("");
+  bind();
+}
+
+function currentValue(path) {
+  const el = document.querySelector(`[data-path="${CSS.escape(path)}"]`);
+  return el.type === "checkbox" ? String(el.checked) : el.value;
+}
+
+function toastResult(r) { Helix.toast(r.lines[0] || (r.success ? "ok" : "failed")); }
+
+function bind() {
+  document.querySelectorAll("[data-save]").forEach(b => b.onclick = async () => {
+    const value = currentValue(b.dataset.save);
+    if (value === "") return Helix.toast("empty value — use Reset to restore the default");
+    const r = await Helix.action("guard.config.set", b.dataset.save, value);
+    toastResult(r);
+    if (r.success) load();
+  });
+  document.querySelectorAll("[data-reset]").forEach(b => b.onclick = async () => {
+    const r = await Helix.action("guard.config.reset", b.dataset.reset);
+    toastResult(r);
+    if (r.success) load();
+  });
+}
+
+document.getElementById("apply").onclick = async () => toastResult(await Helix.action("guard.apply"));
+
+async function load() {
+  const r = await Helix.action("guard.config.get");
+  try { settings = JSON.parse(r.lines[0] || "[]"); } catch (e) { settings = []; }
+  render();
+}
+Helix.ready(load);
+</script>

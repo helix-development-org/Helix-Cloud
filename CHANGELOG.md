@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.43.0 — 2026-07-26
+
+### Helix-Guard — IGuard-Anticheat als Addon, komplett Panel-konfigurierbar
+- Neues Addon `helix.guard`: bündelt das IGuard-Anticheat als eine HXA —
+  `paper.jar` (IGuard Shadow-Jar), `velocity.jar` (IGuards netzwerkweiter
+  Ban-/Alert-Layer), `paper/packetevents.jar` (Fat-Jar der Pflicht-
+  Abhängigkeit) und `addon.jar` (Node-Teil). Ein Drop in `Helix/addons/`
+  verteilt alles automatisch auf Paper- UND Velocity-Services.
+- **Alle 179 IGuard-Einstellungen im Web-Panel** (neue Panel-Seite
+  „Guard"): Alerts, alle 31 Checks (enabled/alert-vl/setback-vl/decay),
+  Confidence, Bans inkl. Command-Templates, Discord-Notifications,
+  Exemptions, Datenbank, Dashboard, Worker/History — gruppiert, typisiert
+  (Checkbox/Zahl/Text), mit „overridden"- und „restart"-Badges.
+- Verteilung: Bei jedem Save rendert der Node die komplette
+  `config.yml`, schreibt sie in alle Templates + statischen Workspaces
+  und schickt laufenden Paper-Services `iguard reload` über die Konsole
+  (dynamische Werte greifen sofort; statische melden „requires service
+  restart"). Die `server-id` wird pro Service automatisch über
+  `${HELIX_SERVICE_ID}` aufgelöst.
+- Plattform: HXAs können jetzt zusätzlich `velocity.jar` (Velocity-
+  Komponenten) und `paper/<name>.jar` (mitreisende Plugin-Abhängigkeiten)
+  enthalten; neue Action `service.command <id> <line...>`.
+- Build-Automatik: `:helix-addon-guard:packageHxa` baut IGuard und sein
+  Velocity-Plugin aus dem Geschwister-Checkout `../IGuard` (IGui wird
+  nach mavenLocal publiziert; `org.fsqrt.rune:base` muss in mavenLocal
+  liegen) und lädt packetevents von codemc.
+
 ## 0.42.1 — 2026-07-25
 
 ### Fix: Resource-Pack-Download ("1 out of 1 packs failed")

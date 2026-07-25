@@ -121,6 +121,7 @@ class HelixNode(
                     .ensureJar(environment, version)
             },
             paperComponents = { taskName -> addonManager.paperComponents(taskName) },
+            velocityComponents = { taskName -> addonManager.velocityComponents(taskName) },
         ),
         executors = mapOf(
             ExecutorType.PROCESS to ProcessServiceExecutor(),

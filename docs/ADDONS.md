@@ -346,6 +346,11 @@ enthalten:
   Addon-Actions über `POST /actions` auf — so bleibt die Node-Seite die
   einzige Datenquelle (netzwerkweit), während die GUI-/Event-Logik im
   Server läuft.
+- **`velocity.jar`** — analog für Velocity-Services (z.B. netzwerkweite
+  Enforcement-Layer wie bei Helix-Guard).
+- **`paper/<name>.jar`** — weitere Paper-Plugins, die als Abhängigkeiten
+  mitreisen (z.B. packetevents für Helix-Guard); installiert als
+  `HelixAddon-<id>-<name>.jar`.
 - **`pack.zip`** — ein Resource Pack, das die Control-API **öffentlich**
   unter `/api/v1/packs/<addon-id>.zip` (+ `.sha1`) ausliefert, damit
   Minecraft-Clients es direkt laden können. Ist die Control-API nicht

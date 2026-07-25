@@ -1,0 +1,7 @@
+{
+  "id": "helix.guard",
+  "name": "Helix-Guard",
+  "version": "1.0.0",
+  "main": "org.helix.addons.guard.GuardAddon",
+  "description": "IGuard anticheat management: every IGuard config value is editable in the web panel, distributed to all Paper service directories and hot-reloaded on running services."
+}

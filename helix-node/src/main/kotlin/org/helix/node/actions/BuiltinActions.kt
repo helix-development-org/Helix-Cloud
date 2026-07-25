@@ -233,6 +233,20 @@ class BuiltinActions(
                 ActionResult.error("no active services for task: $name")
             }
         }
+        register(
+            registry,
+            "service.command",
+            "Sends a console command line to a running service.",
+            "service.command <service> <line...>",
+        ) { invocation ->
+            val id = argument(invocation, 0, "service")
+            val line = invocation.arguments.drop(1).joinToString(" ")
+            when {
+                line.isBlank() -> ActionResult.error("usage: service.command <service> <line...>")
+                manager.sendCommand(id, line) -> ActionResult.ok("sent to $id: $line")
+                else -> ActionResult.error("service not running: $id")
+            }
+        }
         register(registry, "service.logs", "Shows the newest log lines of a service.", "service.logs <service> [lines]") { invocation ->
             val id = argument(invocation, 0, "service")
             val tail = invocation.arguments.getOrNull(1)?.toIntOrNull() ?: 25

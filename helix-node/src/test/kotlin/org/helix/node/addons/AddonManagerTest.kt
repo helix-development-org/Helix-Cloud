@@ -26,6 +26,8 @@ class AddonManagerTest {
         withJar: Boolean = true,
         withPaperComponent: Boolean = false,
         withResourcePack: Boolean = false,
+        withVelocityComponent: Boolean = false,
+        extraPaperJars: List<String> = emptyList(),
     ): Path {
         val file = directory.resolve("$id.hxa")
         ZipOutputStream(Files.newOutputStream(file)).use { zip ->
@@ -58,6 +60,16 @@ class AddonManagerTest {
                 zip.write("pack-bytes".toByteArray())
                 zip.closeEntry()
             }
+            if (withVelocityComponent) {
+                zip.putNextEntry(ZipEntry("velocity.jar"))
+                zip.write("velocity-plugin".toByteArray())
+                zip.closeEntry()
+            }
+            extraPaperJars.forEach { name ->
+                zip.putNextEntry(ZipEntry("paper/$name.jar"))
+                zip.write(name.toByteArray())
+                zip.closeEntry()
+            }
         }
         return file
     }
@@ -77,6 +89,23 @@ class AddonManagerTest {
         manager.disable("helix.test")
         assertTrue(manager.paperComponents("Lobby").isEmpty())
         assertEquals(null, manager.resourcePack("helix.test"))
+    }
+
+    @Test
+    fun `velocity components and extra paper jars are extracted`() {
+        writeHxa(withPaperComponent = true, withVelocityComponent = true, extraPaperJars = listOf("packetevents"))
+        manager.loadAll()
+
+        val paper = manager.paperComponents("Lobby")
+        assertEquals(listOf("helix.test", "helix.test-packetevents"), paper.map { it.first }.sorted())
+        paper.forEach { (_, path) -> assertTrue(Files.exists(path)) }
+
+        val velocity = manager.velocityComponents("Proxy")
+        assertEquals(listOf("helix.test"), velocity.map { it.first })
+        assertTrue(Files.exists(velocity.single().second))
+
+        manager.disable("helix.test")
+        assertTrue(manager.velocityComponents("Proxy").isEmpty())
     }
 
     @Test

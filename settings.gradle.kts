@@ -25,6 +25,7 @@ include(
     "helix-addon-bettermsgs-paper",
     "helix-addon-permissions",
     "helix-addon-friends",
+    "helix-addon-guard",
     "helix-addon-tablist",
     "helix-addon-chat",
     "helix-addon-economy",

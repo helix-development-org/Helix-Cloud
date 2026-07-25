@@ -32,6 +32,7 @@ class WorkspacePreparer(
     private val internalResources: InternalResources,
     private val serverJar: (Environment, String) -> Path,
     private val paperComponents: (taskName: String) -> List<Pair<String, Path>> = { emptyList() },
+    private val velocityComponents: (taskName: String) -> List<Pair<String, Path>> = { emptyList() },
 ) {
     private val logger = LoggerFactory.getLogger(WorkspacePreparer::class.java)
 
@@ -150,12 +151,13 @@ class WorkspacePreparer(
      * reflects the current addon state.
      */
     private fun installAddonComponents(task: TaskDefinition, workspace: Path) {
-        if (task.environment != Environment.PAPER) {
-            return
+        val components = when (task.environment) {
+            Environment.PAPER -> paperComponents(task.name)
+            Environment.VELOCITY -> velocityComponents(task.name)
         }
         val plugins = workspace.resolve("plugins")
         Files.createDirectories(plugins)
-        val desired = paperComponents(task.name).associateBy { (id, _) -> componentFileName(id) }
+        val desired = components.associateBy { (id, _) -> componentFileName(id) }
         Files.list(plugins).use { stream ->
             stream.filter { it.fileName.toString().let { name -> name.startsWith(COMPONENT_PREFIX) && name.endsWith(".jar") } }
                 .filter { it.fileName.toString() !in desired }
