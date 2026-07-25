@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.39.0 — 2026-07-25
+
+### Backend- & Launcher-Restart (`/helix <modul> restart`)
+- **`platform.restart`** bzw. in-game **`/helix backend restart`**
+  (Permission `helix.admin`): Der Node-Prozess startet sich selbst neu,
+  während alle Services **headless weiterlaufen**. Der Nachfolger-Prozess
+  adoptiert sie wieder — Prozess-Services über die persistierte Wrapper-PID
+  (`Helix/services/registry.json`, wird bei jedem Lifecycle-Wechsel
+  gespiegelt), Docker-Services über ihren Container-Namen. Bridges
+  verbinden sich über ihre bestehenden Loops automatisch neu.
+- **Der Cache überlebt den Restart:** Maintenance-Flag, Spieler-Roster,
+  native Permission-Snapshots, Scheduler-Timing (keine doppelten
+  Daily-Jobs) und die Metrik-Historie der Dashboard-Graphen werden über
+  `Helix/restart-state.json` an den Nachfolger übergeben.
+- **`launcher.restart`** bzw. **`/helix launcher restart`**: voller
+  Neustart — Services stoppen sauber, eine frische `Launcher.jar` startet
+  anstelle der alten (nimmt eine ersetzte Jar-Datei mit, z.B. nach Update).
+- Respawn erbt Konsole/Arbeitsverzeichnis (`HELIX_RELAUNCH=1`); ein
+  respawnter Node ohne Terminal beendet sich nicht mehr bei stdin-EOF.
+- Neue E2E-Tests: `tools/e2e-restart.sh` (headless-Überleben, Re-Adoption
+  mit identischer PID, State-Restore, Konsole an adoptierten Service) und
+  `tools/e2e-launcher-restart.sh`.
+
 ## 0.38.0 — 2026-07-25
 
 ### Scheduled Restarts mit Chat-Countdown

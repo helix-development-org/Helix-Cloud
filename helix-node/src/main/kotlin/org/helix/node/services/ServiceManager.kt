@@ -22,6 +22,8 @@ import org.slf4j.LoggerFactory
  * @property environmentProvider extra environment variables per service,
  *   for example control URL and token for the bridge.
  * @property clock epoch millis source, injectable for tests.
+ * @property registry on-disk mirror of the services map, rewritten on every
+ *   lifecycle change so a restarted node can re-adopt surviving services.
  */
 class ServiceManager(
     private val taskStore: TaskStore,
@@ -30,6 +32,7 @@ class ServiceManager(
     private val environmentProvider: (ManagedService) -> Map<String, String> = { emptyMap() },
     private val clock: () -> Long = System::currentTimeMillis,
     private val eventSink: (category: String, level: String, message: String) -> Unit = { _, _, _ -> },
+    private val registry: ServiceRegistryFile? = null,
 ) {
     private val logger = LoggerFactory.getLogger(ServiceManager::class.java)
     private val services = linkedMapOf<String, ManagedService>()
@@ -126,6 +129,7 @@ class ServiceManager(
         managed.state = ServiceState.STOPPING
         logger.info("Stopping {}", id)
         handle.stop()
+        persistRegistry()
         return true
     }
 
@@ -202,6 +206,7 @@ class ServiceManager(
             managed.state = ServiceState.RUNNING
             logger.info("Service {} is now RUNNING", managed.id)
             eventSink("service", "info", "${managed.id} is now running")
+            persistRegistry()
         }
         managed.emptySinceEpochMs = when {
             report.onlinePlayers > 0 -> null
@@ -232,7 +237,38 @@ class ServiceManager(
         handle.onExit { exitCode -> onExit(managed, exitCode) }
         logger.info("Started {} on port {} via {}", managed.id, managed.port, task.executor)
         eventSink("service", "info", "Started ${managed.id} on port ${managed.port} via ${task.executor}")
+        persistRegistry()
         return managed.toInfo()
+    }
+
+    /**
+     * Re-adopts a service that survived a node restart headless.
+     *
+     * The service is registered as `RUNNING` with the given handle; the next
+     * bridge heartbeat refreshes its live stats. Ids and ports of adopted
+     * services are respected by future allocations.
+     *
+     * @param task the owning task definition.
+     * @param entry the persisted registry entry.
+     * @param handle re-attached control handle.
+     * @return the adopted service.
+     */
+    @Synchronized
+    fun adopt(task: TaskDefinition, entry: ServiceRegistryEntry, handle: ServiceHandle): ManagedService {
+        val managed = ManagedService(entry.id, task, java.nio.file.Path.of(entry.workspace), entry.port)
+        managed.state = ServiceState.RUNNING
+        managed.startedAtEpochMs = entry.startedAtEpochMs
+        managed.handle = handle
+        services[managed.id] = managed
+        handle.onExit { exitCode -> onExit(managed, exitCode) }
+        logger.info("Adopted surviving service {} (pid {})", managed.id, handle.pid ?: "n/a")
+        eventSink("service", "info", "Adopted surviving service ${managed.id}")
+        persistRegistry()
+        return managed
+    }
+
+    private fun persistRegistry() {
+        registry?.write(synchronized(this) { services.values.toList() })
     }
 
     private fun baseEnvironment(managed: ManagedService): Map<String, String> = mapOf(
@@ -271,6 +307,7 @@ class ServiceManager(
                 synchronized(this) { services.remove(managed.id) }
             }
         }
+        persistRegistry()
         stopListeners.forEach { it(managed) }
     }
 

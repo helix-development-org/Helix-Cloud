@@ -5,45 +5,51 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /**
- * [ServiceHandle] over a local wrapper process.
+ * [ServiceHandle] over a wrapper process that outlived a node restart.
  *
- * @property process the wrapper process.
+ * A fresh node JVM cannot reconstruct the original [java.lang.Process], so
+ * the surviving wrapper is controlled through its [ProcessHandle] instead.
+ * The exit code of an adopted process is not observable — exits report code
+ * `0`, so an adopted service never shows up as `FAILED`.
+ *
+ * @property processHandle OS handle of the surviving wrapper process.
  * @property logFile combined output of wrapper and server.
  */
-class ProcessServiceHandle(
-    private val process: Process,
+class AdoptedProcessHandle(
+    private val processHandle: ProcessHandle,
     private val logFile: Path,
 ) : ServiceHandle {
     /** Whether the wrapper process is still running. */
     override val alive: Boolean
-        get() = process.isAlive
+        get() = processHandle.isAlive
 
     /** OS process id of the wrapper. */
     override val pid: Long
-        get() = process.pid()
+        get() = processHandle.pid()
 
     /**
      * Requests a graceful stop by terminating the wrapper, which forwards
      * the termination to the server.
      */
     override fun stop() {
-        process.destroy()
+        processHandle.destroy()
     }
 
     /**
      * Kills the wrapper process immediately.
      */
     override fun kill() {
-        process.destroyForcibly()
+        processHandle.destroyForcibly()
     }
 
     /**
      * Registers a callback invoked once when the process exits.
      *
-     * @param callback receives the exit code.
+     * @param callback receives exit code `0` (the real code is unknown for
+     *   adopted processes).
      */
     override fun onExit(callback: (Int) -> Unit) {
-        process.onExit().thenAccept { callback(it.exitValue()) }
+        processHandle.onExit().thenAccept { callback(0) }
     }
 
     /**
@@ -67,7 +73,7 @@ class ProcessServiceHandle(
      */
     @Synchronized
     override fun sendCommand(line: String): Boolean {
-        if (!process.isAlive) {
+        if (!processHandle.isAlive) {
             return false
         }
         return ConsoleInput.append(logFile.resolveSibling("console.in"), line)

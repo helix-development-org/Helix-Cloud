@@ -38,6 +38,8 @@ Session-Token. Die sichtbaren Views/Panels richten sich nach den Permissions
 | GET | `/proxy` | Proxy-Übersicht: Maintenance, Proxies, Backend-Routing |
 | POST | `/proxy/maintenance` | Maintenance schalten — Body `{"enabled": true}` |
 | GET | `/panels` / `/panels/{id}` | Addon-Dashboard-Seiten (Metadaten / HTML) |
+| POST | `/actions` `{"action":"platform.restart"}` | Backend-Restart: Node-Prozess startet neu, Services laufen headless weiter und werden re-adoptiert |
+| POST | `/actions` `{"action":"launcher.restart"}` | Launcher-Restart: Services stoppen, frische `Launcher.jar` startet (Update-fähig) |
 | GET | `/translations` | Übersetzungs-Store: `{languages, defaultLanguage, entries:[{key, values, defaults}]}` — flache Keys `helix.translations.<owner>.<key>`, Werte/Defaults je Sprache |
 | POST | `/translations` | Übersetzung setzen/anlegen/zurücksetzen — Body `{key, language, value}` oder `{key, language, reset:true}`; neue Keys unter `helix.translations.custom.*` |
 | DELETE | `/translations/{key}` | Custom-Key löschen (Keys mit Code-Default sind nur resetbar) |

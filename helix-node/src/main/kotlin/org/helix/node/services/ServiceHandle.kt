@@ -8,6 +8,13 @@ interface ServiceHandle {
     val alive: Boolean
 
     /**
+     * OS process id of the service, when the executor runs local processes.
+     * Persisted so a restarted node can re-adopt surviving services.
+     */
+    val pid: Long?
+        get() = null
+
+    /**
      * Requests a graceful stop.
      */
     fun stop()

@@ -32,4 +32,17 @@ class MetricsHistory(private val capacity: Int = 2880) {
      */
     @Synchronized
     fun recent(limit: Int): List<MetricSample> = samples.toList().takeLast(limit)
+
+    /**
+     * Restores history after a node restart, prepending the persisted
+     * samples to anything already recorded.
+     *
+     * @param restored the samples in chronological order.
+     */
+    @Synchronized
+    fun restore(restored: List<MetricSample>) {
+        val current = samples.toList()
+        samples.clear()
+        (restored + current).takeLast(capacity).forEach(samples::addLast)
+    }
 }

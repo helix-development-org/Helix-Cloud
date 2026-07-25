@@ -57,6 +57,17 @@ class PlayerRegistry(private val clock: () -> Long = System::currentTimeMillis) 
     fun online(): List<OnlinePlayer> = players.values.sortedBy { it.name.lowercase() }
 
     /**
+     * Restores the roster after a node restart, without firing join events.
+     *
+     * Subsequent bridge-reported joins and leaves correct the roster again.
+     *
+     * @param restored the players online before the restart.
+     */
+    fun restore(restored: List<OnlinePlayer>) {
+        restored.forEach { player -> players.putIfAbsent(player.name.lowercase(), player) }
+    }
+
+    /**
      * Looks up an online player.
      *
      * @param name player name, case-insensitive.

@@ -38,4 +38,20 @@ class NativePermissionCache {
      * @return the granted nodes, or `null` if no snapshot exists.
      */
     fun granted(name: String): Set<String>? = granted[name.lowercase()]
+
+    /**
+     * Snapshot of every player's granted nodes, for the restart state.
+     *
+     * @return lowercase player name to granted nodes.
+     */
+    fun snapshot(): Map<String, Set<String>> = granted.toMap()
+
+    /**
+     * Restores snapshots after a node restart.
+     *
+     * @param snapshots lowercase player name to granted nodes.
+     */
+    fun restore(snapshots: Map<String, Set<String>>) {
+        snapshots.forEach { (name, nodes) -> granted.putIfAbsent(name, nodes) }
+    }
 }

@@ -44,6 +44,10 @@ import org.helix.node.versions.VersionCatalog
  *  subcommands of `/helix`.
  * @property addonSubcommands handler of the `/helix` addon-management
  *  subcommands, wired to [org.helix.node.addons.AddonActions].
+ * @property restartBackend restarts the node process while services keep
+ *  running headless, wired by the launcher.
+ * @property restartLauncher stops services and starts a fresh Launcher.jar,
+ *  wired by the launcher.
  */
 class BuiltinActions(
     private val paths: NodePaths,
@@ -63,6 +67,8 @@ class BuiltinActions(
     private val addonSubcommands: (args: List<String>) -> ActionResult = {
         ActionResult.error("addon management unavailable")
     },
+    private val restartBackend: () -> Boolean = { false },
+    private val restartLauncher: () -> Boolean = { false },
 ) {
     private val restarts = RestartCoordinator(
         manager = manager,
@@ -87,6 +93,30 @@ class BuiltinActions(
         register(registry, "platform.stop", "Stops all services and shuts the node down.", "platform.stop") {
             shutdown()
             ActionResult.ok("shutdown initiated")
+        }
+        register(
+            registry,
+            "platform.restart",
+            "Restarts the node process; services keep running headless and are re-adopted.",
+            "platform.restart",
+        ) {
+            if (restartBackend()) {
+                ActionResult.ok("backend restart initiated — services keep running")
+            } else {
+                ActionResult.error("restart unavailable (not running from Launcher.jar, or already stopping)")
+            }
+        }
+        register(
+            registry,
+            "launcher.restart",
+            "Stops all services and starts a fresh Launcher.jar in place of this one.",
+            "launcher.restart",
+        ) {
+            if (restartLauncher()) {
+                ActionResult.ok("launcher restart initiated — services stop, new launcher starts")
+            } else {
+                ActionResult.error("restart unavailable (not running from Launcher.jar, or already stopping)")
+            }
         }
         register(registry, "actions.list", "Lists all registered actions.", "actions.list") {
             ActionResult.ok(
@@ -280,8 +310,8 @@ class BuiltinActions(
         registry.register(
             ActionDescriptor(
                 name = "helix",
-                description = "Helix network command: language and administration.",
-                usage = "helix <language|addons|enable|disable|reload> [arg]",
+                description = "Helix network command: language, administration and restarts.",
+                usage = "helix <language|addons|enable|disable|reload|backend|launcher> [arg]",
                 playerCommand = true,
             ),
             ::handleHelixCommand,
@@ -361,7 +391,21 @@ class BuiltinActions(
             "addons", "list", "enable", "disable", "reload" -> requireAdmin(player) {
                 addonSubcommands(invocation.arguments.drop(1))
             }
+            "backend" -> requireAdmin(player) { moduleRestart(player, "backend", invocation) }
+            "launcher" -> requireAdmin(player) { moduleRestart(player, "launcher", invocation) }
             else -> ActionResult.ok(helixMessages.formatFor(player, "usage"))
+        }
+    }
+
+    private fun moduleRestart(player: String, module: String, invocation: ActionInvocation): ActionResult {
+        if (invocation.arguments.getOrNull(2)?.lowercase() != "restart") {
+            return ActionResult.ok(helixMessages.formatFor(player, "usage"))
+        }
+        val initiated = if (module == "backend") restartBackend() else restartLauncher()
+        return if (initiated) {
+            ActionResult.ok(helixMessages.formatFor(player, "restart.$module"))
+        } else {
+            ActionResult.error(helixMessages.formatFor(player, "restart.unavailable"))
         }
     }
 

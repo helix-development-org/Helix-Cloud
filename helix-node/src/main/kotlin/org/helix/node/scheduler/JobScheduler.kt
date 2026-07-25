@@ -100,6 +100,25 @@ class JobScheduler(
         }
     }
 
+    /**
+     * Snapshot of the last-run timestamps, for the restart state.
+     *
+     * @return job id to epoch millis of the last execution.
+     */
+    @Synchronized
+    fun lastRuns(): Map<String, Long> = lastRun.toMap()
+
+    /**
+     * Restores last-run timestamps after a node restart, so daily jobs do
+     * not re-fire and intervals do not reset.
+     *
+     * @param runs job id to epoch millis of the last execution.
+     */
+    @Synchronized
+    fun restoreLastRuns(runs: Map<String, Long>) {
+        lastRun.putAll(runs)
+    }
+
     private fun isDue(job: ScheduledJob, now: Long): Boolean {
         val previous = lastRun[job.id]
         if (job.everyMinutes > 0) {

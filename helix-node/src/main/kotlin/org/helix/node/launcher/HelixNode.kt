@@ -48,11 +48,16 @@ import org.helix.node.proxy.ProxyEventHub
 import org.helix.node.proxy.ProxyRoutingService
 import org.helix.node.resources.ClasspathInternalResources
 import org.helix.node.scaling.AutoScaler
+import org.helix.node.services.AdoptedProcessHandle
 import org.helix.node.services.ManagedService
 import org.helix.node.services.ProcessServiceExecutor
 import org.helix.node.services.ServiceManager
+import org.helix.node.services.ServiceRegistryFile
 import org.helix.node.services.WorkspacePreparer
+import org.helix.node.services.docker.DockerNames
 import org.helix.node.services.docker.DockerServiceExecutor
+import org.helix.node.services.docker.DockerServiceHandle
+import org.helix.node.services.docker.SystemCommandRunner
 import org.helix.node.storage.StorageBackend
 import org.helix.node.storage.StorageProvider
 import org.helix.node.tasks.TaskStore
@@ -72,6 +77,10 @@ class HelixNode(
 ) {
     private val logger = LoggerFactory.getLogger(HelixNode::class.java)
     private val stopping = AtomicBoolean(false)
+
+    /** Set during a backend restart so the shutdown path spares the services. */
+    @Volatile
+    private var keepServicesOnExit = false
 
     /** Recent node events for the dashboard timeline. */
     val eventLog: EventLog = EventLog()
@@ -98,6 +107,9 @@ class HelixNode(
     /** Central action registry. */
     val registry: ActionRegistry = ActionRegistry()
 
+    /** On-disk mirror of the running services, read back after a restart. */
+    private val serviceRegistry = ServiceRegistryFile(paths.root.resolve("services/registry.json"))
+
     /** Service lifecycle owner. */
     val manager: ServiceManager = ServiceManager(
         taskStore = taskStore,
@@ -115,6 +127,7 @@ class HelixNode(
         ),
         environmentProvider = ::bridgeEnvironment,
         eventSink = ::recordEvent,
+        registry = serviceRegistry,
     )
 
     /** Proxy routing state. */
@@ -226,8 +239,13 @@ class HelixNode(
         "helix",
         mapOf(
             "en" to linkedMapOf(
-                "usage" to "{prefix} <gray>Usage: <white>/helix \\<language|addons|enable|disable|reload> [arg]",
+                "usage" to "{prefix} <gray>Usage: <white>/helix " +
+                    "\\<language|addons|enable|disable|reload|backend restart|launcher restart>",
                 "no_permission" to "{prefix} <red>You do not have permission to do that.",
+                "restart.backend" to "{prefix} <green>Backend restart initiated — services keep running.",
+                "restart.launcher" to "{prefix} <green>Launcher restart initiated — services stop and " +
+                    "a fresh launcher starts.",
+                "restart.unavailable" to "{prefix} <red>Restart unavailable (not running from Launcher.jar).",
                 "language.current" to "{prefix} <gray>Your language: <white>{language}<gray>. " +
                     "Available: <white>{languages}<gray>. Change it with <white>/helix language \\<code><gray>.",
                 "language.set" to "{prefix} <green>Language changed to <white>{language}<green>.",
@@ -235,8 +253,13 @@ class HelixNode(
                     "Available: <white>{languages}",
             ),
             "de" to linkedMapOf(
-                "usage" to "{prefix} <gray>Benutzung: <white>/helix \\<language|addons|enable|disable|reload> [arg]",
+                "usage" to "{prefix} <gray>Benutzung: <white>/helix " +
+                    "\\<language|addons|enable|disable|reload|backend restart|launcher restart>",
                 "no_permission" to "{prefix} <red>Dafür hast du keine Berechtigung.",
+                "restart.backend" to "{prefix} <green>Backend-Neustart gestartet — die Services laufen weiter.",
+                "restart.launcher" to "{prefix} <green>Launcher-Neustart gestartet — Services stoppen und " +
+                    "ein frischer Launcher startet.",
+                "restart.unavailable" to "{prefix} <red>Neustart nicht verfügbar (läuft nicht aus einer Launcher.jar).",
                 "language.current" to "{prefix} <gray>Deine Sprache: <white>{language}<gray>. " +
                     "Verfügbar: <white>{languages}<gray>. Ändern mit <white>/helix language \\<code><gray>.",
                 "language.set" to "{prefix} <green>Sprache geändert zu <white>{language}<green>.",
@@ -415,6 +438,8 @@ class HelixNode(
     fun start() {
         logger.info("Booting Helix-Cloud {} from {}", version(), dataDirectory.toAbsolutePath())
         taskStore.reload()
+        adoptSurvivingServices()
+        restoreRestartState()
         migrateLegacyProxyScreens()
         languages.onChange { proxyEvents.bumpRouting() }
         val addonActions = AddonActions(addonManager)
@@ -438,6 +463,8 @@ class HelixNode(
                 )
             },
             addonSubcommands = addonActions::helixSubcommand,
+            restartBackend = ::restartBackend,
+            restartLauncher = ::restartLauncher,
         ).registerAll(registry)
         addonActions.registerAll(registry)
         BackupActions(backups).registerAll(registry)
@@ -473,7 +500,13 @@ class HelixNode(
             JOB_PERIOD_SECONDS,
             TimeUnit.SECONDS,
         )
-        Runtime.getRuntime().addShutdownHook(Thread { stopServicesQuietly() })
+        Runtime.getRuntime().addShutdownHook(
+            Thread {
+                if (!keepServicesOnExit) {
+                    stopServicesQuietly()
+                }
+            },
+        )
         logger.info(
             "Node ready — dashboard: http://{}:{}/  token: {}",
             config.control.host,
@@ -484,10 +517,22 @@ class HelixNode(
 
     /**
      * Runs the interactive CLI until the input ends or `platform.stop` runs.
+     *
+     * A respawned node (`HELIX_RELAUNCH=1`) usually has no terminal on
+     * stdin; instead of shutting down on the immediate EOF it stays alive
+     * until `platform.stop` or a restart terminates the process.
      */
     fun runCli() {
         NodeCli(registry).run(System.`in`.bufferedReader())
-        shutdown()
+        if (stopping.get()) {
+            return
+        }
+        if (System.getenv("HELIX_RELAUNCH") == "1") {
+            logger.info("Console input ended — node keeps running (stop via panel or platform.stop)")
+            java.util.concurrent.CountDownLatch(1).await()
+        } else {
+            shutdown()
+        }
     }
 
     /**
@@ -507,6 +552,164 @@ class HelixNode(
             runCatching { storageBackend.close() }
             exitProcess(0)
         }, "helix-shutdown").start()
+    }
+
+    /**
+     * Restarts the node process while every running service keeps running
+     * headless; the successor process re-adopts them.
+     *
+     * The runtime state (maintenance flag, player roster, permission
+     * snapshots, scheduler timing, metrics history) is written to disk and
+     * restored by the successor, then a fresh launcher process is spawned
+     * and this one exits without stopping any service.
+     *
+     * @return `true` when the restart was initiated; `false` when not
+     *   running from a `Launcher.jar` or already stopping.
+     */
+    fun restartBackend(): Boolean {
+        val jar = LauncherRespawn.launcherJar()
+        if (jar == null) {
+            logger.error("Backend restart unavailable — not running from a Launcher.jar")
+            return false
+        }
+        if (!stopping.compareAndSet(false, true)) {
+            return false
+        }
+        keepServicesOnExit = true
+        eventLog.record("node", "Backend restart initiated — services keep running", "warn")
+        audit.record("node", "system", "Backend restart initiated")
+        Thread({
+            logger.info("Backend restart: services keep running, respawning {}", jar)
+            runCatching(::saveRestartState)
+                .onFailure { logger.warn("Could not persist the restart state: {}", it.message) }
+            scheduler.shutdownNow()
+            addonManager.disableAll()
+            controlServer.stop()
+            runCatching { storageProvider.close() }
+            runCatching { storageBackend.close() }
+            val spawned = LauncherRespawn.spawn(jar)
+            if (!spawned) {
+                logger.error("Failed to spawn the successor launcher — start it manually")
+            }
+            exitProcess(if (spawned) 0 else 1)
+        }, "helix-restart").start()
+        return true
+    }
+
+    /**
+     * Stops every service gracefully, then replaces this process with a
+     * freshly started `Launcher.jar` (picking up a replaced jar file).
+     *
+     * @return `true` when the restart was initiated.
+     */
+    fun restartLauncher(): Boolean {
+        val jar = LauncherRespawn.launcherJar()
+        if (jar == null) {
+            logger.error("Launcher restart unavailable — not running from a Launcher.jar")
+            return false
+        }
+        if (!stopping.compareAndSet(false, true)) {
+            return false
+        }
+        eventLog.record("node", "Launcher restart initiated", "warn")
+        audit.record("node", "system", "Launcher restart initiated")
+        Thread({
+            logger.info("Launcher restart: stopping services, respawning {}", jar)
+            scheduler.shutdownNow()
+            stopServicesQuietly()
+            addonManager.disableAll()
+            controlServer.stop()
+            runCatching { storageProvider.close() }
+            runCatching { storageBackend.close() }
+            val spawned = LauncherRespawn.spawn(jar)
+            if (!spawned) {
+                logger.error("Failed to spawn the successor launcher — start it manually")
+            }
+            exitProcess(if (spawned) 0 else 1)
+        }, "helix-restart").start()
+        return true
+    }
+
+    /**
+     * Re-adopts services that survived a backend restart headless: process
+     * services via their persisted pid, Docker services via their
+     * deterministic container name. Entries whose process or container died
+     * are dropped; the auto-scaler starts replacements.
+     */
+    private fun adoptSurvivingServices() {
+        val entries = serviceRegistry.read().filter {
+            it.state != ServiceState.STOPPED && it.state != ServiceState.FAILED
+        }
+        if (entries.isEmpty()) {
+            return
+        }
+        var adopted = 0
+        entries.forEach { entry ->
+            val task = taskStore.find(entry.task)
+            if (task == null) {
+                logger.warn(
+                    "Surviving service {} belongs to an unknown task {} — left running unmanaged",
+                    entry.id,
+                    entry.task,
+                )
+                return@forEach
+            }
+            val workspace = Path.of(entry.workspace)
+            val handle = when (entry.executor) {
+                ExecutorType.PROCESS -> entry.pid
+                    ?.let { pid -> ProcessHandle.of(pid).orElse(null) }
+                    ?.takeIf { it.isAlive }
+                    ?.let { AdoptedProcessHandle(it, workspace.resolve("service.log")) }
+                ExecutorType.DOCKER -> DockerServiceHandle(
+                    containerName = DockerNames.containerName(entry.id),
+                    runner = SystemCommandRunner(),
+                    workspace = workspace,
+                ).takeIf { it.alive }
+            }
+            if (handle != null) {
+                manager.adopt(task, entry, handle)
+                adopted++
+            } else {
+                logger.info("Service {} did not survive the restart", entry.id)
+            }
+        }
+        logger.info("Adopted {}/{} surviving service(s)", adopted, entries.size)
+        serviceRegistry.write(manager.managedServices())
+    }
+
+    /** Writes the in-memory runtime state for the successor process. */
+    private fun saveRestartState() {
+        val state = RestartState(
+            maintenance = routing.maintenance,
+            players = playerRegistry.online(),
+            nativePermissions = nativePermissions.snapshot(),
+            jobLastRuns = jobScheduler.lastRuns(),
+            metrics = metrics.recent(Int.MAX_VALUE),
+        )
+        java.nio.file.Files.writeString(paths.root.resolve(RESTART_STATE_FILE), Json.encodeToString(state))
+    }
+
+    /** Restores the runtime state left behind by the predecessor, once. */
+    private fun restoreRestartState() {
+        val file = paths.root.resolve(RESTART_STATE_FILE)
+        if (!java.nio.file.Files.exists(file)) {
+            return
+        }
+        runCatching {
+            val state = Json { ignoreUnknownKeys = true }
+                .decodeFromString<RestartState>(java.nio.file.Files.readString(file))
+            routing.maintenance = state.maintenance
+            playerRegistry.restore(state.players)
+            nativePermissions.restore(state.nativePermissions)
+            jobScheduler.restoreLastRuns(state.jobLastRuns)
+            metrics.restore(state.metrics)
+            logger.info(
+                "Restored runtime state from before the restart ({} player(s), maintenance={})",
+                state.players.size,
+                state.maintenance,
+            )
+        }.onFailure { logger.warn("Could not restore the restart state: {}", it.message) }
+        java.nio.file.Files.deleteIfExists(file)
     }
 
     /**
@@ -629,5 +832,8 @@ class HelixNode(
 
         /** Maximum milliseconds to wait for services during shutdown. */
         const val SHUTDOWN_WAIT_MILLIS = 15_000L
+
+        /** File name of the persisted runtime state during a restart. */
+        const val RESTART_STATE_FILE = "restart-state.json"
     }
 }

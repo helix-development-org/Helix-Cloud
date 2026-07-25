@@ -97,6 +97,31 @@ Plattform-Config (`server.properties`/`velocity.toml`). Details in
    dynamisch, wählt Initial-Server/Fallback und erzwingt Maintenance.
 5. Actions laufen einheitlich über CLI, REST, Dashboard und Addons.
 
+## Node-Restart ohne Downtime
+
+Die Node spiegelt ihre Service-Map laufend nach
+`Helix/services/registry.json` (Task, Workspace, Port, Executor, State,
+Wrapper-PID). `platform.restart` (auch `/helix backend restart` in-game)
+startet den Node-Prozess neu, **ohne die Services zu stoppen**:
+
+1. Runtime-State (Maintenance-Flag, Spieler-Roster, Permission-Snapshots,
+   Scheduler-Timing, Metrik-Historie) wird nach `Helix/restart-state.json`
+   geschrieben.
+2. Der Shutdown-Pfad überspringt das Service-Stoppen; die Wrapper-Prozesse
+   laufen verwaist (headless) weiter, Docker-Container sowieso.
+3. Eine frische `Launcher.jar`-JVM wird mit `HELIX_RELAUNCH=1` gespawnt
+   (erbt Konsole und Arbeitsverzeichnis), der alte Prozess endet.
+4. Der Nachfolger **adoptiert** die Überlebenden: Prozess-Services über die
+   persistierte PID (`ProcessHandle`), Docker-Services über den
+   deterministischen Container-Namen `helix-<id>`. Tote Einträge ersetzt
+   der Auto-Scaler. Bridges verbinden sich über ihre Poll-/Heartbeat-Loops
+   automatisch neu; der erste Heartbeat bestätigt `RUNNING`.
+
+`launcher.restart` (`/helix launcher restart`) ist der volle Neustart:
+Services stoppen sauber, danach startet eine frische `Launcher.jar` —
+eine zwischenzeitlich ersetzte Jar-Datei wird dabei übernommen (Update).
+E2E-Abdeckung: `tools/e2e-restart.sh` und `tools/e2e-launcher-restart.sh`.
+
 ## Dashboard (Frontend)
 
 Das Web-Dashboard ist eine **React + Vite + Tailwind + shadcn/ui**-App im
