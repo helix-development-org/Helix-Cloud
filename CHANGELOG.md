@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.38.0 — 2026-07-25
+
+### Scheduled Restarts mit Chat-Countdown
+- Neue Actions `service.restart <id> [delaySeconds]` und
+  `task.restart <task> [delaySeconds]` (Default 60 s): angekündigter
+  Neustart mit netzwerkweitem Chat-Countdown (Marken 600/300/120/60/30/10/
+  5/3/2/1 s) — die Announcements erscheinen in der Sprache jedes Spielers
+  (`helix.translations.network.restart.warn`/`.now`, `{target}`/`{seconds}`).
+- Task-Restarts laufen **rollierend**: ein Service nach dem anderen wird
+  gestoppt, auf Terminierung gewartet und ersetzt — übernimmt der
+  Auto-Scaler den Ersatz bereits, wird kein doppelter Service gestartet.
+- Über die bestehende **Schedules**-Seite planbar (z.B. täglicher
+  4-Uhr-Restart: Action `task.restart`, Argumente `Lobby, 300`,
+  `dailyAt 04:00`).
+
 ## 0.37.0 — 2026-07-25
 
 ### Mehrsprachiges Translation-System

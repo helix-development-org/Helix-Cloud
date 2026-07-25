@@ -71,6 +71,16 @@ Session-Token. Die sichtbaren Views/Panels richten sich nach den Permissions
 Erfordert Permission `helix.panel.schedules`. Jobs führen eine beliebige Action
 per Intervall (`everyMinutes`) oder täglich (`dailyAt` = `HH:mm`) aus.
 
+**Scheduled Restarts:** Die Actions `service.restart <id> [delaySeconds]` und
+`task.restart <task> [delaySeconds]` (Default 60 s) starten Services mit
+Chat-Countdown neu — Announcements laufen als Broadcast in der Sprache jedes
+Spielers (`helix.translations.network.restart.warn`/`.now`, Platzhalter
+`{target}` und `{seconds}`; Marken 600/300/120/60/30/10/5/3/2/1 s vor dem
+Neustart). Task-Restarts laufen rollierend (ein Service nach dem anderen);
+ersetzt der Auto-Scaler den gestoppten Service bereits, wird kein zweiter
+gestartet. Beispiel-Job für den täglichen 4-Uhr-Restart:
+`{"id":"lobby-nightly", "action":"task.restart", "arguments":["Lobby","300"], "dailyAt":"04:00", "enabled":true}`.
+
 | Methode | Pfad | Beschreibung |
 |---|---|---|
 | GET | `/schedules` | Alle Jobs |

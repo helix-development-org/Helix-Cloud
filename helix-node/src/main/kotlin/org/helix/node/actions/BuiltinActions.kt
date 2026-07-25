@@ -19,6 +19,7 @@ import org.helix.node.proxy.ProxyCommandQueue
 import org.helix.node.proxy.ProxyEventHub
 import org.helix.node.proxy.ProxyRoutingService
 import org.helix.api.proxy.ProxyCommand
+import org.helix.node.services.RestartCoordinator
 import org.helix.node.services.ServiceManager
 import org.helix.node.tasks.TaskStore
 import org.helix.node.versions.VersionCatalog
@@ -63,6 +64,11 @@ class BuiltinActions(
         ActionResult.error("addon management unavailable")
     },
 ) {
+    private val restarts = RestartCoordinator(
+        manager = manager,
+        deliver = { command -> deliver(command) },
+        eventSink = eventSink,
+    )
     /**
      * Registers every built-in action.
      *
@@ -164,6 +170,38 @@ class BuiltinActions(
         register(registry, "service.kill", "Kills a service immediately.", "service.kill <service>") { invocation ->
             val id = argument(invocation, 0, "service")
             if (manager.killService(id)) ActionResult.ok("killed $id") else ActionResult.error("service not running: $id")
+        }
+        register(
+            registry,
+            "service.restart",
+            "Restarts a service after an announced countdown.",
+            "service.restart <service> [delaySeconds]",
+        ) { invocation ->
+            val id = argument(invocation, 0, "service")
+            val delay = delaySeconds(invocation, 1)
+                ?: return@register ActionResult.error("invalid delay: ${invocation.arguments[1]}")
+            if (restarts.restartService(id, delay)) {
+                ActionResult.ok("restart of $id scheduled in ${delay}s")
+            } else {
+                ActionResult.error("service not running: $id")
+            }
+        }
+        register(
+            registry,
+            "task.restart",
+            "Rolling-restarts every service of a task after an announced countdown.",
+            "task.restart <task> [delaySeconds]",
+        ) { invocation ->
+            val name = argument(invocation, 0, "task")
+            taskStore.find(name) ?: return@register ActionResult.error("unknown task: $name")
+            val delay = delaySeconds(invocation, 1)
+                ?: return@register ActionResult.error("invalid delay: ${invocation.arguments[1]}")
+            val count = restarts.restartTask(name, delay)
+            if (count > 0) {
+                ActionResult.ok("rolling restart of $count service(s) of $name scheduled in ${delay}s")
+            } else {
+                ActionResult.error("no active services for task: $name")
+            }
         }
         register(registry, "service.logs", "Shows the newest log lines of a service.", "service.logs <service> [lines]") { invocation ->
             val id = argument(invocation, 0, "service")
@@ -373,6 +411,11 @@ class BuiltinActions(
         }
     }
 
+    private fun delaySeconds(invocation: ActionInvocation, index: Int): Long? {
+        val raw = invocation.arguments.getOrNull(index) ?: return DEFAULT_RESTART_DELAY_SECONDS
+        return raw.toLongOrNull()?.takeIf { it >= 0 }
+    }
+
     private fun argument(invocation: ActionInvocation, index: Int, label: String): String =
         requireNotNull(invocation.arguments.getOrNull(index)) { "missing argument: <$label>" }
 
@@ -384,5 +427,10 @@ class BuiltinActions(
         handler: (ActionInvocation) -> ActionResult,
     ) {
         registry.register(ActionDescriptor(name, description, usage), handler)
+    }
+
+    private companion object {
+        /** Countdown length of `service.restart`/`task.restart` without an explicit delay. */
+        const val DEFAULT_RESTART_DELAY_SECONDS = 60L
     }
 }

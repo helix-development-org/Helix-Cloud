@@ -262,6 +262,12 @@ class HelixNode(
             "en" to linkedMapOf(
                 "prefix" to "<gradient:#8b5cf6:#38bdf8><bold>Helix</bold></gradient> <dark_gray>»</dark_gray>",
                 "name" to config.network.name,
+                "restart.warn" to "{prefix} <gray><white>{target}</white> restarts in <white>{seconds}s</white>.",
+                "restart.now" to "{prefix} <gray><white>{target}</white> is restarting now.",
+            ),
+            "de" to linkedMapOf(
+                "restart.warn" to "{prefix} <gray><white>{target}</white> startet in <white>{seconds}s</white> neu.",
+                "restart.now" to "{prefix} <gray><white>{target}</white> startet jetzt neu.",
             ),
         ),
     )
