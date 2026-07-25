@@ -56,6 +56,10 @@ class GuardAddon : AddonBase() {
             "/panel.html",
             "<path d=\"M12 3l7 3v5c0 4.4-3 8.4-7 10-4-1.6-7-5.6-7-10V6z\"/><path d=\"M9 12l2 2 4-4\"/>",
         )
+        // seed the panel-managed config into every template and workspace at
+        // boot — services must never start on IGuard's bundled default
+        // (wrong server-id, unresolvable env placeholders)
+        runCatching { applyConfig(emptyList()) }
     }
 
     private fun configGet(): ActionResult {

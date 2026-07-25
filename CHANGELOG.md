@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.43.1 — 2026-07-26
+
+### Fix: IGuard deaktivierte sich beim Service-Start
+- Der Default für `database.password` war das Literal
+  `${IGUARD_DB_PASSWORD}` — IGuards Env-Substitution wirft bei fehlender
+  Variable und das Plugin deaktiviert sich. Default ist jetzt leer;
+  Zugangsdaten kommen aus dem Guard-Panel.
+- Das Guard-Addon verteilt seine gerenderte `config.yml` jetzt schon beim
+  Enable in alle Templates/Workspaces — Services starten nie mehr auf
+  IGuards Bundled-Default (falsche `server-id`, Env-Falle).
+
 ## 0.43.0 — 2026-07-26
 
 ### Helix-Guard — IGuard-Anticheat als Addon, komplett Panel-konfigurierbar

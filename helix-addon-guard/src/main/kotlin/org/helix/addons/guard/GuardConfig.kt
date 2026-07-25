@@ -121,7 +121,7 @@ object GuardConfig {
         plain("database.port", GuardValueType.INT, "5432", static = true),
         plain("database.database", GuardValueType.STRING, "iguard", static = true),
         plain("database.username", GuardValueType.STRING, "iguard", static = true),
-        plain("database.password", GuardValueType.STRING, "\${IGUARD_DB_PASSWORD}", static = true),
+        plain("database.password", GuardValueType.STRING, "", static = true),
         plain("database.ssl", GuardValueType.BOOLEAN, "false", static = true),
         plain("database.pool-size", GuardValueType.INT, "6", static = true),
         // workers.* — thread pool sized on startup
