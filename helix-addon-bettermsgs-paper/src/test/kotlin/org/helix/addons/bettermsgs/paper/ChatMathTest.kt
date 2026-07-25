@@ -7,7 +7,7 @@ class ChatMathTest {
     @Test
     fun `offset clamps to the scrollable range`() {
         assertEquals(0, ChatMath.clampOffset(-5, 20))
-        assertEquals(12, ChatMath.clampOffset(50, 20))
+        assertEquals(20 - ChatMath.WINDOW, ChatMath.clampOffset(50, 20))
         assertEquals(0, ChatMath.clampOffset(3, 5))
     }
 
@@ -15,8 +15,8 @@ class ChatMathTest {
     fun `thumb sits at the bottom for the newest window and at the top for the oldest`() {
         assertEquals(7, ChatMath.thumbIndex(0, 5))
         assertEquals(7, ChatMath.thumbIndex(0, 100))
-        assertEquals(0, ChatMath.thumbIndex(92, 100))
-        assertEquals(4, ChatMath.thumbIndex(46, 100))
+        assertEquals(0, ChatMath.thumbIndex(100 - ChatMath.WINDOW, 100))
+        assertEquals(4, ChatMath.thumbIndex((100 - ChatMath.WINDOW) / 2, 100))
     }
 
     @Test

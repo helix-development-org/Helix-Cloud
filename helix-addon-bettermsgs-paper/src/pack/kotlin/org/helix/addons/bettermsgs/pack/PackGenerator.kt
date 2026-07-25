@@ -56,6 +56,10 @@ fun main(args: Array<String>) {
         g.fillRect(0, 0, 2, 2)
     }
     entries["assets/bettermsgs/font/pixels.json"] = pixelFont()
+    // hide the vanilla container "Inventory" label under the drawn chat
+    val emptyInventoryLabel = """{"container.inventory": ""}""".toByteArray()
+    entries["assets/minecraft/lang/en_us.json"] = emptyInventoryLabel
+    entries["assets/minecraft/lang/de_de.json"] = emptyInventoryLabel
     ZipOutputStream(Files.newOutputStream(output)).use { zip ->
         entries.forEach { (name, bytes) ->
             val entry = ZipEntry(name)
@@ -194,7 +198,7 @@ private fun drawChat(g: Graphics2D) {
     // message area: alternating row separators for chest rows 2..6 and
     // the player inventory rows — one message per 18px row
     g.color = Color(0xFF, 0xFF, 0xFF, 8)
-    for (rowTop in intArrayOf(36, 72, 108, 140, 176)) {
+    for (rowTop in intArrayOf(39, 75, 111, 147)) {
         g.fillRect(4, rowTop, WIDTH - 12, 18)
     }
     // scrollbar track along the right edge of the message area
@@ -258,7 +262,7 @@ private fun drawThumb(g: Graphics2D) {
  * plus eight message rows (chest rows 2..6, then the three player
  * inventory rows).
  */
-private val TEXT_ROW_Y = intArrayOf(5, 22, 40, 58, 76, 94, 141, 159, 177)
+private val TEXT_ROW_Y = intArrayOf(5, 22, 40, 58, 76, 94, 112, 130, 148, 166)
 
 /**
  * Fonts `bettermsgs:text_row_0..8` re-declare Minecraft's ascii glyphs with
@@ -304,7 +308,7 @@ private val ASCII_GRID: String = buildString {
  * of the white 2x2 pixel at codepoints 0xE100 + row*8 + subRow.
  */
 private fun pixelFont(): ByteArray {
-    val anchors = intArrayOf(1, 19, 37, 55, 73, 91, 141, 159, 177)
+    val anchors = intArrayOf(1, 21, 39, 57, 75, 93, 111, 129, 147, 165)
     val providers = buildList {
         anchors.forEachIndexed { row, headY ->
             for (sub in 0..7) {

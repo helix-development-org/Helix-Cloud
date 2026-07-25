@@ -5,8 +5,8 @@ package org.helix.addons.bettermsgs.paper
  * and message text wrapping.
  */
 object ChatMath {
-    /** Messages visible at once (5 chest rows + 3 player-inventory rows). */
-    const val WINDOW = 8
+    /** Messages visible at once — the chat area is drawn continuously. */
+    const val WINDOW = 9
 
     /**
      * Clamps a scroll offset (messages back from the newest).
