@@ -107,6 +107,10 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
     @Volatile
     private var packSha1: ByteArray? = null
 
+    /** Operator-configured pack URL (`bettermsgs.packurl`), via bridge values. */
+    @Volatile
+    private var configuredPackUrl: String? = null
+
     /** Dispatcher running coroutines on the Bukkit main thread. */
     private val mainDispatcher = object : CoroutineDispatcher() {
         override fun isDispatchNeeded(context: CoroutineContext): Boolean = !Bukkit.isPrimaryThread()
@@ -149,7 +153,17 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
             chatGui = buildChatGui(installed)
             logger.info("BetterMSGs GUIs ready")
         }
-        server.scheduler.runTaskTimerAsynchronously(this, Runnable { translations.sync() }, 20L, 100L)
+        server.scheduler.runTaskTimerAsynchronously(
+            this,
+            Runnable {
+                translations.sync()
+                configuredPackUrl = client?.getJson("/api/v1/internal/bridge-values")
+                    ?.let { runCatching { json.decodeFromString<Map<String, String>>(it) }.getOrNull() }
+                    ?.get("bettermsgs.pack_url")
+            },
+            20L,
+            100L,
+        )
         server.scheduler.runTaskTimerAsynchronously(this, Runnable { pollOpenChats() }, 20L, 20L)
         server.scheduler.runTaskTimerAsynchronously(
             this,
@@ -212,15 +226,36 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
     @EventHandler
     fun onJoin(event: PlayerJoinEvent) {
         takeover.restoreCrashed(event.player)
-        val nodeClient = client ?: return
-        val url = System.getenv("HELIX_PACK_URL")
-            ?: "${nodeClient.controlUrl}/api/v1/packs/helix.bettermsgs.zip"
+        val url = packUrl(event.player) ?: return
         val sha1 = packSha1
         if (sha1 != null) {
             event.player.setResourcePack(url, sha1)
         } else {
             event.player.setResourcePack(url)
         }
+    }
+
+    /**
+     * Resolves the pack URL the player's CLIENT can reach: the configured
+     * `bettermsgs.packurl` value, then the `HELIX_PACK_URL` env override,
+     * then the address the player connected with (virtual host — control
+     * URLs like `host.docker.internal` or `127.0.0.1` mean nothing to a
+     * remote client), and finally the raw control URL.
+     *
+     * @param player the joining player.
+     * @return a download URL, or `null` without a node connection.
+     */
+    private fun packUrl(player: Player): String? {
+        val nodeClient = client ?: return null
+        configuredPackUrl?.let { return it }
+        System.getenv("HELIX_PACK_URL")?.let { return it }
+        val path = "/api/v1/packs/helix.bettermsgs.zip"
+        val controlPort = runCatching { java.net.URI(nodeClient.controlUrl).port }.getOrDefault(-1)
+        val clientHost = player.virtualHost?.hostString?.takeIf { it.isNotBlank() }
+        if (controlPort > 0 && clientHost != null) {
+            return "http://$clientHost:$controlPort$path"
+        }
+        return nodeClient.controlUrl + path
     }
 
     /**

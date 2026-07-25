@@ -92,6 +92,34 @@ class BetterMsgsAddon : AddonBase() {
             "Records which conversation a player has open; '-' clears the focus.",
             "bettermsgs.focus <player> <peer|->",
         ) { invocation -> setFocus(invocation) }
+        action(
+            "bettermsgs.packurl",
+            "Sets the public resource-pack URL clients download; '-' resets to auto.",
+            "bettermsgs.packurl <url|->",
+        ) { invocation -> setPackUrl(invocation) }
+        publishPackUrl()
+    }
+
+    private fun setPackUrl(invocation: ActionInvocation): ActionResult {
+        val url = invocation.arguments.firstOrNull()
+            ?: return ActionResult.error("usage: bettermsgs.packurl <url|->")
+        if (url == "-") {
+            context.storage().delete(PACK_URL_DOCUMENT)
+        } else {
+            context.storage().write(PACK_URL_DOCUMENT, url)
+        }
+        publishPackUrl()
+        return ActionResult.ok(if (url == "-") "pack url reset to auto" else "pack url set to $url")
+    }
+
+    /**
+     * Publishes the configured pack URL as a bridge value, so the Paper
+     * component can prefer it over the auto-detected address.
+     */
+    private fun publishPackUrl() {
+        context.storage().read(PACK_URL_DOCUMENT)?.let { url ->
+            context.publishBridgeValue("bettermsgs.pack_url", url)
+        }
     }
 
     private fun send(invocation: ActionInvocation): ActionResult {
@@ -191,5 +219,8 @@ class BetterMsgsAddon : AddonBase() {
     private companion object {
         /** Maximum window size a single history request may return. */
         const val MAX_HISTORY_LIMIT = 50
+
+        /** Storage document holding the configured public pack URL. */
+        const val PACK_URL_DOCUMENT = "packurl"
     }
 }

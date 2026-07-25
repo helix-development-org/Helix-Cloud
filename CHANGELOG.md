@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.42.1 — 2026-07-25
+
+### Fix: Resource-Pack-Download ("1 out of 1 packs failed")
+- Die Pack-Route lag im Auth-Bereich der API (401 für Clients) — sie ist
+  jetzt wirklich öffentlich.
+- Die Download-URL ist jetzt client-tauglich: Docker-/localhost-Adressen
+  aus `HELIX_CONTROL_URL` erreichen den Minecraft-Client nicht. Neue
+  Kette: per Action `bettermsgs.packurl <url|->` konfigurierte URL →
+  `HELIX_PACK_URL`-Env → **automatisch die Adresse, mit der der Spieler
+  verbunden ist** (Virtual Host + Control-Port) → Control-URL.
+- End-to-end verifiziert: Download ohne Auth, SHA-1 identisch,
+  konfigurierte URL erreicht die Paper-Komponente über Bridge-Values.
+
 ## 0.42.0 — 2026-07-25
 
 ### BetterMSGs — Handy-GUI für private Nachrichten

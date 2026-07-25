@@ -129,6 +129,7 @@ fun Application.controlModule(dependencies: ControlDependencies) {
         }
         route("/api/v1") {
             publicAuthRoutes(dependencies)
+            packRoutes(dependencies)
         }
         authenticate("helix") {
             route("/api/v1") {
@@ -764,9 +765,9 @@ private fun io.ktor.server.routing.Route.actionRoutes(dependencies: ControlDepen
     }
 }
 
-private fun io.ktor.server.routing.Route.addonRoutes(dependencies: ControlDependencies) {
-    // deliberately unauthenticated: Minecraft clients download addon
-    // resource packs directly from this URL (packs contain no secrets)
+// deliberately unauthenticated: Minecraft clients download addon
+// resource packs directly from this URL (packs contain no secrets)
+private fun io.ktor.server.routing.Route.packRoutes(dependencies: ControlDependencies) {
     get("/packs/{file}") {
         val file = call.parameters["file"].orEmpty()
         val id = file.removeSuffix(".zip").removeSuffix(".sha1")
@@ -782,6 +783,9 @@ private fun io.ktor.server.routing.Route.addonRoutes(dependencies: ControlDepend
             call.respondBytes(java.nio.file.Files.readAllBytes(pack), ContentType.Application.Zip)
         }
     }
+}
+
+private fun io.ktor.server.routing.Route.addonRoutes(dependencies: ControlDependencies) {
     get("/addons") {
         if (!authorize(dependencies, "helix.panel.addons")) return@get
         call.respond(dependencies.addonManager.addons())
