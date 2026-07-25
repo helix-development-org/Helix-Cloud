@@ -23,6 +23,11 @@ class NodeCli(
     /**
      * Processes input lines until the stream ends.
      *
+     * Read errors are treated like end-of-input: a node that lost its
+     * controlling terminal (for example the successor of a backend
+     * restart, whose inherited terminal returns `EIO`) must never crash
+     * the main thread — the caller decides whether to park or shut down.
+     *
      * @param reader source of input lines.
      */
     fun run(reader: BufferedReader) {
@@ -30,7 +35,12 @@ class NodeCli(
         while (true) {
             output.print("helix> ")
             output.flush()
-            val line = reader.readLine() ?: break
+            val line = try {
+                reader.readLine() ?: break
+            } catch (failure: java.io.IOException) {
+                output.println("console input unavailable (${failure.message}) — CLI closed")
+                break
+            }
             if (!handle(line)) {
                 break
             }

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.40.1 — 2026-07-25
+
+### Fix: Backend-Restart im Terminal stoppte alle Services
+- Der Nachfolger-Prozess erbte das Terminal-stdin; nach dem Exit des alten
+  Prozesses lieferte das TTY `EIO` → unbehandelte `IOException` im
+  Main-Thread → JVM-Shutdown → der Shutdown-Hook stoppte die frisch
+  adoptierten Services, während der Auto-Scaler parallel neue startete.
+- Fix (dreifach): Der Nachfolger bekommt `stdin=/dev/null` statt des
+  geerbten Terminals (stdout/stderr bleiben auf der Konsole; Steuerung
+  nach dem Restart über Panel/REST/in-game). Die CLI behandelt
+  Lese-Fehler wie EOF statt zu crashen. Der Shutdown-Hook setzt jetzt
+  das Stopping-Flag und stoppt den Scheduler, damit der Auto-Scaler
+  Services nicht wiederbelebt, während sie heruntergefahren werden.
+- Reproduziert und verifiziert unter echtem PTY: Service überlebt den
+  Backend-Restart mit identischer Wrapper-PID, keine IO-Errors.
+
 ## 0.40.0 — 2026-07-25
 
 ### Linux-Install-Script & systemd-Integration

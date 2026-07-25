@@ -503,6 +503,10 @@ class HelixNode(
         Runtime.getRuntime().addShutdownHook(
             Thread {
                 if (!keepServicesOnExit) {
+                    // Mark the node as stopping and silence the auto-scaler,
+                    // otherwise it resurrects services while the hook stops them.
+                    stopping.set(true)
+                    scheduler.shutdownNow()
                     stopServicesQuietly()
                 }
             },

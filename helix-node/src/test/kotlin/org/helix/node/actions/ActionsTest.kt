@@ -147,4 +147,21 @@ class ActionsTest {
         assertNotNull(taskStore.find("Lobby"))
         assertTrue(shutdownCalled)
     }
+
+    @Test
+    fun `cli treats read errors as end of input instead of crashing`() {
+        val out = java.io.ByteArrayOutputStream()
+        val broken = object : java.io.Reader() {
+            override fun read(cbuf: CharArray, off: Int, len: Int): Int =
+                throw java.io.IOException("Input/output error")
+
+            override fun close() = Unit
+        }
+
+        // must return normally — a lost controlling terminal (EIO) would
+        // otherwise kill the main thread and tear the whole node down
+        NodeCli(registry, PrintStream(out)).run(java.io.BufferedReader(broken))
+
+        assertTrue(out.toString().contains("console input unavailable"))
+    }
 }

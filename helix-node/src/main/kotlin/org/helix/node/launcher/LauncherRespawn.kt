@@ -30,16 +30,29 @@ object LauncherRespawn {
     /**
      * Starts a detached successor launcher process.
      *
+     * stdout/stderr stay on the current console, but stdin is detached
+     * (`/dev/null`): the successor must never read the inherited terminal —
+     * once this process exits, its orphaned process group would only get
+     * `EIO` from it. The successor parks on the immediate EOF instead
+     * (`HELIX_RELAUNCH=1`) and is controlled via panel, REST or in-game.
+     *
      * @param jar the launcher jar to execute; a freshly replaced jar file
      *   starts the new version.
      * @return `true` when the process was spawned.
      */
     fun spawn(jar: Path): Boolean = runCatching {
         val java = ProcessHandle.current().info().command().orElse("java")
+        val devNull = Path.of("/dev/null")
         ProcessBuilder(java, "-jar", jar.toAbsolutePath().toString())
             .directory(Path.of("").toAbsolutePath().toFile())
-            .inheritIO()
-            .apply { environment()["HELIX_RELAUNCH"] = "1" }
+            .redirectOutput(ProcessBuilder.Redirect.INHERIT)
+            .redirectError(ProcessBuilder.Redirect.INHERIT)
+            .apply {
+                if (Files.exists(devNull)) {
+                    redirectInput(devNull.toFile())
+                }
+                environment()["HELIX_RELAUNCH"] = "1"
+            }
             .start()
         true
     }.onFailure { logger.error("Failed to spawn {}", jar, it) }.getOrDefault(false)
