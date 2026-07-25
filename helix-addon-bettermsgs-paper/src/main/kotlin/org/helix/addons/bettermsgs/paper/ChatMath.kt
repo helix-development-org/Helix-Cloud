@@ -37,6 +37,16 @@ object ChatMath {
     }
 
     /**
+     * Shortens text to a maximum length, appending `..` when cut.
+     *
+     * @param text raw message text.
+     * @param max maximum characters.
+     * @return the possibly shortened text.
+     */
+    fun ellipsize(text: String, max: Int): String =
+        if (text.length <= max) text else text.take((max - 2).coerceAtLeast(1)).trimEnd() + ".."
+
+    /**
      * Wraps message text into display lines.
      *
      * @param text raw message text.

@@ -21,7 +21,9 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.command.Command
@@ -429,9 +431,6 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                 render { context, contact -> contactItem(context.player, contact) }
                 onClick { context, contact -> openChat(context.player, contact.name) }
             }
-            item(chestSlot(6, 5)) { context ->
-                namedItem(Material.BARRIER, translations.text(context.player, "item.close", "<red>Close"))
-            }
             onClick(chestSlot(6, 5)) { context -> context.close() }
         }
     }
@@ -484,12 +483,35 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                     moveTo(169)
                     texture(installed.cachedTexture("bettermsgs.thumb${ChatMath.thumbIndex(state.offset, state.total)}"))
                     toStart()
+                    moveTo(28)
+                    text(state.peer, 0, NamedTextColor.WHITE, rowFont(0))
+                    toStart()
+                    if (state.messages.isEmpty()) {
+                        centeredText(
+                            translations.text(context.player, "note.empty", "No messages yet - say hi!"),
+                            0,
+                            88,
+                            NamedTextColor.GRAY,
+                            rowFont(4),
+                        )
+                    }
+                    val padding = ChatMath.WINDOW - state.messages.size
+                    state.messages.forEachIndexed { index, message ->
+                        val row = padding + index + 1
+                        val own = message.from.equals(context.player.name, ignoreCase = true)
+                        val time = timeOf(message.epochMs)
+                        val line = "[$time] ${ChatMath.ellipsize(message.text, 24)}"
+                        if (own) {
+                            endText(line, 0, 148, NamedTextColor.AQUA, rowFont(row))
+                        } else {
+                            moveTo(28)
+                            text(line, 0, NamedTextColor.WHITE, rowFont(row))
+                            toStart()
+                        }
+                    }
                 }
             }
             // header: back, peer head, scroll older
-            item(chestSlot(1, 1)) { context ->
-                namedItem(Material.ARROW, translations.text(context.player, "item.back", "<gray>Back"))
-            }
             onClick(chestSlot(1, 1)) { context ->
                 chats.remove(context.player.uniqueId)
                 phoneGui?.open(context.player)
@@ -503,9 +525,6 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                     }
                     head
                 }
-            }
-            item(chestSlot(1, 9)) { context ->
-                namedItem(Material.SPECTRAL_ARROW, translations.text(context.player, "item.scroll.up", "<gray>Older"))
             }
             onClick(chestSlot(1, 9)) { context ->
                 chats[context.player.uniqueId]?.let { scroll(context.player, it, ChatMath.WINDOW) }
@@ -538,53 +557,34 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
     }
 
     private fun messageItem(viewer: Player, state: ChatState, rowIndex: Int, column: Int): ItemStack? {
-        val message = windowMessage(state, rowIndex) ?: return emptyNote(viewer, state, rowIndex, column)
+        val message = windowMessage(state, rowIndex) ?: return null
         val own = message.from.equals(viewer.name, ignoreCase = true)
         val headColumn = if (own) 9 else 1
-        val textColumn = if (own) 8 else 2
-        return when (column) {
-            headColumn -> ItemStack(Material.PLAYER_HEAD).also { head ->
-                head.editMeta(SkullMeta::class.java) { meta ->
-                    meta.owningPlayer = Bukkit.getOfflinePlayer(message.from)
-                    meta.displayName(translations.render(if (own) "<aqua>${message.from}" else "<white>${message.from}"))
+        if (column != headColumn) {
+            return null
+        }
+        return ItemStack(Material.PLAYER_HEAD).also { head ->
+            head.editMeta(SkullMeta::class.java) { meta ->
+                meta.owningPlayer = Bukkit.getOfflinePlayer(message.from)
+                meta.displayName(translations.render(if (own) "<aqua>${message.from}" else "<white>${message.from}"))
+                if (message.text.length > 24) {
+                    meta.lore(ChatMath.wrap(message.text).map { translations.render("<gray>$it") })
                 }
             }
-            textColumn -> textItem(message, own)
-            else -> null
         }
     }
+
+    private fun timeOf(epochMs: Long): String = DateTimeFormatter.ofPattern("HH:mm")
+        .withZone(ZoneId.systemDefault())
+        .format(Instant.ofEpochMilli(epochMs))
+
+    private fun rowFont(row: Int): Key = Key.key("bettermsgs", "text_row_$row")
 
     private fun windowMessage(state: ChatState, rowIndex: Int): ChatMessage? {
         // bottom-aligned: the newest message sits on the lowest visible row
         val padding = ChatMath.WINDOW - state.messages.size
         val index = rowIndex - padding
         return state.messages.getOrNull(index)
-    }
-
-    private fun emptyNote(viewer: Player, state: ChatState, rowIndex: Int, column: Int): ItemStack? {
-        if (state.messages.isNotEmpty() || rowIndex != 2 || column != 5) {
-            return null
-        }
-        return namedItem(
-            Material.PAPER,
-            translations.text(viewer, "note.empty", "<gray>No messages yet — say hi!"),
-        )
-    }
-
-    private fun textItem(message: ChatMessage, own: Boolean): ItemStack {
-        val time = DateTimeFormatter.ofPattern("HH:mm")
-            .withZone(ZoneId.systemDefault())
-            .format(Instant.ofEpochMilli(message.epochMs))
-        val lines = ChatMath.wrap(message.text)
-        val color = if (own) "<aqua>" else "<white>"
-        val item = ItemStack(Material.PAPER)
-        item.editMeta { meta ->
-            meta.displayName(translations.render("<dark_gray>[$time] $color${lines.first()}"))
-            if (lines.size > 1) {
-                meta.lore(lines.drop(1).map { translations.render("$color$it") })
-            }
-        }
-        return item
     }
 
     /**
@@ -606,11 +606,6 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                 inventory.setItem(base + column - 1, messageItem(player, state, rowIndex, column))
             }
         }
-        inventory.setItem(0, namedItem(Material.ARROW, translations.text(player, "item.back", "<gray>Back")))
-        inventory.setItem(3, namedItem(Material.SPECTRAL_ARROW, translations.text(player, "item.scroll.up", "<gray>Older")))
-        inventory.setItem(4, namedItem(Material.WRITABLE_BOOK, translations.text(player, "item.write", "<green>Write a message…")))
-        inventory.setItem(5, namedItem(Material.SPECTRAL_ARROW, translations.text(player, "item.scroll.down", "<gray>Newer")))
-        inventory.setItem(8, namedItem(Material.BARRIER, translations.text(player, "item.close", "<red>Close")))
     }
 
     private fun namedItem(material: Material, name: String): ItemStack {
