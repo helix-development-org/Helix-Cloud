@@ -259,15 +259,36 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
      */
     private fun packUrl(player: Player): String? {
         val nodeClient = client ?: return null
-        configuredPackUrl?.let { return it }
-        System.getenv("HELIX_PACK_URL")?.let { return it }
-        val path = "/api/v1/packs/helix.bettermsgs.zip"
-        val controlPort = runCatching { java.net.URI(nodeClient.controlUrl).port }.getOrDefault(-1)
-        val clientHost = player.virtualHost?.hostString?.takeIf { it.isNotBlank() }
-        if (controlPort > 0 && clientHost != null) {
-            return "http://$clientHost:$controlPort$path"
+        val controlPort = runCatching { java.net.URI(nodeClient.controlUrl).port }.getOrDefault(8080)
+        // 0.0.0.0 is a bind address, never something a client can download from
+        configuredPackUrl?.takeIf { it.isNotBlank() && !it.contains("0.0.0.0") }
+            ?.let { return expandPackUrl(it, controlPort) }
+        System.getenv("HELIX_PACK_URL")?.let { return expandPackUrl(it, controlPort) }
+        val clientHost = player.virtualHost?.hostString
+            ?.takeIf { it.isNotBlank() && it != "0.0.0.0" && it != "127.0.0.1" }
+        if (clientHost != null) {
+            return expandPackUrl(clientHost, controlPort)
         }
-        return nodeClient.controlUrl + path
+        return nodeClient.controlUrl + PACK_PATH
+    }
+
+    /**
+     * Expands operator input into a full download URL: a bare host or ip
+     * gets the control port and the pack path appended, a base URL just
+     * the path.
+     *
+     * @param value full URL, `host:port` or bare host/ip.
+     * @param controlPort port of the control API.
+     * @return a complete pack URL.
+     */
+    private fun expandPackUrl(value: String, controlPort: Int): String {
+        val base = if (value.startsWith("http://") || value.startsWith("https://")) {
+            value
+        } else {
+            val hostPort = if (':' in value) value else "$value:$controlPort"
+            "http://$hostPort"
+        }
+        return if (base.contains("/api/")) base else base.trimEnd('/') + PACK_PATH
     }
 
     /**
@@ -602,5 +623,10 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
         val item = ItemStack(material)
         item.editMeta { meta -> meta.displayName(name) }
         return item
+    }
+
+    private companion object {
+        /** Download path of the BetterMSGs resource pack on the control API. */
+        const val PACK_PATH = "/api/v1/packs/helix.bettermsgs.zip"
     }
 }
