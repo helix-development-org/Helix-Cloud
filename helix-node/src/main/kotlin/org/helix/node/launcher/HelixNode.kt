@@ -360,6 +360,16 @@ class HelixNode(
         serviceDirectories = { listOf(paths.servicesStatic, paths.servicesTemp, paths.templates) },
         defaultLanguage = languages::defaultLanguage,
         languageOf = languages::languageOf,
+        storageConnection = {
+            org.helix.api.addon.StorageConnection(
+                mode = config.storage.mode,
+                url = config.storage.url,
+                user = config.storage.user,
+                password = config.storage.password,
+                database = config.storage.database,
+                poolSize = config.storage.poolSize,
+            )
+        },
     )
 
     private val overviewService = PlatformOverviewService(version(), taskStore, manager)

@@ -105,6 +105,16 @@ interface AddonContext {
     fun serviceDirectories(): List<Path> = emptyList()
 
     /**
+     * The node's central storage connection, for addon components that
+     * reuse the node database (for example an anticheat persisting into
+     * the same PostgreSQL). `null` when the node runs on file storage or
+     * the connection is not exposed.
+     *
+     * @return the connection details, or `null`.
+     */
+    fun storageConnection(): StorageConnection? = null
+
+    /**
      * Registers a network-wide player join/leave listener owned by this
      * addon. Removed when the addon is disabled.
      *

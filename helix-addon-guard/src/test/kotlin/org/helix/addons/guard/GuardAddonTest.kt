@@ -47,13 +47,13 @@ class GuardAddonTest {
     @Test
     fun `registry mirrors the full iguard schema`() {
         // 55 plain settings + 31 checks x 4 fields; server-id is fixed and not editable
-        assertEquals(55 + 31 * 4, GuardConfig.settings.size)
+        assertEquals(49 + 31 * 4, GuardConfig.settings.size)
         assertEquals(GuardConfig.settings.size, GuardConfig.byPath.size)
         assertFalse("server-id" in GuardConfig.byPath)
 
-        assertEquals(16, GuardConfig.settings.count { it.static })
+        assertEquals(10, GuardConfig.settings.count { it.static })
         listOf(
-            "database.host", "database.pool-size", "workers.stripes", "workers.queue-capacity",
+            "database.pool-size", "workers.stripes", "workers.queue-capacity",
             "history.queue-capacity", "history.batch-size", "history.flush-millis",
             "dashboard.enabled", "dashboard.bind", "dashboard.port", "dashboard.token",
         ).forEach { path -> assertTrue(GuardConfig.byPath.getValue(path).static, path) }
@@ -112,13 +112,16 @@ class GuardAddonTest {
 
     @Test
     fun `renderConfigYaml nests dotted paths with two-space indent`() {
-        val yaml = GuardConfig.renderConfigYaml(
+        val yaml = GuardConfig.renderConfigYaml(database = GuardDatabase("db.example", 5433, "helix", "helix", "secret", false), overrides = 
             mapOf("alerts.cooldown-millis" to "2500", "checks.movement.fly.a.enabled" to "false"),
         )
         val lines = yaml.lines()
         assertEquals("server-id: \"\${HELIX_SERVICE_ID}\"", lines.first())
+        // database values come from the node storage, not from settings
         assertContains(lines, "database:")
-        assertContains(lines, "  host: \"127.0.0.1\"")
+        assertContains(lines, "  host: \"db.example\"")
+        assertContains(lines, "  port: 5433")
+        assertContains(lines, "  password: \"secret\"")
         assertContains(lines, "  pool-size: 6")
         assertContains(lines, "  cooldown-millis: 2500")
         assertContains(lines, "bans:")

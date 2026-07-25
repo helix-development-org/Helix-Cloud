@@ -73,11 +73,20 @@ object GuardConfig {
      * line is always the fixed `server-id` entry.
      *
      * @param overrides map of dotted path to canonical override value.
+     * @param database connection values inherited from the node storage.
      * @return the full config.yml content, ready to write to disk.
      */
-    fun renderConfigYaml(overrides: Map<String, String>): String {
+    fun renderConfigYaml(overrides: Map<String, String>, database: GuardDatabase): String {
         val root = LinkedHashMap<String, Any>()
         root["server-id"] = quote(SERVER_ID_VALUE)
+        val databaseNode = LinkedHashMap<String, Any>()
+        databaseNode["host"] = quote(database.host)
+        databaseNode["port"] = database.port
+        databaseNode["database"] = quote(database.database)
+        databaseNode["username"] = quote(database.username)
+        databaseNode["password"] = quote(database.password)
+        databaseNode["ssl"] = database.ssl
+        root["database"] = databaseNode
         settings.forEach { setting ->
             var node = root
             setting.segments.dropLast(1).forEach { segment ->
@@ -117,12 +126,8 @@ object GuardConfig {
 
     private fun baseSettings(): List<GuardSetting> = listOf(
         // database.* — connection pool built once on startup
-        plain("database.host", GuardValueType.STRING, "127.0.0.1", static = true),
-        plain("database.port", GuardValueType.INT, "5432", static = true),
-        plain("database.database", GuardValueType.STRING, "iguard", static = true),
-        plain("database.username", GuardValueType.STRING, "iguard", static = true),
-        plain("database.password", GuardValueType.STRING, "", static = true),
-        plain("database.ssl", GuardValueType.BOOLEAN, "false", static = true),
+        // database.host/port/database/username/password/ssl come from the
+        // node's own storage connection — only the pool size stays editable
         plain("database.pool-size", GuardValueType.INT, "6", static = true),
         // workers.* — thread pool sized on startup
         plain("workers.stripes", GuardValueType.INT, "8", static = true),

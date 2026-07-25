@@ -121,7 +121,8 @@ class GuardAddon : AddonBase() {
      * then sends `iguard reload` to all running services.
      */
     private fun applyConfig(changedStaticPaths: List<String>): ActionResult {
-        val yaml = GuardConfig.renderConfigYaml(store.overrides())
+        val database = GuardDatabase.fromStorage(context.storageConnection())
+        val yaml = GuardConfig.renderConfigYaml(store.overrides(), database ?: GuardDatabase.UNCONFIGURED)
         var written = 0
         context.serviceDirectories().forEach { root ->
             serviceSubdirectories(root).forEach { subdirectory ->
@@ -151,6 +152,9 @@ class GuardAddon : AddonBase() {
         if (changedStaticPaths.isNotEmpty()) {
             lines += "warning: static value(s) changed, requires service restart: " +
                 changedStaticPaths.sorted().joinToString(", ")
+        }
+        if (database == null) {
+            lines += "warning: node storage is not postgres — IGuard requires storage.mode=\"postgres\" in node.toml"
         }
         return ActionResult.ok(*lines.toTypedArray())
     }

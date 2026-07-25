@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.44.0 — 2026-07-26
+
+### Helix-Guard: Datenbank kommt aus der Node
+- IGuards PostgreSQL-Verbindung wird nicht mehr im Panel eingestellt,
+  sondern aus der zentralen Storage-Konfiguration der Node geerbt
+  (`node.toml` → `[storage]` mit `mode = "postgres"`): Host/Port/DB/User/
+  Passwort/SSL werden aus der JDBC-URL abgeleitet und in jede gerenderte
+  IGuard-`config.yml` geschrieben. Im Panel bleibt nur `database.pool-size`.
+- Läuft die Node nicht auf Postgres, warnt jedes Apply deutlich —
+  IGuard setzt Postgres voraus.
+- Neue Addon-API: `context.storageConnection()` liefert Addons die
+  zentrale Storage-Verbindung (Mode, URL, User, Passwort, DB, Pool).
+
 ## 0.43.1 — 2026-07-26
 
 ### Fix: IGuard deaktivierte sich beim Service-Start

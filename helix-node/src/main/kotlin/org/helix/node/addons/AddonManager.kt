@@ -90,6 +90,7 @@ class AddonManager(
     private val serviceDirectories: () -> List<Path> = { emptyList() },
     private val defaultLanguage: () -> String = { "en" },
     private val languageOf: ((String) -> String)? = null,
+    private val storageConnection: () -> org.helix.api.addon.StorageConnection? = { null },
 ) {
     private val logger = LoggerFactory.getLogger(AddonManager::class.java)
     private val json = Json { ignoreUnknownKeys = true }
@@ -376,6 +377,9 @@ class AddonManager(
 
         override fun storage(): AddonStorage =
             storageProvider.forAddon(record.manifest.id, dataDirectory)
+
+        override fun storageConnection(): org.helix.api.addon.StorageConnection? =
+            this@AddonManager.storageConnection()
 
         override fun isActiveForTask(taskName: String): Boolean =
             taskAddonActive(taskName, record.manifest.id)
