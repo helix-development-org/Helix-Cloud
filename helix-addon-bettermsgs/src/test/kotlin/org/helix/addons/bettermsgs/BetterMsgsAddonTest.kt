@@ -147,10 +147,9 @@ class BetterMsgsAddonTest {
     }
 
     @Test
-    fun `self messages and blank texts are rejected`() {
-        val self = send("Steve", "steve", "hi")
-        assertFalse(self.success)
-        assertTrue(self.lines.single().contains("yourself"))
+    fun `self messages are allowed and blank texts are rejected`() {
+        // messaging yourself is allowed (useful for testing the GUI)
+        assertTrue(send("Steve", "steve", "hi").success)
 
         assertFalse(send("Steve", "Alex", " ").success)
         assertFalse(context.run("bettermsgs.send", "Steve", "Alex").success)

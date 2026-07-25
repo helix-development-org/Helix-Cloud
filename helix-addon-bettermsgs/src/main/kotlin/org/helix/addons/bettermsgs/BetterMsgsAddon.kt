@@ -131,9 +131,6 @@ class BetterMsgsAddon : AddonBase() {
         if (text.isBlank()) {
             return ActionResult.error("usage: bettermsgs.send <from> <to> <text...>")
         }
-        if (from.equals(to, ignoreCase = true)) {
-            return ActionResult.error(msg.formatFor(from, "error.self"))
-        }
         val epochMs = System.currentTimeMillis()
         store.append(from, to, text, epochMs)
         val recipientFocused = focus[to.lowercase()] == from.lowercase()
