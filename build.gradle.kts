@@ -87,8 +87,6 @@ tasks.register("releaseBundle") {
 
     doLast {
         val releaseDirectory = layout.buildDirectory.dir("release").get().asFile
-        releaseDirectory.deleteRecursively()
-        releaseDirectory.mkdirs()
         val artifacts = buildList {
             add(
                 project(":helix-node").layout.buildDirectory.file("libs/Launcher.jar").get().asFile
@@ -102,10 +100,16 @@ tasks.register("releaseBundle") {
                 )
             }
         }
+        // verify everything BEFORE wiping the previous release, so a failed
+        // build never leaves an empty release directory behind
+        artifacts.forEach { (source, _) ->
+            require(source.isFile) { "release artifact missing: $source" }
+        }
+        releaseDirectory.deleteRecursively()
+        releaseDirectory.mkdirs()
         val digest = java.security.MessageDigest.getInstance("SHA-256")
         val checksums = StringBuilder()
         artifacts.forEach { (source, targetName) ->
-            require(source.isFile) { "release artifact missing: $source" }
             val target = releaseDirectory.resolve(targetName)
             source.copyTo(target, overwrite = true)
             digest.reset()
