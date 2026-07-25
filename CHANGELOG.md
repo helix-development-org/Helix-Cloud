@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.40.0 — 2026-07-25
+
+### Linux-Install-Script & systemd-Integration
+- **`tools/install.sh`**: Ein-Kommando-Installation auf Linux-Servern
+  (`curl … | sudo bash`). Installiert nach `/opt/helix` (konfigurierbar):
+  Launcher.jar (GitHub-Release-Asset, `--jar`-Datei oder Source-Build),
+  Temurin-JDK falls das System-Java < 24 ist, `node.toml` mit
+  **zufälligem Admin-Token** (0600), dedizierter Systemuser, systemd-Unit
+  (alternativ `--no-systemd` mit screen-freundlichem `start.sh`).
+- **systemd-bewusste Restarts:** Als Service (`HELIX_SYSTEMD=1` oder
+  `INVOCATION_ID` erkannt) spawnt die Node den Nachfolger nicht mehr
+  selbst, sondern beendet sich mit Exit-Code `10` — die Unit
+  (`Restart=on-failure`, `KillMode=process`) startet den Nachfolger, die
+  headless laufenden Services überleben und werden adoptiert. Eine
+  service-managed Node fährt bei stdin-EOF nicht mehr herunter.
+- Verifiziert: Exit-Code-10-Delegation, Überleben des Wrappers, Adoption
+  mit identischer PID durch den Nachfolger, sauberer `platform.stop`.
+
 ## 0.39.0 — 2026-07-25
 
 ### Backend- & Launcher-Restart (`/helix <modul> restart`)

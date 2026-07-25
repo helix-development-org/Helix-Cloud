@@ -122,6 +122,16 @@ Services stoppen sauber, danach startet eine frische `Launcher.jar` —
 eine zwischenzeitlich ersetzte Jar-Datei wird dabei übernommen (Update).
 E2E-Abdeckung: `tools/e2e-restart.sh` und `tools/e2e-launcher-restart.sh`.
 
+**systemd-Betrieb:** Läuft die Node als Service (`HELIX_SYSTEMD=1` oder
+erkannt über `INVOCATION_ID`), spawnt sie den Nachfolger nicht selbst,
+sondern beendet sich mit Exit-Code `10` — die Unit (`Restart=on-failure`)
+startet den Nachfolger. Die Unit braucht zwingend `KillMode=process`,
+sonst killt systemd die headless weiterlaufenden Wrapper mit dem
+Node-Prozess. Bei stdin-EOF (systemd: `/dev/null`) bleibt eine
+service-managed Node am Leben statt herunterzufahren. Das Install-Script
+`tools/install.sh` richtet all das ein (Jar, Java, Zufalls-Token,
+passende Unit).
+
 ## Dashboard (Frontend)
 
 Das Web-Dashboard ist eine **React + Vite + Tailwind + shadcn/ui**-App im

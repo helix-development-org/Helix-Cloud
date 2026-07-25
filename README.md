@@ -30,6 +30,26 @@ java -jar helix-node/build/libs/Launcher.jar
 Dashboard: `http://127.0.0.1:8080/` — Token: `dev-token-change-me`
 (ändern in `Helix/config/node.toml`).
 
+## Server-Installation (Linux)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Tytoss/Helix-Cloud/main/tools/install.sh | sudo bash
+```
+
+Installiert nach `/opt/helix`: Launcher.jar (Release-Asset oder
+Source-Build), passende Java-Runtime (Temurin, falls das System-Java zu
+alt ist), Config mit **zufälligem Admin-Token** und eine systemd-Unit, die
+mit dem In-Place-Restart kompatibel ist (`/helix backend restart` lässt
+die Services headless weiterlaufen; systemd startet die Node neu und
+adoptiert sie). Optionen: `--dir`, `--user`, `--host`, `--port`, `--jar`,
+`--ref`, `--no-systemd`, `--no-start` — Details: `tools/install.sh --help`.
+
+```bash
+systemctl status helix        # Verwaltung
+journalctl -u helix -f        # Logs
+grep token /opt/helix/Helix/config/node.toml   # Panel-Token
+```
+
 ```text
 helix> task.create Lobby paper 1.21.11 min=1 max=3 autoscale=true
 helix> task.create Proxy velocity 3.4.0

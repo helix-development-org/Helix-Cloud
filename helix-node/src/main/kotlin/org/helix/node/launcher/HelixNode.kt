@@ -518,16 +518,17 @@ class HelixNode(
     /**
      * Runs the interactive CLI until the input ends or `platform.stop` runs.
      *
-     * A respawned node (`HELIX_RELAUNCH=1`) usually has no terminal on
-     * stdin; instead of shutting down on the immediate EOF it stays alive
-     * until `platform.stop` or a restart terminates the process.
+     * A respawned node (`HELIX_RELAUNCH=1`) or a service-managed node
+     * (systemd) usually has no terminal on stdin; instead of shutting down
+     * on the immediate EOF it stays alive until `platform.stop`, a restart
+     * or the service manager terminates the process.
      */
     fun runCli() {
         NodeCli(registry).run(System.`in`.bufferedReader())
         if (stopping.get()) {
             return
         }
-        if (System.getenv("HELIX_RELAUNCH") == "1") {
+        if (System.getenv("HELIX_RELAUNCH") == "1" || serviceManaged()) {
             logger.info("Console input ended — node keeps running (stop via panel or platform.stop)")
             java.util.concurrent.CountDownLatch(1).await()
         } else {
@@ -560,41 +561,15 @@ class HelixNode(
      *
      * The runtime state (maintenance flag, player roster, permission
      * snapshots, scheduler timing, metrics history) is written to disk and
-     * restored by the successor, then a fresh launcher process is spawned
-     * and this one exits without stopping any service.
+     * restored by the successor. Standalone nodes spawn a fresh launcher
+     * process themselves; under a service manager (systemd) the node exits
+     * with [RESTART_EXIT_CODE] and the unit's `Restart=on-failure` brings
+     * the successor up.
      *
      * @return `true` when the restart was initiated; `false` when not
      *   running from a `Launcher.jar` or already stopping.
      */
-    fun restartBackend(): Boolean {
-        val jar = LauncherRespawn.launcherJar()
-        if (jar == null) {
-            logger.error("Backend restart unavailable — not running from a Launcher.jar")
-            return false
-        }
-        if (!stopping.compareAndSet(false, true)) {
-            return false
-        }
-        keepServicesOnExit = true
-        eventLog.record("node", "Backend restart initiated — services keep running", "warn")
-        audit.record("node", "system", "Backend restart initiated")
-        Thread({
-            logger.info("Backend restart: services keep running, respawning {}", jar)
-            runCatching(::saveRestartState)
-                .onFailure { logger.warn("Could not persist the restart state: {}", it.message) }
-            scheduler.shutdownNow()
-            addonManager.disableAll()
-            controlServer.stop()
-            runCatching { storageProvider.close() }
-            runCatching { storageBackend.close() }
-            val spawned = LauncherRespawn.spawn(jar)
-            if (!spawned) {
-                logger.error("Failed to spawn the successor launcher — start it manually")
-            }
-            exitProcess(if (spawned) 0 else 1)
-        }, "helix-restart").start()
-        return true
-    }
+    fun restartBackend(): Boolean = initiateRestart(keepServices = true)
 
     /**
      * Stops every service gracefully, then replaces this process with a
@@ -602,33 +577,57 @@ class HelixNode(
      *
      * @return `true` when the restart was initiated.
      */
-    fun restartLauncher(): Boolean {
-        val jar = LauncherRespawn.launcherJar()
-        if (jar == null) {
-            logger.error("Launcher restart unavailable — not running from a Launcher.jar")
+    fun restartLauncher(): Boolean = initiateRestart(keepServices = false)
+
+    private fun initiateRestart(keepServices: Boolean): Boolean {
+        val managed = serviceManaged()
+        val jar = if (managed) null else LauncherRespawn.launcherJar()
+        if (!managed && jar == null) {
+            logger.error("Restart unavailable — not running from a Launcher.jar")
             return false
         }
         if (!stopping.compareAndSet(false, true)) {
             return false
         }
-        eventLog.record("node", "Launcher restart initiated", "warn")
-        audit.record("node", "system", "Launcher restart initiated")
+        keepServicesOnExit = keepServices
+        val what = if (keepServices) "Backend" else "Launcher"
+        val suffix = if (keepServices) " — services keep running" else ""
+        eventLog.record("node", "$what restart initiated$suffix", "warn")
+        audit.record("node", "system", "$what restart initiated")
         Thread({
-            logger.info("Launcher restart: stopping services, respawning {}", jar)
+            logger.info("{} restart: respawning via {}", what, if (managed) "the service manager" else jar)
+            if (keepServices) {
+                runCatching(::saveRestartState)
+                    .onFailure { logger.warn("Could not persist the restart state: {}", it.message) }
+            }
             scheduler.shutdownNow()
-            stopServicesQuietly()
+            if (!keepServices) {
+                stopServicesQuietly()
+            }
             addonManager.disableAll()
             controlServer.stop()
             runCatching { storageProvider.close() }
             runCatching { storageBackend.close() }
-            val spawned = LauncherRespawn.spawn(jar)
-            if (!spawned) {
-                logger.error("Failed to spawn the successor launcher — start it manually")
+            val exitCode = when {
+                managed -> RESTART_EXIT_CODE
+                LauncherRespawn.spawn(requireNotNull(jar)) -> 0
+                else -> {
+                    logger.error("Failed to spawn the successor launcher — start it manually")
+                    1
+                }
             }
-            exitProcess(if (spawned) 0 else 1)
+            exitProcess(exitCode)
         }, "helix-restart").start()
         return true
     }
+
+    /**
+     * Whether a service manager (systemd) supervises this process, either
+     * declared via `HELIX_SYSTEMD=1` or detected through systemd's
+     * `INVOCATION_ID`. Restarts then delegate the respawn to the manager.
+     */
+    private fun serviceManaged(): Boolean =
+        System.getenv("HELIX_SYSTEMD") == "1" || System.getenv("INVOCATION_ID") != null
 
     /**
      * Re-adopts services that survived a backend restart headless: process
@@ -835,5 +834,11 @@ class HelixNode(
 
         /** File name of the persisted runtime state during a restart. */
         const val RESTART_STATE_FILE = "restart-state.json"
+
+        /**
+         * Exit code signalling a service manager (systemd unit with
+         * `Restart=on-failure`) to start the successor launcher.
+         */
+        const val RESTART_EXIT_CODE = 10
     }
 }
