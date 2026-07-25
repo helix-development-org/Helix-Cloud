@@ -227,12 +227,24 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
     fun onJoin(event: PlayerJoinEvent) {
         takeover.restoreCrashed(event.player)
         val url = packUrl(event.player) ?: return
+        logger.info("Sending resource pack to ${event.player.name}: $url (sha1 ${if (packSha1 != null) "yes" else "no"})")
         val sha1 = packSha1
         if (sha1 != null) {
             event.player.setResourcePack(url, sha1)
         } else {
             event.player.setResourcePack(url)
         }
+    }
+
+    /**
+     * Logs the client's pack download outcome, for diagnosing unreachable
+     * pack URLs.
+     *
+     * @param event the status event.
+     */
+    @EventHandler
+    fun onPackStatus(event: org.bukkit.event.player.PlayerResourcePackStatusEvent) {
+        logger.info("Resource pack status of ${event.player.name}: ${event.status}")
     }
 
     /**
