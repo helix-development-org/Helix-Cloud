@@ -49,7 +49,9 @@ fun main(args: Array<String>) {
         "assets/bettermsgs/textures/font/thumb.png" to png(4, 20, ::drawThumb),
     )
     entries.putAll(textRowFonts())
-    entries["assets/bettermsgs/textures/font/pixel.png"] = png(2, 2) { g ->
+    // 2x16 with the visible 2x2 at the top: bitmap ascents may not exceed
+    // the glyph height, so the transparent padding buys legal ascent room
+    entries["assets/bettermsgs/textures/font/pixel.png"] = png(2, 16) { g ->
         g.color = Color.WHITE
         g.fillRect(0, 0, 2, 2)
     }
@@ -310,7 +312,7 @@ private fun pixelFont(): ByteArray {
                 val char = "\\u%04X".format(0xE100 + row * 8 + sub)
                 add(
                     """{"type": "bitmap", "file": "bettermsgs:font/pixel.png", """ +
-                        """"ascent": $ascent, "height": 2, "chars": ["$char"]}"""
+                        """"ascent": $ascent, "height": 16, "chars": ["$char"]}"""
                 )
             }
         }
