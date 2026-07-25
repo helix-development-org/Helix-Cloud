@@ -104,6 +104,7 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
     private var client: NodeClient? = null
     private lateinit var translations: Translations
     private lateinit var takeover: InventoryTakeover
+    private val skins = SkinPixels()
     private lateinit var scope: CoroutineScope
 
     @Volatile
@@ -471,6 +472,9 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                             state.messages = window.messages
                         }
                         nodeClient.action("bettermsgs.focus", player.name, state.peer)
+                        skins.fetch(player.name)
+                        skins.fetch(state.peer)
+                        state.messages.map { it.from }.distinct().forEach(skins::fetch)
                     }
                 }
             }
@@ -486,6 +490,7 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                     moveTo(28)
                     text(state.peer, 0, NamedTextColor.WHITE, rowFont(0))
                     toStart()
+                    drawHead(this, state.peer, headRow = 0, x = 8)
                     if (state.messages.isEmpty()) {
                         centeredText(
                             translations.text(context.player, "note.empty", "No messages yet - say hi!"),
@@ -502,11 +507,13 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                         val time = timeOf(message.epochMs)
                         val line = "[$time] ${ChatMath.ellipsize(message.text, 24)}"
                         if (own) {
-                            endText(line, 0, 148, NamedTextColor.AQUA, rowFont(row))
+                            endText(line, 0, 146, NamedTextColor.AQUA, rowFont(row))
+                            drawHead(this, message.from, headRow = row, x = 150)
                         } else {
                             moveTo(28)
                             text(line, 0, NamedTextColor.WHITE, rowFont(row))
                             toStart()
+                            drawHead(this, message.from, headRow = row, x = 8)
                         }
                     }
                 }
@@ -516,28 +523,8 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                 chats.remove(context.player.uniqueId)
                 phoneGui?.open(context.player)
             }
-            item(chestSlot(1, 5)) { context ->
-                chats[context.player.uniqueId]?.let { state ->
-                    val head = ItemStack(Material.PLAYER_HEAD)
-                    head.editMeta(SkullMeta::class.java) { meta ->
-                        meta.owningPlayer = Bukkit.getOfflinePlayer(state.peer)
-                        meta.displayName(translations.render("<white>${state.peer}"))
-                    }
-                    head
-                }
-            }
             onClick(chestSlot(1, 9)) { context ->
                 chats[context.player.uniqueId]?.let { scroll(context.player, it, ChatMath.WINDOW) }
-            }
-            // messages: chest rows 2..6 show window indices 0..4
-            for (row in 2..6) {
-                for (column in 1..9) {
-                    item(chestSlot(row, column)) { context ->
-                        chats[context.player.uniqueId]?.let { state ->
-                            messageItem(context.player, state, row - 2, column)
-                        }
-                    }
-                }
             }
             onOpen { player ->
                 chats[player.uniqueId]?.let { state ->
@@ -556,36 +543,38 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
         }
     }
 
-    private fun messageItem(viewer: Player, state: ChatState, rowIndex: Int, column: Int): ItemStack? {
-        val message = windowMessage(state, rowIndex) ?: return null
-        val own = message.from.equals(viewer.name, ignoreCase = true)
-        val headColumn = if (own) 9 else 1
-        if (column != headColumn) {
-            return null
-        }
-        return ItemStack(Material.PLAYER_HEAD).also { head ->
-            head.editMeta(SkullMeta::class.java) { meta ->
-                meta.owningPlayer = Bukkit.getOfflinePlayer(message.from)
-                meta.displayName(translations.render(if (own) "<aqua>${message.from}" else "<white>${message.from}"))
-                if (message.text.length > 24) {
-                    meta.lore(ChatMath.wrap(message.text).map { translations.render("<gray>$it") })
-                }
-            }
-        }
-    }
-
     private fun timeOf(epochMs: Long): String = DateTimeFormatter.ofPattern("HH:mm")
         .withZone(ZoneId.systemDefault())
         .format(Instant.ofEpochMilli(epochMs))
 
-    private fun rowFont(row: Int): Key = Key.key("bettermsgs", "text_row_$row")
-
-    private fun windowMessage(state: ChatState, rowIndex: Int): ChatMessage? {
-        // bottom-aligned: the newest message sits on the lowest visible row
-        val padding = ChatMath.WINDOW - state.messages.size
-        val index = rowIndex - padding
-        return state.messages.getOrNull(index)
+    /**
+     * Draws a player's face as 8x8 colored pixel glyphs at a text row.
+     *
+     * @param display the title builder.
+     * @param name skin owner.
+     * @param headRow head anchor row (0 = header, 1..8 = message rows).
+     * @param x left edge in GUI pixels.
+     */
+    private fun drawHead(display: de.tytoss.igui.display.DisplayBuilder, name: String, headRow: Int, x: Int) {
+        val pixels = skins.cached(name) ?: return
+        val font = Key.key("bettermsgs", "pixels")
+        for (sub in 0..7) {
+            val glyph = (0xE100 + headRow * 8 + sub).toChar().toString()
+            display.characterWidth(glyph, 2)
+            display.moveTo(x)
+            for (px in 0..7) {
+                val argb = pixels[sub * 8 + px]
+                if (argb ushr 24 < 0x80) {
+                    display.space(2)
+                } else {
+                    display.text(glyph, 0, net.kyori.adventure.text.format.TextColor.color(argb and 0xFFFFFF), font)
+                }
+            }
+            display.toStart()
+        }
     }
+
+    private fun rowFont(row: Int): Key = Key.key("bettermsgs", "text_row_$row")
 
     /**
      * Fills the borrowed player inventory: window rows 5..7 as message rows
@@ -598,14 +587,8 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
         if (!takeover.active(player)) {
             return
         }
-        val inventory = player.inventory
-        inventory.clear()
-        for (rowIndex in 5..7) {
-            val base = 9 + (rowIndex - 5) * 9
-            for (column in 1..9) {
-                inventory.setItem(base + column - 1, messageItem(player, state, rowIndex, column))
-            }
-        }
+        // the chat is fully drawn — the borrowed inventory just stays empty
+        player.inventory.clear()
     }
 
     private fun namedItem(material: Material, name: String): ItemStack {

@@ -49,6 +49,11 @@ fun main(args: Array<String>) {
         "assets/bettermsgs/textures/font/thumb.png" to png(4, 20, ::drawThumb),
     )
     entries.putAll(textRowFonts())
+    entries["assets/bettermsgs/textures/font/pixel.png"] = png(2, 2) { g ->
+        g.color = Color.WHITE
+        g.fillRect(0, 0, 2, 2)
+    }
+    entries["assets/bettermsgs/font/pixels.json"] = pixelFont()
     ZipOutputStream(Files.newOutputStream(output)).use { zip ->
         entries.forEach { (name, bytes) ->
             val entry = ZipEntry(name)
@@ -287,4 +292,28 @@ private val ASCII_GRID: String = buildString {
         "\\u2261\\u00b1\\u2265\\u2264\\u2320\\u2321\\u00f7\\u2248\\u00b0\\u2219\\u00b7\\u221a\\u207f\\u00b2\\u25a0\\u0000",
     )
     append(rows.joinToString(",\n") { "\"$it\"" })
+}
+
+
+/**
+ * Head anchor y positions: the header head plus the eight message rows.
+ * A drawn head is 16x16 px = 8x8 skin pixels at 2 px each; every pixel
+ * sub-row needs its own glyph ascent, so this font declares 9*8 variants
+ * of the white 2x2 pixel at codepoints 0xE100 + row*8 + subRow.
+ */
+private fun pixelFont(): ByteArray {
+    val anchors = intArrayOf(1, 19, 37, 55, 73, 91, 141, 159, 177)
+    val providers = buildList {
+        anchors.forEachIndexed { row, headY ->
+            for (sub in 0..7) {
+                val ascent = 13 - (headY + sub * 2)
+                val char = "\\u%04X".format(0xE100 + row * 8 + sub)
+                add(
+                    """{"type": "bitmap", "file": "bettermsgs:font/pixel.png", """ +
+                        """"ascent": $ascent, "height": 2, "chars": ["$char"]}"""
+                )
+            }
+        }
+    }.joinToString(", ")
+    return """{"providers": [$providers]}""".toByteArray()
 }
