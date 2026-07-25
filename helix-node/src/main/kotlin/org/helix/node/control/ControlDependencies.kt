@@ -4,6 +4,8 @@ import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionSource
 import org.helix.api.message.MapMessages
 import org.helix.api.message.Messages
+import org.helix.api.storage.InMemoryAddonStorage
+import org.helix.node.languages.LanguageRegistry
 import org.helix.node.actions.ActionRegistry
 import org.helix.node.actions.PlayerCommandService
 import org.helix.node.addons.AddonManager
@@ -54,7 +56,9 @@ import org.helix.node.tasks.TaskStore
  * @property loginMessage in-game message template (`{code}` substituted).
  * @property networkName provider of the network display name (`{network}`),
  *  panel-editable at runtime.
- * @property proxyScreens configurable proxy-level disconnect screens.
+ * @property proxyScreens configurable proxy-level disconnect screens
+ *  (`screen.maintenance`, `screen.server_full` of the `velocity` bundle).
+ * @property languages network languages and player language preferences.
  * @property metrics bounded history of network metric samples for graphs.
  * @property apiMetrics rolling control-API performance stats.
  * @property onMessagesChanged invoked after a message bundle changed, with the
@@ -93,6 +97,7 @@ data class ControlDependencies(
     val loginMessage: String = "§b§lHelix §r§7» §fYour panel login code is §b{code}§7.",
     val networkName: () -> String = { "our network" },
     val proxyScreens: Messages = MapMessages(emptyMap()),
+    val languages: LanguageRegistry = LanguageRegistry(InMemoryAddonStorage()),
     val metrics: MetricsHistory = MetricsHistory(),
     val apiMetrics: ApiMetrics = ApiMetrics(),
     val onMessagesChanged: (addonId: String) -> Unit = {},

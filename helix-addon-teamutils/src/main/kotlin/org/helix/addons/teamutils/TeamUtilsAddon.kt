@@ -27,14 +27,26 @@ class TeamUtilsAddon : AddonBase() {
      * Registers the team commands and the join/leave notifications.
      */
     override fun enable() {
-        msg = context.messages(
+        msg = context.localizedMessages(
             mapOf(
-                "chat" to "&b[Team] &f{sender}&7: &f{message}",
-                "empty" to "&7No team members online.",
-                "list" to "&bOnline team: &f{members}",
-                "notify" to "&b[Team] &f{text}",
-                "join" to "&b[Team] &f{player} &7is now &aonline&7.",
-                "leave" to "&b[Team] &f{player} &7is now &8offline&7.",
+                "en" to mapOf(
+                    "chat" to "&b[Team] &f{sender}&7: &f{message}",
+                    "empty" to "&7No team members online.",
+                    "list" to "&bOnline team: &f{members}",
+                    "notify" to "&b[Team] &f{text}",
+                    "join" to "&b[Team] &f{player} &7is now &aonline&7.",
+                    "leave" to "&b[Team] &f{player} &7is now &8offline&7.",
+                    "usage.tc" to "Usage: /tc \\<message...>",
+                ),
+                "de" to mapOf(
+                    "chat" to "&b[Team] &f{sender}&7: &f{message}",
+                    "empty" to "&7Keine Teammitglieder online.",
+                    "list" to "&bTeam online: &f{members}",
+                    "notify" to "&b[Team] &f{text}",
+                    "join" to "&b[Team] &f{player} &7ist jetzt &aonline&7.",
+                    "leave" to "&b[Team] &f{player} &7ist jetzt &8offline&7.",
+                    "usage.tc" to "Verwendung: /tc \\<message...>",
+                ),
             ),
         )
         context.registerAction(
@@ -50,10 +62,12 @@ class TeamUtilsAddon : AddonBase() {
                 ?: return@registerAction ActionResult.error("missing executing player")
             val message = invocation.arguments.drop(1).joinToString(" ")
             if (message.isBlank()) {
-                ActionResult.error("Usage: /tc <message...>")
+                ActionResult.error(msg.formatFor(executor, "usage.tc"))
             } else {
-                val delivered = notifyTeam(msg.format("chat", "sender" to executor, "message" to message))
-                if (delivered == 0) ActionResult.ok(msg.format("empty")) else ActionResult.ok()
+                val delivered = notifyTeam { member ->
+                    msg.formatFor(member, "chat", "sender" to executor, "message" to message)
+                }
+                if (delivered == 0) ActionResult.ok(msg.formatFor(executor, "empty")) else ActionResult.ok()
             }
         }
         context.registerAction(
@@ -64,12 +78,14 @@ class TeamUtilsAddon : AddonBase() {
                 playerCommand = true,
                 permission = TEAM_PERMISSION,
             ),
-        ) {
+        ) { invocation ->
+            val executor = invocation.arguments.firstOrNull()
+                ?: return@registerAction ActionResult.error("missing executing player")
             val members = onlineTeamMembers()
             if (members.isEmpty()) {
-                ActionResult.ok(msg.format("empty"))
+                ActionResult.ok(msg.formatFor(executor, "empty"))
             } else {
-                ActionResult.ok(msg.format("list", "members" to members.joinToString { it.name }))
+                ActionResult.ok(msg.formatFor(executor, "list", "members" to members.joinToString { it.name }))
             }
         }
         action(
@@ -81,13 +97,13 @@ class TeamUtilsAddon : AddonBase() {
             if (text.isBlank()) {
                 ActionResult.error("usage: team.notify <text...>")
             } else {
-                val delivered = notifyTeam(msg.format("notify", "text" to text))
+                val delivered = notifyTeam { member -> msg.formatFor(member, "notify", "text" to text) }
                 ActionResult.ok("notified $delivered team members")
             }
         }
         context.registerNotificationListener { category, message ->
             if (category == "moderation") {
-                notifyTeam(message)
+                notifyTeam { message }
             }
         }
         context.registerPlayerListener(
@@ -95,13 +111,17 @@ class TeamUtilsAddon : AddonBase() {
             object : PlayerListener {
                 override fun onJoin(player: OnlinePlayer) {
                     if (context.hasPermission(player.name, TEAM_PERMISSION)) {
-                        notifyTeam(msg.format("join", "player" to player.name), exclude = player.name)
+                        notifyTeam(exclude = player.name) { member ->
+                            msg.formatFor(member, "join", "player" to player.name)
+                        }
                     }
                 }
 
                 override fun onLeave(player: OnlinePlayer) {
                     if (context.hasPermission(player.name, TEAM_PERMISSION)) {
-                        notifyTeam(msg.format("leave", "player" to player.name), exclude = player.name)
+                        notifyTeam(exclude = player.name) { member ->
+                            msg.formatFor(member, "leave", "player" to player.name)
+                        }
                     }
                 }
             },
@@ -111,11 +131,11 @@ class TeamUtilsAddon : AddonBase() {
     private fun onlineTeamMembers(): List<OnlinePlayer> =
         context.onlinePlayers().filter { context.hasPermission(it.name, TEAM_PERMISSION) }
 
-    private fun notifyTeam(text: String, exclude: String? = null): Int {
+    private fun notifyTeam(exclude: String? = null, render: (String) -> String): Int {
         val members = onlineTeamMembers().filter { !it.name.equals(exclude, ignoreCase = true) }
         members.forEach { member ->
             context.actions.invoke(
-                ActionInvocation("player.message", listOf(member.name, text), ActionSource.ADDON),
+                ActionInvocation("player.message", listOf(member.name, render(member.name)), ActionSource.ADDON),
             )
         }
         return members.size

@@ -189,4 +189,21 @@ interface AddonContext {
      * @return a live message accessor.
      */
     fun messages(defaults: Map<String, String>): Messages = MapMessages(defaults)
+
+    /**
+     * Declares the addon's configurable message templates in multiple
+     * languages.
+     *
+     * Like [messages], but with one default map per language code. Players
+     * receive the language they picked via `/helix language` (or their
+     * Minecraft client language on first join) through
+     * [Messages.formatFor]; missing translations fall back to the network's
+     * default language.
+     *
+     * @param defaultsByLanguage language code to (message key to default
+     *   template), `{placeholder}` markers and `&` color codes allowed.
+     * @return a live message accessor.
+     */
+    fun localizedMessages(defaultsByLanguage: Map<String, Map<String, String>>): Messages =
+        MapMessages(defaultsByLanguage["en"] ?: defaultsByLanguage.values.firstOrNull() ?: emptyMap())
 }

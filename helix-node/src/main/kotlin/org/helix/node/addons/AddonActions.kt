@@ -11,21 +11,13 @@ import org.helix.node.actions.ActionRegistry
  */
 class AddonActions(private val manager: AddonManager) {
     /**
-     * Registers `addon.list`, `addon.list.reload`, `addon.enable`,
-     * `addon.disable` and the in-game `/helix` management command.
+     * Registers `addon.list`, `addon.list.reload`, `addon.enable` and
+     * `addon.disable`. The in-game addon management rides on the unified
+     * `/helix` command via [helixSubcommand].
      *
      * @param registry target registry.
      */
     fun registerAll(registry: ActionRegistry) {
-        registry.register(
-            ActionDescriptor(
-                "helix",
-                "Helix management: list, enable, disable and reload addons.",
-                "helix <addons|enable|disable|reload> [id]",
-                playerCommand = true,
-                permission = "helix.admin",
-            ),
-        ) { invocation -> helixCommand(invocation.arguments.drop(1)) }
         registry.register(
             ActionDescriptor(
                 "addon.list.reload",
@@ -75,12 +67,13 @@ class AddonActions(private val manager: AddonManager) {
     }
 
     /**
-     * Dispatches the `/helix` in-game subcommands.
+     * Dispatches the addon-management subcommands of the in-game `/helix`
+     * command (`addons`, `enable`, `disable`, `reload`).
      *
      * @param args the arguments after the player name.
      * @return the command result.
      */
-    private fun helixCommand(args: List<String>): ActionResult = when (args.firstOrNull()?.lowercase()) {
+    fun helixSubcommand(args: List<String>): ActionResult = when (args.firstOrNull()?.lowercase()) {
         "addons", "list" -> {
             val addons = manager.addons()
             if (addons.isEmpty()) {

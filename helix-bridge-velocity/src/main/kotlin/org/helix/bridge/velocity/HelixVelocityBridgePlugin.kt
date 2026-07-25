@@ -8,10 +8,12 @@ import com.velocitypowered.api.event.connection.LoginEvent
 import com.velocitypowered.api.event.connection.PostLoginEvent
 import com.velocitypowered.api.event.player.KickedFromServerEvent
 import com.velocitypowered.api.event.player.PlayerChooseInitialServerEvent
+import com.velocitypowered.api.event.player.PlayerSettingsChangedEvent
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent
 import com.velocitypowered.api.event.proxy.ProxyPingEvent
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent
 import com.velocitypowered.api.plugin.Plugin
+import com.velocitypowered.api.proxy.Player
 import com.velocitypowered.api.proxy.ProxyServer
 import com.velocitypowered.api.proxy.server.ServerPing
 import java.util.UUID
@@ -22,12 +24,13 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.serialization.json.Json
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.minimessage.MiniMessage
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.bridge.HeartbeatReport
 import org.helix.api.bridge.ResourceProbe
+import org.helix.api.i18n.TranslationsSnapshot
 import org.helix.api.message.LegacyToMini
 import org.helix.api.player.PlayerEvent
+import org.helix.api.player.PlayerLocaleReport
 import org.helix.api.proxy.JoinDecision
 import org.helix.api.proxy.JoinRequest
 import org.helix.api.proxy.PermissionCheckRequest
@@ -53,6 +56,8 @@ class HelixVelocityBridgePlugin @Inject constructor(
     private val miniMessage = MiniMessage.miniMessage()
     private val maintenance = AtomicBoolean(false)
     private val registeredPlayerCommands = ConcurrentHashMap.newKeySet<String>()
+    private val translations = BridgeTranslations()
+    private val reportedLocales = ConcurrentHashMap.newKeySet<String>()
     private var settings: BridgeSettings? = null
     private var client: NodeHttpClient? = null
     private var registry: BackendRegistry? = null
@@ -97,7 +102,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
         client = httpClient
         val backendRegistry = BackendRegistry(proxy, logger)
         registry = backendRegistry
-        ProxyCommands(proxy, backendRegistry).register(this)
+        ProxyCommands(proxy, backendRegistry, ::translate).register(this)
         // Heartbeat is the only periodic task; everything else (commands,
         // routing, player-command registration) is delivered instantly via
         // a long-poll the node answers the moment something changes.
@@ -107,6 +112,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
                 Runnable {
                     sendHeartbeat(loaded, httpClient)
                     syncBridgeValues(loaded, httpClient)
+                    syncTranslations(httpClient)
                 },
             )
             .delay(Duration.ofSeconds(1))
@@ -204,6 +210,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
      */
     @Subscribe
     fun onDisconnect(event: DisconnectEvent) {
+        reportedLocales.remove(event.player.username.lowercase())
         reportPlayerEvent("leave", event.player.username, event.player.uniqueId.toString())
     }
 
@@ -245,7 +252,11 @@ class HelixVelocityBridgePlugin @Inject constructor(
             !hasPermission(name, "helix.maintenance.bypass")
         ) {
             event.result = ResultedEvent.ComponentResult.denied(
-                screen(serverFullScreen.ifBlank { "The network is full." }, ctxFor(name)),
+                translate(
+                    event.player,
+                    "helix.translations.velocity.screen.server_full",
+                    serverFullScreen.ifBlank { "The network is full." },
+                ),
             )
             return
         }
@@ -259,8 +270,13 @@ class HelixVelocityBridgePlugin @Inject constructor(
             logger.warn("Helix join gate failed for {} ({}): fail-open", name, it.message)
         }.getOrNull() ?: return
         if (!decision.allowed) {
+            val message = decision.message
             event.result = ResultedEvent.ComponentResult.denied(
-                screen(decision.message ?: "You may not join this network.", ctxFor(name)),
+                if (message != null) {
+                    screen(message, ctxFor(name))
+                } else {
+                    translate(event.player, "helix.translations.velocity.join.denied", "You may not join this network.")
+                },
             )
             logger.info("Denied join of {} via {}: {}", name, activeSettings.serviceId, decision.message)
         }
@@ -277,7 +293,11 @@ class HelixVelocityBridgePlugin @Inject constructor(
         val name = event.player.username
         if (maintenance.get() && !hasPermission(name, "helix.maintenance.bypass")) {
             event.player.disconnect(
-                screen(maintenanceScreen.ifBlank { "The network is under maintenance." }, ctxFor(name)),
+                translate(
+                    event.player,
+                    "helix.translations.velocity.screen.maintenance",
+                    maintenanceScreen.ifBlank { "The network is under maintenance." },
+                ),
             )
             return
         }
@@ -306,8 +326,34 @@ class HelixVelocityBridgePlugin @Inject constructor(
         val fallback = registry?.fallback(exclude = event.server.serverInfo.name) ?: return
         event.result = KickedFromServerEvent.RedirectPlayer.create(
             fallback,
-            Component.text("Sent to ${fallback.serverInfo.name}."),
+            translate(
+                event.player,
+                "helix.translations.velocity.command.sent",
+                "Sent to {server}.",
+                mapOf("server" to fallback.serverInfo.name),
+            ),
         )
+    }
+
+    /**
+     * Reports the player's Minecraft client locale to the node, once per
+     * connection, so first-joiners start in their client language.
+     *
+     * @param event the settings event.
+     */
+    @Subscribe
+    fun onPlayerSettingsChanged(event: PlayerSettingsChangedEvent) {
+        val httpClient = client ?: return
+        val locale = event.playerSettings.locale ?: return
+        if (!reportedLocales.add(event.player.username.lowercase())) {
+            return
+        }
+        runCatching {
+            httpClient.postJson(
+                "/api/v1/internal/player-language",
+                json.encodeToString(PlayerLocaleReport(event.player.username, locale.toString())),
+            )
+        }.onFailure { logger.warn("Helix locale report failed: {}", it.message) }
     }
 
     /**
@@ -322,7 +368,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
             // No MOTD addon installed — keep the previous minimal behaviour.
             if (maintenance.get()) {
                 event.ping = event.ping.asBuilder()
-                    .description(Component.text("§cMaintenance"))
+                    .description(translate(null, "helix.translations.velocity.motd.maintenance", "<red>Maintenance"))
                     .build()
             }
             return
@@ -477,34 +523,85 @@ class HelixVelocityBridgePlugin @Inject constructor(
         }.onFailure { logger.warn("Player command /{} failed: {}", descriptor.name, it.message) }
             .getOrNull()
         if (response == null) {
-            player.sendMessage(Component.text("Command is currently unavailable."))
+            player.sendMessage(
+                translate(player, "helix.translations.velocity.command.unavailable", "Command is currently unavailable."),
+            )
             return
         }
         val result = json.decodeFromString<org.helix.api.action.ActionResult>(response)
-        result.lines.ifEmpty { listOf(if (result.success) "Done." else "Failed.") }
-            .forEach { line -> player.sendMessage(screen(line, ctxFor(player.username))) }
+        if (result.lines.isEmpty()) {
+            val key = if (result.success) "command.result.done" else "command.result.failed"
+            val fallback = if (result.success) "Done." else "Failed."
+            player.sendMessage(translate(player, "helix.translations.velocity.$key", fallback))
+            return
+        }
+        result.lines.forEach { line -> player.sendMessage(screen(line, ctxFor(player.username))) }
     }
 
     private fun executeCommand(command: ProxyCommand) {
         when (command.type) {
             "kick" -> proxy.getPlayer(command.player).ifPresent { player ->
-                player.disconnect(
-                    screen(command.reason ?: "You were kicked from the network.", ctxFor(command.player)),
-                )
+                val text = command.translationKey
+                    ?.let { commandComponent(command, player) }
+                    ?: command.reason?.let { screen(it, ctxFor(player.username)) }
+                    ?: translate(player, "helix.translations.velocity.kick.default", "You were kicked from the network.")
+                player.disconnect(text)
                 logger.info("Kicked {} ({})", command.player, command.reason ?: "no reason")
             }
             "message" -> proxy.getPlayer(command.player).ifPresent { player ->
-                player.sendMessage(screen(command.reason ?: "", ctxFor(command.player)))
+                player.sendMessage(commandComponent(command, player))
             }
             "broadcast" -> proxy.allPlayers.forEach { player ->
-                player.sendMessage(screen(command.reason ?: "", ctxFor(player.username)))
+                player.sendMessage(commandComponent(command, player))
             }
             else -> logger.warn("Unknown proxy command type: {}", command.type)
         }
     }
 
-    private fun colored(text: String): Component =
-        LegacyComponentSerializer.legacyAmpersand().deserialize(text)
+    /**
+     * Renders a proxy command's text for one receiving player: resolves the
+     * translation key in the player's language when present, otherwise the
+     * plain text.
+     *
+     * @param command the proxy command.
+     * @param player the receiving player.
+     * @return the rendered component.
+     */
+    private fun commandComponent(command: ProxyCommand, player: Player): Component {
+        val key = command.translationKey
+        return if (key != null) {
+            translate(player, key, command.reason ?: "", command.params)
+        } else {
+            screen(command.reason ?: "", ctxFor(player.username))
+        }
+    }
+
+    /**
+     * Renders a translation key in a player's language, with universal
+     * placeholders plus [extra] substituted.
+     *
+     * @param player the receiving player, or `null` for the default language.
+     * @param key flat translation key.
+     * @param fallback template used while the key is not yet synced.
+     * @param extra additional placeholder values.
+     * @return the rendered component.
+     */
+    private fun translate(
+        player: Player?,
+        key: String,
+        fallback: String,
+        extra: Map<String, String> = emptyMap(),
+    ): Component {
+        val template = translations.resolve(key, player) ?: fallback
+        return screen(template, ctxFor(player?.username ?: "") + extra)
+    }
+
+    private fun syncTranslations(client: NodeHttpClient) {
+        runCatching {
+            val body = client.getJson("/api/v1/internal/translations") ?: return@runCatching
+            translations.update(json.decodeFromString<TranslationsSnapshot>(body))
+        }.onFailure { logger.warn("Helix translation sync failed: {}", it.message) }
+    }
 
     /**
      * Universal placeholder values every disconnect screen and message can use.

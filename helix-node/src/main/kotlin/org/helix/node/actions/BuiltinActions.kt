@@ -8,6 +8,10 @@ import org.helix.api.environment.Environment
 import org.helix.api.execution.ExecutorType
 import org.helix.api.task.AutoScaleSettings
 import org.helix.api.task.TaskDefinition
+import org.helix.api.message.MapMessages
+import org.helix.api.message.Messages
+import org.helix.api.storage.InMemoryAddonStorage
+import org.helix.node.languages.LanguageRegistry
 import org.helix.node.launcher.NodePaths
 import org.helix.node.platform.PlatformOverviewService
 import org.helix.node.players.PlayerRegistry
@@ -33,6 +37,12 @@ import org.helix.node.versions.VersionCatalog
  * @property playerRegistry online players of the network.
  * @property eventSink records dashboard events.
  * @property proxyEvents wakes long-polling proxy bridges on new commands.
+ * @property languages network languages and player language preferences.
+ * @property helixMessages texts of the `/helix` player command.
+ * @property adminCheck whether a player holds `helix.admin`, for the admin
+ *  subcommands of `/helix`.
+ * @property addonSubcommands handler of the `/helix` addon-management
+ *  subcommands, wired to [org.helix.node.addons.AddonActions].
  */
 class BuiltinActions(
     private val paths: NodePaths,
@@ -46,6 +56,12 @@ class BuiltinActions(
     private val playerRegistry: PlayerRegistry = PlayerRegistry(),
     private val eventSink: (category: String, level: String, message: String) -> Unit = { _, _, _ -> },
     private val proxyEvents: ProxyEventHub = ProxyEventHub(),
+    private val languages: LanguageRegistry = LanguageRegistry(InMemoryAddonStorage()),
+    private val helixMessages: Messages = MapMessages(emptyMap()),
+    private val adminCheck: (player: String) -> Boolean = { false },
+    private val addonSubcommands: (args: List<String>) -> ActionResult = {
+        ActionResult.error("addon management unavailable")
+    },
 ) {
     /**
      * Registers every built-in action.
@@ -223,6 +239,15 @@ class BuiltinActions(
                 )
             }
         }
+        registry.register(
+            ActionDescriptor(
+                name = "helix",
+                description = "Helix network command: language and administration.",
+                usage = "helix <language|addons|enable|disable|reload> [arg]",
+                playerCommand = true,
+            ),
+            ::handleHelixCommand,
+        )
         register(registry, "versions.list", "Lists configured platform versions.", "versions.list") {
             val entries = versionCatalog().entries
             if (entries.isEmpty()) {
@@ -288,6 +313,49 @@ class BuiltinActions(
             "created task ${task.name} (${task.environment} ${task.version}, executor=${task.executor})",
             "template directory: templates/${task.name}",
         )
+    }
+
+    private fun handleHelixCommand(invocation: ActionInvocation): ActionResult {
+        val player = invocation.arguments.firstOrNull()
+            ?: return ActionResult.error("missing executing player")
+        return when (invocation.arguments.getOrNull(1)?.lowercase()) {
+            null, "language" -> language(player, invocation.arguments.getOrNull(2))
+            "addons", "list", "enable", "disable", "reload" -> requireAdmin(player) {
+                addonSubcommands(invocation.arguments.drop(1))
+            }
+            else -> ActionResult.ok(helixMessages.formatFor(player, "usage"))
+        }
+    }
+
+    private fun requireAdmin(player: String, block: () -> ActionResult): ActionResult =
+        if (adminCheck(player)) {
+            block()
+        } else {
+            ActionResult.error(helixMessages.formatFor(player, "no_permission"))
+        }
+
+    private fun language(player: String, code: String?): ActionResult {
+        val available = languages.languages().joinToString()
+        if (code == null) {
+            return ActionResult.ok(
+                helixMessages.formatFor(
+                    player,
+                    "language.current",
+                    "language" to languages.languageOf(player),
+                    "languages" to available,
+                ),
+            )
+        }
+        return if (languages.setPlayerLanguage(player, code)) {
+            eventSink("player", "info", "$player switched language to ${code.lowercase()}")
+            ActionResult.ok(
+                helixMessages.formatFor(player, "language.set", "language" to code.lowercase()),
+            )
+        } else {
+            ActionResult.error(
+                helixMessages.formatFor(player, "language.unknown", "language" to code, "languages" to available),
+            )
+        }
     }
 
     private fun deliver(command: ProxyCommand): ActionResult {

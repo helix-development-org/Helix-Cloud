@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.37.0 — 2026-07-25
+
+### Mehrsprachiges Translation-System
+- Neuer netzwerkweiter Übersetzungs-Store: **alle** player-facing Nachrichten
+  (Disconnect-Screens, Proxy-Commands, Kicks/Broadcasts, alle Addon-Messages)
+  liegen als flache Keys `helix.translations.<owner>.<key>` mit Werten **pro
+  Sprache** vor. Ausgeliefert mit Englisch (Default) und Deutsch, weitere
+  Sprachen im Panel anlegbar.
+- **Spieler wählen ihre Sprache** mit `/helix language <code>`; beim First
+  Join wird die Minecraft-Client-Sprache übernommen (`de_DE` → `de`).
+  Präferenzen persistieren über den zentralen Storage.
+- Neue Panel-Seite **Translations** (ersetzt **Messages**, Permission
+  `helix.panel.translations`): Sprachen verwalten (anlegen, Default setzen,
+  entfernen), Keys filtern/editieren/resetten, eigene Keys unter
+  `helix.translations.custom.*` anlegen/löschen.
+- Addon-API: `context.localizedMessages(mapOf("en" to …, "de" to …))` und
+  `Messages.formatFor(player, key, …)` — alle mitgelieferten Addons sind
+  migriert und vollständig auf Deutsch übersetzt. `context.messages(…)`
+  bleibt als einsprachige Kurzform (registriert als Englisch).
+- Velocity-Bridge rendert per Spieler-Sprache (Snapshot-Sync alle 5 s):
+  Maintenance-/Full-Screens, Join-Deny, Kick-Redirect, Command-Antworten.
+  `ProxyCommand` kann jetzt einen `translationKey` tragen — Broadcasts
+  werden je Empfänger in dessen Sprache aufgelöst.
+- Messages-Polish: `/lobby`, `/server`, `/servers` antworten übersetzt in
+  MiniMessage mit `{prefix}`; die `/servers`-Liste ist **klickbar**
+  (click-to-connect mit Hover). Alte Proxy-Screens (`proxy`-Bundle) werden
+  automatisch migriert.
+- REST: `GET/POST /translations`, `DELETE /translations/{key}`,
+  `POST/DELETE /translations/languages`, intern `GET /internal/translations`
+  und `POST /internal/player-language` (`GET/POST /messages` entfällt).
+
 ## 0.36.0 — 2026-07-22
 
 ### Live-Log-Streaming (SSE)

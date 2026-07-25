@@ -38,8 +38,11 @@ Session-Token. Die sichtbaren Views/Panels richten sich nach den Permissions
 | GET | `/proxy` | Proxy-Übersicht: Maintenance, Proxies, Backend-Routing |
 | POST | `/proxy/maintenance` | Maintenance schalten — Body `{"enabled": true}` |
 | GET | `/panels` / `/panels/{id}` | Addon-Dashboard-Seiten (Metadaten / HTML) |
-| GET | `/messages` | Alle konfigurierbaren Addon-Nachrichten (addonId → key → template) |
-| POST | `/messages` | Nachricht setzen/zurücksetzen — Body `{addonId, key, value}` oder `{addonId, key, reset:true}` |
+| GET | `/translations` | Übersetzungs-Store: `{languages, defaultLanguage, entries:[{key, values, defaults}]}` — flache Keys `helix.translations.<owner>.<key>`, Werte/Defaults je Sprache |
+| POST | `/translations` | Übersetzung setzen/anlegen/zurücksetzen — Body `{key, language, value}` oder `{key, language, reset:true}`; neue Keys unter `helix.translations.custom.*` |
+| DELETE | `/translations/{key}` | Custom-Key löschen (Keys mit Code-Default sind nur resetbar) |
+| POST | `/translations/languages` | Sprache anlegen (`{language:"fr"}`) oder Default setzen (`{language:"de", default:true}`) |
+| DELETE | `/translations/languages/{lang}` | Sprache entfernen (Default-Sprache nicht entfernbar) |
 
 ## Tasks
 

@@ -24,24 +24,52 @@ class BansAddon : AddonBase() {
      */
     override fun enable() {
         store = BanStore(context.storage())
-        msg = context.messages(
+        msg = context.localizedMessages(
             mapOf(
-                // Disconnect screens — MiniMessage, multi-line. Placeholders:
-                // {player} {reason} {remaining} {expiry} {duration} {staff} {network} {date} {time}
-                "banned" to (
-                    "<red><bold>You are banned</bold>\n" +
-                        "<gray>from {network}\n \n" +
-                        "<gray>Reason: <white>{reason}"
-                    ),
-                "banned.temp" to (
-                    "<red><bold>You are temporarily banned</bold>\n" +
-                        "<gray>from {network}\n \n" +
-                        "<gray>Reason: <white>{reason}\n" +
-                        "<gray>Time left: <yellow>{remaining}\n" +
-                        "<gray>Expires: <white>{expiry}"
-                    ),
-                "notify.set" to "&c[Ban] &f{player} &7was banned: {reason} ({expiry})",
-                "notify.pardon" to "&a[Ban] &f{player} &7was pardoned.",
+                "en" to mapOf(
+                    // Disconnect screens — MiniMessage, multi-line. Placeholders:
+                    // {player} {reason} {remaining} {expiry} {duration} {staff} {network} {date} {time}
+                    "banned" to (
+                        "<red><bold>You are banned</bold>\n" +
+                            "<gray>from {network}\n \n" +
+                            "<gray>Reason: <white>{reason}"
+                        ),
+                    "banned.temp" to (
+                        "<red><bold>You are temporarily banned</bold>\n" +
+                            "<gray>from {network}\n \n" +
+                            "<gray>Reason: <white>{reason}\n" +
+                            "<gray>Time left: <yellow>{remaining}\n" +
+                            "<gray>Expires: <white>{expiry}"
+                        ),
+                    "notify.set" to "&c[Ban] &f{player} &7was banned: {reason} ({expiry})",
+                    "notify.pardon" to "&a[Ban] &f{player} &7was pardoned.",
+                    "help.header" to "&cBan commands:",
+                    "help.set" to "&f/bans set <player> [duration] [reason...] &7— 30m, 12h, 7d or permanent",
+                    "help.pardon" to "&f/bans pardon <player>",
+                    "help.check" to "&f/bans check <player>",
+                    "help.list" to "&f/bans list",
+                ),
+                "de" to mapOf(
+                    "banned" to (
+                        "<red><bold>Du bist gebannt</bold>\n" +
+                            "<gray>von {network}\n \n" +
+                            "<gray>Grund: <white>{reason}"
+                        ),
+                    "banned.temp" to (
+                        "<red><bold>Du bist vorübergehend gebannt</bold>\n" +
+                            "<gray>von {network}\n \n" +
+                            "<gray>Grund: <white>{reason}\n" +
+                            "<gray>Verbleibende Zeit: <yellow>{remaining}\n" +
+                            "<gray>Läuft ab: <white>{expiry}"
+                        ),
+                    "notify.set" to "&c[Ban] &f{player} &7wurde gebannt: {reason} ({expiry})",
+                    "notify.pardon" to "&a[Ban] &f{player} &7wurde entbannt.",
+                    "help.header" to "&cBan-Befehle:",
+                    "help.set" to "&f/bans set <player> [duration] [reason...] &7— 30m, 12h, 7d oder permanent",
+                    "help.pardon" to "&f/bans pardon <player>",
+                    "help.check" to "&f/bans check <player>",
+                    "help.list" to "&f/bans list",
+                ),
             ),
         )
         context.registerJoinGate { request ->
@@ -88,7 +116,11 @@ class BansAddon : AddonBase() {
             "bans <set|pardon|check|list> ...",
             playerCommand = true,
             permission = "helix.bans",
-        ) { invocation -> bansCommand(invocation.arguments.drop(1)) }
+        ) { invocation ->
+            val executor = invocation.arguments.firstOrNull()
+                ?: return@action ActionResult.error("missing executing player")
+            bansCommand(executor, invocation.arguments.drop(1))
+        }
         panel(
             "bans",
             "Bans",
@@ -100,10 +132,11 @@ class BansAddon : AddonBase() {
     /**
      * Dispatches the `/bans` in-game subcommands to the `ban.*` actions.
      *
+     * @param executor name of the executing player.
      * @param args arguments after the executing player name.
      * @return the command result.
      */
-    private fun bansCommand(args: List<String>): ActionResult {
+    private fun bansCommand(executor: String, args: List<String>): ActionResult {
         val rest = args.drop(1)
         return when (args.firstOrNull()?.lowercase()) {
             "set" -> delegate("ban.set", rest)
@@ -111,11 +144,11 @@ class BansAddon : AddonBase() {
             "check" -> delegate("ban.check", rest)
             "list" -> delegate("ban.list", emptyList())
             else -> ActionResult.ok(
-                "&cBan commands:",
-                "&f/bans set <player> [duration] [reason...] &7— 30m, 12h, 7d or permanent",
-                "&f/bans pardon <player>",
-                "&f/bans check <player>",
-                "&f/bans list",
+                msg.formatFor(executor, "help.header"),
+                msg.formatFor(executor, "help.set"),
+                msg.formatFor(executor, "help.pardon"),
+                msg.formatFor(executor, "help.check"),
+                msg.formatFor(executor, "help.list"),
             )
         }
     }
@@ -160,7 +193,8 @@ class BansAddon : AddonBase() {
     private fun banMessage(entry: BanEntry): String {
         val expiresAt = entry.expiresAtEpochMs
         return if (expiresAt != null) {
-            msg.format(
+            msg.formatFor(
+                entry.player,
                 "banned.temp",
                 "player" to entry.player,
                 "reason" to entry.reason,
@@ -170,7 +204,8 @@ class BansAddon : AddonBase() {
                 "expiry" to formatDate(expiresAt),
             )
         } else {
-            msg.format(
+            msg.formatFor(
+                entry.player,
                 "banned",
                 "player" to entry.player,
                 "reason" to entry.reason,

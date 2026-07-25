@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react"
 import {
-  Archive, Blocks, Clock, FolderTree, LayoutDashboard, ListChecks, LogOut, MessageSquare, Moon, Network,
+  Archive, Blocks, Clock, FolderTree, Languages, LayoutDashboard, ListChecks, LogOut, Moon, Network,
   Puzzle, ScrollText, Server, Settings, ShieldCheck, Sun, Users, Zap,
 } from "lucide-react"
 import type { Identity, PanelInfo } from "@/lib/api"
@@ -27,7 +27,7 @@ const NAV: NavItem[] = [
   { id: "schedules", label: "Schedules", icon: Clock, group: "System" },
   { id: "backups", label: "Backups", icon: Archive, group: "System" },
   { id: "files", label: "Files", icon: FolderTree, group: "System" },
-  { id: "messages", label: "Messages", icon: MessageSquare, group: "System" },
+  { id: "translations", label: "Translations", icon: Languages, group: "System" },
   { id: "settings", label: "Settings", icon: Settings, group: "System" },
 ]
 

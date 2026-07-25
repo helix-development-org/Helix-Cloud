@@ -24,7 +24,7 @@ import org.helix.api.message.Messages
 class DiscordCommandHandler(
     private val actions: ActionInvoker,
     private val config: () -> DiscordConfig,
-    private val messages: Messages = MapMessages(DEFAULT_MESSAGES),
+    private val messages: Messages = MapMessages(DEFAULT_MESSAGES.getValue("en")),
 ) {
     /**
      * Handles one Discord message.
@@ -89,10 +89,16 @@ class DiscordCommandHandler(
         "```\n${lines.joinToString("\n")}\n```"
 
     companion object {
-        /** Default configurable reply templates of the Discord bot. */
+        /** Default configurable reply templates of the Discord bot, by language code. */
         val DEFAULT_MESSAGES = mapOf(
-            "run.denied" to "You are not allowed to run actions.",
-            "unavailable" to "Command is currently unavailable.",
+            "en" to mapOf(
+                "run.denied" to "You are not allowed to run actions.",
+                "unavailable" to "Command is currently unavailable.",
+            ),
+            "de" to mapOf(
+                "run.denied" to "Du darfst keine Aktionen ausführen.",
+                "unavailable" to "Der Befehl ist gerade nicht verfügbar.",
+            ),
         )
     }
 }

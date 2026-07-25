@@ -294,6 +294,73 @@ class ControlServerTest {
     }
 
     @Test
+    fun `translations are editable and synced to bridges over rest`() = testApplication {
+        val client = apiClient()
+        dependencies.messages.register(
+            "velocity",
+            org.helix.node.messages.MessageBundle(
+                storage = org.helix.api.storage.InMemoryAddonStorage(),
+                defaults = mapOf(
+                    "en" to mapOf("screen.maintenance" to "Maintenance"),
+                    "de" to mapOf("screen.maintenance" to "Wartung"),
+                ),
+                defaultLanguage = dependencies.languages::defaultLanguage,
+                languageOf = dependencies.languages::languageOf,
+            ),
+        )
+        dependencies.messages.register(
+            "custom",
+            org.helix.node.messages.MessageBundle(
+                org.helix.api.storage.InMemoryAddonStorage(),
+                emptyMap(),
+            ),
+        )
+
+        val view: TranslationsView = client.get("/api/v1/translations") { bearerAuth("secret") }.body()
+        assertEquals("en", view.defaultLanguage)
+        assertTrue(view.languages.containsAll(listOf("en", "de")))
+        assertTrue(view.entries.any { it.key == "helix.translations.velocity.screen.maintenance" })
+
+        // edit a German value, create a custom key, add a language
+        val edit = client.post("/api/v1/translations") {
+            bearerAuth("secret"); contentType(ContentType.Application.Json)
+            setBody(TranslationUpdate("helix.translations.velocity.screen.maintenance", "de", "Bald wieder da"))
+        }
+        assertEquals(HttpStatusCode.OK, edit.status)
+        client.post("/api/v1/translations") {
+            bearerAuth("secret"); contentType(ContentType.Application.Json)
+            setBody(TranslationUpdate("helix.translations.custom.greeting", "en", "Hi there"))
+        }
+        client.post("/api/v1/translations/languages") {
+            bearerAuth("secret"); contentType(ContentType.Application.Json)
+            setBody(LanguageUpdate("fr"))
+        }
+
+        val snapshot: org.helix.api.i18n.TranslationsSnapshot =
+            client.get("/api/v1/internal/translations") { bearerAuth("secret") }.body()
+        assertEquals("Bald wieder da", snapshot.values["de"]!!["helix.translations.velocity.screen.maintenance"])
+        assertEquals("Hi there", snapshot.values["en"]!!["helix.translations.custom.greeting"])
+        assertTrue("fr" in snapshot.languages)
+
+        // unknown owners are rejected, custom keys are deletable
+        val unknown = client.post("/api/v1/translations") {
+            bearerAuth("secret"); contentType(ContentType.Application.Json)
+            setBody(TranslationUpdate("helix.translations.nope.key", "en", "x"))
+        }
+        assertEquals(HttpStatusCode.NotFound, unknown.status)
+        val deleted = client.delete("/api/v1/translations/helix.translations.custom.greeting") { bearerAuth("secret") }
+        assertEquals(HttpStatusCode.OK, deleted.status)
+
+        // first-join locale is applied for new players
+        val locale = client.post("/api/v1/internal/player-language") {
+            bearerAuth("secret"); contentType(ContentType.Application.Json)
+            setBody(org.helix.api.player.PlayerLocaleReport("Erik", "de_DE"))
+        }
+        assertEquals(HttpStatusCode.OK, locale.status)
+        assertEquals("de", dependencies.languages.languageOf("erik"))
+    }
+
+    @Test
     fun `dashboard is served without authentication`() = testApplication {
         val client = apiClient()
 

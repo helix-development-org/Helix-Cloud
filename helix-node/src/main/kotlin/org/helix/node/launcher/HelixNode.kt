@@ -26,6 +26,8 @@ import org.helix.node.display.BridgeValueStore
 import org.helix.node.display.DisplayResolverRegistry
 import org.helix.node.events.EventLog
 import org.helix.node.logging.LogBuffer
+import kotlinx.serialization.json.Json
+import org.helix.node.languages.LanguageRegistry
 import org.helix.node.messages.MessageBundle
 import org.helix.node.messages.MessageRegistry
 import org.helix.node.gates.JoinGateRegistry
@@ -158,34 +160,126 @@ class HelixNode(
     /** Backend for addon document storage (files or PostgreSQL). */
     val storageProvider: StorageProvider = storageBackend.storageProvider
 
+    /** Network languages and per-player language preferences. */
+    val languages: LanguageRegistry = LanguageRegistry(
+        storageProvider.forAddon("translations", paths.root.resolve("translations")),
+    )
+
     /**
-     * Configurable, panel-editable proxy-level disconnect screens (maintenance,
-     * network full). Registered as the `proxy` message bundle so they appear on
-     * the dashboard Messages page and persist like any other storage.
+     * Proxy-level texts rendered by the Velocity bridge: disconnect screens,
+     * proxy command messages and generic fallbacks. Registered as the
+     * `velocity` bundle, so the keys appear on the dashboard as
+     * `helix.translations.velocity.*`.
      */
-    val proxyScreens: MessageBundle = MessageBundle(
-        storageProvider.forAddon("proxy", paths.root.resolve("proxy")),
-        linkedMapOf(
-            "maintenance" to "<red><bold>Maintenance</bold>\n" +
-                "<gray>{network} is currently under maintenance.\n" +
-                "<gray>Please check back soon.",
-            "server_full" to "<red><bold>Network Full</bold>\n" +
-                "<gray>{network} is full right now <dark_gray>(<white>{online}<gray>/<white>{max}<dark_gray>)\n" +
-                "<gray>Please try again in a moment.",
+    val velocityMessages: MessageBundle = bundle(
+        "velocity",
+        mapOf(
+            "en" to linkedMapOf(
+                "screen.maintenance" to "<red><bold>Maintenance</bold>\n" +
+                    "<gray>{network} is currently under maintenance.\n" +
+                    "<gray>Please check back soon.",
+                "screen.server_full" to "<red><bold>Network Full</bold>\n" +
+                    "<gray>{network} is full right now <dark_gray>(<white>{online}<gray>/<white>{max}<dark_gray>)\n" +
+                    "<gray>Please try again in a moment.",
+                "command.lobby.none" to "{prefix} <red>No lobby available.",
+                "command.server.usage" to "{prefix} <gray>Usage: <white>/server \\<name>",
+                "command.server.unknown" to "{prefix} <red>Unknown server: <white>{server}",
+                "command.servers.none" to "{prefix} <gray>No servers registered.",
+                "command.servers.header" to "{prefix} <gray>Servers <dark_gray>({count})<gray>:",
+                "command.servers.entry" to "<dark_gray> • <click:run_command:'/server {server}'>" +
+                    "<hover:show_text:'<gray>Connect to <white>{server}'><aqua>{server}</aqua></hover></click>",
+                "command.sent" to "{prefix} <gray>Sent to <white>{server}<gray>.",
+                "command.unavailable" to "{prefix} <red>Command is currently unavailable.",
+                "command.result.done" to "{prefix} <green>Done.",
+                "command.result.failed" to "{prefix} <red>Failed.",
+                "kick.default" to "{prefix} <red>You were kicked from the network.",
+                "join.denied" to "<red>You may not join this network.",
+                "motd.maintenance" to "<red>Maintenance",
+            ),
+            "de" to linkedMapOf(
+                "screen.maintenance" to "<red><bold>Wartungsarbeiten</bold>\n" +
+                    "<gray>{network} befindet sich gerade in Wartung.\n" +
+                    "<gray>Schau später noch einmal vorbei.",
+                "screen.server_full" to "<red><bold>Netzwerk voll</bold>\n" +
+                    "<gray>{network} ist gerade voll <dark_gray>(<white>{online}<gray>/<white>{max}<dark_gray>)\n" +
+                    "<gray>Bitte versuche es gleich noch einmal.",
+                "command.lobby.none" to "{prefix} <red>Keine Lobby verfügbar.",
+                "command.server.usage" to "{prefix} <gray>Benutzung: <white>/server \\<name>",
+                "command.server.unknown" to "{prefix} <red>Unbekannter Server: <white>{server}",
+                "command.servers.none" to "{prefix} <gray>Keine Server registriert.",
+                "command.servers.header" to "{prefix} <gray>Server <dark_gray>({count})<gray>:",
+                "command.servers.entry" to "<dark_gray> • <click:run_command:'/server {server}'>" +
+                    "<hover:show_text:'<gray>Verbinde zu <white>{server}'><aqua>{server}</aqua></hover></click>",
+                "command.sent" to "{prefix} <gray>Weitergeleitet zu <white>{server}<gray>.",
+                "command.unavailable" to "{prefix} <red>Der Befehl ist gerade nicht verfügbar.",
+                "command.result.done" to "{prefix} <green>Erledigt.",
+                "command.result.failed" to "{prefix} <red>Fehlgeschlagen.",
+                "kick.default" to "{prefix} <red>Du wurdest vom Netzwerk geworfen.",
+                "join.denied" to "<red>Du darfst dieses Netzwerk nicht betreten.",
+                "motd.maintenance" to "<red>Wartungsarbeiten",
+            ),
         ),
-    ).also { messages.register("proxy", it) }
+    )
+
+    /** Texts of the built-in `/helix` player command. */
+    val helixMessages: MessageBundle = bundle(
+        "helix",
+        mapOf(
+            "en" to linkedMapOf(
+                "usage" to "{prefix} <gray>Usage: <white>/helix \\<language|addons|enable|disable|reload> [arg]",
+                "no_permission" to "{prefix} <red>You do not have permission to do that.",
+                "language.current" to "{prefix} <gray>Your language: <white>{language}<gray>. " +
+                    "Available: <white>{languages}<gray>. Change it with <white>/helix language \\<code><gray>.",
+                "language.set" to "{prefix} <green>Language changed to <white>{language}<green>.",
+                "language.unknown" to "{prefix} <red>Unknown language <white>{language}<red>. " +
+                    "Available: <white>{languages}",
+            ),
+            "de" to linkedMapOf(
+                "usage" to "{prefix} <gray>Benutzung: <white>/helix \\<language|addons|enable|disable|reload> [arg]",
+                "no_permission" to "{prefix} <red>Dafür hast du keine Berechtigung.",
+                "language.current" to "{prefix} <gray>Deine Sprache: <white>{language}<gray>. " +
+                    "Verfügbar: <white>{languages}<gray>. Ändern mit <white>/helix language \\<code><gray>.",
+                "language.set" to "{prefix} <green>Sprache geändert zu <white>{language}<green>.",
+                "language.unknown" to "{prefix} <red>Unbekannte Sprache <white>{language}<red>. " +
+                    "Verfügbar: <white>{languages}",
+            ),
+        ),
+    )
+
+    /**
+     * Free-form translations created on the dashboard, under
+     * `helix.translations.custom.*`.
+     */
+    val customMessages: MessageBundle = bundle("custom", emptyMap())
 
     /**
      * Panel-editable network-wide texts, currently the global `{prefix}`
      * placeholder usable in every message everywhere.
      */
-    val networkMessages: MessageBundle = MessageBundle(
-        storageProvider.forAddon("network", paths.root.resolve("network")),
-        linkedMapOf(
-            "prefix" to "<gradient:#8b5cf6:#38bdf8><bold>Helix</bold></gradient> <dark_gray>»</dark_gray>",
-            "name" to config.network.name,
+    val networkMessages: MessageBundle = bundle(
+        "network",
+        mapOf(
+            "en" to linkedMapOf(
+                "prefix" to "<gradient:#8b5cf6:#38bdf8><bold>Helix</bold></gradient> <dark_gray>»</dark_gray>",
+                "name" to config.network.name,
+            ),
         ),
-    ).also { messages.register("network", it) }
+    )
+
+    /**
+     * Creates and registers a language-aware message bundle of an owner.
+     *
+     * @param owner bundle owner id (`velocity`, `network`, …).
+     * @param defaults default templates: language code to (key to template).
+     * @return the registered bundle.
+     */
+    private fun bundle(owner: String, defaults: Map<String, Map<String, String>>): MessageBundle =
+        MessageBundle(
+            storage = storageProvider.forAddon(owner, paths.root.resolve(owner)),
+            defaults = defaults,
+            defaultLanguage = languages::defaultLanguage,
+            languageOf = languages::languageOf,
+        ).also { messages.register(owner, it) }
 
     /**
      * Re-reads the network texts, refreshes the global placeholders and
@@ -223,10 +317,13 @@ class HelixNode(
                 addAll(PanelAuthService.VIEW_NODES.values)
                 dashboardPanels.list().forEach { add(PanelAuthService.panelNode(it.id)) }
                 add("helix.maintenance.bypass")
+                add("helix.admin")
                 registry.descriptors().filter { it.playerCommand }.mapNotNull { it.permission }.forEach(::add)
             }.distinct()
         },
         serviceDirectories = { listOf(paths.servicesStatic, paths.servicesTemp, paths.templates) },
+        defaultLanguage = languages::defaultLanguage,
+        languageOf = languages::languageOf,
     )
 
     private val overviewService = PlatformOverviewService(version(), taskStore, manager)
@@ -287,15 +384,17 @@ class HelixNode(
             sessionTtlSeconds = config.control.sessionTtlSeconds,
             loginMessage = config.control.loginMessage,
             networkName = { networkMessages.raw("name") },
-            proxyScreens = proxyScreens,
+            proxyScreens = velocityMessages,
+            languages = languages,
             metrics = metrics,
             apiMetrics = apiMetrics,
             onMessagesChanged = { addonId ->
                 if (addonId == "network") {
                     refreshNetworkPlaceholders()
-                    // the display name rides on the routing snapshot — wake proxies
-                    proxyEvents.bumpRouting()
                 }
+                // screens and the display name ride on the routing snapshot,
+                // everything else on the periodic bridge sync — wake proxies
+                proxyEvents.bumpRouting()
             },
             jobScheduler = jobScheduler,
             backups = backups,
@@ -310,6 +409,9 @@ class HelixNode(
     fun start() {
         logger.info("Booting Helix-Cloud {} from {}", version(), dataDirectory.toAbsolutePath())
         taskStore.reload()
+        migrateLegacyProxyScreens()
+        languages.onChange { proxyEvents.bumpRouting() }
+        val addonActions = AddonActions(addonManager)
         BuiltinActions(
             paths = paths,
             taskStore = taskStore,
@@ -322,8 +424,16 @@ class HelixNode(
             playerRegistry = playerRegistry,
             eventSink = ::recordEvent,
             proxyEvents = proxyEvents,
+            languages = languages,
+            helixMessages = helixMessages,
+            adminCheck = { player ->
+                permissionService.check(
+                    org.helix.api.proxy.PermissionCheckRequest(name = player, permission = "helix.admin"),
+                )
+            },
+            addonSubcommands = addonActions::helixSubcommand,
         ).registerAll(registry)
-        AddonActions(addonManager).registerAll(registry)
+        addonActions.registerAll(registry)
         BackupActions(backups).registerAll(registry)
         addonManager.loadAll()
         registerEventSources()
@@ -391,6 +501,25 @@ class HelixNode(
             runCatching { storageBackend.close() }
             exitProcess(0)
         }, "helix-shutdown").start()
+    }
+
+    /**
+     * Imports edited disconnect screens of the pre-translation `proxy`
+     * bundle into `helix.translations.velocity.screen.*`, once.
+     */
+    private fun migrateLegacyProxyScreens() {
+        val legacy = storageProvider.forAddon("proxy", paths.root.resolve("proxy"))
+        val raw = legacy.read("messages") ?: return
+        runCatching {
+            val doc = Json { ignoreUnknownKeys = true }.decodeFromString<Map<String, String>>(raw)
+            listOf("maintenance" to "screen.maintenance", "server_full" to "screen.server_full")
+                .forEach { (legacyKey, key) ->
+                    doc[legacyKey]?.takeIf { it != velocityMessages.rawIn("en", key) }
+                        ?.let { velocityMessages.set("en", key, it) }
+                }
+        }
+        legacy.delete("messages")
+        logger.info("Migrated legacy proxy screens into the translation system")
     }
 
     private fun stopServicesQuietly() {

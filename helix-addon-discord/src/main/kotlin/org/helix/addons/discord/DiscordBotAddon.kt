@@ -43,7 +43,7 @@ class DiscordBotAddon : AddonBase() {
      */
     override fun enable() {
         config = DiscordConfig.load(context.storage())
-        val msg = context.messages(DiscordCommandHandler.DEFAULT_MESSAGES)
+        val msg = context.localizedMessages(DiscordCommandHandler.DEFAULT_MESSAGES)
         handler = DiscordCommandHandler(context.actions, { config }, msg)
         context.registerNotificationListener { category, message ->
             if (category in config.notificationCategories) {

@@ -13,14 +13,14 @@ import { AddonsView } from "@/views/addons"
 import { SchedulesView } from "@/views/schedules"
 import { BackupsView } from "@/views/backups"
 import { FilesView } from "@/views/files"
-import { MessagesView } from "@/views/messages"
+import { TranslationsView } from "@/views/translations"
 import { SettingsView } from "@/views/settings"
 import { AddonPanelView } from "@/views/addon-panel"
 
 const TITLES: Record<string, string> = {
   overview: "Overview", tasks: "Tasks", services: "Services", players: "Players", proxy: "Proxy",
   events: "Events", logs: "Logs", audit: "Audit", addons: "Addons", schedules: "Schedules", backups: "Backups", files: "Files",
-  messages: "Messages", settings: "Settings",
+  translations: "Translations", settings: "Settings",
 }
 
 export function App() {
@@ -80,7 +80,7 @@ export function App() {
         {current === "schedules" && <SchedulesView />}
         {current === "backups" && <BackupsView />}
         {current === "files" && <FilesView />}
-        {current === "messages" && <MessagesView />}
+        {current === "translations" && <TranslationsView />}
         {current === "settings" && <SettingsView identity={identity} version={version} />}
         {current.startsWith("panel:") && <AddonPanelView panelId={current.slice(6)} />}
       </AppShell>

@@ -15,11 +15,39 @@ interface Messages {
     /**
      * Formats a message, substituting `{placeholder}` markers.
      *
+     * Resolves against the network's default language; prefer
+     * [formatFor] whenever the receiving player is known.
+     *
      * @param key message key.
      * @param params placeholder name to value pairs.
      * @return the formatted message, or the key itself if unknown.
      */
     fun format(key: String, vararg params: Pair<String, String>): String
+
+    /**
+     * Formats a message in the receiving player's language.
+     *
+     * Falls back to the network's default language when the player has no
+     * preference or the key is not translated. Implementations without
+     * language support resolve like [format].
+     *
+     * @param player receiving player name.
+     * @param key message key.
+     * @param params placeholder name to value pairs.
+     * @return the formatted message, or the key itself if unknown.
+     */
+    fun formatFor(player: String, key: String, vararg params: Pair<String, String>): String =
+        format(key, *params)
+
+    /**
+     * Returns the raw template in the receiving player's language, without
+     * substitution.
+     *
+     * @param player receiving player name.
+     * @param key message key.
+     * @return the template, or the key itself if unknown.
+     */
+    fun rawFor(player: String, key: String): String = raw(key)
 
     /**
      * Formats a message from a parameter map — the Java-friendly overload.

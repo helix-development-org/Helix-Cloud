@@ -68,6 +68,8 @@ import org.slf4j.LoggerFactory
  *  addons through the context (feeds the permission catalog).
  * @property serviceDirectories directories that may contain service files,
  *  exposed to addons for plugin scanning.
+ * @property defaultLanguage supplier of the network's default language.
+ * @property languageOf resolver of a player's language preference.
  */
 class AddonManager(
     private val directory: Path,
@@ -86,6 +88,8 @@ class AddonManager(
     private val taskAddonActive: (taskName: String, addonId: String) -> Boolean = { _, _ -> true },
     private val corePermissions: () -> List<String> = { emptyList() },
     private val serviceDirectories: () -> List<Path> = { emptyList() },
+    private val defaultLanguage: () -> String = { "en" },
+    private val languageOf: ((String) -> String)? = null,
 ) {
     private val logger = LoggerFactory.getLogger(AddonManager::class.java)
     private val json = Json { ignoreUnknownKeys = true }
@@ -334,8 +338,11 @@ class AddonManager(
             dashboardPanels.register(record.manifest.id, panel)
         }
 
-        override fun messages(defaults: Map<String, String>): Messages {
-            val bundle = MessageBundle(storage(), defaults)
+        override fun messages(defaults: Map<String, String>): Messages =
+            localizedMessages(mapOf("en" to defaults))
+
+        override fun localizedMessages(defaultsByLanguage: Map<String, Map<String, String>>): Messages {
+            val bundle = MessageBundle(storage(), defaultsByLanguage, defaultLanguage, languageOf)
             messages.register(record.manifest.id, bundle)
             return bundle
         }

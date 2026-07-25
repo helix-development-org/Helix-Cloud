@@ -82,14 +82,15 @@ erzeugen. `/internal/*` bleibt ausschließlich dem Admin-Token vorbehalten.
 
 ### Disconnect-Screens
 
-Alle Trennungs-Screens sind im Web-Panel unter **Messages** editierbar,
-**mehrzeilig** und im **MiniMessage**-Format (Farbverläufe `<gradient:…>`,
-Hex `<#rrggbb>`, `<bold>` …); Legacy-`&`-Codes werden weiterhin unterstützt.
-Verteilung:
+Alle Trennungs-Screens sind im Web-Panel unter **Translations** editierbar —
+**pro Sprache**, **mehrzeilig** und im **MiniMessage**-Format (Farbverläufe
+`<gradient:…>`, Hex `<#rrggbb>`, `<bold>` …); Legacy-`&`-Codes werden
+weiterhin unterstützt. Der Screen erscheint in der Sprache des Spielers
+(`/helix language`, First Join = Client-Sprache). Verteilung:
 
-- **Ban** (permanent/temporär) → Addon `helix.bans`, Keys `banned` / `banned.temp`
-- **Kick** → Addon `helix.moderation`, Key `kick.screen`
-- **Maintenance / Voll** → Bundle `proxy`, Keys `maintenance` / `server_full`
+- **Ban** (permanent/temporär) → `helix.translations.helix.bans.banned` / `….banned.temp`
+- **Kick** → `helix.translations.helix.moderation.kick.screen`
+- **Maintenance / Voll** → `helix.translations.velocity.screen.maintenance` / `….screen.server_full`
 
 Universelle Placeholder (auf jedem Screen verfügbar — vom Proxy gefüllt):
 `{player}`, `{network}`, `{server}`, `{online}`, `{max}`, `{date}`, `{time}`,

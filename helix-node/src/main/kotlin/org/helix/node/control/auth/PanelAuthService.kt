@@ -198,7 +198,7 @@ class PanelAuthService(
             "schedules" to "helix.panel.schedules",
             "backups" to "helix.panel.backups",
             "files" to "helix.panel.files",
-            "messages" to "helix.panel.messages",
+            "translations" to "helix.panel.translations",
             "settings" to "helix.panel.settings",
         )
 

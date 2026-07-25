@@ -36,8 +36,14 @@ function NetworkPrefixCard() {
   const [values, setValues] = useState<{ name: string; prefix: string } | null>(null)
 
   useEffect(() => {
-    api<Record<string, Record<string, string>>>("/messages")
-      .then((all) => setValues({ name: all["network"]?.["name"] ?? "", prefix: all["network"]?.["prefix"] ?? "" }))
+    api<{ entries: { key: string; values: Record<string, string>; defaults: Record<string, string> }[] }>("/translations")
+      .then((view) => {
+        const effective = (key: string) => {
+          const entry = view.entries.find((e) => e.key === `helix.translations.network.${key}`)
+          return entry?.values["en"] ?? entry?.defaults["en"] ?? ""
+        }
+        setValues({ name: effective("name"), prefix: effective("prefix") })
+      })
       .catch(() => setValues(null))
   }, [])
 
@@ -45,7 +51,10 @@ function NetworkPrefixCard() {
 
   const save = async (key: "name" | "prefix") => {
     try {
-      await api("/messages", { method: "POST", body: { addonId: "network", key, value: values[key] } })
+      await api("/translations", {
+        method: "POST",
+        body: { key: `helix.translations.network.${key}`, language: "en", value: values[key] },
+      })
       toast.success(`Network ${key} saved — usable as {${key === "name" ? "network" : "prefix"}} everywhere`)
     } catch (e) {
       toast.error((e as Error).message)

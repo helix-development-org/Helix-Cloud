@@ -44,7 +44,9 @@ import org.helix.node.control.auth.PanelPrincipal
 import org.helix.node.control.auth.VerifyRequest
 import org.helix.node.scheduler.ScheduledJob
 import org.helix.api.bridge.HeartbeatReport
+import org.helix.api.i18n.TranslationsSnapshot
 import org.helix.api.player.PlayerEvent
+import org.helix.api.player.PlayerLocaleReport
 import org.helix.api.proxy.JoinRequest
 import org.helix.api.proxy.PermissionCheckRequest
 import org.helix.api.proxy.PermissionDecision
@@ -136,7 +138,7 @@ fun Application.controlModule(dependencies: ControlDependencies) {
                 proxyRoutes(dependencies)
                 observabilityRoutes(dependencies)
                 panelRoutes(dependencies)
-                messageRoutes(dependencies)
+                translationRoutes(dependencies)
                 scheduleRoutes(dependencies)
                 backupRoutes(dependencies)
                 fileRoutes(dependencies)
@@ -370,24 +372,63 @@ private fun io.ktor.server.routing.Route.panelRoutes(dependencies: ControlDepend
     }
 }
 
-private fun io.ktor.server.routing.Route.messageRoutes(dependencies: ControlDependencies) {
-    get("/messages") {
-        if (!authorize(dependencies, "helix.panel.messages")) return@get
-        call.respond(dependencies.messages.all())
+private fun io.ktor.server.routing.Route.translationRoutes(dependencies: ControlDependencies) {
+    get("/translations") {
+        if (!authorize(dependencies, "helix.panel.translations")) return@get
+        call.respond(
+            TranslationsView(
+                languages = dependencies.languages.languages(),
+                defaultLanguage = dependencies.languages.defaultLanguage(),
+                entries = dependencies.messages.entries(),
+            ),
+        )
     }
-    post("/messages") {
-        if (!authorize(dependencies, "helix.panel.messages")) return@post
-        val update = call.receive<MessageUpdate>()
+    post("/translations") {
+        if (!authorize(dependencies, "helix.panel.translations")) return@post
+        val update = call.receive<TranslationUpdate>()
         val ok = if (update.reset) {
-            dependencies.messages.reset(update.addonId, update.key)
+            dependencies.messages.reset(update.key, update.language)
         } else {
-            dependencies.messages.set(update.addonId, update.key, update.value)
+            dependencies.messages.set(update.key, update.language, update.value)
         }
         if (ok) {
-            dependencies.onMessagesChanged(update.addonId)
-            call.respond(MessageResponse("updated ${update.addonId}.${update.key}"))
+            dependencies.messages.ownerOf(update.key)?.let(dependencies.onMessagesChanged)
+            call.respond(MessageResponse("updated ${update.key} (${update.language})"))
         } else {
-            call.respond(HttpStatusCode.NotFound, ErrorResponse("unknown message ${update.addonId}.${update.key}"))
+            call.respond(HttpStatusCode.NotFound, ErrorResponse("unknown translation ${update.key}"))
+        }
+    }
+    delete("/translations/{key}") {
+        if (!authorize(dependencies, "helix.panel.translations")) return@delete
+        val key = call.parameters["key"].orEmpty()
+        if (dependencies.messages.deleteKey(key)) {
+            dependencies.messages.ownerOf(key)?.let(dependencies.onMessagesChanged)
+            call.respond(MessageResponse("deleted $key"))
+        } else {
+            call.respond(HttpStatusCode.NotFound, ErrorResponse("unknown or default-backed key: $key"))
+        }
+    }
+    post("/translations/languages") {
+        if (!authorize(dependencies, "helix.panel.translations")) return@post
+        val update = call.receive<LanguageUpdate>()
+        val ok = if (update.default) {
+            dependencies.languages.setDefaultLanguage(update.language)
+        } else {
+            dependencies.languages.addLanguage(update.language)
+        }
+        if (ok) {
+            call.respond(MessageResponse("${if (update.default) "default set to" else "added"} ${update.language}"))
+        } else {
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("invalid language: ${update.language}"))
+        }
+    }
+    delete("/translations/languages/{language}") {
+        if (!authorize(dependencies, "helix.panel.translations")) return@delete
+        val language = call.parameters["language"].orEmpty()
+        if (dependencies.languages.removeLanguage(language)) {
+            call.respond(MessageResponse("removed $language"))
+        } else {
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("cannot remove language: $language"))
         }
     }
 }
@@ -762,8 +803,8 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
         call.respond(
             dependencies.routing.snapshot(proxyServiceId).copy(
                 networkName = dependencies.networkName(),
-                maintenanceScreen = dependencies.proxyScreens.raw("maintenance"),
-                serverFullScreen = dependencies.proxyScreens.raw("server_full"),
+                maintenanceScreen = dependencies.proxyScreens.raw("screen.maintenance"),
+                serverFullScreen = dependencies.proxyScreens.raw("screen.server_full"),
             ),
         )
     }
@@ -835,6 +876,25 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
         if (!requireAdmin(dependencies)) return@post
         val request = call.receive<JoinRequest>()
         call.respond(dependencies.displayResolvers.resolve(request.name))
+    }
+    get("/internal/translations") {
+        if (!requireAdmin(dependencies)) return@get
+        val online = dependencies.playerRegistry.online().map { it.name.lowercase() }.toSet()
+        val languageList = dependencies.languages.languages()
+        call.respond(
+            TranslationsSnapshot(
+                defaultLanguage = dependencies.languages.defaultLanguage(),
+                languages = languageList,
+                playerLanguages = dependencies.languages.playerLanguages().filterKeys { it in online },
+                values = dependencies.messages.effectiveTables(languageList),
+            ),
+        )
+    }
+    post("/internal/player-language") {
+        if (!requireAdmin(dependencies)) return@post
+        val report = call.receive<PlayerLocaleReport>()
+        dependencies.languages.applyClientLocale(report.name, report.locale)
+        call.respond(MessageResponse("ok"))
     }
     get("/internal/bridge-values") {
         if (!requireAdmin(dependencies)) return@get

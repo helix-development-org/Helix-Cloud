@@ -23,14 +23,24 @@ class EconomyAddon : AddonBase() {
      */
     override fun enable() {
         store = BalanceStore(context.storage())
-        msg = context.messages(
+        msg = context.localizedMessages(
             mapOf(
-                "balance" to "&6Your balance: &f{balance} coins",
-                "pay.sent" to "&6You sent &f{amount} coins &6to {target}.",
-                "pay.received" to "&6{sender} sent you &f{amount} coins&6.",
-                "error.self" to "&cYou cannot pay yourself.",
-                "error.funds" to "&cYou do not have enough coins.",
-                "error.usage" to "&cUsage: /pay <player> <amount>",
+                "en" to mapOf(
+                    "balance" to "&6Your balance: &f{balance} coins",
+                    "pay.sent" to "&6You sent &f{amount} coins &6to {target}.",
+                    "pay.received" to "&6{sender} sent you &f{amount} coins&6.",
+                    "error.self" to "&cYou cannot pay yourself.",
+                    "error.funds" to "&cYou do not have enough coins.",
+                    "error.usage" to "&cUsage: /pay <player> <amount>",
+                ),
+                "de" to mapOf(
+                    "balance" to "&6Dein Kontostand: &f{balance} Coins",
+                    "pay.sent" to "&6Du hast &f{amount} Coins &6an {target} gesendet.",
+                    "pay.received" to "&6{sender} hat dir &f{amount} Coins &6gesendet.",
+                    "error.self" to "&cDu kannst dir nicht selbst Coins senden.",
+                    "error.funds" to "&cDu hast nicht genug Coins.",
+                    "error.usage" to "&cBenutzung: /pay <player> <amount>",
+                ),
             ),
         )
         context.registerAction(
@@ -43,7 +53,7 @@ class EconomyAddon : AddonBase() {
         ) { invocation ->
             val executor = invocation.arguments.firstOrNull()
                 ?: return@registerAction ActionResult.error("missing executing player")
-            ActionResult.ok(msg.format("balance", "balance" to store.balance(executor).toString()))
+            ActionResult.ok(msg.formatFor(executor, "balance", "balance" to store.balance(executor).toString()))
         }
         context.registerAction(
             ActionDescriptor(
@@ -85,24 +95,27 @@ class EconomyAddon : AddonBase() {
         val executor = invocation.arguments.getOrNull(0)
             ?: return ActionResult.error("missing executing player")
         val target = invocation.arguments.getOrNull(1)
-            ?: return ActionResult.error(msg.format("error.usage"))
+            ?: return ActionResult.error(msg.formatFor(executor, "error.usage"))
         val amount = invocation.arguments.getOrNull(2)?.toLongOrNull()
-            ?: return ActionResult.error(msg.format("error.usage"))
+            ?: return ActionResult.error(msg.formatFor(executor, "error.usage"))
         if (executor.equals(target, ignoreCase = true)) {
-            return ActionResult.error(msg.format("error.self"))
+            return ActionResult.error(msg.formatFor(executor, "error.self"))
         }
         return try {
             store.transfer(executor, target, amount)
             context.actions.invoke(
                 ActionInvocation(
                     "player.message",
-                    listOf(target, msg.format("pay.received", "sender" to executor, "amount" to amount.toString())),
+                    listOf(
+                        target,
+                        msg.formatFor(target, "pay.received", "sender" to executor, "amount" to amount.toString()),
+                    ),
                     ActionSource.ADDON,
                 ),
             )
-            ActionResult.ok(msg.format("pay.sent", "amount" to amount.toString(), "target" to target))
+            ActionResult.ok(msg.formatFor(executor, "pay.sent", "amount" to amount.toString(), "target" to target))
         } catch (failure: IllegalArgumentException) {
-            ActionResult.error(msg.format("error.funds"))
+            ActionResult.error(msg.formatFor(executor, "error.funds"))
         }
     }
 

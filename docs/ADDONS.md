@@ -298,31 +298,39 @@ service-spezifischem Verhalten sollten das respektieren:
 
 Netzwerkweite Addons (z.B. Bans) ignorieren die Task-Aktivierung.
 
-## Konfigurierbare Nachrichten
+## Konfigurierbare Nachrichten (mehrsprachig)
 
-Alle player-facing Texte eines Addons sollen einstellbar sein. Dafür
-deklariert das Addon einmalig Default-Templates; die Node persistiert sie
-in `Helix/addons/data/<addon>/messages.json` und macht sie über die
-Dashboard-Seite **Messages** editierbar. Änderungen wirken sofort (kein
-Neustart). Templates nutzen `{platzhalter}` und `&`-Farbcodes.
+Alle player-facing Texte eines Addons sollen einstellbar und übersetzbar
+sein. Dafür deklariert das Addon Default-Templates **pro Sprache**; die
+Node persistiert Custom-Werte im Addon-Storage und macht alles über die
+Dashboard-Seite **Translations** editierbar (flache Keys
+`helix.translations.<addon-id>.<key>`). Änderungen wirken sofort (kein
+Neustart). Templates nutzen `{platzhalter}`, MiniMessage und `&`-Farbcodes.
+
+Spieler wählen ihre Sprache mit `/helix language <code>`; beim First Join
+wird die Minecraft-Client-Sprache übernommen. Nachrichten an einen
+konkreten Spieler laufen deshalb über `formatFor(player, key, …)` — nur
+Texte ohne Empfänger (z.B. Konsole) über `format(key, …)`.
 
 ```kotlin
 class MyAddon : AddonBase() {
     private lateinit var msg: org.helix.api.message.Messages
     override fun enable() {
-        msg = context.messages(mapOf(
-            "welcome" to "&aWelcome, &f{player}&a!",
+        msg = context.localizedMessages(mapOf(
+            "en" to mapOf("welcome" to "&aWelcome, &f{player}&a!"),
+            "de" to mapOf("welcome" to "&aWillkommen, &f{player}&a!"),
         ))
         // ...
-        val text = msg.format("welcome", "player" to name)  // liest immer den aktuellen Wert
+        val text = msg.formatFor(name, "welcome", "player" to name)  // Sprache des Spielers
     }
 }
 ```
 
-Neue Keys in einer neuen Addon-Version werden beim Start ergänzt, ohne
-bereits geänderte Werte zu überschreiben. Über die REST-API:
-`GET /messages`, `POST /messages {addonId,key,value}` bzw.
-`{addonId,key,reset:true}`.
+`context.messages(defaults)` (einsprachig) bleibt als Kurzform erhalten und
+registriert die Defaults als Englisch. Fehlende Übersetzungen fallen auf
+die Default-Sprache des Netzwerks zurück. Über die REST-API:
+`GET /translations`, `POST /translations {key, language, value}` bzw.
+`{key, language, reset:true}`.
 
 ## Eigene Dashboard-Seite beisteuern
 

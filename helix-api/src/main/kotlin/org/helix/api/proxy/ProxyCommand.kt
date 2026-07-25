@@ -8,13 +8,20 @@ import kotlinx.serialization.Serializable
  * @property type command type: `kick`, `message` or `broadcast`.
  * @property player target player name; `*` for broadcasts.
  * @property reason kick reason or message text; `&` color codes are
- *   rendered by the bridge.
+ *   rendered by the bridge. Used as fallback when [translationKey] is unset
+ *   or unknown to the bridge.
+ * @property translationKey optional translation key the bridge resolves in
+ *   each receiving player's language before rendering.
+ * @property params placeholder name to value pairs substituted into the
+ *   resolved translation.
  */
 @Serializable
 data class ProxyCommand(
     val type: String,
     val player: String,
     val reason: String? = null,
+    val translationKey: String? = null,
+    val params: Map<String, String> = emptyMap(),
 ) {
     companion object {
         /**
@@ -46,5 +53,16 @@ data class ProxyCommand(
          */
         fun broadcast(text: String): ProxyCommand =
             ProxyCommand(type = "broadcast", player = "*", reason = text)
+
+        /**
+         * Creates a network-wide broadcast resolved per receiving player.
+         *
+         * @param key translation key resolved in each player's language.
+         * @param fallback text used when the bridge does not know the key.
+         * @param params placeholder name to value pairs.
+         * @return the broadcast [ProxyCommand].
+         */
+        fun broadcastKey(key: String, fallback: String, params: Map<String, String> = emptyMap()): ProxyCommand =
+            ProxyCommand(type = "broadcast", player = "*", reason = fallback, translationKey = key, params = params)
     }
 }
