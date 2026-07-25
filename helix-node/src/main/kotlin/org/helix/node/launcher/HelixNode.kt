@@ -287,10 +287,15 @@ class HelixNode(
                 "name" to config.network.name,
                 "restart.warn" to "{prefix} <gray><white>{target}</white> restarts in <white>{seconds}s</white>.",
                 "restart.now" to "{prefix} <gray><white>{target}</white> is restarting now.",
+                "restart.backend.start" to "{prefix} <gray>The backend is restarting — you may experience brief lag.",
+                "restart.backend.done" to "{prefix} <green>Backend restart complete.",
             ),
             "de" to linkedMapOf(
                 "restart.warn" to "{prefix} <gray><white>{target}</white> startet in <white>{seconds}s</white> neu.",
                 "restart.now" to "{prefix} <gray><white>{target}</white> startet jetzt neu.",
+                "restart.backend.start" to "{prefix} <gray>Die Backend-Server starten neu — " +
+                    "es kann kurzzeitig zu Lags kommen.",
+                "restart.backend.done" to "{prefix} <green>Backend-Restart beendet.",
             ),
         ),
     )
@@ -511,6 +516,15 @@ class HelixNode(
                 }
             },
         )
+        if (completedBackendRestart) {
+            // The proxies survived headless and re-poll within a second —
+            // the queued broadcast reaches them on their next drain.
+            broadcastToProxies(
+                "helix.translations.network.restart.backend.done",
+                "{prefix} <green>Backend restart complete.",
+            )
+            eventLog.record("node", "Backend restart completed", "info")
+        }
         logger.info(
             "Node ready — dashboard: http://{}:{}/  token: {}",
             config.control.host,
@@ -601,6 +615,15 @@ class HelixNode(
         Thread({
             logger.info("{} restart: respawning via {}", what, if (managed) "the service manager" else jar)
             if (keepServices) {
+                // Announce the restart and give the proxies' long-poll a
+                // moment to deliver it before the control API goes down.
+                if (broadcastToProxies(
+                        "helix.translations.network.restart.backend.start",
+                        "{prefix} <gray>The backend is restarting — you may experience brief lag.",
+                    )
+                ) {
+                    runCatching { Thread.sleep(BROADCAST_GRACE_MILLIS) }
+                }
                 runCatching(::saveRestartState)
                     .onFailure { logger.warn("Could not persist the restart state: {}", it.message) }
             }
@@ -692,12 +715,37 @@ class HelixNode(
         java.nio.file.Files.writeString(paths.root.resolve(RESTART_STATE_FILE), Json.encodeToString(state))
     }
 
+    /** Whether this boot completed a backend restart, for the done-broadcast. */
+    @Volatile
+    private var completedBackendRestart = false
+
+    /**
+     * Queues a translated broadcast on every active proxy and wakes their
+     * long-polls.
+     *
+     * @param key translation key resolved per receiving player.
+     * @param fallback template used while the key is not yet synced.
+     * @return `true` when at least one proxy was notified.
+     */
+    private fun broadcastToProxies(key: String, fallback: String): Boolean {
+        val proxies = manager.managedServices()
+            .filter { it.task.environment.proxy && it.active() }
+            .map { it.id }
+        if (proxies.isEmpty()) {
+            return false
+        }
+        commandQueue.enqueue(proxies, org.helix.api.proxy.ProxyCommand.broadcastKey(key, fallback))
+        proxyEvents.signal()
+        return true
+    }
+
     /** Restores the runtime state left behind by the predecessor, once. */
     private fun restoreRestartState() {
         val file = paths.root.resolve(RESTART_STATE_FILE)
         if (!java.nio.file.Files.exists(file)) {
             return
         }
+        completedBackendRestart = true
         runCatching {
             val state = Json { ignoreUnknownKeys = true }
                 .decodeFromString<RestartState>(java.nio.file.Files.readString(file))
@@ -844,5 +892,11 @@ class HelixNode(
          * `Restart=on-failure`) to start the successor launcher.
          */
         const val RESTART_EXIT_CODE = 10
+
+        /**
+         * Milliseconds the proxies' long-poll gets to deliver the
+         * restart-start broadcast before the control API goes down.
+         */
+        const val BROADCAST_GRACE_MILLIS = 1_500L
     }
 }

@@ -116,6 +116,12 @@ startet den Node-Prozess neu, **ohne die Services zu stoppen**:
    deterministischen Container-Namen `helix-<id>`. Tote Einträge ersetzt
    der Auto-Scaler. Bridges verbinden sich über ihre Poll-/Heartbeat-Loops
    automatisch neu; der erste Heartbeat bestätigt `RUNNING`.
+5. Spieler werden informiert: vor dem Teardown broadcastet die Node
+   `helix.translations.network.restart.backend.start` („Backend startet
+   neu, kurzzeitig Lags möglich") mit einer kurzen Grace-Zeit für die
+   Proxy-Long-Polls; der Nachfolger broadcastet nach der Übernahme
+   `…restart.backend.done` („Backend-Restart beendet") — die Nachricht
+   wartet in der Command-Queue, bis die überlebenden Proxies re-pollen.
 
 `launcher.restart` (`/helix launcher restart`) ist der volle Neustart:
 Services stoppen sauber, danach startet eine frische `Launcher.jar` —

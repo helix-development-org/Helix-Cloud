@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.41.0 — 2026-07-25
+
+### Broadcasts beim Backend-Restart
+- Vor dem Backend-Restart geht ein netzwerkweiter Broadcast raus
+  (`helix.translations.network.restart.backend.start`, de: „Die
+  Backend-Server starten neu — es kann kurzzeitig zu Lags kommen."),
+  mit 1,5 s Grace-Zeit, damit die Proxy-Long-Polls ihn vor dem
+  Control-API-Stopp ausliefern.
+- Nach erfolgreicher Übernahme broadcastet der Nachfolger
+  (`…restart.backend.done`, de: „Backend-Restart beendet."). Die
+  Nachricht wartet in der Command-Queue, bis die headless überlebenden
+  Proxies re-pollen — sie geht also auch dann nicht verloren, wenn der
+  Node ein paar Sekunden weg war.
+- Beide Texte sind pro Sprache im Panel editierbar und werden je
+  Empfänger in dessen Sprache aufgelöst.
+
 ## 0.40.1 — 2026-07-25
 
 ### Fix: Backend-Restart im Terminal stoppte alle Services
