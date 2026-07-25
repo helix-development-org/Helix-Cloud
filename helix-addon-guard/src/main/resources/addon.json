@@ -3,5 +3,8 @@
   "name": "Helix-Guard",
   "version": "1.0.0",
   "main": "org.helix.addons.guard.GuardAddon",
-  "description": "IGuard anticheat management: every IGuard config value is editable in the web panel, distributed to all Paper service directories and hot-reloaded on running services."
+  "description": "IGuard anticheat management: panel-editable config distributed to all Paper services, node-side persistence for violations/incidents/replays/punishments, staff alerts and network-wide ban enforcement.",
+  "permissions": [
+    "iguard.alerts"
+  ]
 }

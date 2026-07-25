@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.45.0 — 2026-07-26
+
+### Helix-Guard: komplett über den Storage-Provider — keine DB-Zugriffe aus den Servern
+- IGuard hat jetzt ein Storage-Interface mit zwei Backends: der bisherige
+  PostgreSQL-Pfad (Standalone, unverändert) und ein neuer **Helix-Mode**
+  ohne jede Datenbankverbindung — alle Writes (Violations, Incidents,
+  Replays, Punishments, Bans) und Reads laufen gebatcht über die
+  Control-API zur Node (`guard.store.*`/`guard.query.*`) und werden dort
+  **über den Storage-Provider** persistiert (json, Postgres oder Mongo —
+  wie in node.toml konfiguriert). `storage.mode: auto` erkennt die
+  Helix-Umgebung automatisch an `HELIX_CONTROL_URL`.
+- Netzwerkweite Durchsetzung übernimmt die Node: Ban → sofortiger Kick +
+  **Join-Gate** (übersetzter Ban-Screen, UUID/Name-Match, Auto-Pruning
+  abgelaufener Bans); Incident → Alert an alle Mods mit `iguard.alerts`
+  auf allen Servern, in deren Sprache. IGuards Velocity-Outbox-Plugin
+  entfällt — `velocity.jar` ist aus der HXA entfernt.
+- In Helix-Mode außerdem: IGuards eigenes Web-Dashboard deaktiviert
+  (das Helix-Panel übernimmt), IGui-Texturen in einer File-DB statt
+  Postgres, `database.*` komplett aus Config und Panel entfernt —
+  gerendert wird `storage.mode: "helix"`.
+
 ## 0.44.0 — 2026-07-26
 
 ### Helix-Guard: Datenbank kommt aus der Node

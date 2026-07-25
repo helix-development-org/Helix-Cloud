@@ -35,16 +35,6 @@ val buildIGuard by tasks.registering(Exec::class) {
     commandLine("./gradlew", "-q", "--no-daemon", "shadowJar")
 }
 
-val buildIGuardVelocity by tasks.registering(Exec::class) {
-    group = "build"
-    description = "Builds IGuard's Velocity enforcement plugin from ../IGuard/velocity."
-    // serialized behind buildIGuard: concurrent nested Gradle builds fight
-    // over the shared ~/.gradle caches
-    mustRunAfter(buildIGuard)
-    workingDir = rootProject.projectDir.resolve("../IGuard/velocity")
-    commandLine(rootProject.projectDir.resolve("../IGuard/gradlew").absolutePath, "-q", "--no-daemon", "build")
-}
-
 /**
  * Merges the packetevents plugin and its API modules into one runnable
  * plugin jar (the maven artifact is the thin spigot module).
@@ -61,13 +51,15 @@ val packetEventsJar by tasks.registering(Jar::class) {
 
 /**
  * Packages the addon as HXA: the node addon (panel-configurable IGuard
- * settings) plus the IGuard Paper plugin, its Velocity enforcement plugin
- * and the bundled packetevents dependency.
+ * settings plus the `guard.store.*` persistence and the network-wide ban
+ * gate) plus the IGuard Paper plugin and the bundled packetevents
+ * dependency. No Velocity component anymore — the node-side join gate and
+ * `player.kick` enforcement supersede IGuard's Velocity outbox poller.
  */
 val packageHxa by tasks.registering(Zip::class) {
     group = "distribution"
-    description = "Packages Helix-Guard as .hxa (addon + IGuard paper/velocity plugins + packetevents)."
-    dependsOn(tasks.named<Jar>("jar"), buildIGuard, buildIGuardVelocity)
+    description = "Packages Helix-Guard as .hxa (addon + IGuard paper plugin + packetevents)."
+    dependsOn(tasks.named<Jar>("jar"), buildIGuard)
     archiveFileName.set("helix-guard-$version.hxa")
     destinationDirectory.set(layout.buildDirectory.dir("distributions"))
     from(layout.projectDirectory.file("src/main/resources/addon.json"))
@@ -76,9 +68,6 @@ val packageHxa by tasks.registering(Zip::class) {
     }
     from(rootProject.projectDir.resolve("../IGuard/build/libs/IGuard-1.0.0-SNAPSHOT.jar")) {
         rename { "paper.jar" }
-    }
-    from(rootProject.projectDir.resolve("../IGuard/velocity/build/libs/iguard-velocity.jar")) {
-        rename { "velocity.jar" }
     }
     from(packetEventsJar) {
         into("paper")

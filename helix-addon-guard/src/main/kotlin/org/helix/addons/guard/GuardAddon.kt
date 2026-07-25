@@ -7,6 +7,8 @@ import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
 import org.helix.api.action.ActionSource
+import org.helix.api.message.Messages
+import org.helix.api.proxy.JoinDecision
 
 /**
  * Node-side management addon for the IGuard anticheat Paper plugin
@@ -16,20 +18,62 @@ import org.helix.api.action.ActionSource
  * actions and the "Guard" dashboard panel. On every change the addon
  * renders a complete `plugins/IGuard/config.yml` from defaults plus
  * overrides, writes it into every service workspace and template and
- * sends `iguard reload` to all running services. Static values (database,
- * workers, history writer, dashboard) additionally need a service restart;
+ * sends `iguard reload` to all running services. Static values (workers,
+ * history writer, dashboard) additionally need a service restart;
  * `server-id` is always the literal `${HELIX_SERVICE_ID}` so IGuard
  * resolves it per service from the environment.
+ *
+ * IGuard persists through the node: the `guard.store.*` / `guard.query.*`
+ * actions ([GuardStoreActions]) store violations, incidents, replays and
+ * punishments in the addon's document storage, alert online staff on
+ * incidents and enforce IGuard bans network-wide through a join gate and
+ * the generic `player.kick` action.
  */
 class GuardAddon : AddonBase() {
     private lateinit var store: GuardConfigStore
+    private lateinit var guardStore: GuardStore
+    private lateinit var storeActions: GuardStoreActions
+    private lateinit var msg: Messages
     private val json = Json
 
     /**
-     * Registers the `guard.*` actions and the dashboard panel.
+     * Registers the `guard.*` actions, the ban join gate and the dashboard
+     * panel.
      */
     override fun enable() {
         store = GuardConfigStore(context.storage())
+        guardStore = GuardStore(context.storage())
+        msg = context.localizedMessages(
+            mapOf(
+                "en" to mapOf(
+                    // network-wide staff alert on every incident; placeholders:
+                    // {player} {check} {confidence} {server}
+                    "alert" to (
+                        "{prefix} <red>⚠</red> <white>{player}</white> <gray>failed</gray> " +
+                            "<red>{check}</red> <gray>({confidence}% on {server})</gray>"
+                        ),
+                    // disconnect screen — MiniMessage, multi-line; placeholders:
+                    // {reason} {expiry}
+                    "ban.screen" to "<red><bold>Banned</bold></red>\n<gray>{reason}\n<gray>Expires: <white>{expiry}",
+                    "ban.expiry.never" to "never",
+                ),
+                "de" to mapOf(
+                    "alert" to (
+                        "{prefix} <red>⚠</red> <white>{player}</white> <gray>ist aufgefallen:</gray> " +
+                            "<red>{check}</red> <gray>({confidence}% auf {server})</gray>"
+                        ),
+                    "ban.screen" to "<red><bold>Gebannt</bold></red>\n<gray>{reason}\n<gray>Läuft ab: <white>{expiry}",
+                    "ban.expiry.never" to "nie",
+                ),
+            ),
+        )
+        storeActions = GuardStoreActions(context, guardStore, msg)
+        storeActions.register()
+        context.registerJoinGate { request ->
+            guardStore.activeBan(request.uuid, request.name)
+                ?.let { ban -> JoinDecision.deny(storeActions.banScreen(request.name, ban)) }
+                ?: JoinDecision.allow()
+        }
         action(
             "guard.config.get",
             "Lists every IGuard config value with its effective value, default, type and static flag.",
@@ -121,8 +165,7 @@ class GuardAddon : AddonBase() {
      * then sends `iguard reload` to all running services.
      */
     private fun applyConfig(changedStaticPaths: List<String>): ActionResult {
-        val database = GuardDatabase.fromStorage(context.storageConnection())
-        val yaml = GuardConfig.renderConfigYaml(store.overrides(), database ?: GuardDatabase.UNCONFIGURED)
+        val yaml = GuardConfig.renderConfigYaml(store.overrides())
         var written = 0
         context.serviceDirectories().forEach { root ->
             serviceSubdirectories(root).forEach { subdirectory ->
@@ -152,9 +195,6 @@ class GuardAddon : AddonBase() {
         if (changedStaticPaths.isNotEmpty()) {
             lines += "warning: static value(s) changed, requires service restart: " +
                 changedStaticPaths.sorted().joinToString(", ")
-        }
-        if (database == null) {
-            lines += "warning: node storage is not postgres — IGuard requires storage.mode=\"postgres\" in node.toml"
         }
         return ActionResult.ok(*lines.toTypedArray())
     }

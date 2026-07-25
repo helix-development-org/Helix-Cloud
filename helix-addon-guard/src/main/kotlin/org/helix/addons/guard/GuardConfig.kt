@@ -17,6 +17,9 @@ object GuardConfig {
     /** Fixed value rendered for `server-id`; resolved by IGuard from the service environment. */
     const val SERVER_ID_VALUE: String = "\${HELIX_SERVICE_ID}"
 
+    /** Fixed value rendered for `storage.mode`; IGuard persists through the node. */
+    const val STORAGE_MODE_VALUE: String = "helix"
+
     /** Per-check default values copied from IGuard's bundled config.yml. */
     private data class CheckDefaults(
         val id: String,
@@ -70,23 +73,19 @@ object GuardConfig {
      *
      * Dotted paths are grouped back into nested YAML with 2-space indent;
      * strings are double-quoted, booleans and numbers stay bare. The first
-     * line is always the fixed `server-id` entry.
+     * line is always the fixed `server-id` entry, followed by the fixed
+     * `storage.mode: "helix"` block — IGuard persists through the node
+     * (`guard.store.*` actions) instead of its own database connection.
      *
      * @param overrides map of dotted path to canonical override value.
-     * @param database connection values inherited from the node storage.
      * @return the full config.yml content, ready to write to disk.
      */
-    fun renderConfigYaml(overrides: Map<String, String>, database: GuardDatabase): String {
+    fun renderConfigYaml(overrides: Map<String, String>): String {
         val root = LinkedHashMap<String, Any>()
         root["server-id"] = quote(SERVER_ID_VALUE)
-        val databaseNode = LinkedHashMap<String, Any>()
-        databaseNode["host"] = quote(database.host)
-        databaseNode["port"] = database.port
-        databaseNode["database"] = quote(database.database)
-        databaseNode["username"] = quote(database.username)
-        databaseNode["password"] = quote(database.password)
-        databaseNode["ssl"] = database.ssl
-        root["database"] = databaseNode
+        val storageNode = LinkedHashMap<String, Any>()
+        storageNode["mode"] = quote(STORAGE_MODE_VALUE)
+        root["storage"] = storageNode
         settings.forEach { setting ->
             var node = root
             setting.segments.dropLast(1).forEach { segment ->
@@ -125,10 +124,6 @@ object GuardConfig {
     ): GuardSetting = GuardSetting(path, path.split('.'), type, default, static)
 
     private fun baseSettings(): List<GuardSetting> = listOf(
-        // database.* — connection pool built once on startup
-        // database.host/port/database/username/password/ssl come from the
-        // node's own storage connection — only the pool size stays editable
-        plain("database.pool-size", GuardValueType.INT, "6", static = true),
         // workers.* — thread pool sized on startup
         plain("workers.stripes", GuardValueType.INT, "8", static = true),
         plain("workers.queue-capacity", GuardValueType.INT, "4096", static = true),
