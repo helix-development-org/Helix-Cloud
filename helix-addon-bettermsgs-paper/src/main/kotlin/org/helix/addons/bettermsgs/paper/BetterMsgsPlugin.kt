@@ -560,7 +560,9 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
         val font = Key.key("bettermsgs", "pixels")
         for (sub in 0..7) {
             val glyph = (0xE100 + headRow * 8 + sub).toChar().toString()
-            display.characterWidth(glyph, 2)
+            // bitmap glyphs advance imageWidth + 1 (shadow column) — track 3,
+            // then pull back 1 so the pixels sit seamlessly at 2 px
+            display.characterWidth(glyph, 3)
             display.moveTo(x)
             for (px in 0..7) {
                 val argb = pixels[sub * 8 + px]
@@ -568,6 +570,7 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                     display.space(2)
                 } else {
                     display.text(glyph, 0, net.kyori.adventure.text.format.TextColor.color(argb and 0xFFFFFF), font)
+                    display.space(-1)
                 }
             }
             display.toStart()
