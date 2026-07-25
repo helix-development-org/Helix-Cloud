@@ -1,0 +1,7 @@
+{
+  "id": "helix.bettermsgs",
+  "name": "BetterMSGs",
+  "version": "1.0.0",
+  "main": "org.helix.addons.bettermsgs.BetterMsgsAddon",
+  "description": "Private-messaging backend: conversations, contact index with unread counts, focus tracking and click-to-open notifications for the BetterMSGs GUI plugin."
+}

@@ -26,6 +26,8 @@ import io.ktor.server.request.receive
 import io.ktor.http.ContentType
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondBytes
+import io.ktor.server.response.respondText
 import io.ktor.server.response.respondTextWriter
 import io.ktor.server.routing.RoutingContext
 import io.ktor.server.routing.delete
@@ -763,6 +765,23 @@ private fun io.ktor.server.routing.Route.actionRoutes(dependencies: ControlDepen
 }
 
 private fun io.ktor.server.routing.Route.addonRoutes(dependencies: ControlDependencies) {
+    // deliberately unauthenticated: Minecraft clients download addon
+    // resource packs directly from this URL (packs contain no secrets)
+    get("/packs/{file}") {
+        val file = call.parameters["file"].orEmpty()
+        val id = file.removeSuffix(".zip").removeSuffix(".sha1")
+        val pack = dependencies.addonManager.resourcePack(id)
+        if (pack == null || !java.nio.file.Files.exists(pack)) {
+            call.respond(HttpStatusCode.NotFound, ErrorResponse("no resource pack for addon: $id"))
+        } else if (file.endsWith(".sha1")) {
+            val digest = java.security.MessageDigest.getInstance("SHA-1")
+            val hash = digest.digest(java.nio.file.Files.readAllBytes(pack))
+                .joinToString("") { "%02x".format(it) }
+            call.respondText(hash)
+        } else {
+            call.respondBytes(java.nio.file.Files.readAllBytes(pack), ContentType.Application.Zip)
+        }
+    }
     get("/addons") {
         if (!authorize(dependencies, "helix.panel.addons")) return@get
         call.respond(dependencies.addonManager.addons())

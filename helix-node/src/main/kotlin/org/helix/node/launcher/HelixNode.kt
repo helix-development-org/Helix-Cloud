@@ -120,6 +120,7 @@ class HelixNode(
                 ServerJarProvider(paths.cache, VersionCatalog.load(dataDirectory))
                     .ensureJar(environment, version)
             },
+            paperComponents = { taskName -> addonManager.paperComponents(taskName) },
         ),
         executors = mapOf(
             ExecutorType.PROCESS to ProcessServiceExecutor(),

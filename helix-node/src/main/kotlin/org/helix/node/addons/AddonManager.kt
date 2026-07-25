@@ -98,6 +98,8 @@ class AddonManager(
     private class LoadedAddon(
         val manifest: AddonManifest,
         val jar: Path,
+        val paperComponent: Path?,
+        val resourcePack: Path?,
     ) {
         var state: AddonState = AddonState.DISABLED
         var instance: HelixAddon? = null
@@ -164,11 +166,41 @@ class AddonManager(
         require(!loaded.containsKey(manifest.id)) { "addon already installed: ${manifest.id}" }
         val jarTarget = extractedJarPath(manifest)
         extractJar(file, jarTarget)
-        val record = LoadedAddon(manifest, jarTarget)
+        val record = LoadedAddon(
+            manifest = manifest,
+            jar = jarTarget,
+            paperComponent = extractOptional(file, "paper.jar", extractedPath(manifest, "paper.jar")),
+            resourcePack = extractOptional(file, "pack.zip", extractedPath(manifest, "pack.zip")),
+        )
         loaded[manifest.id] = record
         enableRecord(record)
         return info(record)
     }
+
+    /**
+     * Paper-side plugin components of enabled addons that are active for a
+     * task, installed into every Paper workspace by the preparer.
+     *
+     * @param taskName the task the workspace belongs to.
+     * @return addon id to extracted `paper.jar` path.
+     */
+    @Synchronized
+    fun paperComponents(taskName: String): List<Pair<String, Path>> =
+        loaded.values
+            .filter { it.state == AddonState.ENABLED && it.paperComponent != null }
+            .filter { taskAddonActive(taskName, it.manifest.id) }
+            .map { it.manifest.id to it.paperComponent!! }
+
+    /**
+     * The resource pack an addon bundled in its HXA, served publicly by the
+     * control API under `/api/v1/packs/<id>.zip`.
+     *
+     * @param id the addon id.
+     * @return the extracted `pack.zip` path, or `null`.
+     */
+    @Synchronized
+    fun resourcePack(id: String): Path? =
+        loaded[id]?.takeIf { it.state == AddonState.ENABLED }?.resourcePack
 
     /**
      * Enables a disabled addon.
@@ -276,8 +308,21 @@ class AddonManager(
         messages.unregisterOwner(id)
     }
 
+    private fun extractOptional(file: Path, entryName: String, target: Path): Path? =
+        ZipFile(file.toFile()).use { zip ->
+            val entry = zip.getEntry(entryName) ?: return null
+            Files.createDirectories(target.parent)
+            zip.getInputStream(entry).use { stream ->
+                Files.copy(stream, target, StandardCopyOption.REPLACE_EXISTING)
+            }
+            target
+        }
+
     private fun extractedJarPath(manifest: AddonManifest): Path =
         directory.resolve(".extracted/${manifest.id}-${manifest.version}.jar")
+
+    private fun extractedPath(manifest: AddonManifest, suffix: String): Path =
+        directory.resolve(".extracted/${manifest.id}-${manifest.version}-$suffix")
 
     private fun info(record: LoadedAddon): AddonInfo = AddonInfo(record.manifest, record.state)
 

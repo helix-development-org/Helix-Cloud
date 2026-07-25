@@ -9,7 +9,7 @@ plugins {
 
 allprojects {
     group = "org.helix"
-    version = "0.41.0"
+    version = "0.42.0"
 
     repositories {
         mavenCentral()
@@ -67,6 +67,7 @@ tasks.register("verifyKDocAvailability") {
 val addonModules = listOf(
     "helix-addon-example",
     "helix-addon-bans",
+    "helix-addon-bettermsgs",
     "helix-addon-permissions",
     "helix-addon-friends",
     "helix-addon-tablist",

@@ -332,6 +332,31 @@ die Default-Sprache des Netzwerks zurück. Über die REST-API:
 `GET /translations`, `POST /translations {key, language, value}` bzw.
 `{key, language, reset:true}`.
 
+## Paper-Komponenten & Resource Packs
+
+Ein HXA kann neben `addon.json` + `addon.jar` zwei optionale Einträge
+enthalten:
+
+- **`paper.jar`** — ein vollständiges Paper-Plugin. Die Node installiert es
+  beim Service-Start als `plugins/HelixAddon-<id>.jar` in jeden
+  Paper-Workspace, in dem das Addon aktiv ist (Task-`disabledAddons` wird
+  respektiert; deaktivierte Addons verschwinden beim nächsten Start).
+  Die Komponente erreicht die Node über die Env-Variablen
+  `HELIX_CONTROL_URL`/`HELIX_CONTROL_TOKEN` (wie die Bridge) und ruft
+  Addon-Actions über `POST /actions` auf — so bleibt die Node-Seite die
+  einzige Datenquelle (netzwerkweit), während die GUI-/Event-Logik im
+  Server läuft.
+- **`pack.zip`** — ein Resource Pack, das die Control-API **öffentlich**
+  unter `/api/v1/packs/<addon-id>.zip` (+ `.sha1`) ausliefert, damit
+  Minecraft-Clients es direkt laden können. Ist die Control-API nicht
+  öffentlich erreichbar, kann die Komponente eine alternative URL über die
+  Env-Variable `HELIX_PACK_URL` bekommen.
+
+Referenz-Implementierung: **BetterMSGs** (`helix-addon-bettermsgs` +
+`helix-addon-bettermsgs-paper`) — ein Handy-artiges `/msg`-GUI auf Basis
+der IGui-Library (Composite-Build `../IGui`), dessen Texturen zur Buildzeit
+mit Java2D gezeichnet werden (`:helix-addon-bettermsgs-paper:generatePack`).
+
 ## Eigene Dashboard-Seite beisteuern
 
 Ein Addon kann eine eigene Seite ins Webpanel bringen. Die Seite ist ein

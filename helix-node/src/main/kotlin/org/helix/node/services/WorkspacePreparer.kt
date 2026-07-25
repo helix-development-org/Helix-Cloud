@@ -23,11 +23,15 @@ import org.slf4j.LoggerFactory
  * @property internalResources embedded wrapper and bridge jars.
  * @property serverJar resolves the cached server jar for an environment and
  *   version, downloading it on first use.
+ * @property paperComponents Paper-side plugin components of enabled addons
+ *   active for a task (addon id to jar path), installed into Paper
+ *   workspaces and refreshed on every service start.
  */
 class WorkspacePreparer(
     private val paths: NodePaths,
     private val internalResources: InternalResources,
     private val serverJar: (Environment, String) -> Path,
+    private val paperComponents: (taskName: String) -> List<Pair<String, Path>> = { emptyList() },
 ) {
     private val logger = LoggerFactory.getLogger(WorkspacePreparer::class.java)
 
@@ -53,6 +57,7 @@ class WorkspacePreparer(
         installServerJar(task, workspace)
         installWrapper(workspace)
         installBridge(task.environment, workspace)
+        installAddonComponents(task, workspace)
         writeWrapperProperties(task, serviceId, workspace)
         writePlatformDefaults(task, port, workspace)
         logger.info("Prepared workspace for {} at {}", serviceId, workspace)
@@ -138,6 +143,34 @@ class WorkspacePreparer(
         }
     }
 
+    /**
+     * Installs the Paper components of active addons as plugins, named
+     * `HelixAddon-<id>.jar`. Stale components (addon disabled or newly
+     * inactive for the task) are removed, so a service restart always
+     * reflects the current addon state.
+     */
+    private fun installAddonComponents(task: TaskDefinition, workspace: Path) {
+        if (task.environment != Environment.PAPER) {
+            return
+        }
+        val plugins = workspace.resolve("plugins")
+        Files.createDirectories(plugins)
+        val desired = paperComponents(task.name).associateBy { (id, _) -> componentFileName(id) }
+        Files.list(plugins).use { stream ->
+            stream.filter { it.fileName.toString().let { name -> name.startsWith(COMPONENT_PREFIX) && name.endsWith(".jar") } }
+                .filter { it.fileName.toString() !in desired }
+                .forEach(Files::delete)
+        }
+        desired.forEach { (fileName, component) ->
+            val (id, jar) = component
+            Files.copy(jar, plugins.resolve(fileName), StandardCopyOption.REPLACE_EXISTING)
+            logger.debug("Installed paper component of {} into {}", id, workspace)
+        }
+    }
+
+    private fun componentFileName(addonId: String): String =
+        COMPONENT_PREFIX + addonId.replace(Regex("[^A-Za-z0-9._-]"), "_") + ".jar"
+
     private fun writeWrapperProperties(task: TaskDefinition, serviceId: String, workspace: Path) {
         val serverArgs = when (task.environment) {
             Environment.PAPER -> "--nogui"
@@ -207,5 +240,10 @@ class WorkspacePreparer(
         if (Files.notExists(file)) {
             Files.writeString(file, content)
         }
+    }
+
+    private companion object {
+        /** File-name prefix of addon-provided Paper plugin components. */
+        const val COMPONENT_PREFIX = "HelixAddon-"
     }
 }

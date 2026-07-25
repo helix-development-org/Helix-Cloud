@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.42.0 — 2026-07-25
+
+### BetterMSGs — Handy-GUI für private Nachrichten
+- Neues Addon `helix.bettermsgs`: `/msg` öffnet einen **Handy-Homescreen**
+  (IGui-Font-Textur als Hintergrund) mit Spielerköpfen als „Apps" —
+  Kontakte zuerst (mit Unread-Badge ✉), dann Online-Spieler, paginiert.
+  Klick auf einen Kopf öffnet den **Discord-artigen Chat**: Nachrichten
+  als Kopf+Text-Items, eigene rechts, fremde links, Zeitstempel,
+  Text-Wrapping in der Lore.
+- **Spieler-Inventar als Chatfläche:** 8 sichtbare Nachrichten über
+  Chest- und Inventar-Zeilen; das echte Inventar wird vorher gesichert
+  (zusätzlich crash-sicher auf Platte) und beim Schließen/Quit/Disable
+  wiederhergestellt. Hotbar = Steuerleiste (Zurück, Ältere, Schreiben,
+  Neuere, Schließen).
+- **Scrollen:** Buttons + eine **gezeichnete Scrollbar** — der Thumb ist
+  eine Font-Textur in 8 Positions-Varianten und wandert im Titel mit der
+  Scroll-Position. Schreiben per Chat-Eingabe (`cancel` bricht ab),
+  Live-Refresh jede Sekunde, Fokus unterdrückt Notifications.
+- **Netzwerkweit:** Konversationen liegen auf der Node (500er-Cap,
+  Unread-Zähler); Offline-/Fremdserver-Empfänger bekommen eine klickbare
+  Notification (`[öffnen]` → `/msg <sender>`). Alle Texte en+de über das
+  Translation-System.
+- **Alle Texturen selbst gezeichnet:** Java2D-Generator
+  (`:helix-addon-bettermsgs-paper:generatePack`) baut Handy-, Chat- und
+  Scrollbar-Texturen + `bettermsgs:`-Fonts deterministisch zur Buildzeit.
+- **Plattform:** HXA-Addons können jetzt eine Paper-Plugin-Komponente
+  (`paper.jar`, wird als `plugins/HelixAddon-<id>.jar` in aktive
+  Paper-Workspaces installiert und bei Deaktivierung entfernt) und ein
+  `pack.zip` mitliefern, das die Control-API öffentlich unter
+  `/api/v1/packs/<id>.zip` (+ `.sha1`) served; Override der Client-URL
+  via `HELIX_PACK_URL`. IGui ist als Composite-Build (`../IGui`)
+  eingebunden; die Textur-Metadaten nutzen eine File-Datenbank statt
+  PostgreSQL.
+
 ## 0.41.0 — 2026-07-25
 
 ### Broadcasts beim Backend-Restart

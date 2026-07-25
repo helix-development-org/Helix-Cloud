@@ -24,6 +24,8 @@ class AddonManagerTest {
         id: String = "helix.test",
         main: String = TestAddon::class.java.name,
         withJar: Boolean = true,
+        withPaperComponent: Boolean = false,
+        withResourcePack: Boolean = false,
     ): Path {
         val file = directory.resolve("$id.hxa")
         ZipOutputStream(Files.newOutputStream(file)).use { zip ->
@@ -46,8 +48,44 @@ class AddonManagerTest {
                 zip.write(jarBytes.toByteArray())
                 zip.closeEntry()
             }
+            if (withPaperComponent) {
+                zip.putNextEntry(ZipEntry("paper.jar"))
+                zip.write("paper-plugin".toByteArray())
+                zip.closeEntry()
+            }
+            if (withResourcePack) {
+                zip.putNextEntry(ZipEntry("pack.zip"))
+                zip.write("pack-bytes".toByteArray())
+                zip.closeEntry()
+            }
         }
         return file
+    }
+
+    @Test
+    fun `paper component and resource pack are extracted and exposed`() {
+        writeHxa(withPaperComponent = true, withResourcePack = true)
+        manager.loadAll()
+
+        val components = manager.paperComponents("Lobby")
+        assertEquals(listOf("helix.test"), components.map { it.first })
+        assertTrue(Files.exists(components.single().second))
+        val pack = manager.resourcePack("helix.test")
+        assertTrue(pack != null && Files.exists(pack))
+
+        // disabled addons expose neither
+        manager.disable("helix.test")
+        assertTrue(manager.paperComponents("Lobby").isEmpty())
+        assertEquals(null, manager.resourcePack("helix.test"))
+    }
+
+    @Test
+    fun `addons without extras expose no paper component`() {
+        writeHxa()
+        manager.loadAll()
+
+        assertTrue(manager.paperComponents("Lobby").isEmpty())
+        assertEquals(null, manager.resourcePack("helix.test"))
     }
 
     @Test

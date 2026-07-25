@@ -38,6 +38,7 @@ Session-Token. Die sichtbaren Views/Panels richten sich nach den Permissions
 | GET | `/proxy` | Proxy-Übersicht: Maintenance, Proxies, Backend-Routing |
 | POST | `/proxy/maintenance` | Maintenance schalten — Body `{"enabled": true}` |
 | GET | `/panels` / `/panels/{id}` | Addon-Dashboard-Seiten (Metadaten / HTML) |
+| GET | `/packs/{addon-id}.zip` / `.sha1` | Resource Pack eines Addons (**ohne Auth** — Minecraft-Clients laden direkt) |
 | POST | `/actions` `{"action":"platform.restart"}` | Backend-Restart: Node-Prozess startet neu, Services laufen headless weiter und werden re-adoptiert |
 | POST | `/actions` `{"action":"launcher.restart"}` | Launcher-Restart: Services stoppen, frische `Launcher.jar` startet (Update-fähig) |
 | GET | `/translations` | Übersetzungs-Store: `{languages, defaultLanguage, entries:[{key, values, defaults}]}` — flache Keys `helix.translations.<owner>.<key>`, Werte/Defaults je Sprache |

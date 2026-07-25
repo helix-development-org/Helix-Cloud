@@ -96,6 +96,34 @@ class WorkspacePreparerTest {
     }
 
     @Test
+    fun `installs addon paper components and removes stale ones`() {
+        val component = Files.write(paths.root.resolve("bettermsgs-paper.jar"), byteArrayOf(7))
+        var active = listOf("helix.bettermsgs" to component)
+        val componentPreparer = WorkspacePreparer(
+            paths = paths,
+            internalResources = { name -> ByteArrayInputStream(name.toByteArray()) },
+            serverJar = { _, _ -> fakeJar },
+            paperComponents = { active },
+        )
+        val task = TaskDefinition(
+            name = "Lobby",
+            environment = Environment.PAPER,
+            version = "1.21.11",
+            staticServices = true,
+        )
+
+        val workspace = componentPreparer.prepare(task, "Lobby-1", 30001)
+        assertTrue(Files.exists(workspace.resolve("plugins/HelixAddon-helix.bettermsgs.jar")))
+
+        // addon disabled → the component disappears on the next prepare
+        active = emptyList()
+        componentPreparer.prepare(task, "Lobby-1", 30001)
+        assertFalse(Files.exists(workspace.resolve("plugins/HelixAddon-helix.bettermsgs.jar")))
+        // the bridge itself is untouched
+        assertTrue(Files.exists(workspace.resolve("plugins/HelixPaperBridge.jar")))
+    }
+
+    @Test
     fun `port allocator skips used ports`() {
         val allocator = PortAllocator()
 
