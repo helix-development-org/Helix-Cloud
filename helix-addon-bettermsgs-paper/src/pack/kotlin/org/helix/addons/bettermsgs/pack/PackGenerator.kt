@@ -273,7 +273,8 @@ private fun textRowFonts(): Map<String, ByteArray> = TEXT_ROW_Y.withIndex().asso
     // vanilla ascii renders at y≈6 with ascent 7 — shift down by (y - 6)
     val ascent = 7 - (y - 6)
     "assets/bettermsgs/font/text_row_$index.json" to
-        ("""{"providers": [{"type": "bitmap", "file": "minecraft:font/ascii.png", """ +
+        ("""{"providers": [{"type": "space", "advances": {" ": 4}}, """ +
+            """{"type": "bitmap", "file": "minecraft:font/ascii.png", """ +
             """"ascent": $ascent, "height": 8, "chars": [$ASCII_GRID]}]}""").toByteArray()
 }
 
@@ -308,7 +309,7 @@ private val ASCII_GRID: String = buildString {
  * of the white 2x2 pixel at codepoints 0xE100 + row*8 + subRow.
  */
 private fun pixelFont(): ByteArray {
-    val anchors = intArrayOf(1, 21, 39, 57, 75, 93, 111, 129, 147, 165)
+    val anchors = intArrayOf(0, 17, 35, 53, 71, 89, 107, 125, 143, 161)
     val providers = buildList {
         anchors.forEachIndexed { row, headY ->
             for (sub in 0..7) {
