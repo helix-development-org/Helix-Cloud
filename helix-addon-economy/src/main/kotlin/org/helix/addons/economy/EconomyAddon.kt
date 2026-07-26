@@ -22,7 +22,7 @@ class EconomyAddon : AddonBase() {
      * Registers the player commands and admin actions.
      */
     override fun enable() {
-        store = BalanceStore(context.storage())
+        store = BalanceStore(context.storage(), startingBalance = STARTING_BALANCE)
         msg = context.localizedMessages(
             mapOf(
                 "en" to mapOf(
@@ -134,5 +134,10 @@ class EconomyAddon : AddonBase() {
         } catch (failure: IllegalArgumentException) {
             ActionResult.error(failure.message ?: "failed")
         }
+    }
+
+    private companion object {
+        /** Coins every player starts with before their first transaction. */
+        const val STARTING_BALANCE = 1000L
     }
 }

@@ -6,9 +6,15 @@ import org.helix.api.storage.AddonStorage
 /**
  * Coin balances backed by the addon's document storage.
  *
+ * Players who never interacted have no stored entry and start at
+ * [startingBalance]; the first deposit/transfer/set persists a concrete
+ * balance. Because every mutation reads through [balance], the starting
+ * balance is applied consistently across pay, transfer and admin actions.
+ *
  * @property storage addon-scoped document store.
+ * @property startingBalance balance new players begin with.
  */
-class BalanceStore(private val storage: AddonStorage) {
+class BalanceStore(private val storage: AddonStorage, private val startingBalance: Long = 0) {
     private val json = Json { prettyPrint = true }
     private val balances = linkedMapOf<String, Long>()
 
@@ -23,10 +29,10 @@ class BalanceStore(private val storage: AddonStorage) {
      * Reads a balance.
      *
      * @param player player name.
-     * @return the balance, 0 for unknown players.
+     * @return the balance, [startingBalance] for players without an entry.
      */
     @Synchronized
-    fun balance(player: String): Long = balances[player.lowercase()] ?: 0
+    fun balance(player: String): Long = balances[player.lowercase()] ?: startingBalance
 
     /**
      * Adds a (possibly negative) amount to a balance.
