@@ -1,0 +1,7 @@
+{
+  "id": "helix.scoreboard",
+  "name": "Scoreboard",
+  "version": "1.0.0",
+  "main": "org.helix.addons.scoreboard.ScoreboardAddon",
+  "description": "Per-task sidebar scoreboard, edited in the web panel and rendered network-wide by the paper bridge."
+}

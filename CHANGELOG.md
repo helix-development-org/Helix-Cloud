@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.49.0 — 2026-07-26
+
+### Neue Addons: Clans, Scoreboard, NPCs — plus ECO-Startguthaben
+- **Economy:** Neue Spieler starten mit **1000 Coins**. Balance wird als
+  Bridge-Value publiziert (`economy.balance.<name>`) für den Scoreboard-
+  Platzhalter `{balance}`.
+- **Clan-System** (`helix.clan`): `/clan` mit create/invite/join/leave/
+  kick/promote/demote/disband/setowner/tag, `[TAG]`-Prefix in Chat & Tab
+  über den DisplayResolver, und eine **Clan-Bank**, die echtes Geld atomar
+  über die Economy bewegt (Einzahlung nur bei ausreichendem Guthaben, der
+  Bank-Zähler folgt der tatsächlichen Transaktion). Tag als Bridge-Value
+  für den Scoreboard-Platzhalter `{clan}`.
+- **Scoreboard** (`helix.scoreboard`): **pro Task/Server** einstellbares
+  Sidebar-Board, im Panel editierbar (Titel + Zeilen + Intervall), gerendert
+  von der bestehenden Paper-Bridge (wie Tablist — kein extra Plugin). Live-
+  Platzhalter ({player}, {online}, {ping}, {tps}, {balance}, {clan}, …),
+  Duplikat-Zeilen-Fix, per-Task-Auswahl über `HELIX_TASK`.
+- **NPCs** (`helix.npc` + gebündelte Paper-Komponente): das INpc-Framework
+  eingebunden — `/npc create|delete|skin|look|hologram|interact|tp`,
+  netzwerkweit persistent im Node-Storage, pro Task, Klick-Aktionen (z.B.
+  Server-Wechsel). INpc bleibt als Framework für andere Addon-Entwickler
+  nutzbar (vendored Jar). **Hinweis:** die Paper-Server müssen auf **Java 24+**
+  laufen (INpc-Bytecode), sonst `UnsupportedClassVersionError`.
+
 ## 0.48.0 — 2026-07-26
 
 ### Guard-Detection Stufe 3: Bedrock/Geyser-Erkennung

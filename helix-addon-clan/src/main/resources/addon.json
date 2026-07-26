@@ -1,0 +1,11 @@
+{
+  "id": "helix.clan",
+  "name": "Clan",
+  "version": "1.0.0",
+  "main": "org.helix.addons.clan.ClanAddon",
+  "description": "Clans with a [TAG] chat/tab prefix, roles, invites and a shared clan bank.",
+  "permissions": [
+    "helix.clan",
+    "helix.clan.admin"
+  ]
+}

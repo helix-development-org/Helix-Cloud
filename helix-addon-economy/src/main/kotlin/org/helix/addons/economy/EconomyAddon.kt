@@ -89,6 +89,19 @@ class EconomyAddon : AddonBase() {
             "/panel.html",
             "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M14.5 9a2.5 2.5 0 00-2.5-1.5c-1.4 0-2.5.8-2.5 2s1.1 1.8 2.5 2 2.5.8 2.5 2-1.1 2-2.5 2A2.5 2.5 0 019.5 15M12 6v1.5M12 16.5V18\"/>",
         )
+        // Expose each online player's balance as a bridge value so the sidebar
+        // scoreboard's {balance} placeholder resolves without a per-player round-trip.
+        context.registerPlayerListener(
+            /** Publishes the joining player's balance for the sidebar `{balance}` placeholder. */
+            object : org.helix.api.addon.PlayerListener {
+                override fun onJoin(player: org.helix.api.player.OnlinePlayer) = publishBalance(player.name)
+            },
+        )
+    }
+
+    /** Publishes a player's balance as the `economy.balance.<name>` bridge value. */
+    private fun publishBalance(player: String) {
+        context.publishBridgeValue("economy.balance.${player.lowercase()}", store.balance(player).toString())
     }
 
     private fun pay(invocation: ActionInvocation): ActionResult {
@@ -103,6 +116,8 @@ class EconomyAddon : AddonBase() {
         }
         return try {
             store.transfer(executor, target, amount)
+            publishBalance(executor)
+            publishBalance(target)
             context.actions.invoke(
                 ActionInvocation(
                     "player.message",
@@ -130,6 +145,7 @@ class EconomyAddon : AddonBase() {
         }
         return try {
             val updated = change(player, amount)
+            publishBalance(player)
             ActionResult.ok("$player now has $updated coins")
         } catch (failure: IllegalArgumentException) {
             ActionResult.error(failure.message ?: "failed")

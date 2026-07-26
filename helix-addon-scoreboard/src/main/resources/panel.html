@@ -1,0 +1,117 @@
+<div class="card">
+  <div class="card-head"><h2>Scoreboard</h2>
+    <div class="sub">&amp; color codes · one board per task · falls back to <b>default</b> · max 15 lines</div>
+    <div class="right">
+      <select id="task" style="max-width:200px"></select>
+      <button class="btn sm subtle" id="reset">Reset task</button>
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="row" style="margin-bottom:12px">
+      <label class="checkbox"><input type="checkbox" id="enabled"> board enabled</label>
+      <div class="field" style="max-width:220px"><label>Update interval (ticks, 20 = 1s)</label><input type="number" id="interval" value="20" min="1" step="1"></div>
+    </div>
+    <div class="field"><label>Title</label><input id="title" style="font-family:var(--mono)" placeholder="&amp;6&amp;lHELIX"></div>
+    <div class="card-head" style="margin-top:14px"><h2>Lines</h2><div class="right"><button class="btn sm subtle" id="add-line">+ Line</button></div></div>
+    <div id="lines"></div>
+    <div class="sub" style="margin-top:10px">Placeholders: {player} {displayname} {online} {server} {task} {ping} {tps} {world} {x} {y} {z} {date} {time} {network} {prefix} {balance} {clan}</div>
+    <div class="row" style="margin-top:14px"><button class="btn" id="save">Save</button></div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-head"><h2>Preview</h2><div class="sub">title on top, lines below</div></div>
+  <div class="card-body"><div id="preview" style="background:var(--surface-2);border-radius:var(--radius-sm);padding:16px;white-space:pre-wrap;line-height:1.7;min-width:180px;display:inline-block"></div></div>
+</div>
+<script>
+"use strict";
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const COLORS = { "0":"#000","1":"#00a","2":"#0a0","3":"#0aa","4":"#a00","5":"#a0a","6":"#fa0","7":"#aaa","8":"#555","9":"#55f","a":"#5f5","b":"#5ff","c":"#f55","d":"#f5f","e":"#ff5","f":"#fff" };
+const SAMPLE = { "{player}":"Steve","{displayname}":"Steve","{online}":"12","{server}":"Lobby-1","{task}":"Lobby","{ping}":"23","{tps}":"20.0","{world}":"world","{x}":"128","{y}":"64","{z}":"-40","{date}":"2026-07-26","{time}":"14:03","{network}":"Helix","{prefix}":"","{balance}":"1000","{clan}":"" };
+
+let boards = {};        // task -> config
+let current = "default";
+let lines = [];         // working copy of the selected board's lines
+
+function mc(text) {
+  let out = "", color = "var(--ink)";
+  let s = String(text);
+  for (const [k, v] of Object.entries(SAMPLE)) s = s.split(k).join(v);
+  const parts = s.split(/(&[0-9a-fk-or])/i);
+  for (const p of parts) { if (/^&[0-9a-f]$/i.test(p)) color = COLORS[p[1].toLowerCase()]; else if (/^&[k-or]$/i.test(p)) {} else if (p) out += `<span style="color:${color}">${esc(p)}</span>`; }
+  return out || "&nbsp;";
+}
+
+function board() {
+  return boards[current] || { title: "", lines: [], enabled: true, updateIntervalTicks: 20 };
+}
+
+function renderTasks() {
+  const names = Array.from(new Set(["default", ...Object.keys(boards), ...window._tasks || []]));
+  document.getElementById("task").innerHTML = names.map(n => `<option ${n === current ? "selected" : ""}>${esc(n)}</option>`).join("");
+}
+
+function renderLines() {
+  document.getElementById("lines").innerHTML = lines.map((l, i) => `
+    <div class="row" style="margin-bottom:6px">
+      <input style="flex:1;font-family:var(--mono)" data-i="${i}" value="${esc(l)}">
+      <button class="btn sm subtle" data-up="${i}" ${i === 0 ? "disabled" : ""}>&uarr;</button>
+      <button class="btn sm subtle" data-down="${i}" ${i === lines.length - 1 ? "disabled" : ""}>&darr;</button>
+      <button class="btn sm danger" data-rm="${i}">&times;</button>
+    </div>`).join("") || `<div class="sub">no lines yet — add one</div>`;
+  document.querySelectorAll("#lines input").forEach(t => t.oninput = () => { lines[+t.dataset.i] = t.value; drawPreview(); });
+  document.querySelectorAll("[data-rm]").forEach(b => b.onclick = () => { lines.splice(+b.dataset.rm, 1); renderLines(); });
+  document.querySelectorAll("[data-up]").forEach(b => b.onclick = () => { const i = +b.dataset.up; [lines[i - 1], lines[i]] = [lines[i], lines[i - 1]]; renderLines(); });
+  document.querySelectorAll("[data-down]").forEach(b => b.onclick = () => { const i = +b.dataset.down; [lines[i + 1], lines[i]] = [lines[i], lines[i + 1]]; renderLines(); });
+  drawPreview();
+}
+
+function drawPreview() {
+  document.getElementById("preview").innerHTML =
+    `<b>${mc(document.getElementById("title").value)}</b><br>` + lines.map(mc).join("<br>");
+}
+
+function selectTask(task) {
+  current = task;
+  const b = board();
+  lines = [...(b.lines || [])];
+  document.getElementById("title").value = b.title || "";
+  document.getElementById("enabled").checked = b.enabled !== false;
+  document.getElementById("interval").value = b.updateIntervalTicks || 20;
+  renderTasks();
+  renderLines();
+}
+
+document.getElementById("task").onchange = e => selectTask(e.target.value);
+document.getElementById("title").oninput = drawPreview;
+document.getElementById("add-line").onclick = () => {
+  if (lines.length >= 15) return Helix.toast("max 15 lines");
+  lines.push(""); renderLines();
+};
+document.getElementById("save").onclick = async () => {
+  if (lines.length > 15) return Helix.toast("max 15 lines");
+  const cfg = {
+    title: document.getElementById("title").value,
+    lines: lines,
+    enabled: document.getElementById("enabled").checked,
+    updateIntervalTicks: Math.max(1, parseInt(document.getElementById("interval").value) || 20),
+  };
+  const r = await Helix.action("scoreboard.set", current, JSON.stringify(cfg));
+  Helix.toast(r.lines[0] || (r.success ? "saved" : "failed"));
+  if (r.success) { boards[current] = cfg; renderTasks(); }
+};
+document.getElementById("reset").onclick = async () => {
+  const r = await Helix.action("scoreboard.reset", current);
+  Helix.toast(r.lines[0] || (r.success ? "reset" : "failed"));
+  if (r.success) await load();
+};
+
+async function load() {
+  const r = await Helix.action("scoreboard.get");
+  try { boards = JSON.parse(r.lines[0] || "{}"); } catch (e) { boards = {}; }
+  const tl = await Helix.action("task.list");
+  window._tasks = (tl.success ? tl.lines : []).map(l => l.split(/\s+/)[0]).filter(Boolean);
+  if (!boards[current]) current = boards["default"] ? "default" : (Object.keys(boards)[0] || "default");
+  selectTask(current);
+}
+Helix.ready(load);
+</script>

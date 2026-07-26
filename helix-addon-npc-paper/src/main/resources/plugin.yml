@@ -1,0 +1,14 @@
+name: Helix-NPC
+version: '${version}'
+main: org.helix.addons.npc.paper.NpcPlugin
+api-version: '1.21'
+authors: [Tytoss]
+description: Renders the network's INpc NPCs for this server's task and offers the /npc admin surface.
+commands:
+  npc:
+    description: Create, edit and delete network-wide NPCs.
+    usage: /npc <create|delete|list|tp|skin|hologram|look|interact|reload>
+permissions:
+  helix.npc.admin:
+    description: Manage NPCs with /npc.
+    default: op

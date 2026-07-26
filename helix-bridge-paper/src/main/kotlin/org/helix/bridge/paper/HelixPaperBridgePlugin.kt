@@ -2,7 +2,11 @@ package org.helix.bridge.paper
 
 import io.papermc.paper.chat.ChatRenderer
 import io.papermc.paper.event.player.AsyncChatEvent
+import java.time.LocalDate
+import java.time.LocalTime
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
@@ -14,6 +18,10 @@ import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
+import org.bukkit.scoreboard.Criteria
+import org.bukkit.scoreboard.DisplaySlot
+import org.bukkit.scoreboard.Objective
+import org.bukkit.scoreboard.Scoreboard
 import org.helix.api.bridge.HeartbeatReport
 import org.helix.api.bridge.ResourceProbe
 import org.helix.api.display.DisplayProfile
@@ -30,6 +38,7 @@ import org.helix.api.proxy.JoinRequest
  */
 class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     private val json = Json { ignoreUnknownKeys = true }
+    private val scoreboardMapSerializer = MapSerializer(String.serializer(), ScoreboardData.serializer())
     private val miniMessage = MiniMessage.miniMessage()
     private val displayProfiles = ConcurrentHashMap<String, DisplayProfile>()
 
@@ -40,9 +49,17 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     private var tablist: TablistData? = null
 
     @Volatile
+    private var scoreboards: Map<String, ScoreboardData> = emptyMap()
+
+    /** One private Bukkit scoreboard per online player, keyed by name. */
+    private val playerBoards = ConcurrentHashMap<String, Scoreboard>()
+
+    @Volatile
     private var lastFrameIndex: Int = -1
     private var heartbeatTask: BukkitTask? = null
     private var animationTask: BukkitTask? = null
+    private var scoreboardTask: BukkitTask? = null
+    private var scoreboardInterval: Long = -1
     private var client: NodeHttpClient? = null
     private var settings: BridgeSettings? = null
     private var pollCounter = 0
@@ -83,6 +100,9 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         heartbeatTask = null
         animationTask?.cancel()
         animationTask = null
+        scoreboardTask?.cancel()
+        scoreboardTask = null
+        clearAllScoreboards()
     }
 
     /**
@@ -131,6 +151,7 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         sendHeartbeat(settings, client)
         syncBridgeValues(settings, client)
         applyTablist()
+        ensureScoreboardTask()
         if (pollCounter++ % DISPLAY_REFRESH_CYCLES == 0) {
             server.onlinePlayers.forEach { player -> refreshDisplay(client, player.name) }
         }
@@ -157,6 +178,9 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
                 tablist = bridgeValues["tablist.config"]?.let { raw ->
                     runCatching { json.decodeFromString<TablistData>(raw) }.getOrNull()
                 }
+                scoreboards = bridgeValues["scoreboard.config"]?.let { raw ->
+                    runCatching { json.decodeFromString(scoreboardMapSerializer, raw) }.getOrNull()
+                } ?: emptyMap()
             }
         }.onFailure { logger.warning("Helix bridge value sync failed: ${it.message}") }
     }
@@ -199,6 +223,143 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         if (config.frameIndexAt(System.currentTimeMillis()) != lastFrameIndex) {
             applyTablist()
         }
+    }
+
+    /**
+     * The board configured for this server's task, or the shared `default`
+     * board. `null` when no scoreboard is published at all.
+     */
+    private fun activeBoard(): ScoreboardData? {
+        val map = scoreboards
+        if (map.isEmpty()) return null
+        return map[settings?.task] ?: map["default"]
+    }
+
+    /**
+     * Schedules, reschedules or tears down the sidebar refresh task so its
+     * period matches the active board's interval. Safe to call from the
+     * async pulse; the actual scoreboard mutation runs on the main thread.
+     */
+    private fun ensureScoreboardTask() {
+        val board = activeBoard()?.takeIf { it.enabled && it.lines.isNotEmpty() }
+        if (board == null) {
+            if (scoreboardTask != null || playerBoards.isNotEmpty()) {
+                scoreboardTask?.cancel()
+                scoreboardTask = null
+                scoreboardInterval = -1
+                server.scheduler.runTask(this, Runnable { clearAllScoreboards() })
+            }
+            return
+        }
+        val interval = board.intervalTicks()
+        if (scoreboardTask != null && scoreboardInterval == interval) {
+            return
+        }
+        scoreboardTask?.cancel()
+        scoreboardInterval = interval
+        scoreboardTask = server.scheduler.runTaskTimer(this, Runnable { refreshScoreboards() }, 1L, interval)
+    }
+
+    private fun refreshScoreboards() {
+        val board = activeBoard()?.takeIf { it.enabled && it.lines.isNotEmpty() }
+        if (board == null) {
+            clearAllScoreboards()
+            return
+        }
+        val manager = server.scoreboardManager ?: return
+        server.onlinePlayers.forEach { player -> runCatching { applyBoard(player, board, manager) } }
+        playerBoards.keys.toList().forEach { name ->
+            if (server.getPlayerExact(name) == null) {
+                playerBoards.remove(name)
+            }
+        }
+    }
+
+    /**
+     * Builds (or updates in place, to avoid flicker) the player's private
+     * sidebar scoreboard from [board], substituting placeholders per player.
+     * Each line is stored on a per-index team prefix with a unique invisible
+     * score entry, so identical lines still render (a Bukkit quirk).
+     *
+     * @param player the viewer.
+     * @param board the active board configuration.
+     * @param manager the server scoreboard manager.
+     */
+    private fun applyBoard(
+        player: Player,
+        board: ScoreboardData,
+        manager: org.bukkit.scoreboard.ScoreboardManager,
+    ) {
+        val scoreboard = playerBoards.getOrPut(player.name) { manager.newScoreboard }
+        val objective = scoreboard.getObjective(OBJECTIVE_NAME)
+            ?: scoreboard.registerNewObjective(OBJECTIVE_NAME, Criteria.DUMMY, Component.empty()).also {
+                it.displaySlot = DisplaySlot.SIDEBAR
+                runCatching { it.numberFormat(io.papermc.paper.scoreboard.numbers.NumberFormat.blank()) }
+            }
+        objective.displayName(colored(placeholders(board.title, player)))
+        val lines = board.boundedLines()
+        lines.forEachIndexed { index, raw ->
+            val entry = invisibleEntry(index)
+            val team = scoreboard.getTeam(LINE_TEAM_PREFIX + index)
+                ?: scoreboard.registerNewTeam(LINE_TEAM_PREFIX + index)
+            team.entries.filter { it != entry }.forEach { team.removeEntry(it) }
+            if (!team.hasEntry(entry)) {
+                team.addEntry(entry)
+            }
+            team.prefix(colored(placeholders(raw, player)))
+            objective.getScore(entry).score = lines.size - index
+        }
+        for (index in lines.size until ScoreboardData.MAX_LINES) {
+            scoreboard.getTeam(LINE_TEAM_PREFIX + index)?.unregister()
+            scoreboard.resetScores(invisibleEntry(index))
+        }
+        if (player.scoreboard !== scoreboard) {
+            player.scoreboard = scoreboard
+        }
+    }
+
+    private fun clearAllScoreboards() {
+        val main = server.scoreboardManager?.mainScoreboard
+        playerBoards.keys.toList().forEach { name ->
+            playerBoards.remove(name)
+            if (main != null) {
+                server.getPlayerExact(name)?.scoreboard = main
+            }
+        }
+    }
+
+    /**
+     * A unique, visually empty score entry for a line index — two `§` color
+     * codes render nothing yet keep every line's entry distinct, which lets
+     * duplicate line texts (held in the team prefix) coexist on the sidebar.
+     */
+    private fun invisibleEntry(index: Int): String {
+        val hex = "0123456789abcdef"
+        return "§${hex[index % 16]}§r"
+    }
+
+    private fun placeholders(text: String, player: Player): String {
+        val location = player.location
+        val now = LocalTime.now()
+        return text
+            .replace("{player}", player.name)
+            .replace("{displayname}", PlainTextComponentSerializer.plainText().serialize(player.displayName()))
+            .replace("{online}", (bridgeValues["network.online"]?.toIntOrNull() ?: server.onlinePlayers.size).toString())
+            .replace("{max}", server.maxPlayers.toString())
+            .replace("{server}", settings?.serviceId ?: "")
+            .replace("{task}", settings?.task ?: "")
+            .replace("{ping}", player.ping.toString())
+            .replace("{tps}", String.format(java.util.Locale.ROOT, "%.1f", server.tps.firstOrNull() ?: 20.0))
+            .replace("{world}", location.world?.name ?: "")
+            .replace("{x}", location.blockX.toString())
+            .replace("{y}", location.blockY.toString())
+            .replace("{z}", location.blockZ.toString())
+            .replace("{date}", LocalDate.now().toString())
+            .replace("{time}", String.format(java.util.Locale.ROOT, "%02d:%02d", now.hour, now.minute))
+            .replace("{network}", bridgeValues["network.name"] ?: "")
+            .replace("{prefix}", bridgeValues["network.prefix"] ?: "")
+            .replace("{balance}", bridgeValues["economy.balance.${player.name.lowercase()}"] ?: "")
+            .replace("{clan}", bridgeValues["clan.tag.${player.name.lowercase()}"] ?: "")
     }
 
     private fun placeholders(text: String): String = text
@@ -293,5 +454,11 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
 
         /** Ticks between tab list animation checks (250 ms). */
         const val ANIMATION_PERIOD_TICKS = 5L
+
+        /** Sidebar objective name (must stay within 16 characters). */
+        const val OBJECTIVE_NAME = "helix_sidebar"
+
+        /** Team name prefix holding each sidebar line's text. */
+        const val LINE_TEAM_PREFIX = "hline"
     }
 }

@@ -1,0 +1,10 @@
+{
+  "id": "helix.npc",
+  "name": "Helix-NPC",
+  "version": "1.0.0",
+  "main": "org.helix.addons.npc.NpcAddon",
+  "description": "Network-wide NPC definitions backed by the INpc framework: node-side persistence of packet-based NPCs plus the in-game /npc admin surface of the bundled Paper component, synced to every server running a task.",
+  "permissions": [
+    "helix.npc.admin"
+  ]
+}

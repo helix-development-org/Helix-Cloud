@@ -369,6 +369,46 @@ Referenz-Implementierung: **BetterMSGs** (`helix-addon-bettermsgs` +
 der IGui-Library (Composite-Build `../IGui`), dessen Texturen zur Buildzeit
 mit Java2D gezeichnet werden (`:helix-addon-bettermsgs-paper:generatePack`).
 
+### Framework: INpc (paketbasierte NPCs)
+
+**Helix-NPC** (`helix-addon-npc` + `helix-addon-npc-paper`) zeigt, wie eine
+Paper-Komponente das **INpc**-Framework wiederverwendet. INpc ist Tytoss'
+Kotlin-Bibliothek für vollständig konfigurierbare, paketbasierte Spieler-NPCs
+(Skin, Hologramm, Equipment, Look-Behavior, Interaktion) — das NPC-Gegenstück
+zu IGui.
+
+INpc wird als **vorgebautes Jar vendored**, nicht als Composite-Build: sein
+eigener Build braucht `paperweight.userdev` + `paperDevBundle` (Mojang-mapped
+NMS) + JVM-Toolchain 25, was den Helix-Build unnötig belasten würde. Stattdessen
+liegt das Library-Jar unter `libs/` und wird mitsamt seinen Runtime-Deps ins
+`paper.jar` gepackt:
+
+```kotlin
+dependencies {
+    compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
+    implementation(files("libs/inpc-1.0.0-SNAPSHOT.jar"))
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+}
+```
+
+```kotlin
+val npcs = INpc.install(this)
+npcs.npc("greeter") {
+    location(world, x, y, z, yaw, pitch)
+    skin("Notch")            // oder skin { mirrorViewer() } für den Skin des Viewers
+    hologram { line("<gold>Hi") }
+    look { nearestPlayer() }
+    onInteract { ctx -> ctx.player.performCommand("server Lobby") }
+}.spawn()
+```
+
+Das Reobf-Jar referenziert NMS über Mojang-Namen — das ist für Paper 1.21.11
+korrekt (Mojang-mapped Runtime). Da das Jar mit JVM-24-Bytecode ausgeliefert
+wird, müssen die Paper-Server auf **Java 24+** laufen (Helix-Node-Toolchain 24,
+Deployment hier Java 25). Andere Addons können denselben Weg gehen und INpc so
+als geteiltes Framework nutzen.
+
 ## Eigene Dashboard-Seite beisteuern
 
 Ein Addon kann eine eigene Seite ins Webpanel bringen. Die Seite ist ein

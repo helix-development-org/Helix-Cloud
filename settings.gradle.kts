@@ -25,13 +25,17 @@ include(
     "helix-addon-bettermsgs-paper",
     "helix-addon-permissions",
     "helix-addon-friends",
+    "helix-addon-clan",
     "helix-addon-guard",
     "helix-addon-guard-paper",
     "helix-addon-tablist",
+    "helix-addon-scoreboard",
     "helix-addon-chat",
     "helix-addon-economy",
     "helix-addon-moderation",
     "helix-addon-teamutils",
     "helix-addon-discord",
-    "helix-addon-motd"
+    "helix-addon-motd",
+    "helix-addon-npc",
+    "helix-addon-npc-paper"
 )
