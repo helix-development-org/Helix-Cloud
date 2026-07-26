@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.46.2 — 2026-07-26
+
+### Guard: Replay mit Welt-Kopie, Zuschauen mit freier Kamera
+- Die **Welt wird wieder rekonstruiert**: Incidents tragen jetzt die
+  World-UUID durch den Node-Contract (beim Schreiben über den Spieler
+  aufgelöst, von der Node gespeichert und abgefragt) — das Replay kopiert
+  damit das Terrain der Szene wieder in die Replay-Welt statt im Void zu
+  spielen.
+- **Kein Festhalten mehr am Spieler:** `/iguard spectate` teleportiert
+  dich an einen Aussichtspunkt hinter/über den Verdächtigen mit Blick auf
+  ihn — freie Spectator-Kamera, kein `spectatorTarget`-Lock. Im Replay
+  ist die Verfolgerkamera jetzt standardmäßig aus (per „Follow"-Button
+  weiterhin zuschaltbar).
+
 ## 0.46.1 — 2026-07-26
 
 ### Helix-Guard: Panel-Texturen im Netzwerk-Pack

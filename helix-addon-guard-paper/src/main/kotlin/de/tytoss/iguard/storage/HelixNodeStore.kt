@@ -57,7 +57,7 @@ private data class NodeAction(val action: String, val arguments: List<String>)
  *    bans network-wide (kick + join gate) itself, so no Velocity outbox polling is needed;
  *  - [activeBans], [banHistory] and [findPlayer] return empty results — the
  *    Helix panel takes over those views and the node contract exposes no matching query;
- *  - [incidentWorld] returns null (the node does not record world uuids), so replays rebuild without
+ *  - [incidentWorld] resolves through the incident's recorded world uuid; replays rebuild without
  *    the terrain paste.
  */
 class HelixNodeStore(
@@ -243,7 +243,19 @@ class HelixNodeStore(
         incident(incidentId)?.let { it.playerId to it.playerName }
 
     /** World uuids are not part of the node contract; replays rebuild without the terrain paste. */
-    override suspend fun incidentWorld(incidentId: UUID): UUID? = null
+    override suspend fun incidentWorld(incidentId: UUID): UUID? = withContext(Dispatchers.IO) {
+        val lines = invoke("guard.query.incidents", listOf("all", "200")) ?: return@withContext null
+        val payload = lines.firstOrNull() ?: return@withContext null
+        runCatching {
+            val incidents = json.parseToJsonElement(payload).jsonObject["incidents"]?.jsonArray ?: return@runCatching null
+            incidents.asSequence()
+                .map { it.jsonObject }
+                .firstOrNull { it["id"]?.jsonPrimitive?.content == incidentId.toString() }
+                ?.get("world")?.jsonPrimitive?.content
+                ?.takeIf { it.isNotBlank() }
+                ?.let(UUID::fromString)
+        }.getOrNull()
+    }
 
     override suspend fun replayFrames(incidentId: UUID): List<ReplayFrameRow> = withContext(Dispatchers.IO) {
         val payload = firstLineObject(invoke("guard.query.replay", listOf(incidentId.toString())))
@@ -373,6 +385,7 @@ class HelixNodeStore(
     private fun incidentJson(record: IncidentRecord): String = buildJsonObject {
         put("id", record.incidentId.toString())
         put("serverId", record.serverId)
+        put("world", org.bukkit.Bukkit.getPlayer(record.playerId)?.world?.uid?.toString() ?: "")
         put("uuid", record.playerId.toString())
         put("name", record.playerName.lowercase())
         put("check", record.families.joinToString(",") { it.name })

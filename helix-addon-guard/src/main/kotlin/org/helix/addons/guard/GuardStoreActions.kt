@@ -65,6 +65,8 @@ data class GuardIncident(
     val confidence: Double,
     val epochMs: Long,
     val summary: String,
+    /** World uuid of the incident scene, for the replay terrain rebuild. */
+    val world: String = "",
 )
 
 /**

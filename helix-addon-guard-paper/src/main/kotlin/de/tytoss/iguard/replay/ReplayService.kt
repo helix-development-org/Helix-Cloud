@@ -53,7 +53,8 @@ class ReplayService(
         var task: BukkitTask? = null
         var elapsed = 0.0
         var paused = false
-        var follow = true
+        // free camera by default — the chase cam stays available via the Follow control
+        var follow = false
         var trail = true
         var ticks = 0L
     }

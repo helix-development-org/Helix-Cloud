@@ -37,17 +37,21 @@ class SpectateService(private val plugin: JavaPlugin) : Listener {
         } else {
             existing.targetId = target.uniqueId
         }
-        admin.teleport(target.location)
-        // Lock the camera to the suspect; the admin can press shift to detach into free-cam.
-        plugin.server.scheduler.runTaskLater(plugin, Runnable {
-            if (admin.isOnline && admin.gameMode == GameMode.SPECTATOR) admin.spectatorTarget = target
-        }, 2L)
+        // Free camera from a vantage point behind and above the suspect —
+        // never lock the spectator to the player.
+        val vantage = target.location.clone().add(
+            -target.location.direction.x * 4.0,
+            2.5,
+            -target.location.direction.z * 4.0,
+        )
+        vantage.direction = target.location.toVector().add(org.bukkit.util.Vector(0.0, 1.0, 0.0)).subtract(vantage.toVector())
+        admin.teleport(vantage)
         admin.sendMessage(
             Component.text("Now spectating ", NamedTextColor.GRAY)
                 .append(Component.text(target.name, NamedTextColor.AQUA))
                 .append(Component.text(" — ", NamedTextColor.DARK_GRAY))
                 .append(Component.text("[Stop]", NamedTextColor.RED).clickEvent(ClickEvent.runCommand("/iguard unspectate")))
-                .append(Component.text(" (shift = free camera)", NamedTextColor.DARK_GRAY))
+                .append(Component.text(" (freie Kamera)", NamedTextColor.DARK_GRAY))
         )
         return true
     }
