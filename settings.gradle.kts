@@ -26,6 +26,7 @@ include(
     "helix-addon-permissions",
     "helix-addon-friends",
     "helix-addon-guard",
+    "helix-addon-guard-paper",
     "helix-addon-tablist",
     "helix-addon-chat",
     "helix-addon-economy",

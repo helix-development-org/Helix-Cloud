@@ -351,11 +351,18 @@ enthalten:
 - **`paper/<name>.jar`** — weitere Paper-Plugins, die als Abhängigkeiten
   mitreisen (z.B. packetevents für Helix-Guard); installiert als
   `HelixAddon-<id>-<name>.jar`.
-- **`pack.zip`** — ein Resource Pack, das die Control-API **öffentlich**
-  unter `/api/v1/packs/<addon-id>.zip` (+ `.sha1`) ausliefert, damit
-  Minecraft-Clients es direkt laden können. Ist die Control-API nicht
-  öffentlich erreichbar, kann die Komponente eine alternative URL über die
-  Env-Variable `HELIX_PACK_URL` bekommen.
+- **`pack.zip`** — ein Resource Pack. Die Node fügt die Packs **aller
+  aktivierten Addons** zu einem einzigen Netzwerk-Pack zusammen, das die
+  Control-API öffentlich unter `/api/v1/packs/network.zip` (+ `.sha1`)
+  ausliefert; die Velocity-Bridge verteilt es beim Proxy-Join automatisch
+  an jeden Spieler (und erneut, sobald sich das Pack ändert). Die
+  `pack.mcmeta` wird dabei generiert; liefern zwei Addons denselben
+  Eintragspfad, gewinnt das (nach Addon-Id sortiert) erste Addon und ein
+  Warn-Log nennt beide. Ist die Control-API nicht unter der automatisch
+  ermittelten Adresse erreichbar, setzt die Action
+  `network.packurl <url|->` (oder die Env-Variable `HELIX_PACK_URL` am
+  Proxy) die Download-URL. Die Einzel-Packs bleiben zusätzlich unter
+  `/api/v1/packs/<addon-id>.zip` abrufbar.
 
 Referenz-Implementierung: **BetterMSGs** (`helix-addon-bettermsgs` +
 `helix-addon-bettermsgs-paper`) — ein Handy-artiges `/msg`-GUI auf Basis

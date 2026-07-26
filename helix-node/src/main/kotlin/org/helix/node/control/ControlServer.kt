@@ -765,9 +765,26 @@ private fun io.ktor.server.routing.Route.actionRoutes(dependencies: ControlDepen
     }
 }
 
-// deliberately unauthenticated: Minecraft clients download addon
-// resource packs directly from this URL (packs contain no secrets)
+// deliberately unauthenticated: Minecraft clients download resource
+// packs directly from these URLs (packs contain no secrets)
 private fun io.ktor.server.routing.Route.packRoutes(dependencies: ControlDependencies) {
+    get("/packs/network.zip") {
+        val pack = dependencies.networkPack.packFile()
+        if (pack == null) {
+            call.respond(HttpStatusCode.NotFound, ErrorResponse("no network resource pack"))
+        } else {
+            call.respondBytes(java.nio.file.Files.readAllBytes(pack), ContentType.Application.Zip)
+        }
+    }
+    get("/packs/network.sha1") {
+        val sha1 = dependencies.networkPack.sha1()
+        if (sha1 == null) {
+            call.respond(HttpStatusCode.NotFound, ErrorResponse("no network resource pack"))
+        } else {
+            call.respondText(sha1)
+        }
+    }
+    // per-addon packs, kept for backwards compatibility
     get("/packs/{file}") {
         val file = call.parameters["file"].orEmpty()
         val id = file.removeSuffix(".zip").removeSuffix(".sha1")
@@ -918,6 +935,10 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
         val report = call.receive<PlayerLocaleReport>()
         dependencies.languages.applyClientLocale(report.name, report.locale)
         call.respond(MessageResponse("ok"))
+    }
+    get("/internal/pack") {
+        if (!requireAdmin(dependencies)) return@get
+        call.respond(NetworkPackInfo(sha1 = dependencies.networkPack.sha1()))
     }
     get("/internal/bridge-values") {
         if (!requireAdmin(dependencies)) return@get

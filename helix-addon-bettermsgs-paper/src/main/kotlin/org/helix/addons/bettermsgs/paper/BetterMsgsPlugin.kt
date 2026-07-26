@@ -107,13 +107,6 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
     private val skins = SkinPixels()
     private lateinit var scope: CoroutineScope
 
-    @Volatile
-    private var packSha1: ByteArray? = null
-
-    /** Operator-configured pack URL (`bettermsgs.packurl`), via bridge values. */
-    @Volatile
-    private var configuredPackUrl: String? = null
-
     /** Dispatcher running coroutines on the Bukkit main thread. */
     private val mainDispatcher = object : CoroutineDispatcher() {
         override fun isDispatchNeeded(context: CoroutineContext): Boolean = !Bukkit.isPrimaryThread()
@@ -156,28 +149,8 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
             chatGui = buildChatGui(installed)
             logger.info("BetterMSGs GUIs ready")
         }
-        server.scheduler.runTaskTimerAsynchronously(
-            this,
-            Runnable {
-                translations.sync()
-                configuredPackUrl = client?.getJson("/api/v1/internal/bridge-values")
-                    ?.let { runCatching { json.decodeFromString<Map<String, String>>(it) }.getOrNull() }
-                    ?.get("bettermsgs.pack_url")
-            },
-            20L,
-            100L,
-        )
+        server.scheduler.runTaskTimerAsynchronously(this, Runnable { translations.sync() }, 20L, 100L)
         server.scheduler.runTaskTimerAsynchronously(this, Runnable { pollOpenChats() }, 20L, 20L)
-        server.scheduler.runTaskTimerAsynchronously(
-            this,
-            Runnable {
-                packSha1 = client?.getJson("/api/v1/packs/helix.bettermsgs.sha1")
-                    ?.trim()?.takeIf { it.length == 40 }
-                    ?.chunked(2)?.map { it.toInt(16).toByte() }?.toByteArray()
-            },
-            1L,
-            20L * 300,
-        )
     }
 
     /**
@@ -222,76 +195,15 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
     }
 
     /**
-     * Applies the addon resource pack and restores crash snapshots.
+     * Restores crash snapshots of borrowed inventories. The GUI textures
+     * arrive with the network resource pack, which the node merges from all
+     * addon packs and the Velocity bridge applies on proxy join.
      *
      * @param event the join event.
      */
     @EventHandler
     fun onJoin(event: PlayerJoinEvent) {
         takeover.restoreCrashed(event.player)
-        val url = packUrl(event.player) ?: return
-        logger.info("Sending resource pack to ${event.player.name}: $url (sha1 ${if (packSha1 != null) "yes" else "no"})")
-        val sha1 = packSha1
-        if (sha1 != null) {
-            event.player.setResourcePack(url, sha1)
-        } else {
-            event.player.setResourcePack(url)
-        }
-    }
-
-    /**
-     * Logs the client's pack download outcome, for diagnosing unreachable
-     * pack URLs.
-     *
-     * @param event the status event.
-     */
-    @EventHandler
-    fun onPackStatus(event: org.bukkit.event.player.PlayerResourcePackStatusEvent) {
-        logger.info("Resource pack status of ${event.player.name}: ${event.status}")
-    }
-
-    /**
-     * Resolves the pack URL the player's CLIENT can reach: the configured
-     * `bettermsgs.packurl` value, then the `HELIX_PACK_URL` env override,
-     * then the address the player connected with (virtual host — control
-     * URLs like `host.docker.internal` or `127.0.0.1` mean nothing to a
-     * remote client), and finally the raw control URL.
-     *
-     * @param player the joining player.
-     * @return a download URL, or `null` without a node connection.
-     */
-    private fun packUrl(player: Player): String? {
-        val nodeClient = client ?: return null
-        val controlPort = runCatching { java.net.URI(nodeClient.controlUrl).port }.getOrDefault(8080)
-        // 0.0.0.0 is a bind address, never something a client can download from
-        configuredPackUrl?.takeIf { it.isNotBlank() && !it.contains("0.0.0.0") }
-            ?.let { return expandPackUrl(it, controlPort) }
-        System.getenv("HELIX_PACK_URL")?.let { return expandPackUrl(it, controlPort) }
-        val clientHost = player.virtualHost?.hostString
-            ?.takeIf { it.isNotBlank() && it != "0.0.0.0" && it != "127.0.0.1" }
-        if (clientHost != null) {
-            return expandPackUrl(clientHost, controlPort)
-        }
-        return nodeClient.controlUrl + PACK_PATH
-    }
-
-    /**
-     * Expands operator input into a full download URL: a bare host or ip
-     * gets the control port and the pack path appended, a base URL just
-     * the path.
-     *
-     * @param value full URL, `host:port` or bare host/ip.
-     * @param controlPort port of the control API.
-     * @return a complete pack URL.
-     */
-    private fun expandPackUrl(value: String, controlPort: Int): String {
-        val base = if (value.startsWith("http://") || value.startsWith("https://")) {
-            value
-        } else {
-            val hostPort = if (':' in value) value else "$value:$controlPort"
-            "http://$hostPort"
-        }
-        return if (base.contains("/api/")) base else base.trimEnd('/') + PACK_PATH
     }
 
     /**
@@ -604,10 +516,5 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
         val item = ItemStack(material)
         item.editMeta { meta -> meta.displayName(name) }
         return item
-    }
-
-    private companion object {
-        /** Download path of the BetterMSGs resource pack on the control API. */
-        const val PACK_PATH = "/api/v1/packs/helix.bettermsgs.zip"
     }
 }

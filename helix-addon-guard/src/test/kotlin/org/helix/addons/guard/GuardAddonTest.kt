@@ -55,17 +55,16 @@ class GuardAddonTest {
     fun `registry mirrors the full iguard schema`() {
         // 48 plain settings + 31 checks x 4 fields; server-id and storage.mode
         // are fixed and not editable
-        assertEquals(48 + 31 * 4, GuardConfig.settings.size)
+        assertEquals(44 + 31 * 4, GuardConfig.settings.size)
         assertEquals(GuardConfig.settings.size, GuardConfig.byPath.size)
         assertFalse("server-id" in GuardConfig.byPath)
         assertFalse("storage.mode" in GuardConfig.byPath)
         assertFalse("database.pool-size" in GuardConfig.byPath)
 
-        assertEquals(9, GuardConfig.settings.count { it.static })
+        assertEquals(5, GuardConfig.settings.count { it.static })
         listOf(
             "workers.stripes", "workers.queue-capacity",
             "history.queue-capacity", "history.batch-size", "history.flush-millis",
-            "dashboard.enabled", "dashboard.bind", "dashboard.port", "dashboard.token",
         ).forEach { path -> assertTrue(GuardConfig.byPath.getValue(path).static, path) }
         listOf(
             "history.retention-days", "alerts.enabled", "alerts.message", "bans.provider",

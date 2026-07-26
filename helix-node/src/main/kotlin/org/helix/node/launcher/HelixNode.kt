@@ -36,6 +36,7 @@ import org.helix.node.gates.NativePermissionProvider
 import org.helix.node.gates.PermissionResolverRegistry
 import org.helix.node.gates.PermissionService
 import org.helix.node.notifications.NotificationBus
+import org.helix.node.packs.NetworkPackService
 import org.helix.api.platform.MetricSample
 import org.helix.api.service.ServiceState
 import org.helix.node.platform.ApiMetrics
@@ -330,6 +331,31 @@ class HelixNode(
         bridgeValues.publish("network", "network.name", name)
     }
 
+    /** Merged network resource pack of all enabled addons. */
+    val networkPack: NetworkPackService = NetworkPackService(paths.root.resolve("packs"))
+
+    /**
+     * Rebuilds the merged network pack from all enabled addons and
+     * republishes its SHA-1 (and the optional public URL override) as
+     * bridge values, so proxies notice the change on their next sync.
+     */
+    fun rebuildNetworkPack() {
+        networkPack.rebuild(addonManager.resourcePacks())
+        bridgeValues.publish("network", "network.pack.sha1", networkPack.sha1() ?: "")
+        networkPack.publicUrl()?.let { bridgeValues.publish("network", "network.pack_url", it) }
+    }
+
+    /**
+     * Persists the operator-configured public pack download URL and
+     * republishes it to the bridges; `null` resets to automatic resolution.
+     *
+     * @param url the client-reachable URL, or `null` to reset.
+     */
+    fun setNetworkPackUrl(url: String?) {
+        networkPack.setPublicUrl(url)
+        bridgeValues.publish("network", "network.pack_url", url ?: "")
+    }
+
     /** Installed addons. */
     val addonManager: AddonManager = AddonManager(
         paths.addons,
@@ -370,6 +396,7 @@ class HelixNode(
                 poolSize = config.storage.poolSize,
             )
         },
+        onChange = { rebuildNetworkPack() },
     )
 
     private val overviewService = PlatformOverviewService(version(), taskStore, manager)
@@ -445,6 +472,7 @@ class HelixNode(
             jobScheduler = jobScheduler,
             backups = backups,
             files = files,
+            networkPack = networkPack,
         ),
     )
 
@@ -482,10 +510,12 @@ class HelixNode(
             addonSubcommands = addonActions::helixSubcommand,
             restartBackend = ::restartBackend,
             restartLauncher = ::restartLauncher,
+            networkPackUrl = ::setNetworkPackUrl,
         ).registerAll(registry)
         addonActions.registerAll(registry)
         BackupActions(backups).registerAll(registry)
         addonManager.loadAll()
+        rebuildNetworkPack()
         registerEventSources()
         refreshNetworkPlaceholders()
         controlServer.start()

@@ -70,6 +70,9 @@ import org.slf4j.LoggerFactory
  *  exposed to addons for plugin scanning.
  * @property defaultLanguage supplier of the network's default language.
  * @property languageOf resolver of a player's language preference.
+ * @property onChange invoked after an addon was installed, enabled or
+ *  disabled, so the node can rebuild derived state such as the merged
+ *  network resource pack.
  */
 class AddonManager(
     private val directory: Path,
@@ -91,6 +94,7 @@ class AddonManager(
     private val defaultLanguage: () -> String = { "en" },
     private val languageOf: ((String) -> String)? = null,
     private val storageConnection: () -> org.helix.api.addon.StorageConnection? = { null },
+    private val onChange: () -> Unit = {},
 ) {
     private val logger = LoggerFactory.getLogger(AddonManager::class.java)
     private val json = Json { ignoreUnknownKeys = true }
@@ -177,6 +181,7 @@ class AddonManager(
         )
         loaded[manifest.id] = record
         enableRecord(record)
+        onChange()
         return info(record)
     }
 
@@ -219,6 +224,18 @@ class AddonManager(
         loaded[id]?.takeIf { it.state == AddonState.ENABLED }?.resourcePack
 
     /**
+     * The resource packs of all enabled addons, merged by the node's
+     * [org.helix.node.packs.NetworkPackService] into the network pack.
+     *
+     * @return addon id to extracted `pack.zip` path.
+     */
+    @Synchronized
+    fun resourcePacks(): List<Pair<String, Path>> =
+        loaded.values
+            .filter { it.state == AddonState.ENABLED && it.resourcePack != null }
+            .map { it.manifest.id to it.resourcePack!! }
+
+    /**
      * Enables a disabled addon.
      *
      * @param id the addon id.
@@ -231,6 +248,7 @@ class AddonManager(
             return true
         }
         enableRecord(record)
+        onChange()
         return record.state == AddonState.ENABLED
     }
 
@@ -256,6 +274,7 @@ class AddonManager(
         record.classLoader = null
         record.state = AddonState.DISABLED
         logger.info("Disabled addon {}", id)
+        onChange()
         return true
     }
 

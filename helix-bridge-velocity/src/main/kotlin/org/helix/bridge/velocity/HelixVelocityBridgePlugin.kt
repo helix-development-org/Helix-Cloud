@@ -81,6 +81,14 @@ class HelixVelocityBridgePlugin @Inject constructor(
     @Volatile
     private var networkPrefix: String = ""
 
+    /** Hex SHA-1 of the node's merged network resource pack, `null` while none exists. */
+    @Volatile
+    private var networkPackSha1: String? = null
+
+    /** Operator-configured pack URL (`network.packurl`), via bridge values. */
+    @Volatile
+    private var configuredPackUrl: String? = null
+
     @Volatile
     private var polling = false
     private var pollThread: Thread? = null
@@ -113,6 +121,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
                     sendHeartbeat(loaded, httpClient)
                     syncBridgeValues(loaded, httpClient)
                     syncTranslations(httpClient)
+                    syncNetworkPack(httpClient)
                 },
             )
             .delay(Duration.ofSeconds(1))
@@ -176,7 +185,8 @@ class HelixVelocityBridgePlugin @Inject constructor(
     }
 
     /**
-     * Reports the join to the node's player registry.
+     * Reports the join to the node's player registry and offers the merged
+     * network resource pack.
      *
      * @param event the post-login event.
      */
@@ -184,6 +194,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
     fun onPostLogin(event: PostLoginEvent) {
         val granted = permissionNodes().filter { event.player.hasPermission(it) }
         reportPlayerEvent("join", event.player.username, event.player.uniqueId.toString(), granted)
+        sendNetworkPack(event.player)
     }
 
     /**
@@ -441,7 +452,93 @@ class HelixVelocityBridgePlugin @Inject constructor(
             }
             networkPrefix = values["network.prefix"] ?: ""
             values["network.name"]?.takeIf { it.isNotBlank() }?.let { networkName = it }
+            // 0.0.0.0 is a bind address, never something a client can download from
+            configuredPackUrl = values["network.pack_url"]
+                ?.takeIf { it.isNotBlank() && !it.contains("0.0.0.0") }
         }.onFailure { logger.warn("Helix bridge value sync failed: {}", it.message) }
+    }
+
+    /**
+     * Fetches the network pack state and, when its SHA-1 changed since the
+     * last sync, re-offers the pack to every online player.
+     *
+     * @param client the node HTTP client.
+     */
+    private fun syncNetworkPack(client: NodeHttpClient) {
+        runCatching {
+            val body = client.getJson("/api/v1/internal/pack") ?: return@runCatching
+            val info = json.decodeFromString<NetworkPackData>(body)
+            if (info.sha1 == networkPackSha1) {
+                return@runCatching
+            }
+            networkPackSha1 = info.sha1
+            if (info.sha1 != null) {
+                logger.info("Network pack changed (sha1 {}), re-sending to {} player(s)", info.sha1, proxy.playerCount)
+                proxy.allPlayers.forEach(::sendNetworkPack)
+            }
+        }.onFailure { logger.warn("Helix network pack sync failed: {}", it.message) }
+    }
+
+    /**
+     * Offers the merged network resource pack to a player; a no-op while
+     * the node serves no pack.
+     *
+     * @param player the receiving player.
+     */
+    private fun sendNetworkPack(player: Player) {
+        val sha1 = networkPackSha1?.takeIf { it.length == SHA1_HEX_LENGTH } ?: return
+        val url = packUrl(player) ?: return
+        runCatching {
+            player.sendResourcePackOffer(
+                proxy.createResourcePackBuilder(url)
+                    .setHash(sha1.chunked(2).map { it.toInt(16).toByte() }.toByteArray())
+                    .setShouldForce(false)
+                    .build(),
+            )
+        }.onFailure { logger.warn("Sending the network pack to {} failed: {}", player.username, it.message) }
+    }
+
+    /**
+     * Resolves the pack URL the player's CLIENT can reach: the configured
+     * `network.packurl` value, then the `HELIX_PACK_URL` env override, then
+     * the address the player connected with (virtual host — control URLs
+     * like `host.docker.internal` or `127.0.0.1` mean nothing to a remote
+     * client), and finally the raw control URL.
+     *
+     * @param player the receiving player.
+     * @return a download URL, or `null` without a node connection.
+     */
+    private fun packUrl(player: Player): String? {
+        val activeSettings = settings ?: return null
+        val controlPort = runCatching { java.net.URI(activeSettings.controlUrl).port }
+            .getOrDefault(-1).takeIf { it > 0 } ?: DEFAULT_CONTROL_PORT
+        configuredPackUrl?.let { return expandPackUrl(it, controlPort) }
+        System.getenv("HELIX_PACK_URL")?.let { return expandPackUrl(it, controlPort) }
+        val clientHost = player.virtualHost.map { it.hostString }.orElse(null)
+            ?.takeIf { it.isNotBlank() && it != "0.0.0.0" && it != "127.0.0.1" }
+        if (clientHost != null) {
+            return expandPackUrl(clientHost, controlPort)
+        }
+        return activeSettings.controlUrl + PACK_PATH
+    }
+
+    /**
+     * Expands operator input into a full download URL: a bare host or ip
+     * gets the control port and the pack path appended, a base URL just
+     * the path.
+     *
+     * @param value full URL, `host:port` or bare host/ip.
+     * @param controlPort port of the control API.
+     * @return a complete pack URL.
+     */
+    private fun expandPackUrl(value: String, controlPort: Int): String {
+        val base = if (value.startsWith("http://") || value.startsWith("https://")) {
+            value
+        } else {
+            val hostPort = if (':' in value) value else "$value:$controlPort"
+            "http://$hostPort"
+        }
+        return if (base.contains("/api/")) base else base.trimEnd('/') + PACK_PATH
     }
 
     private fun sendHeartbeat(settings: BridgeSettings, client: NodeHttpClient) {
@@ -643,5 +740,14 @@ class HelixVelocityBridgePlugin @Inject constructor(
     private companion object {
         /** Delay before reconnecting the poll loop after a failure. */
         const val RECONNECT_DELAY_MS = 1_000L
+
+        /** Download path of the merged network pack on the control API. */
+        const val PACK_PATH = "/api/v1/packs/network.zip"
+
+        /** Control API port assumed when the control URL names none. */
+        const val DEFAULT_CONTROL_PORT = 8080
+
+        /** Length of a hex-encoded SHA-1 hash. */
+        const val SHA1_HEX_LENGTH = 40
     }
 }

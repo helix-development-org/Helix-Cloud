@@ -24,6 +24,7 @@ import org.helix.node.audit.AuditLog
 import org.helix.node.backup.BackupService
 import org.helix.node.files.FileManagerService
 import org.helix.node.messages.MessageRegistry
+import org.helix.node.packs.NetworkPackService
 import org.helix.node.platform.ApiMetrics
 import org.helix.node.platform.MetricsHistory
 import org.helix.node.platform.PlatformOverviewService
@@ -67,6 +68,8 @@ import org.helix.node.tasks.TaskStore
  * @property jobScheduler recurring scheduled jobs.
  * @property backups workspace backups of static services.
  * @property files file manager over workspaces and templates.
+ * @property networkPack merged network resource pack of all enabled addons
+ *  (the default is an empty service that serves nothing, for tests).
  */
 data class ControlDependencies(
     val token: String,
@@ -114,6 +117,7 @@ data class ControlDependencies(
         org.helix.node.storage.JsonStorageProvider().forAddon("scheduler", java.nio.file.Path.of("scheduler")),
         registry,
     ),
+    val networkPack: NetworkPackService = NetworkPackService(java.nio.file.Path.of("packs")),
 ) {
     /** Player command execution shared by the internal routes. */
     val playerCommands: PlayerCommandService = PlayerCommandService(registry, permissionService)

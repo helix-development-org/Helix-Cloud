@@ -60,6 +60,7 @@ class ControlServerTest {
     private val registry = ActionRegistry()
     private val eventLog = org.helix.node.events.EventLog()
     private val logBuffer = org.helix.node.logging.LogBuffer().apply { add("[main] INFO boot line") }
+    private val networkPack = org.helix.node.packs.NetworkPackService(paths.root.resolve("packs"))
     private val dependencies = ControlDependencies(
         token = "secret",
         registry = registry,
@@ -70,6 +71,7 @@ class ControlServerTest {
         addonManager = AddonManager(paths.addons, registry),
         logBuffer = logBuffer,
         eventLog = eventLog,
+        networkPack = networkPack,
     )
 
     init {
@@ -358,6 +360,33 @@ class ControlServerTest {
         }
         assertEquals(HttpStatusCode.OK, locale.status)
         assertEquals("de", dependencies.languages.languageOf("erik"))
+    }
+
+    @Test
+    fun `network pack routes serve the merged pack`() = testApplication {
+        val client = apiClient()
+
+        // without any addon pack every network pack route answers 404 / null
+        assertEquals(HttpStatusCode.NotFound, client.get("/api/v1/packs/network.zip").status)
+        assertEquals(HttpStatusCode.NotFound, client.get("/api/v1/packs/network.sha1").status)
+        val empty: NetworkPackInfo = client.get("/api/v1/internal/pack") { bearerAuth("secret") }.body()
+        assertEquals(null, empty.sha1)
+
+        val source = paths.root.resolve("fake-pack.zip")
+        java.util.zip.ZipOutputStream(Files.newOutputStream(source)).use { zip ->
+            zip.putNextEntry(java.util.zip.ZipEntry("assets/icon.png"))
+            zip.write(byteArrayOf(1, 2, 3))
+            zip.closeEntry()
+        }
+        networkPack.rebuild(listOf("helix.test" to source))
+
+        // pack routes are public (clients download without a token)
+        assertEquals(HttpStatusCode.OK, client.get("/api/v1/packs/network.zip").status)
+        assertEquals(networkPack.sha1(), client.get("/api/v1/packs/network.sha1").body<String>())
+
+        val info: NetworkPackInfo = client.get("/api/v1/internal/pack") { bearerAuth("secret") }.body()
+        assertEquals(networkPack.sha1(), info.sha1)
+        assertEquals("/api/v1/packs/network.zip", info.path)
     }
 
     @Test

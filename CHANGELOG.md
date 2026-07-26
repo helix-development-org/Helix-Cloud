@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.46.0 — 2026-07-26
+
+### Zentrales Resource-Pack: ein Netzwerk-Pack für alle Addons
+- Die Node fügt die `pack.zip`s **aller aktivierten Addons** zu einem
+  deterministischen Netzwerk-Pack zusammen (`Helix/packs/network.zip`,
+  generierte `pack.mcmeta`; bei Pfad-Konflikten gewinnt das nach Addon-Id
+  erste Addon, ein Warn-Log nennt beide) — neu gebaut bei Node-Start und
+  bei jedem Addon-Enable/-Disable.
+- Die Control-API liefert es öffentlich unter `/api/v1/packs/network.zip`
+  (+ `.sha1`) aus; die Velocity-Bridge verteilt es **beim Proxy-Join** an
+  jeden Spieler und erneut an alle Online-Spieler, sobald sich die SHA-1
+  ändert (`GET /internal/pack` im 5s-Sync). Zwei Addons mit Packs
+  überschreiben sich damit nicht mehr gegenseitig den Pack-Slot des
+  Clients.
+- Download-URL-Auflösung wie bewährt: `network.packurl <url|->`
+  (persistiert, als Bridge-Value `network.pack_url` publiziert) →
+  `HELIX_PACK_URL` → Virtual-Host des Spielers + Control-Port →
+  Control-URL.
+- BetterMSGs wendet sein Pack nicht mehr selbst an; die Action
+  `bettermsgs.packurl` entfällt zugunsten von `network.packurl`. Die
+  Einzel-Packs bleiben unter `/api/v1/packs/<addon-id>.zip` abrufbar.
+
+### Helix-Guard: IGuard-Quellcode vollständig im Repo
+- Der komplette IGuard-Quellbaum lebt jetzt als Modul
+  `helix-addon-guard-paper` im Helix-Cloud-Repo — das externe
+  IGuard-Verzeichnis wird nicht mehr gebraucht und kann gelöscht werden.
+- Dabei Helix-nativ verschlankt: PostgreSQL-Backend, eigenes
+  Web-Dashboard und die `storage`/`database`/`dashboard`-Config-Sektionen
+  sind entfernt — der `HelixNodeStore` (Node-Storage über die Control-API)
+  ist der einzige Persistenz-Pfad; `bans.provider: native` ist ein Alias
+  des Helix-Providers. `rune` liegt als vendored Jar im Modul, IGui kommt
+  über den Composite-Build, packetevents bleibt gebündelte
+  Plugin-Abhängigkeit. 131 fehlende KDoc-Blöcke ergänzt, 30 portierte
+  Tests grün; die HXA enthält null postgres-/hikari-Klassen.
+
 ## 0.45.0 — 2026-07-26
 
 ### Helix-Guard: komplett über den Storage-Provider — keine DB-Zugriffe aus den Servern

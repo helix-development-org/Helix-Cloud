@@ -1,0 +1,43 @@
+name: IGuard
+version: '${version}'
+main: de.tytoss.iguard.IGuardPlugin
+api-version: '1.21'
+authors: [Tytoss]
+description: Packet-based Paper anti-cheat with conservative setbacks
+depend: [packetevents]
+softdepend: [ViaVersion]
+commands:
+  iguard:
+    description: IGuard administration
+    usage: /iguard <panel|spectate|alerts|clients|info|history|cases|case|replay|confidence|ban|status|reload>
+permissions:
+  iguard.panel:
+    default: op
+  iguard.spectate:
+    default: op
+  iguard.ban:
+    default: op
+  iguard.alerts:
+    default: op
+  iguard.info:
+    default: op
+  iguard.clients:
+    default: op
+  iguard.history:
+    default: op
+  iguard.cases:
+    default: op
+  iguard.case:
+    default: op
+  iguard.replay:
+    default: op
+  iguard.confidence:
+    default: op
+  iguard.status:
+    default: op
+  iguard.reload:
+    default: op
+  iguard.bypass:
+    default: false
+  iguard.sanctions.bypass:
+    default: op

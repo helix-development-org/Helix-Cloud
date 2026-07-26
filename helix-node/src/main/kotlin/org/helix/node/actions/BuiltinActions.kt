@@ -48,6 +48,8 @@ import org.helix.node.versions.VersionCatalog
  *  running headless, wired by the launcher.
  * @property restartLauncher stops services and starts a fresh Launcher.jar,
  *  wired by the launcher.
+ * @property networkPackUrl persists the public network resource-pack URL
+ *  override (`null` resets to automatic resolution), wired by the launcher.
  */
 class BuiltinActions(
     private val paths: NodePaths,
@@ -69,6 +71,7 @@ class BuiltinActions(
     },
     private val restartBackend: () -> Boolean = { false },
     private val restartLauncher: () -> Boolean = { false },
+    private val networkPackUrl: (url: String?) -> Unit = {},
 ) {
     private val restarts = RestartCoordinator(
         manager = manager,
@@ -330,6 +333,17 @@ class BuiltinActions(
             ),
             ::handleHelixCommand,
         )
+        register(
+            registry,
+            "network.packurl",
+            "Sets the public network resource-pack URL clients download; '-' resets to auto.",
+            "network.packurl <url|->",
+        ) { invocation ->
+            val url = invocation.arguments.firstOrNull()
+                ?: return@register ActionResult.error("usage: network.packurl <url|->")
+            networkPackUrl(if (url == "-") null else url)
+            ActionResult.ok(if (url == "-") "network pack url reset to auto" else "network pack url set to $url")
+        }
         register(registry, "versions.list", "Lists configured platform versions.", "versions.list") {
             val entries = versionCatalog().entries
             if (entries.isEmpty()) {

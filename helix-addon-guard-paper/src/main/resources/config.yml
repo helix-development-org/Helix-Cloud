@@ -1,0 +1,234 @@
+# IGuard persists violations, incidents, replays and bans through its Helix-Cloud node
+# (HELIX_CONTROL_URL + HELIX_CONTROL_TOKEN env vars, provided by the service environment).
+# In a Helix deployment the node addon renders this file from its own settings registry.
+server-id: "${HELIX_SERVICE_ID}"
+workers:
+  stripes: 8
+  queue-capacity: 4096
+history:
+  queue-capacity: 10000
+  batch-size: 250
+  flush-millis: 250
+  retention-days: 30
+alerts:
+  enabled: true
+  message: "&8[&cIGuard&8] &f%player% &7failed &c%check% &8(&7VL %vl%&8) &7case=%incident% confidence=%confidence%% shadow=%shadow% %details%"
+  console: true
+  cooldown-millis: 1000
+bans:
+  # Which ban backend IGuard enforces through:
+  #   native  = alias of the default helix backend (node-enforced network bans: kick + join gate)
+  #   command = delegate to ANY ban plugin via console commands below (LiteBans, AdvancedBan, Essentials, ...)
+  #   service = use a BanProvider another plugin registered with Bukkit's ServicesManager (tight integration)
+  # IGuard always keeps its own audit log + notifications regardless of the provider.
+  provider: native
+  command:
+    # Placeholders: %player% %uuid% %reason% %hours% %actor%
+    ban: "ban %player% %reason%"
+    tempban: "tempban %player% %hours%h %reason%"
+    unban: "pardon %player%"
+notifications:
+  discord:
+    enabled: false
+    # Channel webhook URL (Server Settings -> Integrations -> Webhooks).
+    webhook-url: ""
+    # Only post incidents at/above this confidence (0..1).
+    min-confidence: 0.80
+    # Also post an embed whenever a ban is issued (auto or manual).
+    notify-bans: true
+    # Per-player anti-spam window for incident embeds.
+    cooldown-millis: 30000
+exemptions:
+  overload-millis: 2000
+  teleport-millis: 1500
+  velocity-millis: 1000
+  respawn-millis: 2000
+  world-change-millis: 2000
+  low-tps-threshold: 18.0
+  snapshot-max-age-millis: 300
+sampler:
+  # Max players whose environment is refreshed per tick (round-robin). Worst-case per-player refresh
+  # interval = ceil(players / this) * 50ms; keep snapshot-max-age-millis above that plus jitter.
+  max-players-per-tick: 256
+  # Hard main-thread safety cap: the sampler yields the tick once it has spent this many nanos.
+  max-nanos-per-tick: 2000000
+detection:
+  incident-gap-millis: 30000
+  replay-pre-millis: 10000
+  replay-post-millis: 5000
+  replay-retention-days: 7
+  replay-max-bytes: 524288
+  signal-cooldown-millis: 500
+sanctions:
+  # "shadow" (default) only records WOULD_BAN decisions; "enforce" issues real bans, but ONLY for
+  # incidents whose recipe matches calibrated-recipe below. Leave calibrated-recipe empty to keep
+  # every decision shadow until a recipe has been validated on the bot harness.
+  mode: "shadow"
+  calibrated-recipe: ""
+  shadow-threshold: 0.80
+  minimum-independent-families: 2
+  first-ban-hours: 24
+  repeat-ban-hours: 168
+# Per-signal confidence + noisy-OR caps (hot-reloadable via /iguard reload for calibration). Any check
+# omitted from confidence.signal falls back to a sensible built-in default.
+confidence:
+  default-signal: 0.50
+  single-family-cap: 0.79
+  multi-family-cap: 0.95
+  deterministic: 0.85
+checks:
+  client.identity.a:
+    enabled: true
+    alert-vl: 1.0
+    setback-vl: -1.0
+    decay: 0.0
+  client.brand_spoof.a:
+    enabled: true
+    alert-vl: 1.0
+    setback-vl: -1.0
+    decay: 0.0
+  protocol.badpackets.a:
+    enabled: true
+    alert-vl: 1.0
+    setback-vl: -1.0
+    decay: 0.0
+  movement.fly.a:
+    enabled: true
+    alert-vl: 4.0
+    setback-vl: 7.0
+    decay: 0.2
+  movement.speed.a:
+    enabled: true
+    alert-vl: 5.0
+    setback-vl: 9.0
+    decay: 0.2
+  movement.nofall.a:
+    enabled: true
+    alert-vl: 4.0
+    setback-vl: -1.0
+    decay: 0.25
+  movement.timer.a:
+    enabled: true
+    alert-vl: 3.0
+    setback-vl: -1.0
+    decay: 0.1
+  movement.phase.a:
+    enabled: true
+    alert-vl: 3.0
+    setback-vl: -1.0
+    decay: 0.15
+  movement.step.a:
+    enabled: true
+    alert-vl: 3.0
+    setback-vl: -1.0
+    decay: 0.2
+  movement.spider.a:
+    enabled: true
+    alert-vl: 3.0
+    setback-vl: -1.0
+    decay: 0.2
+  movement.jesus.a:
+    enabled: true
+    alert-vl: 4.0
+    setback-vl: -1.0
+    decay: 0.2
+  movement.velocity.a:
+    enabled: true
+    alert-vl: 4.0
+    setback-vl: -1.0
+    decay: 0.1
+  combat.reach.a:
+    enabled: true
+    alert-vl: 4.0
+    setback-vl: -1.0
+    decay: 0.25
+  combat.rotation.a:
+    enabled: true
+    alert-vl: 5.0
+    setback-vl: -1.0
+    decay: 0.25
+  combat.multitarget.a:
+    enabled: true
+    alert-vl: 3.0
+    setback-vl: -1.0
+    decay: 0.25
+  combat.autoclicker.a:
+    enabled: true
+    alert-vl: 5.0
+    setback-vl: -1.0
+    decay: 0.1
+  combat.inventory.a:
+    enabled: true
+    alert-vl: 3.0
+    setback-vl: -1.0
+    decay: 0.2
+  world.interactionreach.a:
+    enabled: true
+    alert-vl: 3.0
+    setback-vl: -1.0
+    decay: 0.2
+  world.scaffold.a:
+    enabled: true
+    alert-vl: 4.0
+    setback-vl: -1.0
+    decay: 0.2
+  world.fastplace.a:
+    enabled: true
+    alert-vl: 4.0
+    setback-vl: -1.0
+    decay: 0.2
+  world.fastbreak.a:
+    enabled: true
+    alert-vl: 4.0
+    setback-vl: -1.0
+    decay: 0.2
+  world.nuker.a:
+    enabled: true
+    alert-vl: 4.0
+    setback-vl: -1.0
+    decay: 0.2
+  inventory.impossible.a:
+    enabled: true
+    alert-vl: 1.0
+    setback-vl: -1.0
+    decay: 0.0
+  inventory.move.a:
+    enabled: true
+    alert-vl: 4.0
+    setback-vl: -1.0
+    decay: 0.2
+  movement.airjump.a:
+    enabled: true
+    alert-vl: 4.0
+    setback-vl: -1.0
+    decay: 0.2
+  movement.sprintbackwards.a:
+    enabled: true
+    alert-vl: 5.0
+    setback-vl: -1.0
+    decay: 0.2
+  combat.noswing.a:
+    enabled: true
+    alert-vl: 5.0
+    setback-vl: -1.0
+    decay: 0.2
+  combat.snapaim.a:
+    enabled: true
+    alert-vl: 4.0
+    setback-vl: -1.0
+    decay: 0.25
+  world.nofacing.a:
+    enabled: true
+    alert-vl: 4.0
+    setback-vl: -1.0
+    decay: 0.2
+  movement.fastladder.a:
+    enabled: true
+    alert-vl: 5.0
+    setback-vl: -1.0
+    decay: 0.2
+  movement.highjump.a:
+    enabled: true
+    alert-vl: 4.0
+    setback-vl: -1.0
+    decay: 0.2

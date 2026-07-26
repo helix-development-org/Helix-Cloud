@@ -147,11 +147,6 @@ object GuardConfig {
         plain("bans.command.ban", GuardValueType.STRING, "ban %player% %reason%"),
         plain("bans.command.tempban", GuardValueType.STRING, "tempban %player% %hours%h %reason%"),
         plain("bans.command.unban", GuardValueType.STRING, "pardon %player%"),
-        // dashboard.* — embedded web server bound on startup
-        plain("dashboard.enabled", GuardValueType.BOOLEAN, "false", static = true),
-        plain("dashboard.bind", GuardValueType.STRING, "0.0.0.0", static = true),
-        plain("dashboard.port", GuardValueType.INT, "8085", static = true),
-        plain("dashboard.token", GuardValueType.STRING, "", static = true),
         // notifications.discord.*
         plain("notifications.discord.enabled", GuardValueType.BOOLEAN, "false"),
         plain("notifications.discord.webhook-url", GuardValueType.STRING, ""),
