@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.46.3 — 2026-07-26
+
+### Fix: Replay-Crash durch relozierte rune-Bibliothek
+- Die vendored `rune`-Jar stammte aus IGuards altem Shadow-Jar, in dem
+  Kotlin nach `de.tytoss.iguard.lib.kotlin` relokiert war — ihr Bytecode
+  zeigte auf ein Paket, das das neue Modul nicht bündelt
+  (`NoClassDefFoundError` beim Region-Export im Replay). Die Jar wurde
+  per ASM auf Standard-Kotlin-Pakete zurückgemappt (0 echte
+  Typ-Referenzen verbleiben); das Replay baut die Region wieder auf.
+
 ## 0.46.2 — 2026-07-26
 
 ### Guard: Replay mit Welt-Kopie, Zuschauen mit freier Kamera
