@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.46.1 — 2026-07-26
+
+### Helix-Guard: Panel-Texturen im Netzwerk-Pack
+- Neuer Java2D-Generator zeichnet die IGuard-Panel-Texturen (Header-Bar
+  mit Schild-Icon, dunkles Full-Window-Background mit Slot-Raster) und
+  baut daraus das `iguard`-Namespace-Pack inkl. Spacing-Font und
+  Text-Zeilen — als `pack.zip` in der Guard-HXA, automatisch ins
+  Netzwerk-Pack gemerged. Das In-Game-Panel (`/iguard panel`) rendert
+  damit ohne weiteres Zutun.
+
 ## 0.46.0 — 2026-07-26
 
 ### Zentrales Resource-Pack: ein Netzwerk-Pack für alle Addons
