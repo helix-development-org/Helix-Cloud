@@ -41,6 +41,7 @@ import org.helix.api.platform.MetricSample
 import org.helix.api.service.ServiceState
 import org.helix.node.platform.ApiMetrics
 import org.helix.node.platform.MetricsHistory
+import org.helix.node.platform.NodeHealthService
 import org.helix.node.platform.PlatformOverviewService
 import org.helix.node.scheduler.JobScheduler
 import org.helix.node.players.PlayerRegistry
@@ -424,6 +425,10 @@ class HelixNode(
         actions = registry,
         eventSink = ::recordEvent,
     )
+
+    /** The node's own runtime health (process CPU/heap, host load, aggregates). */
+    val nodeHealth: NodeHealthService =
+        NodeHealthService(manager, playerRegistry, nativePermissions, jobScheduler)
     private val autoScaler = AutoScaler(taskStore, manager)
     private val scheduler = Executors.newSingleThreadScheduledExecutor { runnable ->
         Thread(runnable, "helix-autoscaler").apply { isDaemon = true }
@@ -461,6 +466,7 @@ class HelixNode(
             languages = languages,
             metrics = metrics,
             apiMetrics = apiMetrics,
+            nodeHealth = nodeHealth::snapshot,
             onMessagesChanged = { addonId ->
                 if (addonId == "network") {
                     refreshNetworkPlaceholders()
@@ -897,6 +903,7 @@ class HelixNode(
         val tpsValues = manager.managedServices()
             .filter { !it.task.environment.proxy && it.state == ServiceState.RUNNING }
             .mapNotNull { it.tps }
+        val resources = nodeHealth.serviceResources()
         metrics.record(
             MetricSample(
                 epochMs = System.currentTimeMillis(),
@@ -906,6 +913,15 @@ class HelixNode(
                 servicesTotal = overview.servicesTotal,
                 avgTps = if (tpsValues.isEmpty()) null else tpsValues.average(),
                 avgApiMs = apiMetrics.recentAverageMs(),
+                nodeCpuPercent = org.helix.api.bridge.ResourceProbe.cpuPercent(),
+                nodeHeapUsedMb = org.helix.api.bridge.ResourceProbe.memoryUsedMb(),
+                nodeHeapMaxMb = org.helix.api.bridge.ResourceProbe.memoryMaxMb(),
+                systemLoadAverage = Math.round(
+                    java.lang.management.ManagementFactory.getOperatingSystemMXBean().systemLoadAverage * 100.0,
+                ) / 100.0,
+                servicesCpuPercent = resources.cpuPercent,
+                servicesMemoryUsedMb = resources.memoryUsedMb,
+                servicesMemoryMaxMb = resources.memoryMaxMb,
             ),
         )
     }

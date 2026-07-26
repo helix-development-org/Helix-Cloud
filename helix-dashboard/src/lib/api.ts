@@ -67,6 +67,44 @@ export interface MetricSample {
   servicesTotal: number
   avgTps: number | null
   avgApiMs: number | null
+  /** Node process CPU usage in percent; -1 when unknown (old samples). */
+  nodeCpuPercent: number
+  /** Node JVM heap used in MB; -1 when unknown. */
+  nodeHeapUsedMb: number
+  /** Node JVM heap max in MB; -1 when unknown. */
+  nodeHeapMaxMb: number
+  /** System load average; -1 when unknown. */
+  systemLoadAverage: number
+  /** Summed CPU usage of all services in percent; -1 when unknown. */
+  servicesCpuPercent: number
+  /** Summed memory used by all services in MB; -1 when unknown. */
+  servicesMemoryUsedMb: number
+  /** Summed memory limit of all services in MB; -1 when unknown. */
+  servicesMemoryMaxMb: number
+}
+/** Live node health snapshot from {@link fetchHealth}; resource fields are -1 when unknown. */
+export interface NodeHealth {
+  uptimeMs: number
+  nodeCpuPercent: number
+  heapUsedMb: number
+  heapMaxMb: number
+  heapPercent: number
+  nonHeapUsedMb: number
+  systemLoadAverage: number
+  availableProcessors: number
+  threadCount: number
+  peakThreadCount: number
+  gcCount: number
+  gcTimeMs: number
+  servicesRunning: number
+  servicesTotal: number
+  onlinePlayers: number
+  permissionCacheSize: number
+  scheduledJobs: number
+  servicesCpuPercent: number
+  servicesMemoryUsedMb: number
+  servicesMemoryMaxMb: number
+  staleHeartbeats: number
 }
 export interface ApiStats {
   avgMs: number

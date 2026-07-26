@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.50.0 — 2026-07-27
+
+### Deutlich mehr Performance-Metriken im Dashboard
+- **Die Node misst sich jetzt selbst** (bisheriger Blind-Spot): eigener
+  CPU, Heap (used/max + Auslastung), Non-Heap, System-Load-Average,
+  Threads (aktuell/Peak), GC (Anzahl + Gesamtzeit), Uptime. Neuer Endpoint
+  `GET /api/v1/health` mit der kompletten Momentaufnahme.
+- **Aggregierte Ressourcen-Trends:** Gesamt-CPU und Gesamt-RAM aller
+  laufenden Services sowie Node-CPU/Heap/System-Load wandern in die
+  Metrik-Zeitreihe (`MetricSample` erweitert, wire-kompatibel).
+- **Interne Health-Indikatoren:** Permission-Cache-Größe, Scheduled-Jobs,
+  und **überfällige Heartbeats** (laufende Services ohne Heartbeat > 15 s)
+  als direkter „hängt etwas?"-Indikator.
+- **Dashboard** in gruppierte Karten umgebaut (Network / Node / Services /
+  API): neue Node-Health-Kachel-Grid (Heap-Meter, Load/Cores, Threads, GC,
+  Uptime, Stale-Heartbeat-Warnung), neue Trend-Graphen (Node-CPU, Node-Heap,
+  System-Load, Services-CPU gesamt, Services-RAM gesamt), ausgebaute
+  API-Gruppe (p95, Req/min, Fehlerrate rot bei >0). „Keine Daten"-Fälle
+  (−1/null) werden als Lücken bzw. Platzhalter sauber dargestellt.
+
 ## 0.49.0 — 2026-07-26
 
 ### Neue Addons: Clans, Scoreboard, NPCs — plus ECO-Startguthaben

@@ -103,6 +103,7 @@ data class ControlDependencies(
     val languages: LanguageRegistry = LanguageRegistry(InMemoryAddonStorage()),
     val metrics: MetricsHistory = MetricsHistory(),
     val apiMetrics: ApiMetrics = ApiMetrics(),
+    val nodeHealth: (() -> org.helix.api.platform.NodeHealth)? = null,
     val onMessagesChanged: (addonId: String) -> Unit = {},
     val backups: BackupService = BackupService(
         java.nio.file.Path.of("backups"),

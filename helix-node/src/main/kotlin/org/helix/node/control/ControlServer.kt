@@ -321,6 +321,15 @@ private fun io.ktor.server.routing.Route.platformRoutes(dependencies: ControlDep
         if (!authorize(dependencies, "helix.panel.overview")) return@get
         call.respond(dependencies.apiMetrics.snapshot())
     }
+    get("/health") {
+        if (!authorize(dependencies, "helix.panel.overview")) return@get
+        val health = dependencies.nodeHealth?.invoke()
+        if (health == null) {
+            call.respond(HttpStatusCode.NotFound, ErrorResponse("node health unavailable"))
+        } else {
+            call.respond(health)
+        }
+    }
 }
 
 private fun io.ktor.server.routing.Route.observabilityRoutes(dependencies: ControlDependencies) {
