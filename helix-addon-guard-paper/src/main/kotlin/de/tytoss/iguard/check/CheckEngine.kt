@@ -101,6 +101,13 @@ internal class PlayerState {
     var predictedVertical = 0.0
     var lastSpeedFailureTick = -1000L
     var speedFailureStreak = 0
+
+    // Decaying knockback residual (Grim-style velocity uncertainty): after a server velocity or
+    // explosion the possible-movement interval must widen by the knockback the client still carries,
+    // decaying over the following ticks instead of a fixed time exemption. Added to the speed limit
+    // and the fly ceiling so a legit knocked-back player is never flagged.
+    var horizontalUncertainty = 0.0
+    var verticalUncertainty = 0.0
     var positionGapTicks = 0
     var physicalSupporting = true
     val clientTickTimes = ArrayDeque<Long>()
@@ -147,6 +154,8 @@ internal class PlayerState {
         predictedVertical = 0.0
         lastSpeedFailureTick = -1000L
         speedFailureStreak = 0
+        horizontalUncertainty = 0.0
+        verticalUncertainty = 0.0
         positionGapTicks = 0
         physicalSupporting = true
     }
@@ -422,6 +431,11 @@ class CheckEngine(
             state.lastVerticalDelta = delta.y
             state.lastHorizontalDelta = sqrt(delta.horizontalLengthSquared())
             state.positionGapTicks = 0
+            // Decay the knockback-uncertainty window. Horizontal decays with air friction (slower than
+            // ground on purpose — a wider window a bit longer is FP-safe); vertical decays like gravity.
+            state.horizontalUncertainty = (state.horizontalUncertainty * 0.91).let { if (it < 0.005) 0.0 else it }
+            state.verticalUncertainty = ((state.verticalUncertainty - environment.gravity.coerceIn(0.01, 0.2)) * 0.98)
+                .let { if (it < 0.005) 0.0 else it }
             movementEvaluator.velocityFailure(state, environment)?.let { velocityFailure ->
                 applyResults(incoming, state, environment, playerName, listOf(velocityFailure), setOf("movement.velocity.a"))
             }
@@ -582,6 +596,10 @@ class CheckEngine(
         state.pendingVelocityTick = state.clientTick
         state.velocityObservedHorizontal = 0.0
         state.velocityObservedVertical = 0.0
+        // Open a decaying possible-movement window for the knockback the client will carry for the
+        // next ticks; the short exemption still covers the immediate impact tick.
+        state.horizontalUncertainty = max(state.horizontalUncertainty, sqrt(frame.velocity.horizontalLengthSquared()))
+        state.verticalUncertainty = max(state.verticalUncertainty, max(0.0, frame.velocity.y))
         exemptions.exempt(frame.playerId, Duration.ofMillis(exemptionConfig.velocityMillis), frame.source)
     }
 
@@ -853,7 +871,10 @@ class CheckEngine(
             )
             storage.enqueue(record, incident.incident)
             if (violationLevel >= config.alertVl) alerts.record(record)
-            if (config.setbackVl >= 0.0 && violationLevel >= config.setbackVl && failure.checkId in setOf("movement.fly.a", "movement.speed.a")) {
+            // Setback is the primary reaction for every movement check: a movement cheat is neutralised
+            // by rewinding the player, so a false positive can never ban anyone. Bans stay for the
+            // confidence pipeline (deterministic/multi-family), keeping enforcement conservative.
+            if (config.setbackVl >= 0.0 && violationLevel >= config.setbackVl && failure.checkId in SETBACK_CHECKS) {
                 state.safePosition?.let { setbacks.request(frame.playerId, it, failure.checkId) }
             }
         }
@@ -905,6 +926,14 @@ private const val PUBLISH_INTERVAL_MILLIS = 200L
 // Max age of a player's sampled environment for its collision/support data to be trusted by
 // support-dependent checks (~1 server tick). Beyond this the snapshot may lag a moving player.
 private const val SUPPORT_FRESH_MILLIS = 60L
+
+// Movement checks neutralised by a setback instead of a punishment: rewinding the player defeats the
+// cheat, so a false positive can never escalate to a ban.
+private val SETBACK_CHECKS = setOf(
+    "movement.fly.a", "movement.speed.a", "movement.nofall.a", "movement.phase.a",
+    "movement.step.a", "movement.spider.a", "movement.jesus.a", "movement.highjump.a",
+    "movement.airjump.a"
+)
 
 private fun Double.rounded() = round(this * 10000.0) / 10000.0
 

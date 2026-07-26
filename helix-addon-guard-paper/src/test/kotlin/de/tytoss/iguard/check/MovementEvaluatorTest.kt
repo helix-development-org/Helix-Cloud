@@ -112,22 +112,40 @@ class MovementEvaluatorTest {
     }
 
     @Test
-    fun `periodic speed failures gain repeat evidence`() {
+    fun `sustained speed cheat flags every tick and its weight scales with the offset`() {
         val state = PlayerState().apply {
             sprinting = false
             predictedHorizontal = 0.08
             positionGapTicks = 1
         }
-        var lastWeight = 0.0
 
-        repeat(6) {
-            state.clientTick += 12
-            val delta = Vec3(0.0, 0.0, 0.28)
-            val evaluation = evaluator.evaluate(movement(Vec3(0.0, 1.0, 0.28), onGround = false), delta, ground(), profile, state)
-            lastWeight = evaluation.failures.first { failure -> failure.checkId == "movement.speed.a" }.weight
+        // a small offset over the limit accrues little weight...
+        val smallDelta = Vec3(0.0, 0.0, 0.14)
+        val small = evaluator.evaluate(movement(Vec3(0.0, 1.0, 0.14), onGround = false), smallDelta, ground(), profile, state)
+        val smallWeight = small.failures.firstOrNull { it.checkId == "movement.speed.a" }?.weight ?: 0.0
+
+        // ...while a blatant offset accrues far more, on the same clean state
+        val bigState = PlayerState().apply { predictedHorizontal = 0.08; positionGapTicks = 1 }
+        val bigDelta = Vec3(0.0, 0.0, 0.6)
+        val big = evaluator.evaluate(movement(Vec3(0.0, 1.0, 0.6), onGround = false), bigDelta, ground(), profile, bigState)
+        val bigWeight = big.failures.first { it.checkId == "movement.speed.a" }.weight
+
+        assertTrue(small.failed("movement.speed.a"))
+        assertTrue(bigWeight > smallWeight, "blatant offset ($bigWeight) must outweigh the borderline one ($smallWeight)")
+    }
+
+    @Test
+    fun `knockback residual widens the speed window so a knocked-back player is not flagged`() {
+        val state = PlayerState().apply {
+            sprinting = false
+            predictedHorizontal = 0.1
+            positionGapTicks = 1
+            horizontalUncertainty = 0.6
         }
+        val delta = Vec3(0.0, 0.0, 0.5)
+        val evaluation = evaluator.evaluate(movement(Vec3(0.0, 1.0, 0.5), onGround = false), delta, ground(), profile, state)
 
-        assertTrue(lastWeight >= 5.0)
+        assertFalse(evaluation.failed("movement.speed.a"), "0.5 move within a 0.6 knockback window must be legal")
     }
 
     @Test

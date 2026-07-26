@@ -17,6 +17,11 @@ internal data class MovementEvaluation(val failures: List<CheckFailure>, val sup
 // support is unreliable under lag). Well above vanilla fall onset so real nofall still trips.
 private const val LAG_NOFALL_AIRTICKS = 12
 
+// Offset (blocks outside the physically possible move) that maps to a violation weight of 1.0. A
+// clear cheat produces a multiple of this; a borderline offset a fraction, so the VL self-calibrates.
+private const val FLY_OFFSET_REF = 0.1
+private const val SPEED_OFFSET_REF = 0.1
+
 private data class HorizontalProjection(
     val limit: Double,
     val nextVelocity: Double,
@@ -188,19 +193,27 @@ internal class MovementEvaluator {
             vertical = verticalAfterTick(vertical, environment)
         }
         val stepAllowance = if (state.airTicks == 0) environment.stepHeight.coerceIn(0.0, 1.5) else 0.0
-        // Under server lag the sampled environment lags the client; widen the margin so a legit
-        // player is not flagged. Detection stays active (unlike the old blanket low-tps exemption).
-        val tolerance = 0.035 * ticks + stepAllowance + if (laggy) 0.05 * ticks else 0.0
-        val impossibleRise = delta.y > maximumRise + tolerance
+        // Physics uncertainty of the possible vertical interval: sampling jitter, step, lag widening,
+        // plus the decaying knockback residual. The offset is how far the observed rise is OUTSIDE the
+        // largest physically possible rise — 0 means definitely legal (no guessed flat tolerance).
+        val tolerance = 0.035 * ticks + stepAllowance + (if (laggy) 0.05 * ticks else 0.0)
+        val ceiling = maximumRise + tolerance + state.verticalUncertainty
+        val offset = delta.y - ceiling
         val expectedFall = maximumRise < -0.08 && delta.y > maximumRise + 0.09
-        val hovering = state.airTicks > 7 && expectedFall && abs(delta.y) < 0.03
-        if (!impossibleRise && !hovering) return null
+        val hovering = state.airTicks > 7 && expectedFall && abs(delta.y) < 0.03 && state.verticalUncertainty <= 0.0
+        if (offset <= 0.0 && !hovering) return null
+        // Weight is the offset itself in FP-safe units: a borderline offset (a few cm over possible)
+        // barely accrues and decays away; a clear fly accrues fast. Deterministic, self-calibrating.
+        val weight = if (offset > 0.0) (offset / FLY_OFFSET_REF).coerceIn(0.1, 8.0) else 1.0
         return CheckFailure(
             "movement.fly.a",
-            if (impossibleRise) 1.25 else 1.0,
+            weight,
             mapOf(
                 "dy" to delta.y.rounded(),
                 "maximum" to maximumRise.rounded(),
+                "ceiling" to ceiling.rounded(),
+                "offset" to offset.coerceAtLeast(0.0).rounded(),
+                "knockback" to state.verticalUncertainty.rounded(),
                 "previousVelocity" to state.lastVerticalDelta.rounded(),
                 "airTicks" to state.airTicks,
                 "packetTicks" to ticks
@@ -217,29 +230,30 @@ internal class MovementEvaluator {
         laggy: Boolean
     ): CheckFailure? {
         val projection = horizontalProjection(environment, state, ticks, supporting)
-        // Under lag, widen the horizontal budget rather than skipping the check entirely.
-        val limit = projection.limit * if (laggy) 1.15 else 1.0
+        // The possible-horizontal interval: the projected budget (already carries physics tolerance),
+        // widened under lag, plus the decaying knockback residual. The offset is how far the observed
+        // horizontal is OUTSIDE the largest physically possible move.
+        val limit = projection.limit * (if (laggy) 1.15 else 1.0) + state.horizontalUncertainty
         val horizontal = sqrt(delta.horizontalLengthSquared())
-        if (horizontal <= limit) return null
-        state.speedFailureStreak = if (state.clientTick - state.lastSpeedFailureTick <= 30) {
-            state.speedFailureStreak + 1
-        } else {
-            1
-        }
+        val offset = horizontal - limit
+        if (offset <= 0.0) return null
         state.lastSpeedFailureTick = state.clientTick
-        val baseWeight = (horizontal / limit.coerceAtLeast(0.01)).coerceIn(1.0, 2.5)
-        val repeatBonus = (state.speedFailureStreak - 1) * 0.75
+        // Weight is the offset in FP-safe units — a hair over the limit barely accrues and decays
+        // away; a real speed cheat accrues fast. Repeated offsets accumulate in the VL naturally, so
+        // no separate streak bonus (which could amplify a borderline legit player) is needed.
+        val weight = (offset / SPEED_OFFSET_REF).coerceIn(0.1, 8.0)
         return CheckFailure(
             "movement.speed.a",
-            (baseWeight + repeatBonus).coerceAtMost(6.0),
+            weight,
             mapOf(
                 "horizontal" to horizontal.rounded(),
                 "limit" to limit.rounded(),
+                "offset" to offset.rounded(),
+                "knockback" to state.horizontalUncertainty.rounded(),
                 "acceleration" to projection.acceleration.rounded(),
                 "friction" to projection.friction.rounded(),
                 "jumpImpulse" to projection.jumpImpulse.rounded(),
                 "takeoffAllowance" to projection.takeoffAllowance.rounded(),
-                "repeat" to state.speedFailureStreak,
                 "sprinting" to state.sprinting,
                 "surface" to environment.surface,
                 "packetTicks" to ticks

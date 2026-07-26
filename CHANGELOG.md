@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.47.0 — 2026-07-26
+
+### Guard-Detection Stufe 1+2: Offset-Engine + Setback-Primärreaktion
+- **Movement-Checks (fly/speed) auf Grim-Prinzip umgestellt:** statt „ein
+  vorhergesagter Wert + geratene Toleranz → Flag mit fester Gewichtung"
+  jetzt Unsicherheits-Intervall + **Offset** — wie weit die beobachtete
+  Bewegung *außerhalb* des physikalisch Möglichen liegt. Offset 0 = sicher
+  legal. Die Violation-Gewichtung IST der Offset (selbst-kalibrierend,
+  deterministisch): ein Grenzfall akkumuliert kaum und decayt weg, ein
+  klarer Cheat akkumuliert schnell.
+- **Knockback-Unsicherheit (decaying velocity window):** nach Server-
+  Velocity/Explosion wird das Möglichkeits-Intervall um den Knockback
+  erweitert, der der Client noch trägt, und decayt über die Folge-Ticks —
+  behebt den klassischen False Positive, wenn ein zurückgeworfener Spieler
+  kurz „zu schnell/zu hoch" wirkt.
+- **Setback ist jetzt Primärreaktion für ALLE Movement-Checks** (nicht nur
+  fly/speed): ein Movement-Cheat wird durch Zurücksetzen neutralisiert, ein
+  False Positive kann damit prinzipiell niemanden bannen. Bans bleiben der
+  konservativen Confidence-Pipeline (deterministisch/mehrere Familien)
+  vorbehalten.
+- Streak-/Repeat-Bonus entfernt (verstärkte Grenzfälle) — wiederholte
+  Offsets akkumulieren ohnehin natürlich in der VL. `offset`/`knockback`
+  stehen als Evidenz im Incident für Panel und Replay.
+
 ## 0.46.3 — 2026-07-26
 
 ### Fix: Replay-Crash durch relozierte rune-Bibliothek
