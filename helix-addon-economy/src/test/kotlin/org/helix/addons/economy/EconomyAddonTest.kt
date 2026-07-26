@@ -22,7 +22,7 @@ class EconomyAddonTest {
 
     @Test
     fun `overdraft is rejected`() {
-        context.run("eco.give", "Steve", "10")
+        context.run("eco.set", "Steve", "10")
 
         assertFalse(context.run("eco.take", "Steve", "50").success)
         assertTrue(context.run("eco.get", "Steve").lines.single().contains("10"))
@@ -43,7 +43,7 @@ class EconomyAddonTest {
 
     @Test
     fun `pay validates funds amount and self`() {
-        context.run("eco.give", "Steve", "10")
+        context.run("eco.set", "Steve", "10")
 
         assertFalse(context.run("pay", "Steve", "Alex", "50").success)
         assertFalse(context.run("pay", "Steve", "Alex", "-5").success)
@@ -58,4 +58,10 @@ class EconomyAddonTest {
 
         assertEquals(250, BalanceStore(storage).balance("Steve"))
     }
+
+    @Test
+    fun `new players start with the starting balance`() {
+        assertTrue(context.run("eco.get", "Newbie").lines.single().contains("1000"))
+    }
+
 }
