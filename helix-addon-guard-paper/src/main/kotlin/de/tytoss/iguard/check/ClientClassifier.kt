@@ -1,6 +1,7 @@
 package de.tytoss.iguard.check
 
 import java.nio.charset.StandardCharsets
+import java.util.UUID
 
 internal data class ClientFingerprint(
     val family: String,
@@ -34,6 +35,18 @@ internal object ClientClassifier {
         "forge" to "Forge",
         "fabric" to "Fabric / modded"
     )
+
+    /**
+     * Whether a uuid belongs to a Bedrock player connected through Geyser/Floodgate.
+     *
+     * Floodgate issues xuid-derived uuids whose most-significant 64 bits are zero
+     * (`00000000-0000-0000-xxxx-xxxxxxxxxxxx`); the all-zero uuid is excluded. This is
+     * dependency-free and reliable without requiring the Floodgate plugin API.
+     *
+     * @param uuid the player uuid.
+     * @return `true` for a Bedrock/Floodgate player.
+     */
+    fun isBedrock(uuid: UUID): Boolean = uuid.mostSignificantBits == 0L && uuid.leastSignificantBits != 0L
 
     /** Classifies a client from its declared brand + registered plugin channels. */
     fun classify(brand: String?, channels: Set<String>): ClientFingerprint {

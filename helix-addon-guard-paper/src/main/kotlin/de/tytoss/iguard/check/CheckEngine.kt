@@ -82,6 +82,11 @@ internal class PlayerState {
     var sprinting = false
     var sneaking = false
     var clientFlying = false
+    // Bedrock (Geyser/Floodgate) players run different movement physics than Java, so the Java
+    // prediction would false-positive them. Resolved once from the uuid; movement checks are skipped
+    // for Bedrock while deterministic/combat/world checks stay active.
+    var bedrock: Boolean? = null
+
     var clientBrand: String? = null
     val clientChannels = LinkedHashSet<String>()
     var clientFingerprint = ClientFingerprint.UNKNOWN
@@ -285,6 +290,7 @@ class CheckEngine(
     private fun process(frame: PacketFrame) {
         incidentTracker.observe(frame)
         val state = states.computeIfAbsent(frame.playerId) { PlayerState() }
+        if (state.bedrock == null) state.bedrock = ClientClassifier.isBedrock(frame.playerId)
         val dropped = pendingDrops.remove(frame.playerId)?.get() ?: 0L
         val sequenceGap = state.lastSequence != 0L && frame.sequence != state.lastSequence + 1
         if (dropped > 0 || sequenceGap) {
@@ -371,7 +377,7 @@ class CheckEngine(
         // fresh (sampled within ~1 tick); otherwise freeze airborne accounting instead of guessing.
         val supportReliable = incoming.receivedAt - environment.capturedAt <= SUPPORT_FRESH_MILLIS
         val exempt = exemptions.isExempt(incoming.playerId, incoming.receivedAt) || exemptEnvironment ||
-            stale || !environment.chunkLoaded || previous == null || worldChanged
+            stale || !environment.chunkLoaded || previous == null || worldChanged || state.bedrock == true
         val safeCandidate = if (environment.supportingCollision && !environment.colliding) {
             SafePosition(environment.worldId, environment.position, environment.yaw, environment.pitch, environment.tick)
         } else null
@@ -443,7 +449,7 @@ class CheckEngine(
             safeCandidate?.let { state.safePosition = it }
             if (incoming.positionChanged && previous != null) {
                 val delta = frame.position - previous.position
-                if (supportReliable && state.airTicks >= (if (laggy) 18 else 6)) {
+                if (supportReliable && state.bedrock != true && state.airTicks >= (if (laggy) 18 else 6)) {
                     val failure = movementEvaluator.groundSpoofFailure(frame.onGround, frame.position, environment, state, laggy)
                     applyResults(incoming, state, environment, playerName, listOfNotNull(failure), setOf("movement.nofall.a"))
                 }
@@ -452,7 +458,7 @@ class CheckEngine(
                 state.lastHorizontalDelta = sqrt(delta.horizontalLengthSquared())
                 state.positionGapTicks = 0
             } else {
-                if (supportReliable && (!exempt || state.airTicks >= 10) && (!laggy || state.airTicks >= 18)) {
+                if (supportReliable && state.bedrock != true && (!exempt || state.airTicks >= 10) && (!laggy || state.airTicks >= 18)) {
                     val failure = movementEvaluator.groundSpoofFailure(frame.onGround, frame.position, environment, state, laggy)
                     applyResults(incoming, state, environment, playerName, listOfNotNull(failure), setOf("movement.nofall.a"))
                 }

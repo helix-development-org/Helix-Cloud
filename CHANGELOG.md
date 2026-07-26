@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.48.0 — 2026-07-26
+
+### Guard-Detection Stufe 3: Bedrock/Geyser-Erkennung
+- Bedrock-Spieler (Geyser/Floodgate, erkannt an der Floodgate-UUID mit
+  Null-High-Bits — dependency-frei) laufen mit anderer Bewegungsphysik als
+  Java; die Java-Prediction hätte sie systematisch als False Positive
+  geflaggt. Movement-Checks werden für Bedrock jetzt ausgesetzt,
+  deterministische Protokoll-, Combat- und World-Checks bleiben aktiv.
+
 ## 0.47.0 — 2026-07-26
 
 ### Guard-Detection Stufe 1+2: Offset-Engine + Setback-Primärreaktion

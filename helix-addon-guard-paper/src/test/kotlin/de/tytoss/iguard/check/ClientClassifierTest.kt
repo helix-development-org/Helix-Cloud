@@ -1,5 +1,7 @@
 package de.tytoss.iguard.check
 
+import java.util.UUID
+
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -63,4 +65,13 @@ class ClientClassifierTest {
 
         assertEquals(setOf("fabric:registry/sync", "example:test"), ClientClassifier.decodeRegisteredChannels(payload))
     }
+
+    @Test
+    fun `floodgate uuids are detected as bedrock`() {
+        // Floodgate uuids have zero high bits; Java/online uuids do not; the null uuid is excluded.
+        assertTrue(ClientClassifier.isBedrock(UUID(0L, 1234L)))
+        assertFalse(ClientClassifier.isBedrock(UUID(0L, 0L)))
+        assertFalse(ClientClassifier.isBedrock(UUID(0x1234_5678_9abc_def0L, 0x1L)))
+    }
+
 }
