@@ -36,7 +36,7 @@ class TeamUtilsAddon : AddonBase() {
                     "notify" to "&b[Team] &f{text}",
                     "join" to "&b[Team] &f{player} &7is now &aonline&7.",
                     "leave" to "&b[Team] &f{player} &7is now &8offline&7.",
-                    "usage.tc" to "Usage: /tc \\<message...>",
+                    "usage.tc" to "Usage: /tc \\<message...> — or write @team \\<message> in chat",
                 ),
                 "de" to mapOf(
                     "chat" to "&b[Team] &f{sender}&7: &f{message}",
@@ -45,7 +45,7 @@ class TeamUtilsAddon : AddonBase() {
                     "notify" to "&b[Team] &f{text}",
                     "join" to "&b[Team] &f{player} &7ist jetzt &aonline&7.",
                     "leave" to "&b[Team] &f{player} &7ist jetzt &8offline&7.",
-                    "usage.tc" to "Verwendung: /tc \\<message...>",
+                    "usage.tc" to "Verwendung: /tc \\<nachricht...> — oder schreibe @team \\<nachricht> in den Chat",
                 ),
             ),
         )

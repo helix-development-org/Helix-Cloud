@@ -23,6 +23,24 @@ class ClanAddonTest {
     }
 
     @Test
+    fun `clan chat reaches online members only and requires a clan`() {
+        createClan()
+        context.run("clan", "Steve", "invite", "Alex")
+        context.run("clan", "Alex", "accept", "STV")
+        context.online += org.helix.api.player.OnlinePlayer(name = "Steve")
+        context.online += org.helix.api.player.OnlinePlayer(name = "Alex")
+        context.invocations.clear()
+
+        assertTrue(context.run("cc", "Steve", "hello", "clan").success)
+        val delivered = context.invocations.filter { it.action == "player.message" }
+        assertEquals(setOf("steve", "alex"), delivered.map { it.arguments.first() }.toSet())
+        assertTrue(delivered.all { it.arguments[1].contains("hello clan") && it.arguments[1].contains("STV") })
+
+        assertFalse(context.run("cc", "Steve").success, "empty message shows usage")
+        assertFalse(context.run("cc", "Nobody", "hi").success, "clanless players cannot use clan chat")
+    }
+
+    @Test
     fun `create then info round-trips`() {
         assertTrue(createClan().success)
 

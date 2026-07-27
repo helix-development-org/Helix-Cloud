@@ -122,13 +122,33 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     /**
      * Renders chat with the addon-published format and display profiles.
      *
+     * Messages starting with a channel prefix (`@team`, `@clan`) never reach
+     * public chat: the event is cancelled and the text is forwarded to the
+     * matching node player-command (`tc` / `cc`), which delivers it to the
+     * channel members network-wide and enforces the channel's permission.
+     *
      * Without a published `chat.format` bridge value the vanilla chat
      * stays untouched.
      *
      * @param event the chat event.
      */
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     fun onChat(event: AsyncChatEvent) {
+        val plain = PlainTextComponentSerializer.plainText().serialize(event.message())
+        val channel = CHAT_CHANNELS.entries.firstOrNull { (prefix, _) ->
+            plain.length >= prefix.length && plain.substring(0, prefix.length).equals(prefix, ignoreCase = true) &&
+                (plain.length == prefix.length || plain[prefix.length] == ' ')
+        }
+        if (channel != null) {
+            event.isCancelled = true
+            val playerName = event.player.name
+            val text = plain.drop(channel.key.length).trim()
+            server.scheduler.runTaskAsynchronously(
+                this,
+                Runnable { forwardChannelChat(playerName, channel.value, text) },
+            )
+            return
+        }
         val format = bridgeValues["chat.format"] ?: return
         val profile = displayProfiles[event.player.name.lowercase()] ?: DisplayProfile()
         event.renderer(
@@ -145,6 +165,42 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
                 )
             },
         )
+    }
+
+    /**
+     * Forwards a channel-chat message (`@team`/`@clan`) to the node's
+     * player-command endpoint and relays any feedback lines (usage, missing
+     * permission, "no clan") back to the sender. Runs off the main thread.
+     *
+     * @param playerName the sending player.
+     * @param command the node player-command (`tc` or `cc`).
+     * @param text the message text, may be empty (the action answers with
+     *   its usage line).
+     */
+    private fun forwardChannelChat(playerName: String, command: String, text: String) {
+        val httpClient = client ?: return
+        val response = runCatching {
+            httpClient.postJsonForBody(
+                "/api/v1/internal/player-command",
+                json.encodeToString(
+                    org.helix.api.action.PlayerCommandRequest(
+                        player = playerName,
+                        command = command,
+                        arguments = if (text.isEmpty()) emptyList() else text.split(" "),
+                    ),
+                ),
+            )
+        }.onFailure { logger.warning("Channel chat @$command failed: ${it.message}") }.getOrNull()
+        val player = server.getPlayerExact(playerName) ?: return
+        if (response == null) {
+            player.sendMessage(colored("&cThis chat channel is currently unavailable."))
+            return
+        }
+        val result = json.decodeFromString<org.helix.api.action.ActionResult>(response)
+        result.lines.forEach { line -> player.sendMessage(colored(line)) }
+        if (!result.success && result.lines.isEmpty()) {
+            player.sendMessage(colored("&cThis chat channel is not available to you."))
+        }
     }
 
     private fun pulse(settings: BridgeSettings, client: NodeHttpClient) {
@@ -498,5 +554,8 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
 
         /** Team name prefix holding each sidebar line's text. */
         const val LINE_TEAM_PREFIX = "hline"
+
+        /** Chat prefixes routed to node player-commands instead of public chat. */
+        val CHAT_CHANNELS = mapOf("@team" to "tc", "@clan" to "cc")
     }
 }

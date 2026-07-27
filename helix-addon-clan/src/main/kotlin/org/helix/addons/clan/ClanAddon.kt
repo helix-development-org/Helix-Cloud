@@ -57,6 +57,21 @@ class ClanAddon : AddonBase() {
                 handleClanCommand(invocation).also { invocation.arguments.firstOrNull()?.let(::publishTag) }
             },
         )
+        // Clan chat: reachable as /cc and via the @clan chat prefix (the paper bridge forwards
+        // "@clan <text>" from regular chat to this action).
+        context.registerAction(
+            org.helix.api.action.ActionDescriptor(
+                name = "cc",
+                description = "Sends a message to all online clan members.",
+                usage = "cc <message...>",
+                playerCommand = true,
+                permission = "helix.clan",
+            ),
+        ) { invocation ->
+            val executor = invocation.arguments.firstOrNull()
+                ?: return@registerAction ActionResult.error("missing executing player")
+            chat(executor, invocation.arguments.drop(1).joinToString(" "))
+        }
         action("clan.list", "Lists all clans as JSON (dashboard/panel).", "clan.list") {
             ActionResult.ok(
                 json.encodeToString(
@@ -408,6 +423,22 @@ class ClanAddon : AddonBase() {
     private fun canManage(clan: Clan, player: String): Boolean =
         roleOf(clan, player)?.let { it.rank >= ClanRole.OFFICER.rank } == true
 
+    /** Delivers a clan-chat line to every online member (including the sender). */
+    private fun chat(executor: String, text: String): ActionResult {
+        if (text.isBlank()) {
+            return ActionResult.error(msg.formatFor(executor, "chat.usage"))
+        }
+        val clan = store.clanOf(executor)
+            ?: return ActionResult.error(msg.formatFor(executor, "error.noclan"))
+        val online = context.onlinePlayers().map { it.name.lowercase() }.toSet()
+        clan.members.keys
+            .filter { it in online }
+            .forEach { member ->
+                message(member, msg.formatFor(member, "chat", "tag" to clan.tag, "sender" to executor, "message" to text))
+            }
+        return ActionResult.ok()
+    }
+
     private fun broadcast(clan: Clan, except: String, key: String, vararg params: Pair<String, String>) {
         val online = context.onlinePlayers().map { it.name.lowercase() }.toSet()
         clan.members.keys
@@ -429,6 +460,8 @@ class ClanAddon : AddonBase() {
     private fun messages(): Map<String, Map<String, String>> = mapOf(
         "en" to mapOf(
             "create.ok" to "&aClan &f{name} &acreated with tag &f[{tag}]&a.",
+            "chat" to "&8[&b{tag}&8] &f{sender}&7: &f{message}",
+            "chat.usage" to "&cUsage: /cc \\<message...> &7— or write &f@clan \\<message> &7in chat",
             "create.usage" to "&cUsage: /clan create \\<tag> \\<name...>",
             "info.header" to "&8— &b{name} &7[&b{tag}&7] &8—",
             "info.owner" to "&7Owner: &f{owner}",
@@ -486,6 +519,8 @@ class ClanAddon : AddonBase() {
         ),
         "de" to mapOf(
             "create.ok" to "&aClan &f{name} &amit Tag &f[{tag}] &aerstellt.",
+            "chat" to "&8[&b{tag}&8] &f{sender}&7: &f{message}",
+            "chat.usage" to "&cVerwendung: /cc \\<nachricht...> &7— oder schreibe &f@clan \\<nachricht> &7in den Chat",
             "create.usage" to "&cVerwendung: /clan create \\<tag> \\<name...>",
             "info.header" to "&8— &b{name} &7[&b{tag}&7] &8—",
             "info.owner" to "&7Besitzer: &f{owner}",

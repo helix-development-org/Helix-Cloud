@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.54.0 — 2026-07-27
+
+### Chat-Kanäle: @team und @clan
+- **`@team <nachricht>`** im normalen Chat schreibt in den Team-Chat,
+  **`@clan <nachricht>`** in den Clan-Chat (Präfix case-insensitive).
+  Die Paper-Bridge cancelt die öffentliche Chat-Nachricht und leitet den
+  Text als Player-Command (`tc`/`cc`) an die Node weiter — Permissions
+  (`helix.team.member`/`helix.clan`) prüft die Node wie bei jedem
+  Command, Feedback (Usage, „kein Clan", fehlende Rechte) geht nur an
+  den Absender. Nichts landet versehentlich im öffentlichen Chat.
+- **Neuer Clan-Chat:** `/cc <nachricht>` erreicht alle Online-Mitglieder
+  des eigenen Clans netzwerkweit, Format `[TAG] Sender: Nachricht`,
+  Nachrichten de/en. Der Team-Chat `/tc` existierte bereits; beide
+  Usage-Texte erwähnen jetzt die @-Kurzform.
+
 ## 0.53.0 — 2026-07-27
 
 ### Permissions: vollständiger Katalog + Auswahl-Modal im Panel
