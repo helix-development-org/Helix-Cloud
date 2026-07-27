@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.53.0 — 2026-07-27
+
+### Permissions: vollständiger Katalog + Auswahl-Modal im Panel
+- **Permission-Audit über alle Addons:** Jede im Code verwendete
+  Permission steht jetzt in der jeweiligen `addon.json` (und landet damit
+  im Katalog des Permission-Panels). Einziger Fund: Helix-Guard
+  deklarierte nur `iguard.alerts` — die 13 weiteren `iguard.*`-Nodes des
+  Paper-Plugins (`ban`, `bypass`, `panel`, `spectate`, `reload`,
+  `status`, `info`, `history`, `cases`, `case`, `replay`, `clients`,
+  `confidence`) sind ergänzt. Die Chat-Prefix-Regeln nutzen bewusst
+  betreiberdefinierte Nodes und bleiben undeklariert.
+- **Permission-Auswahl im Panel als Modal:** Statt des Datalist-Eingabefelds
+  öffnet „＋ Add permissions" (Gruppen-Editor) bzw. „＋ Grant permissions"
+  (User-Detail) ein durchsuchbares Modal — Katalog nach Quelle/Addon
+  gruppiert, Mehrfachauswahl per Checkbox, bereits gewährte Nodes
+  ausgegraut markiert, Custom-Feld für Wildcards (`iguard.*`) und eigene
+  Nodes, Negations-Schalter (`-node`). Bei Usern wird die Duration aus
+  dem bestehenden Feld auf alle ausgewählten Nodes angewandt.
+  Gruppen-Editoren bleiben über Reloads hinweg geöffnet.
+
 ## 0.52.0 — 2026-07-27
 
 ### Display-Namen: Prefix + Name + Suffix — überall

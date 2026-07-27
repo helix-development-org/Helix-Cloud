@@ -5,6 +5,19 @@
   "main": "org.helix.addons.guard.GuardAddon",
   "description": "IGuard anticheat management: panel-editable config distributed to all Paper services, node-side persistence for violations/incidents/replays/punishments, staff alerts and network-wide ban enforcement.",
   "permissions": [
-    "iguard.alerts"
+    "iguard.alerts",
+    "iguard.ban",
+    "iguard.bypass",
+    "iguard.case",
+    "iguard.cases",
+    "iguard.clients",
+    "iguard.confidence",
+    "iguard.history",
+    "iguard.info",
+    "iguard.panel",
+    "iguard.reload",
+    "iguard.replay",
+    "iguard.spectate",
+    "iguard.status"
   ]
 }

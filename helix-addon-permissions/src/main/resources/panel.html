@@ -30,7 +30,38 @@
   </div>
 </div>
 
-<datalist id="perm-catalog"></datalist>
+<div id="perm-modal" class="backdrop hidden">
+  <div class="modal" style="max-width:560px;width:100%">
+    <div class="card-head">
+      <h2 id="pm-title">Select permissions</h2>
+      <div class="right"><input id="pm-search" placeholder="Search nodes…" autocomplete="off" style="max-width:220px"></div>
+    </div>
+    <div class="card-body">
+      <div id="pm-list" style="max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px"></div>
+      <div class="grid c2" style="margin-top:12px">
+        <div class="field"><label>Custom node (wildcards allowed, e.g. iguard.*)</label>
+          <input id="pm-custom" placeholder="my.custom.node" autocomplete="off"></div>
+        <div class="field"><label>Mode</label>
+          <label class="checkbox"><input type="checkbox" id="pm-negate"> grant as negation (<span class="mono">-node</span>)</label></div>
+      </div>
+      <div class="row" style="margin-top:16px;justify-content:space-between">
+        <span class="muted" id="pm-count">0 selected</span>
+        <span>
+          <button class="btn subtle" id="pm-cancel">Cancel</button>
+          <button class="btn" id="pm-apply">Grant selected</button>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .pm-source { padding: 8px 12px 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted, #888); position: sticky; top: 0; background: var(--surface, inherit); }
+  .pm-row { display: flex; align-items: center; gap: 10px; padding: 6px 12px; cursor: pointer; border-radius: 6px; }
+  .pm-row:hover { background: var(--surface-2); }
+  .pm-row.granted { opacity: .55; cursor: default; }
+  .pm-row .mono { flex: 1; }
+</style>
 
 <script>
 "use strict";
@@ -48,14 +79,78 @@ async function loadCatalog() {
   try {
     const res = await Helix.action("perm.catalog");
     catalog = JSON.parse(res.lines[0] || "[]");
-    document.getElementById("perm-catalog").innerHTML =
-      catalog.map(e => `<option value="${esc(e.node)}">${esc(e.source)}</option>`).join("");
   } catch (e) { catalog = []; }
 }
 
+/* permission picker modal */
+const permModal = document.getElementById("perm-modal");
+let pmSelected = new Set();
+let pmExisting = new Set();
+let pmOnPick = null;
+
+function openPermModal(title, existing, onPick) {
+  pmSelected = new Set();
+  pmExisting = new Set((existing || []).map(p => p.replace(/^-/, "")));
+  pmOnPick = onPick;
+  document.getElementById("pm-title").textContent = title;
+  document.getElementById("pm-search").value = "";
+  document.getElementById("pm-custom").value = "";
+  document.getElementById("pm-negate").checked = false;
+  renderPermList("");
+  permModal.classList.remove("hidden");
+  document.getElementById("pm-search").focus();
+}
+
+function renderPermList(filter) {
+  const box = document.getElementById("pm-list");
+  const needle = filter.trim().toLowerCase();
+  const visible = catalog.filter(e => !needle || e.node.toLowerCase().includes(needle) || e.source.toLowerCase().includes(needle));
+  if (!visible.length) { box.innerHTML = '<div class="empty">No matching nodes — use the custom field below</div>'; updatePmCount(); return; }
+  const bySource = new Map();
+  visible.forEach(e => { if (!bySource.has(e.source)) bySource.set(e.source, []); bySource.get(e.source).push(e.node); });
+  box.innerHTML = [...bySource.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([source, nodes]) =>
+    `<div class="pm-source">${esc(source)}</div>` + nodes.sort().map(node => {
+      const granted = pmExisting.has(node);
+      const checked = pmSelected.has(node);
+      return `<label class="pm-row${granted ? " granted" : ""}">
+        <input type="checkbox" data-node="${esc(node)}" ${granted ? "disabled checked" : checked ? "checked" : ""}>
+        <span class="mono">${esc(node)}</span>${granted ? '<span class="tag">granted</span>' : ""}
+      </label>`;
+    }).join("")).join("");
+  box.querySelectorAll("input[data-node]:not([disabled])").forEach(cb => cb.onchange = () => {
+    cb.checked ? pmSelected.add(cb.dataset.node) : pmSelected.delete(cb.dataset.node);
+    updatePmCount();
+  });
+  updatePmCount();
+}
+
+function updatePmCount() {
+  const custom = document.getElementById("pm-custom").value.trim();
+  const total = pmSelected.size + (custom ? 1 : 0);
+  document.getElementById("pm-count").textContent = `${total} selected`;
+  document.getElementById("pm-apply").disabled = total === 0;
+}
+
+document.getElementById("pm-search").oninput = e => renderPermList(e.target.value);
+document.getElementById("pm-custom").oninput = updatePmCount;
+document.getElementById("pm-cancel").onclick = () => permModal.classList.add("hidden");
+permModal.onclick = e => { if (e.target === permModal) permModal.classList.add("hidden"); };
+document.getElementById("pm-apply").onclick = async () => {
+  const nodes = [...pmSelected];
+  const custom = document.getElementById("pm-custom").value.trim();
+  if (custom && !nodes.includes(custom)) nodes.push(custom);
+  if (!nodes.length || !pmOnPick) return;
+  const negate = document.getElementById("pm-negate").checked;
+  permModal.classList.add("hidden");
+  await pmOnPick(nodes.map(n => negate && !n.startsWith("-") ? "-" + n : n));
+};
+
 async function load() {
+  const open = new Set((doc.groups || []).filter(g => g._open).map(g => g.name));
   const res = await Helix.action("perm.export");
   try { doc = JSON.parse(res.lines[0] || "{}"); } catch (e) { doc = { groups: [], users: [] }; }
+  // keep group editors open across reloads (granting from the modal reloads the document)
+  (doc.groups || []).forEach(g => { if (open.has(g.name)) g._open = true; });
   renderGroups();
   renderUsers();
 }
@@ -82,8 +177,8 @@ function renderGroups() {
 function groupEditor(g) {
   return `<tr><td colspan="6" style="background:var(--surface-2)"><div class="card-body">
     <div class="grid c2">
-      <div class="field"><label>Add permission node (pick from catalog or type any, -node negates, * wildcards)</label>
-        <div class="row"><input id="perm-in-${esc(g.name)}" list="perm-catalog" placeholder="helix.command.fly" style="max-width:320px"><button class="btn sm" data-grant="${esc(g.name)}">Grant</button></div></div>
+      <div class="field"><label>Permissions</label>
+        <div class="row"><button class="btn sm" data-grant="${esc(g.name)}">＋ Add permissions</button></div></div>
       <div class="field"><label>Add parent group</label>
         <div class="row"><select id="parent-in-${esc(g.name)}" style="max-width:220px">${doc.groups.filter(x=>x.name!==g.name).map(x=>`<option>${esc(x.name)}</option>`).join("")}</select><button class="btn sm subtle" data-addparent="${esc(g.name)}">Add</button></div></div>
     </div>
@@ -94,7 +189,14 @@ function groupEditor(g) {
 
 function bindEditors() {
   const box = document.getElementById("groups");
-  box.querySelectorAll("[data-grant]").forEach(b => b.onclick = async () => { const v = document.getElementById("perm-in-"+b.dataset.grant).value.trim(); if(!v) return; await Helix.action("perm.group.grant", b.dataset.grant, v); load(); });
+  box.querySelectorAll("[data-grant]").forEach(b => b.onclick = () => {
+    const group = doc.groups.find(x => x.name === b.dataset.grant);
+    openPermModal(`Grant to group ${b.dataset.grant}`, group?.permissions || [], async nodes => {
+      for (const node of nodes) await Helix.action("perm.group.grant", b.dataset.grant, node);
+      Helix.toast(`Granted ${nodes.length} node${nodes.length === 1 ? "" : "s"} to ${b.dataset.grant}`);
+      load();
+    });
+  });
   box.querySelectorAll("[data-revoke]").forEach(b => b.onclick = async () => { const [g,p]=b.dataset.revoke.split("|"); await Helix.action("perm.group.revoke", g, p); load(); });
   box.querySelectorAll("[data-addparent]").forEach(b => b.onclick = async () => { const v = document.getElementById("parent-in-"+b.dataset.addparent).value; if(!v) return; await Helix.action("perm.group.addparent", b.dataset.addparent, v); load(); });
   box.querySelectorAll("[data-rmparent]").forEach(b => b.onclick = async () => { const [g,p]=b.dataset.rmparent.split("|"); await Helix.action("perm.group.removeparent", g, p); load(); });
@@ -159,12 +261,11 @@ async function loadUser() {
           <select id="ug-add" style="max-width:180px">${doc.groups.map(g=>`<option>${esc(g.name)}</option>`).join("")}</select>
           <input id="ug-dur" placeholder="duration (7d, empty = ∞)" style="max-width:160px">
           <button class="btn sm" id="ug-btn">Add to group</button></div></div>
-      <div class="field"><label>Personal permissions (pick from catalog or type any)</label>
+      <div class="field"><label>Personal permissions</label>
         <div>${(u.permissions||[]).map(p=>`<span class="chip">${esc(p)}<button data-up="${esc(p)}">×</button></span>`).join("") || '<span class="muted">none</span>'}${timedPerms}</div>
         <div class="row" style="margin-top:8px">
-          <input id="up-in" list="perm-catalog" placeholder="node or -node" style="max-width:240px">
           <input id="up-dur" placeholder="duration (30m, empty = ∞)" style="max-width:160px">
-          <button class="btn sm" id="up-btn">Grant</button></div></div>
+          <button class="btn sm" id="up-btn">＋ Grant permissions</button></div></div>
     </div></div></div>`;
   const uname = u.name;
   document.getElementById("ug-btn").onclick = async () => {
@@ -174,12 +275,16 @@ async function loadUser() {
     if (!r.success) return Helix.toast(r.lines[0] || "failed");
     document.getElementById("user-name").value = uname; loadUser();
   };
-  document.getElementById("up-btn").onclick = async () => {
-    const v = document.getElementById("up-in").value.trim(); if(!v) return;
+  document.getElementById("up-btn").onclick = () => {
     const dur = document.getElementById("up-dur").value.trim();
-    const r = await Helix.action("perm.user.grant", ...[uname, v].concat(dur ? [dur] : []));
-    if (!r.success) return Helix.toast(r.lines[0] || "failed");
-    document.getElementById("user-name").value = uname; loadUser();
+    const existing = (u.permissions || []).concat((u.timedPermissions || []).map(t => t.value));
+    openPermModal(`Grant to ${uname}${dur ? ` for ${dur}` : ""}`, existing, async nodes => {
+      for (const node of nodes) {
+        const r = await Helix.action("perm.user.grant", ...[uname, node].concat(dur ? [dur] : []));
+        if (!r.success) Helix.toast(r.lines[0] || "failed");
+      }
+      document.getElementById("user-name").value = uname; loadUser();
+    });
   };
   document.querySelectorAll("[data-ug]").forEach(b => b.onclick = async () => { await Helix.action("perm.user.removegroup", uname, b.dataset.ug); document.getElementById("user-name").value = uname; loadUser(); });
   document.querySelectorAll("[data-up]").forEach(b => b.onclick = async () => { await Helix.action("perm.user.revoke", uname, b.dataset.up); document.getElementById("user-name").value = uname; loadUser(); });
