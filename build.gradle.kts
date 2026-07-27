@@ -9,7 +9,7 @@ plugins {
 
 allprojects {
     group = "org.helix"
-    version = "0.51.0"
+    version = "0.52.0"
 
     repositories {
         mavenCentral()
@@ -81,6 +81,7 @@ val addonModules = listOf(
     "helix-addon-discord",
     "helix-addon-motd",
     "helix-addon-npc",
+    "helix-addon-nick",
 )
 
 tasks.register("releaseBundle") {

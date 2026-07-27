@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.52.0 — 2026-07-27
+
+### Display-Namen: Prefix + Name + Suffix — überall
+- **Neues Display-Name-Modell im Helix-User:** Der angezeigte Name setzt
+  sich aus `prefix + color + name + suffix` zusammen. Konvention: Prefix
+  gehört den Gruppen (Chat-Prefix-Regeln), Name ist der veränderbare Nick,
+  Suffix gehört den Clans. `DisplayProfile` hat dafür die neue
+  `name`-Komponente plus `displayName()`-Komposition.
+- **Node merged Resolver komponentenweise** statt „erster Treffer
+  gewinnt": Vorher verdrängten sich Chat-Prefix und Clan-Tag gegenseitig —
+  deshalb fehlte der Clan-Tag im Chat. Jetzt komponieren Chat- (Prefix),
+  Nick- (Name) und Clan-Addon (Suffix) einen gemeinsamen Display-Namen.
+- **Neues Nick-Addon** (`helix.nick`): `/nick <name>` setzt den
+  Anzeigenamen, `/nick off` stellt den echten Namen wieder her. Nicks
+  persistieren, sind 3–16 Zeichen (Buchstaben/Ziffern/Unterstrich) und
+  können keine Account-Namen online befindlicher Spieler oder fremde
+  aktive Nicks imitieren. Admin-Actions: `nick.list`, `nick.clear`.
+  Nachrichten de/en.
+- **Nametag über dem Kopf zeigt jetzt Prefix + Suffix:** Die
+  Display-Teams lagen nur auf dem Main-Scoreboard — sobald das
+  Scoreboard-Addon jedem Spieler seine private Sidebar gab, sah niemand
+  mehr die Teams (Nametags rendern aus dem Scoreboard des *Betrachters*).
+  Die Bridge pflegt die Teams jetzt auf dem Main-Board und allen privaten
+  Boards und seedet sie beim Anlegen neuer Boards.
+- **Clan-Tag als Suffix** (`Name [TAG]` statt `[TAG] Name`), Chat-Format
+  rendert `{suffix}` (bestehende Konfigurationen werden automatisch
+  migriert), Tablist-Name und Paper-`displayName` nutzen den komponierten
+  Namen, Sidebar-Platzhalter `{displayname}` zeigt ihn ebenfalls; neu:
+  `{nick}`.
+- Hinweis: Der Nick ersetzt den Namen in Chat, Tablist und
+  Death-/Join-Messages. Der Name *im* Nametag über dem Kopf bleibt
+  technisch der Account-Name (Prefix/Suffix/Farbe drumherum kommen an) —
+  echtes Nametag-Spoofing braucht Paket-Rewriting und ist als Folgeschritt
+  vorgesehen.
+
 ## 0.51.0 — 2026-07-27
 
 ### IGuard: False-Positive-Großputz (Recipe `shadow-v3`)

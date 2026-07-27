@@ -11,6 +11,6 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class ChatConfig(
-    val format: String = "{prefix}{color}{name} &8» &f{message}",
+    val format: String = "{prefix}{color}{name}{suffix} &8» &f{message}",
     val rules: List<PrefixRule> = emptyList(),
 )

@@ -92,8 +92,15 @@ class PrettyChatAddon : AddonBase() {
         )
     }
 
-    private fun load(): ChatConfig =
-        context.storage().read("chat")?.let { json.decodeFromString(it) } ?: ChatConfig()
+    private fun load(): ChatConfig {
+        val stored = context.storage().read("chat")?.let { json.decodeFromString<ChatConfig>(it) } ?: ChatConfig()
+        // Migration: configs persisted before the display-name split lack {suffix} (the clan tag
+        // renders there); without it the suffix component would silently never show in chat.
+        if ("{suffix}" in stored.format || "{name}" !in stored.format) return stored
+        return stored.copy(format = stored.format.replace("{name}", "{name}{suffix}")).also { migrated ->
+            context.storage().write("chat", json.encodeToString(migrated))
+        }
+    }
 
     private fun save() {
         context.storage().write("chat", json.encodeToString(config))

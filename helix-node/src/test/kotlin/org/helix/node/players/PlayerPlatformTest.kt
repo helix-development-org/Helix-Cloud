@@ -90,12 +90,18 @@ class PlayerPlatformTest {
     }
 
     @Test
-    fun `display registry returns first non-null profile and bridge values track owners`() {
+    fun `display registry merges profile components and bridge values track owners`() {
         val displays = DisplayResolverRegistry()
         displays.register("a") { null }
-        displays.register("b") { name -> if (name == "steve") DisplayProfile(prefix = "&cAdmin ") else null }
+        displays.register("chat") { name -> if (name == "steve") DisplayProfile(prefix = "&cAdmin ") else null }
+        displays.register("nick") { name -> if (name == "steve") DisplayProfile(name = "Herobrine") else null }
+        displays.register("clan") { name -> if (name == "steve") DisplayProfile(suffix = " [STV]", prefix = "ignored") else null }
 
-        assertEquals("&cAdmin ", displays.resolve("steve").prefix)
+        val merged = displays.resolve("steve")
+        assertEquals("&cAdmin ", merged.prefix, "first non-empty prefix wins")
+        assertEquals("Herobrine", merged.name)
+        assertEquals(" [STV]", merged.suffix)
+        assertEquals("&cAdmin Herobrine [STV]", merged.displayName("steve"))
         assertEquals(DisplayProfile(), displays.resolve("alex"))
 
         val values = BridgeValueStore()

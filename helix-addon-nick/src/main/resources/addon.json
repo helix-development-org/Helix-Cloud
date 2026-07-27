@@ -1,0 +1,11 @@
+{
+  "id": "helix.nick",
+  "name": "Nick",
+  "version": "1.0.0",
+  "main": "org.helix.addons.nick.NickAddon",
+  "description": "Lets players change their display name (/nick); the nick replaces the name component in chat, tab list and name tag.",
+  "permissions": [
+    "helix.nick",
+    "helix.nick.admin"
+  ]
+}

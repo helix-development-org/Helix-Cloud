@@ -14,10 +14,10 @@ import org.helix.api.message.Messages
  *
  * Provides the in-game `/clan` command (create, info, invite flow, roles,
  * kick/promote/demote, ownership transfer, tag change, shared bank and a
- * clan list), a `[TAG]` chat/tab prefix via a display resolver, and admin
- * actions for a future dashboard panel. The shared bank moves real coins
- * through the economy addon so its counter never drifts from the players'
- * balances.
+ * clan list), a `[TAG]` display-name suffix via a display resolver (shown
+ * in chat, tab and the name tag), and admin actions for a future dashboard
+ * panel. The shared bank moves real coins through the economy addon so its
+ * counter never drifts from the players' balances.
  */
 class ClanAddon : AddonBase() {
     private val json = Json { prettyPrint = true }
@@ -34,8 +34,10 @@ class ClanAddon : AddonBase() {
     override fun enable() {
         store = ClanStore(context.storage())
         msg = context.localizedMessages(messages())
+        // The clan tag is the SUFFIX component of the display name (the prefix belongs to
+        // permission groups, the name to the nick addon); the node merges the components.
         context.registerDisplayResolver { name ->
-            store.clanOf(name)?.let { DisplayProfile(prefix = "&8[&b${it.tag}&8] ") }
+            store.clanOf(name)?.let { DisplayProfile(suffix = " &8[&b${it.tag}&8]") }
         }
         // Expose each player's clan tag as a bridge value for the sidebar {clan}
         // placeholder; refreshed on join and after every clan command.

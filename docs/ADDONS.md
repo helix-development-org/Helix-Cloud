@@ -102,8 +102,12 @@ context.registerPermissionResolver { request ->
   Join/Leave an die Node).
 - `context.registerPlayerListener(listener)` — netzwerkweite
   Join/Leave-Events empfangen.
-- `context.registerDisplayResolver { name -> ... }` — Prefix/Farbe eines
-  Spielers für Chat und Tablist liefern (erster Nicht-null-Treffer gewinnt).
+- `context.registerDisplayResolver { name -> ... }` — eine Komponente des
+  Display-Namens (`prefix + color + name + suffix`) liefern. Die Node
+  merged alle Resolver komponentenweise (erster nicht-leerer Wert pro
+  Komponente gewinnt); Konvention: Prefix = Gruppen (Chat-Addon), Name =
+  Nick (Nick-Addon), Suffix = Clan-Tag (Clan-Addon). Das Ergebnis rendert
+  die Paper-Bridge in Chat, Tablist und Nametag.
 - `context.publishBridgeValue(key, value)` — globale Werte publizieren,
   die die Bridges pollen (`tablist.header`, `tablist.footer`,
   `chat.format`).

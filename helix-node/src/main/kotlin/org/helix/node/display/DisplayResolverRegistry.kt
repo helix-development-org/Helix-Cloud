@@ -9,8 +9,12 @@ import org.slf4j.LoggerFactory
 /**
  * Aggregates all display resolvers registered by addons.
  *
- * The first resolver returning a profile wins; a resolver that throws is
- * skipped. Without any resolver every player gets the empty profile.
+ * Profiles are merged per component: the first resolver providing a
+ * non-empty prefix supplies the prefix, likewise for name (nick), suffix
+ * and color. This lets independent addons compose one display name — by
+ * convention groups own the prefix, a nick addon owns the name and clans
+ * own the suffix. A resolver that throws is skipped. Without any resolver
+ * every player gets the empty profile.
  */
 class DisplayResolverRegistry {
     private val logger = LoggerFactory.getLogger(DisplayResolverRegistry::class.java)
@@ -36,20 +40,25 @@ class DisplayResolverRegistry {
     }
 
     /**
-     * Resolves a player's display profile.
+     * Resolves a player's display profile by merging all resolver results.
      *
      * @param name player name.
-     * @return the first non-null resolver result, or the empty profile.
+     * @return the merged profile (first non-empty value per component), or
+     *   the empty profile.
      */
     fun resolve(name: String): DisplayProfile {
+        var merged = DisplayProfile()
         resolvers.values.flatten().forEach { resolver ->
             val profile = runCatching { resolver.resolve(name) }
                 .onFailure { logger.error("display resolver failed for {}", name, it) }
-                .getOrNull()
-            if (profile != null) {
-                return profile
-            }
+                .getOrNull() ?: return@forEach
+            merged = DisplayProfile(
+                prefix = merged.prefix.ifEmpty { profile.prefix },
+                name = merged.name.ifEmpty { profile.name },
+                suffix = merged.suffix.ifEmpty { profile.suffix },
+                color = merged.color.ifEmpty { profile.color },
+            )
         }
-        return DisplayProfile()
+        return merged
     }
 }

@@ -139,7 +139,7 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
                         .replace("{prefix}", profile.prefix)
                         .replace("{suffix}", profile.suffix)
                         .replace("{color}", profile.color)
-                        .replace("{name}", source.name)
+                        .replace("{name}", profile.nameOr(source.name))
                         // players must not inject MiniMessage tags (e.g. click events)
                         .replace("{message}", miniMessage.escapeTags(plainMessage)),
                 )
@@ -290,7 +290,9 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         board: ScoreboardData,
         manager: org.bukkit.scoreboard.ScoreboardManager,
     ) {
-        val scoreboard = playerBoards.getOrPut(player.name) { manager.newScoreboard }
+        // A fresh private board must carry the display teams of everyone online, otherwise this
+        // viewer would see plain name tags (teams render from the viewer's scoreboard).
+        val scoreboard = playerBoards.getOrPut(player.name) { manager.newScoreboard.also(::seedDisplayTeams) }
         val objective = scoreboard.getObjective(OBJECTIVE_NAME)
             ?: scoreboard.registerNewObjective(OBJECTIVE_NAME, Criteria.DUMMY, Component.empty()).also {
                 it.displaySlot = DisplaySlot.SIDEBAR
@@ -341,9 +343,11 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     private fun placeholders(text: String, player: Player): String {
         val location = player.location
         val now = LocalTime.now()
+        val profile = displayProfiles[player.name.lowercase()] ?: DisplayProfile()
         return text
             .replace("{player}", player.name)
-            .replace("{displayname}", PlainTextComponentSerializer.plainText().serialize(player.displayName()))
+            .replace("{displayname}", profile.displayName(player.name))
+            .replace("{nick}", profile.nameOr(player.name))
             .replace("{online}", (bridgeValues["network.online"]?.toIntOrNull() ?: server.onlinePlayers.size).toString())
             .replace("{max}", server.maxPlayers.toString())
             .replace("{server}", settings?.serviceId ?: "")
@@ -384,31 +388,65 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     }
 
     /**
-     * Applies a display profile to the player's tab-list entry and the name
-     * shown above their head (via a per-player scoreboard team). Must run on
+     * Applies a display profile to the player's tab-list entry, display name
+     * and the name shown above their head. Name tags render from the VIEWER's
+     * scoreboard, and the sidebar gives every player a private board — so the
+     * display team must exist on the main board AND every private board, not
+     * just on one of them (that was why name tags stayed plain). Must run on
      * the main server thread.
      *
      * @param player the online player.
-     * @param profile the resolved prefix/suffix/color.
+     * @param profile the resolved prefix/nick/suffix/color.
      */
     private fun applyDisplay(player: Player, profile: DisplayProfile) {
-        val scoreboard = server.scoreboardManager?.mainScoreboard ?: return
-        val teamName = "hlx" + Integer.toHexString(player.name.lowercase().hashCode())
-        val hasContent = profile.prefix.isNotEmpty() || profile.suffix.isNotEmpty() || profile.color.isNotEmpty()
-        if (!hasContent) {
-            scoreboard.getTeam(teamName)?.takeIf { it.hasEntry(player.name) }?.removeEntry(player.name)
+        val main = server.scoreboardManager?.mainScoreboard ?: return
+        val boards = listOf(main) + playerBoards.values
+        if (profile.isPlain()) {
+            val teamName = displayTeamName(player.name)
+            boards.forEach { board ->
+                board.getTeam(teamName)?.takeIf { it.hasEntry(player.name) }?.removeEntry(player.name)
+            }
             player.playerListName(null)
+            player.displayName(null)
             return
         }
-        val team = scoreboard.getTeam(teamName) ?: scoreboard.registerNewTeam(teamName)
+        boards.forEach { board -> applyDisplayTeam(board, player.name, profile) }
+        val composed = colored(profile.displayName(player.name))
+        player.playerListName(composed)
+        player.displayName(composed)
+    }
+
+    /**
+     * Creates or updates the player's display team (name-tag prefix/suffix/
+     * color) on one scoreboard.
+     *
+     * @param board the scoreboard to hold the team.
+     * @param playerName the player the team entry belongs to.
+     * @param profile the resolved display profile.
+     */
+    private fun applyDisplayTeam(board: Scoreboard, playerName: String, profile: DisplayProfile) {
+        val teamName = displayTeamName(playerName)
+        val team = board.getTeam(teamName) ?: board.registerNewTeam(teamName)
         team.prefix(colored(profile.prefix))
         team.suffix(colored(profile.suffix))
         namedColor(profile.color)?.let { team.color(it) }
-        if (!team.hasEntry(player.name)) {
-            team.addEntry(player.name)
+        if (!team.hasEntry(playerName)) {
+            team.addEntry(playerName)
         }
-        player.playerListName(colored("${profile.prefix}${profile.color}${player.name}${profile.suffix}"))
     }
+
+    /** Seeds all known display teams onto a freshly created private board. */
+    private fun seedDisplayTeams(board: Scoreboard) {
+        displayProfiles.forEach { (lowerName, profile) ->
+            if (!profile.isPlain()) {
+                server.getPlayerExact(lowerName)?.let { applyDisplayTeam(board, it.name, profile) }
+            }
+        }
+    }
+
+    /** Stable scoreboard-safe team name for a player (16 char limit). */
+    private fun displayTeamName(playerName: String) =
+        "hlx" + Integer.toHexString(playerName.lowercase().hashCode())
 
     /**
      * Maps a legacy `&`-color code to a named colour for scoreboard teams.

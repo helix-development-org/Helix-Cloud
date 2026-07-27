@@ -37,5 +37,6 @@ include(
     "helix-addon-discord",
     "helix-addon-motd",
     "helix-addon-npc",
-    "helix-addon-npc-paper"
+    "helix-addon-npc-paper",
+    "helix-addon-nick"
 )

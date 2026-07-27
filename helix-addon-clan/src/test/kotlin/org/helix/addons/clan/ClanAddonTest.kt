@@ -147,11 +147,11 @@ class ClanAddonTest {
     }
 
     @Test
-    fun `display resolver returns tag prefix for members and null otherwise`() {
+    fun `display resolver returns the tag for members and null otherwise`() {
         createClan()
         val resolver = context.displayResolvers.single()
 
-        assertEquals("&8[&bSTV&8] ", resolver.resolve("Steve")?.prefix)
+        assertEquals(" &8[&bSTV&8]", resolver.resolve("Steve")?.suffix)
         assertNull(resolver.resolve("Nobody"))
     }
 }

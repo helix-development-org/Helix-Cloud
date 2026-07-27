@@ -22,6 +22,23 @@ class PrettyChatAddonTest {
     }
 
     @Test
+    fun `default format renders the suffix component`() {
+        assertTrue(context.bridgeValues["chat.format"]!!.contains("{suffix}"), "clan tags render via {suffix}")
+    }
+
+    @Test
+    fun `legacy formats without suffix are migrated on enable`() {
+        val storage = org.helix.api.storage.InMemoryAddonStorage()
+        storage.write("chat", """{"format":"{prefix}{color}{name} &8» &f{message}","rules":[]}""")
+        val migratedContext = RecordingAddonContext(createTempDirectory("chat-migrate"), storage)
+        PrettyChatAddon().onEnable(migratedContext)
+
+        assertTrue(migratedContext.bridgeValues["chat.format"]!!.contains("{name}{suffix}"))
+        val persisted = kotlinx.serialization.json.Json.decodeFromString<ChatConfig>(storage.read("chat")!!)
+        assertTrue(persisted.format.contains("{suffix}"), "migration is persisted")
+    }
+
+    @Test
     fun `prefix rules resolve through permissions in order`() {
         context.run("chat.prefix.add", "chat.rank.admin", "&c", "&cAdmin")
         context.run("chat.prefix.add", "chat.rank.vip", "&6", "&6VIP")
