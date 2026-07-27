@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.55.2 — 2026-07-27
+
+### Nick: Pre-Login-Prewarm + klarere Logs
+- Nick-Prewarm hängt jetzt am `AsyncPlayerPreLoginEvent` statt am
+  `PlayerLoginEvent` — behebt Papers
+  „HorriblePlayerLoginEventHack"-Warnung (Reconfiguration-API blieb
+  sonst serverweit deaktiviert).
+- Der Rescope-Log sagt bei 0 Zuschauern jetzt explizit, dass der
+  Nick-Nametag nur betrifft, was *andere* Spieler sehen — der eigene
+  Nametag (z. B. via LabyMod-Anzeige) behält absichtlich den echten
+  Namen.
+
 ## 0.55.1 — 2026-07-27
 
 ### Nick: Nametag-Rewrite robuster + diagnostizierbar

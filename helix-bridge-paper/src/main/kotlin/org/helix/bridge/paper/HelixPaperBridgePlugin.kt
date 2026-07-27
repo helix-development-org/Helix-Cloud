@@ -135,15 +135,17 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     /**
      * Pre-warms the nick mapping before the join broadcasts go out, so the
      * very first PLAYER_INFO other players receive already carries the
-     * assumed name (no real-name flash).
+     * assumed name (no real-name flash). Uses the async pre-login event —
+     * listening to PlayerLoginEvent would disable Paper's reconfiguration
+     * API for the whole server.
      *
-     * @param event the login event.
+     * @param event the async pre-login event.
      */
     @EventHandler
-    fun onLogin(event: org.bukkit.event.player.PlayerLoginEvent) {
-        val nick = bridgeValues["nick.name.${event.player.name.lowercase()}"].orEmpty()
+    fun onPreLogin(event: org.bukkit.event.player.AsyncPlayerPreLoginEvent) {
+        val nick = bridgeValues["nick.name.${event.name.lowercase()}"].orEmpty()
         if (nick.isNotEmpty()) {
-            nickNames[event.player.uniqueId] = nick
+            nickNames[event.uniqueId] = nick
         }
     }
 
@@ -571,8 +573,13 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
                 val target = server.getPlayerExact(player.name) ?: return@Runnable
                 viewers.forEach { viewer -> if (viewer.isOnline) viewer.showPlayer(this, target) }
                 logger.info(
-                    "Nick display for ${player.name} re-sent to ${viewers.size} viewers " +
-                        "(profile rewrites so far: ${listener.rewrites.get()})",
+                    if (viewers.isEmpty()) {
+                        "Nick display for ${player.name}: no other players online — the nick name tag " +
+                            "only affects what OTHER players see (the own tag, e.g. via LabyMod, keeps the real name)"
+                    } else {
+                        "Nick display for ${player.name} re-sent to ${viewers.size} viewers " +
+                            "(profile rewrites so far: ${listener.rewrites.get()})"
+                    },
                 )
             },
             2L,
