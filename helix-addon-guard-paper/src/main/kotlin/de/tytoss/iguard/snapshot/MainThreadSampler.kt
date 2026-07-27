@@ -20,6 +20,8 @@ import org.bukkit.entity.Shulker
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
+import org.bukkit.event.block.BlockBreakEvent
+import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.player.PlayerChangedWorldEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.player.PlayerRespawnEvent
@@ -52,7 +54,9 @@ class MainThreadSampler(
         override fun removeEldestEntry(eldest: Map.Entry<String, List<Box>>) = size > 4096
     }
     // Per-player cache of the last scanned block neighborhood, so a player who stays within the same
-    // block reuses the expensive 36-block collision scan instead of re-running it every sample.
+    // block reuses the expensive collision scan instead of re-running it every sample. Invalidated
+    // by nearby block changes (see onBlockBreak/onBlockPlace) so a mined-through block does not
+    // linger as a stale collision box.
     private val lastScan = HashMap<UUID, CachedScan>()
     private var cursor = 0
     private var task: BukkitTask? = null
@@ -168,10 +172,13 @@ class MainThreadSampler(
 
     private fun localEnvironment(location: Location): LocalScan {
         val world = location.world
-        val result = ArrayList<Box>(32)
+        val result = ArrayList<Box>(48)
         var nearDynamic = false
-        for (x in location.blockX - 1..location.blockX + 1) {
-            for (z in location.blockZ - 1..location.blockZ + 1) {
+        // ±2 columns (not ±1): the scan is centred on the SAMPLED position, which lags the packet
+        // stream by 1-2 ticks — a sprint-jumping player outruns a ±1 scan, loses the block under his
+        // feet and reads as phantom-airborne (the root of fly/speed FPs on plain locomotion).
+        for (x in location.blockX - 2..location.blockX + 2) {
+            for (z in location.blockZ - 2..location.blockZ + 2) {
                 if (!world.isChunkLoaded(x shr 4, z shr 4)) {
                     nearDynamic = true
                     continue
@@ -240,6 +247,26 @@ class MainThreadSampler(
         val box = player.boundingBox
         val search = BoundingBox(box.minX - 0.6, box.minY - 1.0, box.minZ - 0.6, box.maxX + 0.6, box.maxY + 0.2, box.maxZ + 0.6)
         return player.world.getNearbyEntities(search) { it !== player && (it is Boat || it is Minecart || it is Shulker) }.isNotEmpty()
+    }
+
+    /** Invalidates cached scans near a broken block (its collision box must vanish immediately). */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onBlockBreak(event: BlockBreakEvent) = invalidateScansNear(event.block)
+
+    /** Invalidates cached scans near a placed block. */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onBlockPlace(event: BlockPlaceEvent) = invalidateScansNear(event.block)
+
+    // A player sprint-mining re-enters the space of a just-broken block before crossing a block
+    // boundary; without invalidation the cached scan kept the phantom box and phase/support checks
+    // judged against a world that no longer exists.
+    private fun invalidateScansNear(block: Block) {
+        val worldUid = block.world.uid
+        lastScan.entries.removeIf { (_, scan) ->
+            scan.worldUid == worldUid &&
+                kotlin.math.abs(scan.bx - block.x) <= 3 && kotlin.math.abs(scan.by - block.y) <= 3 &&
+                kotlin.math.abs(scan.bz - block.z) <= 3
+        }
     }
 
     /** Grants the teleport grace window. */

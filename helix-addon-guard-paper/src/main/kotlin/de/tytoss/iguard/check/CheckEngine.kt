@@ -81,6 +81,7 @@ internal class PlayerState {
     var lastAttackAt = 0L
     var noSwingStreak = 0
     var snapAimStreak = 0
+    var sprintBackStreak = 0
     var sprinting = false
     var sneaking = false
     var clientFlying = false
@@ -165,6 +166,7 @@ internal class PlayerState {
         verticalUncertainty = 0.0
         positionGapTicks = 0
         physicalSupporting = true
+        sprintBackStreak = 0
     }
 }
 
@@ -367,6 +369,14 @@ class CheckEngine(
             state.clientTick++
         }
         val stale = incoming.receivedAt - environment.capturedAt > exemptionConfig.snapshotMaxAgeMillis
+        // The environment's collision scan covers a ±2-column neighborhood around the SAMPLED
+        // position, which lags the packet stream by 1-2 ticks. A frame outside that neighborhood
+        // must be treated as "we could not check" — judging support against a scan that does not
+        // even contain the player's block manufactured phantom-airborne ticks and fly/speed flags
+        // on plain sprint-jumping.
+        val covered = abs(frame.position.x - environment.position.x) <= SCAN_COVERAGE_XZ &&
+            abs(frame.position.z - environment.position.z) <= SCAN_COVERAGE_XZ &&
+            frame.position.y - environment.position.y in -SCAN_COVERAGE_DOWN..SCAN_COVERAGE_UP
         val worldChanged = state.lastWorldId != null && state.lastWorldId != environment.worldId
         // "liquid" alone is not exempting (the jesus check runs there), but it must never cancel the
         // OTHER exempting tags: a boat ON water is still a vehicle, riptide IN water is still riptide —
@@ -374,15 +384,16 @@ class CheckEngine(
         val exemptEnvironment = environment.environmentTags.any { it != "liquid" && it !in TELEMETRY_ONLY_TAGS }
         // Grossly stale snapshot / unloaded chunk = "we could not check", not "clean". Skip is still
         // FP-safe, but we count it so metrics never mistake a load blind spot for a clean player.
-        if ((stale || !environment.chunkLoaded) && incoming.positionChanged) unevaluatedFrames.incrementAndGet()
+        if ((stale || !covered || !environment.chunkLoaded) && incoming.positionChanged) unevaluatedFrames.incrementAndGet()
         val laggy = environment.tps < exemptionConfig.lowTpsThreshold
         // Support-dependent checks (nofall/ground-spoof, fly-hover) rely on collision boxes sampled for
         // the player's position. Under budgeted sampling a moving player can outrun its last sample, so
         // supports() goes stale-false and would false-positive. Only trust support when the snapshot is
-        // fresh (sampled within ~1 tick); otherwise freeze airborne accounting instead of guessing.
-        val supportReliable = incoming.receivedAt - environment.capturedAt <= SUPPORT_FRESH_MILLIS
+        // fresh (sampled within ~1 tick) AND actually covers the frame's position; otherwise freeze
+        // airborne accounting instead of guessing.
+        val supportReliable = covered && incoming.receivedAt - environment.capturedAt <= SUPPORT_FRESH_MILLIS
         val exempt = exemptions.isExempt(incoming.playerId, incoming.receivedAt) || exemptEnvironment ||
-            stale || !environment.chunkLoaded || previous == null || worldChanged || state.bedrock == true
+            stale || !covered || !environment.chunkLoaded || previous == null || worldChanged || state.bedrock == true
         val safeCandidate = if (environment.supportingCollision && !environment.colliding) {
             SafePosition(environment.worldId, environment.position, environment.yaw, environment.pitch, environment.tick)
         } else null
@@ -413,14 +424,21 @@ class CheckEngine(
                 if (supportReliable && !evaluation.supporting && state.airTicks >= 4 && state.lastVerticalDelta < -0.02 && delta.y > 0.33) {
                     extra += CheckFailure("movement.airjump.a", 1.5, mapOf("dy" to delta.y.rounded(), "prevDy" to state.lastVerticalDelta.rounded(), "airTicks" to state.airTicks))
                 }
-                // Omni-sprint: sprinting while the movement vector points opposite the look direction; the
-                // vanilla client only sprints roughly forward.
+                // Omni-sprint: sprinting while the movement vector points opposite the look direction.
+                // Momentum in the AIR is direction-free (a 180° camera turn mid sprint-jump is normal
+                // play), so only grounded ticks count — and ground friction kills reverse momentum
+                // within ~2 ticks, so a streak of 3 grounded backwards ticks cannot be legit.
                 val horizontal = sqrt(delta.horizontalLengthSquared())
-                if (state.sprinting && horizontal > 0.15) {
+                var backwards = false
+                if (state.sprinting && horizontal > 0.15 && evaluation.supporting && supportReliable) {
                     val yawRad = Math.toRadians(frame.yaw.toDouble())
                     val dot = (delta.x * -sin(yawRad) + delta.z * cos(yawRad)) / horizontal
-                    if (dot < -0.4) extra += CheckFailure("movement.sprintbackwards.a", 1.0, mapOf("lookDot" to dot.rounded(), "horizontal" to horizontal.rounded()))
+                    backwards = dot < -0.4
+                    if (backwards && state.sprintBackStreak >= 2) {
+                        extra += CheckFailure("movement.sprintbackwards.a", 1.0, mapOf("lookDot" to dot.rounded(), "horizontal" to horizontal.rounded(), "streak" to state.sprintBackStreak + 1))
+                    }
                 }
+                state.sprintBackStreak = if (backwards) state.sprintBackStreak + 1 else 0
                 // Fast-ladder: climbing a ladder/vine faster than the vanilla climb speed (~0.118/tick up).
                 // Gated on the climbable environment tag, so legit ground movement can never trip it.
                 if ("climbable" in environment.environmentTags && delta.y > 0.235) {
@@ -497,7 +515,10 @@ class CheckEngine(
             }
             state.lastRotationYaw = frame.yaw
         }
-        state.physicalSupporting = physicalSupporting
+        // Only adopt the new support verdict when the sample can be trusted; otherwise keep the last
+        // reliable one so the per-tick airborne accounting (processClientTick) never counts phantom
+        // air ticks from a lagging scan.
+        if (supportReliable) state.physicalSupporting = physicalSupporting
         state.lastMovement = frame
         state.lastWorldId = environment.worldId
     }
@@ -593,7 +614,12 @@ class CheckEngine(
         state.explicitClientTicks = true
         state.clientTick++
         state.positionGapTicks = (state.positionGapTicks + 1).coerceAtMost(3)
-        if (environment != null) state.airTicks = if (state.physicalSupporting) 0 else state.airTicks + 1
+        // Freeze the airborne accounting on a stale support sample (same rule as the legacy-client
+        // path): counting phantom air ticks here made the NEXT normal jump miss the takeoff gate and
+        // fly-flag with a huge offset.
+        if (environment != null && frame.receivedAt - environment.capturedAt <= SUPPORT_FRESH_MILLIS) {
+            state.airTicks = if (state.physicalSupporting) 0 else state.airTicks + 1
+        }
         state.clientTickTimes.addLast(frame.receivedAt)
         while (state.clientTickTimes.firstOrNull()?.let { frame.receivedAt - it > 10_000 } == true) state.clientTickTimes.removeFirst()
         val first = state.clientTickTimes.firstOrNull()
@@ -990,6 +1016,13 @@ private const val PUBLISH_INTERVAL_MILLIS = 200L
 // Max age of a player's sampled environment for its collision/support data to be trusted by
 // support-dependent checks (~1 server tick). Beyond this the snapshot may lag a moving player.
 private const val SUPPORT_FRESH_MILLIS = 60L
+
+// How far a frame position may sit from the sampled environment position and still be covered by
+// its ±2-column collision scan (guaranteed scan reach is 2.0 blocks; minus the feet-box half-width).
+// Vertically the scan spans -1..+2 rows around the sampled block.
+private const val SCAN_COVERAGE_XZ = 1.7
+private const val SCAN_COVERAGE_DOWN = 0.9
+private const val SCAN_COVERAGE_UP = 1.9
 
 // Movement checks neutralised by a setback instead of a punishment: rewinding the player defeats the
 // cheat, so a false positive can never escalate to a ban.

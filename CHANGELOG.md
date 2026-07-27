@@ -3,6 +3,27 @@
 ## 0.51.0 — 2026-07-27
 
 ### IGuard: False-Positive-Großputz (Recipe `shadow-v3`)
+- **Normales Laufen/Springen/Sprint-Jumpen** flaggte über eine
+  Phantom-Airborne-Kette: Der Kollisions-Scan (±1 Block) ist um die
+  server-seitig *gesampelte* Position zentriert und hängt dem Paketstrom
+  1–2 Ticks hinterher — ein Sprinter überholt den Scan, der Block unter
+  ihm fehlt, `supports()` meldet „airborne", airTicks akkumulieren
+  (bei 1.21.2+-Clients ohne Frische-Guard), und der nächste *normale
+  Sprung* verfehlt das Takeoff-Gate → Fly/Speed-Flag mit großem Offset.
+  Fixes: Scan auf ±2 verbreitert, Coverage-Guard (Frame außerhalb des
+  Scans = „nicht prüfbar", nie Evidenz), airTicks-Frische-Guard auch für
+  Tick-End-Clients, und Takeoff/Sprint-Jump-Impuls akzeptieren das
+  Client-`onGround` als Fallback (Lügen fängt weiterhin Nofall).
+- **`baseline()` nullte den Horizontal-Predictor** während Exemptions —
+  der erste Frame nach Knockback (= jedem PvP-Treffer), Elytra-Landung
+  oder Teleport-Grace verglich echtes Momentum gegen ein
+  Stillstand-Budget. Seedet jetzt aus dem beobachteten Momentum.
+- **`sprintbackwards`** feuerte bei 180°-Drehungen im Sprungflug
+  (Momentum in der Luft ist richtungsfrei); zählt jetzt nur noch
+  Boden-Ticks und braucht eine Streak von 3.
+- **Scan-Cache-Invalidierung** bei Blockbruch/-platzierung in der Nähe:
+  beim Sprint-Minen führte die veraltete Kollisionsbox des gerade
+  abgebauten Blocks zu `phase`-FPs.
 - **Fahrzeuge & Wasser:** Der Liquid-Sonderfall hat bisher *alle* anderen
   Exemptions storniert (Boot auf Wasser, Riptide im Wasser) und der
   Nofall-Zweig hat Exemptions nach 10 Airticks überstimmt — jeder Reiter/

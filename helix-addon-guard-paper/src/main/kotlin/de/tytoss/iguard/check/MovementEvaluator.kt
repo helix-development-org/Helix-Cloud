@@ -156,9 +156,13 @@ internal class MovementEvaluator {
         )
     }
 
-    /** Seeds the motion model after a reset (first frame, teleport, respawn). */
+    /** Seeds the motion model from the observed frame (exempt frames, teleport, respawn). */
     fun baseline(delta: Vec3, environment: EnvironmentFrame, state: PlayerState) {
-        state.predictedHorizontal = 0.0
+        // Seed the horizontal predictor from the OBSERVED momentum: zeroing it (as before) made the
+        // first frame after an exemption — knockback (every PvP hit!), elytra landing, teleport
+        // grace — compare real, legitimate momentum against a stand-still budget and speed-flag it.
+        val friction = if (environment.supportingCollision) groundFriction(environment) else 0.91
+        state.predictedHorizontal = (sqrt(delta.horizontalLengthSquared()) * friction).coerceIn(0.0, 1.2)
         state.predictedVertical = if (environment.supportingCollision) 0.0 else verticalAfterTick(delta.y.coerceIn(-0.6, 0.6), environment)
     }
 
@@ -181,7 +185,11 @@ internal class MovementEvaluator {
     ): CheckFailure? {
         if (supporting) return null
         val jumpBoost = if (environment.jumpAmplifier >= 0) 0.1 * (environment.jumpAmplifier + 1) else 0.0
-        val takeoff = state.airTicks <= 1 && state.lastVerticalDelta <= 0.05 && delta.y > 0.0
+        // A jump is also accepted when the previous frame CLAIMED ground: phantom air ticks (support
+        // sample lagging a fast player) must not turn a normal jump into a huge fly offset. Lying
+        // about ground buys only a jump-sized ceiling and is flagged independently by nofall.
+        val claimedGround = state.lastMovement?.onGround == true
+        val takeoff = (state.airTicks <= 1 || claimedGround) && state.lastVerticalDelta <= 0.05 && delta.y > 0.0
         var vertical = if (takeoff) {
             max(environment.jumpStrength, profile.jumpVelocity) + jumpBoost
         } else {
@@ -278,7 +286,10 @@ internal class MovementEvaluator {
         } else {
             if (state.sprinting) 0.026 else 0.02
         }
-        val takingOff = !grounded && state.airTicks == 0 && state.sprinting
+        // Same phantom-air defense as the fly takeoff: a client-claimed ground frame also qualifies
+        // for the sprint-jump impulse, otherwise a normal re-jump after a lagging support sample
+        // speed-flags. Ground-claim abuse is caught by nofall, not here.
+        val takingOff = !grounded && state.sprinting && (state.airTicks == 0 || state.lastMovement?.onGround == true)
         var velocity = if (takingOff) {
             max(state.predictedHorizontal, state.lastHorizontalDelta)
         } else {

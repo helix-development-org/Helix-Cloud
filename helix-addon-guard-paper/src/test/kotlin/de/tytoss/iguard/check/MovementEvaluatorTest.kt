@@ -259,6 +259,51 @@ class MovementEvaluatorTest {
     }
 
     @Test
+    fun `claimed ground takeoff after phantom air ticks does not trigger fly`() {
+        // A lagging support sample can accumulate phantom air ticks while the player runs on solid
+        // ground; the next normal jump must still be recognised as a takeoff via the client's
+        // onGround claim instead of fly-flagging a 0.42 offset.
+        val state = PlayerState().apply {
+            airTicks = 5
+            lastVerticalDelta = 0.0
+            lastMovement = movement(Vec3(0.0, 0.0, 0.0), onGround = true)
+            positionGapTicks = 1
+        }
+        val air = ground().copy(supportingCollision = false, collisionBoxes = emptyList(), surface = "AIR")
+        val evaluation = evaluator.evaluate(movement(Vec3(0.0, 0.42, 0.0), false), Vec3(0.0, 0.42, 0.0), air, profile, state)
+
+        assertFalse(evaluation.failed("movement.fly.a"))
+    }
+
+    @Test
+    fun `claimed ground sprint rejump after phantom air ticks does not trigger speed`() {
+        val state = PlayerState().apply {
+            sprinting = true
+            airTicks = 3
+            predictedHorizontal = 0.153
+            lastHorizontalDelta = 0.41
+            lastMovement = movement(Vec3(0.0, 0.0, 0.0), onGround = true)
+            positionGapTicks = 1
+        }
+        val air = ground().copy(supportingCollision = false, collisionBoxes = emptyList(), surface = "AIR")
+        val delta = Vec3(0.0, 0.42, 0.6)
+        val evaluation = evaluator.evaluate(movement(delta, onGround = false), delta, air, profile, state)
+
+        assertFalse(evaluation.failed("movement.speed.a"))
+    }
+
+    @Test
+    fun `baseline seeds the horizontal predictor from observed momentum`() {
+        // Post-exemption transitions (knockback, elytra landing) carry real momentum; a zeroed
+        // predictor would speed-flag the first evaluated frame.
+        val state = PlayerState()
+        val air = ground().copy(supportingCollision = false, collisionBoxes = emptyList(), surface = "AIR")
+        evaluator.baseline(Vec3(0.9, -0.2, 0.0), air, state)
+
+        assertTrue(state.predictedHorizontal > 0.7)
+    }
+
+    @Test
     fun `a sliver of feet box overlap still counts as support`() {
         // Ground platform ends at x=2.0; player centre at 2.28 leaves ~0.019 overlap — vanilla keeps
         // this player grounded, so supports() must too (edge-standing hover/nofall FP regression).
