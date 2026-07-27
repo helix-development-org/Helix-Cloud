@@ -33,7 +33,7 @@ Dashboard: `http://127.0.0.1:8080/` — Token: `dev-token-change-me`
 ## Server-Installation (Linux)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Tytoss/Helix-Cloud/main/tools/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/helix-development-org/Helix-Cloud/main/tools/install.sh | sudo bash
 ```
 
 Installiert nach `/opt/helix`: Launcher.jar (Release-Asset oder
@@ -74,7 +74,7 @@ helix> service.list
 ## Lizenz & Urheberschaft
 
 Helix-Cloud ist Open Source unter der **Apache License 2.0** — siehe
-[LICENSE](LICENSE). Copyright © 2026 **Tytoss**.
+[LICENSE](LICENSE). Copyright © 2026 **Helix-Development**.
 
 Das bedeutet: Nutzung, Änderung und Weitergabe sind erlaubt, aber die
 [NOTICE](NOTICE)-Datei und der Copyright-Hinweis **müssen erhalten bleiben**,
