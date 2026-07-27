@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.51.0 — 2026-07-27
+
+### IGuard: False-Positive-Großputz (Recipe `shadow-v3`)
+- **Fahrzeuge & Wasser:** Der Liquid-Sonderfall hat bisher *alle* anderen
+  Exemptions storniert (Boot auf Wasser, Riptide im Wasser) und der
+  Nofall-Zweig hat Exemptions nach 10 Airticks überstimmt — jeder Reiter/
+  Boot-Passagier flaggte `nofall`/`jesus`. Beides behoben; Exemptions
+  gelten jetzt absolut, `liquid` schaltet nur noch selektiv auf den
+  Jesus-Check um.
+- **Auf Entities stehen:** Boote, Minecarts und Shulker sind begehbare
+  *Entities* ohne Block-Kollision — Spieler darauf flaggten Hover-Fly/
+  Nofall. Der Sampler taggt jetzt `entity-support`; ebenso neu: `bed`
+  (Bett-Bounce = legitimer Aufwärtsimpuls in der Luft).
+- **Anti-Knockback:** Die KB-Absorption wurde nur auf nicht-exempten
+  Frames gemessen, das Velocity-Paket selbst gewährt aber die Exemption —
+  nach deren Ablauf las der Check „kein KB genommen" und flaggte jeden
+  danach stehenden Spieler. Beobachtung läuft jetzt auf jedem Frame.
+- **NoSwing:** Der Vanilla-Client sendet den Arm-Swing *nach* dem
+  Attack-Paket — der erste Schlag nach >400 ms Pause flaggte immer.
+  Jetzt zählt nur noch eine Serie von Attacks ohne zwischenzeitlichen
+  Swing (Streak ≥ 3).
+- **Autoclicker:** Wurde auf Block-/Dig-Paketen gemessen, die der Client
+  tick-aligned flusht — normales Minen las sich als „perfekt regelmäßiger
+  Autoclicker". Misst jetzt echte Attack-Pakete (inkl. Mob-Kills).
+- **Reach/Rotation-Lag-Kompensation:** Bisher nur Ping/2; die ~100 ms
+  Entity-Interpolation des Clients fehlten komplett — Reach-FPs in jedem
+  laggy Chase-Fight. Das Ziel wird jetzt über das ganze Fenster gesampelt
+  und gegen den günstigsten Frame bewertet.
+- **Kreativ/Exempt-Spieler** liefen ungefiltert in die World-Checks
+  (Instant-Break-Spam = `nuker`/`fastbreak`/`fastplace`). Block- und
+  Interaktions-Checks respektieren jetzt Exemptions und Gamemode.
+- **Kanten-Stand:** Die Feet-Box war um 2 cm geschrumpft — wer mit
+  minimalem Überhang legal an einer Blockkante stand, galt als airborne
+  (Hover-FP). Shrink jetzt 1 mm.
+- **Feinschliff:** `fastbreak`-Fenster 74 ms → 24 ms (Haste+Efficiency-
+  Brüche in 1–2 Ticks sind legal), `snapaim` 60° → 90° plus Streak ≥ 2
+  (High-Sens-Flicks), `step`/`highjump` rechnen Jump-Boost ein,
+  Bedrock-Gates für Timer-, Aim-, Inventar- und Inventory-Move-Checks
+  (Geyser-Spieler laufen/kämpfen legal mit offenem Inventar).
+- Recipe-Version auf `shadow-v3` gebumpt: Enforcement bleibt Shadow, bis
+  das neue Rezept auf dem Bot-Harness kalibriert und in
+  `sanctions.calibrated-recipe` freigegeben wurde.
+
 ## 0.50.0 — 2026-07-27
 
 ### Deutlich mehr Performance-Metriken im Dashboard

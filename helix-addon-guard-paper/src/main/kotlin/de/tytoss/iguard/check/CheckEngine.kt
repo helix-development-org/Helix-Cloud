@@ -79,6 +79,8 @@ internal class PlayerState {
     var attackTarget = -1
     var rotationMisses = 0
     var lastAttackAt = 0L
+    var noSwingStreak = 0
+    var snapAimStreak = 0
     var sprinting = false
     var sneaking = false
     var clientFlying = false
@@ -366,7 +368,10 @@ class CheckEngine(
         }
         val stale = incoming.receivedAt - environment.capturedAt > exemptionConfig.snapshotMaxAgeMillis
         val worldChanged = state.lastWorldId != null && state.lastWorldId != environment.worldId
-        val exemptEnvironment = environment.exemptEnvironment && "liquid" !in environment.environmentTags
+        // "liquid" alone is not exempting (the jesus check runs there), but it must never cancel the
+        // OTHER exempting tags: a boat ON water is still a vehicle, riptide IN water is still riptide —
+        // treating those as checkable produced jesus/highjump false positives for every boat passenger.
+        val exemptEnvironment = environment.environmentTags.any { it != "liquid" && it !in TELEMETRY_ONLY_TAGS }
         // Grossly stale snapshot / unloaded chunk = "we could not check", not "clean". Skip is still
         // FP-safe, but we count it so metrics never mistake a load blind spot for a clean player.
         if ((stale || !environment.chunkLoaded) && incoming.positionChanged) unevaluatedFrames.incrementAndGet()
@@ -382,12 +387,16 @@ class CheckEngine(
             SafePosition(environment.worldId, environment.position, environment.yaw, environment.pitch, environment.tick)
         } else null
         var physicalSupporting = movementEvaluator.supports(frame.position, environment)
+        // Knockback absorption must be observed on EVERY position frame: the velocity packet itself
+        // grants an exemption, so accumulating only on non-exempt frames read as "no knockback taken"
+        // once the exemption expired and anti-KB-flagged any legit, by then stationary, player.
+        if (incoming.positionChanged && previous != null && state.pendingVelocity != null) {
+            val observed = frame.position - previous.position
+            state.velocityObservedHorizontal += sqrt(observed.horizontalLengthSquared())
+            state.velocityObservedVertical = max(state.velocityObservedVertical, observed.y)
+        }
         if (!exempt && incoming.positionChanged) {
             val delta = frame.position - previous.position
-            state.pendingVelocity?.let {
-                state.velocityObservedHorizontal += sqrt(delta.horizontalLengthSquared())
-                state.velocityObservedVertical = max(state.velocityObservedVertical, delta.y)
-            }
             val evaluation = movementEvaluator.evaluate(frame, delta, environment, profile, state, laggy)
             physicalSupporting = evaluation.supporting
             val failures = evaluation.failures
@@ -396,29 +405,35 @@ class CheckEngine(
                 setOf("movement.fly.a", "movement.speed.a", "movement.nofall.a", "movement.phase.a", "movement.step.a", "movement.spider.a", "movement.jesus.a")
             )
             val extra = ArrayList<CheckFailure>(2)
-            // Air-jump: a jump-sized upward impulse while airborne and previously descending — a second
-            // jump with no ground contact (support-reliable guard prevents lag FP).
-            if (supportReliable && !evaluation.supporting && state.airTicks >= 4 && state.lastVerticalDelta < -0.02 && delta.y > 0.33) {
-                extra += CheckFailure("movement.airjump.a", 1.5, mapOf("dy" to delta.y.rounded(), "prevDy" to state.lastVerticalDelta.rounded(), "airTicks" to state.airTicks))
-            }
-            // Omni-sprint: sprinting while the movement vector points opposite the look direction; the
-            // vanilla client only sprints roughly forward.
-            val horizontal = sqrt(delta.horizontalLengthSquared())
-            if (state.sprinting && horizontal > 0.15) {
-                val yawRad = Math.toRadians(frame.yaw.toDouble())
-                val dot = (delta.x * -sin(yawRad) + delta.z * cos(yawRad)) / horizontal
-                if (dot < -0.4) extra += CheckFailure("movement.sprintbackwards.a", 1.0, mapOf("lookDot" to dot.rounded(), "horizontal" to horizontal.rounded()))
-            }
-            // Fast-ladder: climbing a ladder/vine faster than the vanilla climb speed (~0.118/tick up).
-            // Gated on the climbable environment tag, so legit ground movement can never trip it.
-            if ("climbable" in environment.environmentTags && delta.y > 0.235) {
-                extra += CheckFailure("movement.fastladder.a", 1.0, mapOf("dy" to delta.y.rounded()))
-            }
-            // High-jump: leaving the ground with an upward impulse beyond even Jump Boost II (~0.62/tick).
-            // Requires a fresh takeoff (previous tick roughly level) so descending/apex frames don't fire.
-            if (supportReliable && state.airTicks <= 1 && state.lastVerticalDelta <= 0.02 &&
-                delta.y > 0.72 && "climbable" !in environment.environmentTags) {
-                extra += CheckFailure("movement.highjump.a", 1.5, mapOf("dy" to delta.y.rounded(), "airTicks" to state.airTicks))
+            // The impulse heuristics below model dry-land physics only: swimming (dolphin's grace,
+            // ascent out of water) legitimately produces jump-sized impulses and reversed vectors.
+            if ("liquid" !in environment.environmentTags) {
+                // Air-jump: a jump-sized upward impulse while airborne and previously descending — a second
+                // jump with no ground contact (support-reliable guard prevents lag FP).
+                if (supportReliable && !evaluation.supporting && state.airTicks >= 4 && state.lastVerticalDelta < -0.02 && delta.y > 0.33) {
+                    extra += CheckFailure("movement.airjump.a", 1.5, mapOf("dy" to delta.y.rounded(), "prevDy" to state.lastVerticalDelta.rounded(), "airTicks" to state.airTicks))
+                }
+                // Omni-sprint: sprinting while the movement vector points opposite the look direction; the
+                // vanilla client only sprints roughly forward.
+                val horizontal = sqrt(delta.horizontalLengthSquared())
+                if (state.sprinting && horizontal > 0.15) {
+                    val yawRad = Math.toRadians(frame.yaw.toDouble())
+                    val dot = (delta.x * -sin(yawRad) + delta.z * cos(yawRad)) / horizontal
+                    if (dot < -0.4) extra += CheckFailure("movement.sprintbackwards.a", 1.0, mapOf("lookDot" to dot.rounded(), "horizontal" to horizontal.rounded()))
+                }
+                // Fast-ladder: climbing a ladder/vine faster than the vanilla climb speed (~0.118/tick up).
+                // Gated on the climbable environment tag, so legit ground movement can never trip it.
+                if ("climbable" in environment.environmentTags && delta.y > 0.235) {
+                    extra += CheckFailure("movement.fastladder.a", 1.0, mapOf("dy" to delta.y.rounded()))
+                }
+                // High-jump: leaving the ground with an upward impulse beyond what the active jump-boost
+                // level allows (base jump 0.42 + 0.1 per amplifier level, plus margin). Requires a fresh
+                // takeoff (previous tick roughly level) so descending/apex frames don't fire.
+                val jumpBoost = if (environment.jumpAmplifier >= 0) 0.1 * (environment.jumpAmplifier + 1) else 0.0
+                if (supportReliable && state.airTicks <= 1 && state.lastVerticalDelta <= 0.02 &&
+                    delta.y > 0.72 + jumpBoost && "climbable" !in environment.environmentTags) {
+                    extra += CheckFailure("movement.highjump.a", 1.5, mapOf("dy" to delta.y.rounded(), "airTicks" to state.airTicks))
+                }
             }
             if (extra.isNotEmpty()) applyResults(incoming, state, environment, playerName, extra, setOf("movement.airjump.a", "movement.sprintbackwards.a", "movement.fastladder.a", "movement.highjump.a"))
             if (failures.none { it.checkId == "movement.speed.a" }) {
@@ -447,9 +462,12 @@ class CheckEngine(
             }
         } else {
             safeCandidate?.let { state.safePosition = it }
+            // Exemptions are absolute for the ground-spoof check too: a mounted or otherwise exempt
+            // player is legitimately onGround with no block support (the vehicle carries them), so the
+            // old "airTicks >= 10 overrides the exemption" escape hatch nofall-flagged every rider.
             if (incoming.positionChanged && previous != null) {
                 val delta = frame.position - previous.position
-                if (supportReliable && state.bedrock != true && state.airTicks >= (if (laggy) 18 else 6)) {
+                if (!exempt && supportReliable && state.bedrock != true && state.airTicks >= (if (laggy) 18 else 6)) {
                     val failure = movementEvaluator.groundSpoofFailure(frame.onGround, frame.position, environment, state, laggy)
                     applyResults(incoming, state, environment, playerName, listOfNotNull(failure), setOf("movement.nofall.a"))
                 }
@@ -458,7 +476,7 @@ class CheckEngine(
                 state.lastHorizontalDelta = sqrt(delta.horizontalLengthSquared())
                 state.positionGapTicks = 0
             } else {
-                if (supportReliable && state.bedrock != true && (!exempt || state.airTicks >= 10) && (!laggy || state.airTicks >= 18)) {
+                if (!exempt && supportReliable && state.bedrock != true && (!laggy || state.airTicks >= 18)) {
                     val failure = movementEvaluator.groundSpoofFailure(frame.onGround, frame.position, environment, state, laggy)
                     applyResults(incoming, state, environment, playerName, listOfNotNull(failure), setOf("movement.nofall.a"))
                 }
@@ -583,7 +601,7 @@ class CheckEngine(
             state.clientTickTimes.size >= 190 && frame.receivedAt - state.lastTimerFailureAt >= 1_000
         ) {
             val rate = (state.clientTickTimes.size - 1) * 1000.0 / (frame.receivedAt - first).coerceAtLeast(1)
-            if (rate > 21.2 && state.confirmedRttMillis < 500 && environment.tps >= 19.0) {
+            if (rate > 21.2 && state.bedrock != true && state.confirmedRttMillis < 500 && environment.tps >= 19.0) {
                 state.lastTimerFailureAt = frame.receivedAt
                 applyResults(
                     frame, state, environment, playerName,
@@ -668,25 +686,10 @@ class CheckEngine(
     }
 
     private fun processBlockAction(frame: BlockActionFrame, state: PlayerState, environment: EnvironmentFrame, playerName: String) {
+        // The world/interaction heuristics model survival pacing: creative building (instant break,
+        // rapid place) and exempt states (bypass, dead, vehicle, ...) would flood them with FPs.
+        if (exemptions.isExempt(frame.playerId, frame.receivedAt) || environment.exemptEnvironment) return
         val failures = ArrayList<CheckFailure>()
-        state.attackTimes.addLast(frame.receivedAt)
-        trimTimes(state.attackTimes, frame.receivedAt, 3_000)
-        if (state.attackTimes.size >= 40) {
-            val duration = state.attackTimes.last() - state.attackTimes.first()
-            if (duration >= 2_000) {
-                val intervals = state.attackTimes.zipWithNext { first, second -> (second - first).toDouble() }
-                val mean = intervals.average()
-                val variance = intervals.sumOf { (it - mean) * (it - mean) } / intervals.size
-                val deviation = sqrt(variance)
-                val cps = (state.attackTimes.size - 1) * 1000.0 / duration
-                if (cps > 13.0 && deviation / mean.coerceAtLeast(1.0) < 0.035) {
-                    failures += CheckFailure(
-                        "combat.autoclicker.a", 1.0,
-                        mapOf("cps" to cps.rounded(), "meanInterval" to mean.rounded(), "deviation" to deviation.rounded(), "samples" to intervals.size)
-                    )
-                }
-            }
-        }
         if (frame.interactionSequence >= 0 && state.lastInteractionSequence >= 0 && frame.interactionSequence < state.lastInteractionSequence - 4) {
             failures += CheckFailure(
                 "protocol.badpackets.a", 1.0,
@@ -744,7 +747,10 @@ class CheckEngine(
             }
             BlockAction.FINISH_DIG -> state.digStarts.remove(key)?.let { started ->
                 val duration = frame.receivedAt - started
-                if (duration in 0..74) failures += CheckFailure("world.fastbreak.a", 0.5, mapOf("durationMillis" to duration, "block" to key))
+                // Only a FINISH in the same client flush as its START is cheat evidence. A legit 1-2
+                // tick break (haste + efficiency) sends FINISH 50-100ms later, and network jitter can
+                // compress that gap — the old 74ms window fastbreak-flagged exactly those players.
+                if (duration in 0..24) failures += CheckFailure("world.fastbreak.a", 0.5, mapOf("durationMillis" to duration, "block" to key))
             }
             BlockAction.CANCEL_DIG -> state.digStarts.remove(key)
             else -> Unit
@@ -769,7 +775,8 @@ class CheckEngine(
                 )
             )
             state.lastInventoryClickAt = frame.receivedAt
-            if (state.sprinting && state.lastHorizontalDelta > 0.12) {
+            // Bedrock (Geyser) clients can legitimately keep walking with an open inventory.
+            if (state.bedrock != true && state.sprinting && state.lastHorizontalDelta > 0.12) {
                 state.inventoryMoveTimes.addLast(frame.receivedAt)
                 trimTimes(state.inventoryMoveTimes, frame.receivedAt, 2_000)
                 if (state.inventoryMoveTimes.size >= 5) {
@@ -789,32 +796,78 @@ class CheckEngine(
     ) {
         if (exemptions.isExempt(frame.playerId, frame.receivedAt) || environment.exemptEnvironment || !environment.chunkLoaded) return
         val movement = state.lastMovement ?: return
-        val target = snapshots.target(frame.targetEntityId) ?: return
-        if (target.playerId == frame.playerId || target.current.worldId != environment.worldId) return
-        val compensatedAt = frame.receivedAt - environment.ping.coerceIn(0, 300) / 2L
-        val targetFrame = snapshots.frameAt(target, compensatedAt)
-        val attackerFrame = snapshots.view(frame.playerId)?.let { snapshots.frameAt(it, compensatedAt) } ?: environment
-        val eyeHeight = if (attackerFrame.entityBox.maxY - attackerFrame.entityBox.minY < 1.0) 0.4 else 1.62
-        val origin = movement.position + Vec3(0.0, eyeHeight, 0.0)
-        val direction = Vec3.direction(movement.yaw, movement.pitch)
-        val tolerance = 0.1 + environment.ping.coerceIn(0, 300) * 0.0005
-        val distance = targetFrame.entityBox.expand(tolerance).rayDistance(origin, direction, profile.reach + 1.0)
+        val previousAttackAt = state.lastAttackAt
+        state.lastAttackAt = frame.receivedAt
         val failures = ArrayList<CheckFailure>()
-        if (frame.receivedAt - state.lastInventoryClickAt in 0..75) {
+        // Autoclicker cadence is measured on real attack packets only: block/dig packets are flushed
+        // tick-aligned by the vanilla client, so measuring them (as before) read plain mining as a
+        // perfectly regular "autoclicker".
+        state.attackTimes.addLast(frame.receivedAt)
+        trimTimes(state.attackTimes, frame.receivedAt, 3_000)
+        if (state.attackTimes.size >= 40) {
+            val duration = state.attackTimes.last() - state.attackTimes.first()
+            if (duration >= 2_000) {
+                val intervals = state.attackTimes.zipWithNext { first, second -> (second - first).toDouble() }
+                val mean = intervals.average()
+                val variance = intervals.sumOf { (it - mean) * (it - mean) } / intervals.size
+                val deviation = sqrt(variance)
+                val cps = (state.attackTimes.size - 1) * 1000.0 / duration
+                if (cps > 13.0 && deviation / mean.coerceAtLeast(1.0) < 0.035) {
+                    failures += CheckFailure(
+                        "combat.autoclicker.a", 1.0,
+                        mapOf("cps" to cps.rounded(), "meanInterval" to mean.rounded(), "deviation" to deviation.rounded(), "samples" to intervals.size)
+                    )
+                }
+            }
+        }
+        // No-swing: the vanilla client sends the arm-swing right AFTER the attack packet, so "no swing
+        // yet" is normal for the current hit — flagging on that (as before) hit every first attack after
+        // idling. Only a sustained series of attacks with no swing arriving in between is killaura
+        // evidence.
+        if (previousAttackAt > 0 && frame.receivedAt - previousAttackAt <= 2_000 && state.lastSwingAt < previousAttackAt) {
+            state.noSwingStreak++
+        } else {
+            state.noSwingStreak = 0
+        }
+        if (state.noSwingStreak >= 3) {
+            failures += CheckFailure("combat.noswing.a", 1.0, mapOf("attacksWithoutSwing" to state.noSwingStreak, "sinceSwingMs" to (frame.receivedAt - state.lastSwingAt)))
+        }
+        // Bedrock (Geyser) clients can legitimately attack straight out of an open inventory.
+        if (state.bedrock != true && frame.receivedAt - state.lastInventoryClickAt in 0..75) {
             state.inventoryAttackTimes.addLast(frame.receivedAt)
             trimTimes(state.inventoryAttackTimes, frame.receivedAt, 5_000)
             if (state.inventoryAttackTimes.size >= 3) {
                 failures += CheckFailure("combat.inventory.a", 1.0, mapOf("attacksAfterInventory" to state.inventoryAttackTimes.size, "delayMillis" to frame.receivedAt - state.lastInventoryClickAt))
             }
         }
+        val target = snapshots.target(frame.targetEntityId)
+        if (target == null || target.playerId == frame.playerId || target.current.worldId != environment.worldId) {
+            // Cadence/no-swing/inventory apply to any attack (mobs included); the positional checks
+            // below need a tracked player target.
+            applyResults(frame, state, environment, playerName, failures, setOf("combat.autoclicker.a", "combat.noswing.a", "combat.inventory.a"))
+            return
+        }
+        // Lag compensation: the attacker acted roughly one-way latency before the packet arrived and
+        // aimed at a target the client renders a further interpolation window (~100ms) in the past.
+        // Judge reach/rotation against the most favorable target frame across that whole window —
+        // compensating only ping/2 (as before) reach-flagged legit hits in every laggy chase fight.
+        val ping = environment.ping.coerceIn(0, 400).toLong()
+        val sampleTimes = longArrayOf(frame.receivedAt - ping / 2, frame.receivedAt - ping, frame.receivedAt - ping - 100)
+        val targetFrames = sampleTimes.map { snapshots.frameAt(target, it) }
+        val attackerFrame = snapshots.view(frame.playerId)?.let { snapshots.frameAt(it, sampleTimes[0]) } ?: environment
+        val eyeHeight = if (attackerFrame.entityBox.maxY - attackerFrame.entityBox.minY < 1.0) 0.4 else 1.62
+        val origin = movement.position + Vec3(0.0, eyeHeight, 0.0)
+        val direction = Vec3.direction(movement.yaw, movement.pitch)
+        val tolerance = 0.1 + environment.ping.coerceIn(0, 300) * 0.0005
+        val distance = targetFrames.mapNotNull { it.entityBox.expand(tolerance).rayDistance(origin, direction, profile.reach + 1.0) }.minOrNull()
         if (distance != null && distance > profile.reach + tolerance) {
             failures += CheckFailure("combat.reach.a", 1.0, mapOf("distance" to distance.rounded(), "limit" to (profile.reach + tolerance).rounded(), "ping" to environment.ping))
         }
-        val rotationHit = targetFrame.entityBox.expand(0.22 + tolerance).rayDistance(origin, direction, profile.reach + 1.0) != null
-        if (frame.receivedAt - state.lastAttackAt > 500) state.rotationMisses = 0
+        val rotationHit = targetFrames.any { it.entityBox.expand(0.22 + tolerance).rayDistance(origin, direction, profile.reach + 1.0) != null }
+        if (frame.receivedAt - previousAttackAt > 500) state.rotationMisses = 0
         state.rotationMisses = if (rotationHit) 0 else state.rotationMisses + 1
-        state.lastAttackAt = frame.receivedAt
-        if (state.rotationMisses >= 3) {
+        // Geyser's input translation produces rotations a Java client never would; skip aim heuristics.
+        if (state.bedrock != true && state.rotationMisses >= 3) {
             failures += CheckFailure("combat.rotation.a", 1.0, mapOf("misses" to state.rotationMisses, "target" to target.playerName))
         }
         if (state.attackTick == state.clientTick && state.attackTarget != -1 && state.attackTarget != frame.targetEntityId) {
@@ -822,13 +875,12 @@ class CheckEngine(
         }
         state.attackTick = state.clientTick
         state.attackTarget = frame.targetEntityId
-        // No-swing: a real client sends an arm-swing animation with every hit; killaura often skips it.
-        if (frame.receivedAt - state.lastSwingAt > 400) {
-            failures += CheckFailure("combat.noswing.a", 1.0, mapOf("sinceSwingMs" to (frame.receivedAt - state.lastSwingAt)))
-        }
-        // Snap-aim: an attack immediately after an impossibly large single-tick rotation.
-        if (frame.receivedAt - state.lastRotationAt <= SNAP_AIM_WINDOW_MILLIS && state.lastYawDelta > SNAP_AIM_DEGREES) {
-            failures += CheckFailure("combat.snapaim.a", 1.0, mapOf("yawDelta" to state.lastYawDelta.rounded(), "sinceRotMs" to (frame.receivedAt - state.lastRotationAt)))
+        // Snap-aim: attacks right after huge single-tick rotations. High-sensitivity players flick past
+        // 60°/tick legitimately, so this needs a larger angle AND a repeat before it becomes evidence.
+        val snapped = frame.receivedAt - state.lastRotationAt <= SNAP_AIM_WINDOW_MILLIS && state.lastYawDelta > SNAP_AIM_DEGREES
+        state.snapAimStreak = if (snapped) state.snapAimStreak + 1 else 0
+        if (state.bedrock != true && snapped && state.snapAimStreak >= 2) {
+            failures += CheckFailure("combat.snapaim.a", 1.0, mapOf("yawDelta" to state.lastYawDelta.rounded(), "sinceRotMs" to (frame.receivedAt - state.lastRotationAt), "streak" to state.snapAimStreak))
         }
         applyResults(frame, state, environment, playerName, failures, setOf("combat.reach.a", "combat.rotation.a", "combat.multitarget.a", "combat.autoclicker.a", "combat.inventory.a", "combat.noswing.a", "combat.snapaim.a"))
     }
@@ -924,8 +976,14 @@ private fun yawDelta(a: Float, b: Float): Double {
 }
 
 // Attack within this window after a huge single-tick rotation counts as an aim snap (combat.snapaim).
-private const val SNAP_AIM_DEGREES = 60.0
+// 90° in one tick is beyond ordinary tracking but reachable by high-sensitivity flicks — which is why
+// the check additionally demands a streak of two before it fires.
+private const val SNAP_AIM_DEGREES = 90.0
 private const val SNAP_AIM_WINDOW_MILLIS = 160L
+
+// Tags that describe server health rather than a per-player physics modifier (mirrors the sampler's
+// telemetry-only set); they never force an exemption.
+private val TELEMETRY_ONLY_TAGS = setOf("low-tps")
 
 private const val PUBLISH_INTERVAL_MILLIS = 200L
 

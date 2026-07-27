@@ -6,7 +6,7 @@ import de.tytoss.iguard.model.EvidenceFamily
 internal object ConfidenceModel {
     // Bump whenever confidence weights / thresholds materially change so shadow decisions and the
     // calibrated-recipe gate stay attributable to a specific tuning.
-    const val RECIPE_VERSION = "shadow-v2"
+    const val RECIPE_VERSION = "shadow-v3"
 
     /** Structural family of a check id — not a tunable, stays in code. */
     fun family(checkId: String): EvidenceFamily = when {

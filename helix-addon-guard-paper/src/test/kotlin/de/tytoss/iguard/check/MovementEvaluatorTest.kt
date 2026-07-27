@@ -259,6 +259,22 @@ class MovementEvaluatorTest {
     }
 
     @Test
+    fun `a sliver of feet box overlap still counts as support`() {
+        // Ground platform ends at x=2.0; player centre at 2.28 leaves ~0.019 overlap — vanilla keeps
+        // this player grounded, so supports() must too (edge-standing hover/nofall FP regression).
+        assertTrue(evaluator.supports(Vec3(2.28, 0.0, 0.0), ground()))
+    }
+
+    @Test
+    fun `jump boost three takeoff does not trigger step`() {
+        val state = PlayerState().apply { positionGapTicks = 1 }
+        val boosted = ground().copy(jumpAmplifier = 2)
+        val evaluation = evaluator.evaluate(movement(Vec3(0.0, 0.8, 0.0), false), Vec3(0.0, 0.8, 0.0), boosted, profile, state)
+
+        assertFalse(evaluation.failed("movement.step.a"))
+    }
+
+    @Test
     fun `oversized instant step triggers step`() {
         val state = PlayerState().apply { positionGapTicks = 1 }
         val evaluation = evaluator.evaluate(movement(Vec3(0.0, 0.8, 0.0), false), Vec3(0.0, 0.8, 0.0), ground(), profile, state)

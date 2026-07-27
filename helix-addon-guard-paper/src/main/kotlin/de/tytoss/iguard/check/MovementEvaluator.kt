@@ -350,7 +350,10 @@ internal class MovementEvaluator {
     }
 
     private fun stepFailure(delta: Vec3, environment: EnvironmentFrame, state: PlayerState): CheckFailure? {
-        if (delta.y <= environment.stepHeight + 0.12 || delta.y <= 0.72 || state.airTicks > 1 || environment.environmentTags.isNotEmpty()) return null
+        // Jump boost raises the legal takeoff impulse by 0.1 per amplifier level; without the
+        // allowance a Jump Boost III+ player step-flagged on every jump.
+        val jumpBoost = if (environment.jumpAmplifier >= 0) 0.1 * (environment.jumpAmplifier + 1) else 0.0
+        if (delta.y <= environment.stepHeight + 0.12 || delta.y <= 0.72 + jumpBoost || state.airTicks > 1 || environment.environmentTags.isNotEmpty()) return null
         return CheckFailure("movement.step.a", 1.0, mapOf("dy" to delta.y.rounded(), "stepHeight" to environment.stepHeight.rounded()))
     }
 
@@ -367,7 +370,11 @@ internal class MovementEvaluator {
     /** True when a collision box supports the player's feet at [position]. */
     fun supports(position: Vec3, environment: EnvironmentFrame): Boolean {
         val width = environment.entityBox.maxX - environment.entityBox.minX
-        val half = width / 2.0 - 0.02
+        // Vanilla keeps a player grounded on an arbitrarily small box overlap, so the feet box must
+        // shrink by no more than a hair: the previous 2cm shrink read real edge-standing as airborne
+        // (hover-fly/nofall FPs). The hair is still needed so exact wall contact (coordinates resolved
+        // onto the face by the client) does not count as support.
+        val half = width / 2.0 - 0.001
         val feet = Box(
             position.x - half,
             position.y - 0.08,

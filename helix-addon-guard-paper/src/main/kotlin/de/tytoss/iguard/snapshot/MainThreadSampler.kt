@@ -13,7 +13,10 @@ import org.bukkit.Material
 import org.bukkit.Tag
 import org.bukkit.attribute.Attribute
 import org.bukkit.block.Block
+import org.bukkit.entity.Boat
+import org.bukkit.entity.Minecart
 import org.bukkit.entity.Player
+import org.bukkit.entity.Shulker
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
@@ -217,6 +220,13 @@ class MainThreadSampler(
         if (block.isLiquid) add("liquid")
         if (Tag.CLIMBABLE.isTagged(type)) add("climbable")
         if (type == Material.COBWEB) add("cobweb")
+        // Beds bounce (a legit upward impulse while "airborne"); the bed is at the player's feet, so
+        // both the occupied block and the one below must be checked.
+        if (Tag.BEDS.isTagged(type) || Tag.BEDS.isTagged(below)) add("bed")
+        // Boats, minecarts and shulkers are collidable ENTITIES: a player standing on one is
+        // legitimately onGround with no block collision underneath, which the block-based support
+        // model cannot see — without this tag they hover-fly/nofall-flag within a second.
+        if (standsOnEntity(player)) add("entity-support")
         if (below == Material.SLIME_BLOCK) add("slime")
         if (below == Material.HONEY_BLOCK) add("honey")
         if (below == Material.SOUL_SAND || below == Material.SOUL_SOIL) add("soul-speed")
@@ -224,6 +234,12 @@ class MainThreadSampler(
         if (player.hasPotionEffect(PotionEffectType.SLOW_FALLING)) add("slow-falling")
         if (tps < config.lowTpsThreshold) add("low-tps")
         if (nearDynamic) add("dynamic-block")
+    }
+
+    private fun standsOnEntity(player: Player): Boolean {
+        val box = player.boundingBox
+        val search = BoundingBox(box.minX - 0.6, box.minY - 1.0, box.minZ - 0.6, box.maxX + 0.6, box.maxY + 0.2, box.maxZ + 0.6)
+        return player.world.getNearbyEntities(search) { it !== player && (it is Boat || it is Minecart || it is Shulker) }.isNotEmpty()
     }
 
     /** Grants the teleport grace window. */
