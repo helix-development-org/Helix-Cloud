@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.57.0 — 2026-07-27
+
+### Clans: Panel-Seite mit Verwaltung
+- **Neue Dashboard-Seite „Clans"** (Extensions, Permission
+  `helix.panel.addon.clan`): Liste aller Clans mit Suche, Tag,
+  Mitgliederzahl und Bank; Detail-Ansicht mit Mitgliedern und Rollen;
+  Verwaltung direkt im Panel — Tag ändern (validiert, eindeutig),
+  Mitglied entfernen (Owner geschützt), Ownership übertragen, Clan
+  auflösen.
+- **Neue Admin-Actions:** `clan.detail <clan>` (JSON inkl. Mitglieder),
+  `clan.settag <clan> <TAG>`, `clan.remove <player>`,
+  `clan.transfer <clan> <player>`. Tag-Änderungen, Entfernungen und
+  Auflösungen aktualisieren jetzt sofort die `clan.tag.*`-Bridge-Values
+  der betroffenen Spieler (Sidebar/{clan}-Platzhalter).
+
 ## 0.56.0 — 2026-07-27
 
 ### Prefixes gehören jetzt den Permission-Gruppen

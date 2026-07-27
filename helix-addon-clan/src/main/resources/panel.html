@@ -1,0 +1,117 @@
+<div class="card">
+  <div class="card-head">
+    <h2>Clans</h2>
+    <div class="right"><input id="search" placeholder="Search clans…" autocomplete="off" style="max-width:220px"></div>
+  </div>
+  <div id="clans"><div class="empty">loading…</div></div>
+</div>
+
+<div class="card hidden" id="detail-card">
+  <div class="card-head"><h2 id="detail-title">Clan</h2><div class="right"><button class="btn sm subtle" id="detail-close">Close</button></div></div>
+  <div class="card-body" id="detail"></div>
+</div>
+
+<script>
+"use strict";
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+let clans = [];
+let openId = null;
+
+async function load() {
+  const r = await Helix.action("clan.list");
+  try { clans = JSON.parse(r.lines[0] || "[]"); } catch (e) { clans = []; }
+  render();
+  if (openId) openDetail(openId);
+}
+
+function render() {
+  const box = document.getElementById("clans");
+  const needle = document.getElementById("search").value.trim().toLowerCase();
+  const visible = clans.filter(c => !needle ||
+    c.name.toLowerCase().includes(needle) || c.tag.toLowerCase().includes(needle) || c.owner.toLowerCase().includes(needle));
+  if (!clans.length) { box.innerHTML = '<div class="empty">No clans yet — players create them with /clan create</div>'; return; }
+  if (!visible.length) { box.innerHTML = '<div class="empty">No clans match the search</div>'; return; }
+  const sorted = [...visible].sort((a, b) => b.memberCount - a.memberCount || a.name.localeCompare(b.name));
+  box.innerHTML = `<table><thead><tr><th>Tag</th><th>Name</th><th>Owner</th><th>Members</th><th>Bank</th><th></th></tr></thead><tbody>${
+    sorted.map(c => `<tr>
+      <td><span class="tag">${esc(c.tag)}</span></td>
+      <td><strong>${esc(c.name)}</strong></td>
+      <td class="mono">${esc(c.owner)}</td>
+      <td class="mono">${c.memberCount}</td>
+      <td class="mono">${c.bank}</td>
+      <td style="text-align:right">
+        <button class="btn sm subtle" data-manage="${esc(c.id)}">Manage</button>
+        <button class="btn sm danger" data-disband="${esc(c.id)}">Disband</button>
+      </td>
+    </tr>`).join("")
+  }</tbody></table>`;
+  box.querySelectorAll("[data-manage]").forEach(b => b.onclick = () => openDetail(b.dataset.manage));
+  box.querySelectorAll("[data-disband]").forEach(b => b.onclick = () => disband(b.dataset.disband));
+}
+
+async function disband(id) {
+  if (!confirm(`Disband clan ${id}? Members lose their clan and the bank is gone.`)) return;
+  const r = await Helix.action("clan.disband", id);
+  Helix.toast(r.lines[0] || (r.success ? "disbanded" : "failed"));
+  if (openId === id) closeDetail();
+  load();
+}
+
+async function openDetail(id) {
+  const r = await Helix.action("clan.detail", id);
+  if (!r.success) { Helix.toast(r.lines[0] || "failed"); return; }
+  let c; try { c = JSON.parse(r.lines[0]); } catch (e) { return; }
+  openId = c.id;
+  document.getElementById("detail-card").classList.remove("hidden");
+  document.getElementById("detail-title").textContent = `${c.name} [${c.tag}]`;
+  const created = c.createdAtEpochMs ? new Date(c.createdAtEpochMs).toLocaleDateString() : "—";
+  const roleBadge = r0 => r0 === "OWNER" ? '<span class="badge good">owner</span>'
+    : r0 === "OFFICER" ? '<span class="badge">officer</span>' : '<span class="muted">member</span>';
+  document.getElementById("detail").innerHTML = `
+    <div class="grid c2">
+      <div class="field"><label>Tag</label>
+        <div class="row"><input id="d-tag" class="mono" value="${esc(c.tag)}" maxlength="5" style="max-width:100px">
+        <button class="btn sm" id="d-settag">Save</button></div></div>
+      <div class="field"><label>Info</label>
+        <div class="muted">Bank: <span class="mono">${c.bank}</span> coins · created ${esc(created)} · id <span class="mono">${esc(c.id)}</span></div></div>
+    </div>
+    <div class="field" style="margin-top:12px"><label>Members (${c.members.length})</label>
+      <table><thead><tr><th>Player</th><th>Role</th><th></th></tr></thead><tbody>${
+        c.members.map(m => `<tr>
+          <td class="mono">${esc(m.name)}</td>
+          <td>${roleBadge(m.role)}</td>
+          <td style="text-align:right">${m.role === "OWNER" ? "" :
+            `<button class="btn sm subtle" data-transfer="${esc(m.name)}">Make owner</button>
+             <button class="btn sm danger" data-kick="${esc(m.name)}">Remove</button>`}</td>
+        </tr>`).join("")
+      }</tbody></table></div>`;
+  document.getElementById("d-settag").onclick = async () => {
+    const tag = document.getElementById("d-tag").value.trim();
+    if (!tag || tag.toUpperCase() === c.tag.toUpperCase()) return;
+    const res = await Helix.action("clan.settag", c.id, tag);
+    Helix.toast(res.lines[0] || "failed");
+    load();
+  };
+  document.querySelectorAll("[data-kick]").forEach(b => b.onclick = async () => {
+    if (!confirm(`Remove ${b.dataset.kick} from ${c.name}?`)) return;
+    const res = await Helix.action("clan.remove", b.dataset.kick);
+    Helix.toast(res.lines[0] || "failed");
+    load();
+  });
+  document.querySelectorAll("[data-transfer]").forEach(b => b.onclick = async () => {
+    if (!confirm(`Transfer ownership of ${c.name} to ${b.dataset.transfer}?`)) return;
+    const res = await Helix.action("clan.transfer", c.id, b.dataset.transfer);
+    Helix.toast(res.lines[0] || "failed");
+    load();
+  });
+}
+
+function closeDetail() {
+  openId = null;
+  document.getElementById("detail-card").classList.add("hidden");
+}
+
+document.getElementById("detail-close").onclick = closeDetail;
+document.getElementById("search").oninput = render;
+Helix.ready(load);
+</script>

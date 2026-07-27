@@ -41,6 +41,35 @@ class ClanAddonTest {
     }
 
     @Test
+    fun `panel admin actions manage a clan end to end`() {
+        createClan()
+        context.run("clan", "Steve", "invite", "Alex")
+        context.run("clan", "Alex", "accept", "STV")
+
+        // detail: members with roles as JSON
+        val detail = context.run("clan.detail", "STV")
+        assertTrue(detail.success)
+        assertTrue(detail.lines.single().contains("\"owner\": \"steve\""))
+        assertTrue(detail.lines.single().contains("\"alex\""))
+
+        // settag: validation + republished bridge values
+        assertFalse(context.run("clan.settag", "STV", "TOOLONG").success)
+        assertTrue(context.run("clan.settag", "STV", "NEW").success)
+        assertEquals("NEW", context.bridgeValues["clan.tag.steve"])
+
+        // transfer: new owner, old owner demoted; owner cannot be removed
+        assertTrue(context.run("clan.transfer", "NEW", "Alex").success)
+        assertFalse(context.run("clan.remove", "Alex").success, "owner is protected")
+        assertTrue(context.run("clan.remove", "Steve").success)
+        assertEquals("", context.bridgeValues["clan.tag.steve"])
+
+        // disband clears the remaining member's tag value
+        assertTrue(context.run("clan.disband", "NEW").success)
+        assertEquals("", context.bridgeValues["clan.tag.alex"])
+        assertFalse(context.run("clan.detail", "NEW").success)
+    }
+
+    @Test
     fun `create then info round-trips`() {
         assertTrue(createClan().success)
 

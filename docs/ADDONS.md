@@ -451,7 +451,7 @@ class MyAddon : AddonBase() {
 
 Das Panel erscheint in der Sidebar unter **Extensions** und verschwindet
 wieder, wenn das Addon deaktiviert wird. Mitgelieferte Panels:
-Permissions, Economy, Bans, Chat, Tablist, Discord, MOTD.
+Permissions, Clans, Economy, Bans, Chat, Tablist, Discord, MOTD.
 
 ## Addons zur Laufzeit nachladen
 

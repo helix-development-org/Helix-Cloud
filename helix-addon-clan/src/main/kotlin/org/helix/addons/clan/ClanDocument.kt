@@ -72,3 +72,37 @@ data class ClanSummary(
     val memberCount: Int,
     val bank: Long,
 )
+
+/**
+ * One clan member in the panel detail view.
+ *
+ * @property name lowercase member name.
+ * @property role the member's [ClanRole].
+ */
+@Serializable
+data class ClanMemberEntry(
+    val name: String,
+    val role: ClanRole,
+)
+
+/**
+ * Full panel view of a clan including its member list.
+ *
+ * @property id lowercase clan id.
+ * @property name clan name.
+ * @property tag clan tag.
+ * @property owner lowercase owner name.
+ * @property bank shared bank balance.
+ * @property createdAtEpochMs creation timestamp in epoch milliseconds.
+ * @property members members with their roles, owner first, then by role.
+ */
+@Serializable
+data class ClanDetail(
+    val id: String,
+    val name: String,
+    val tag: String,
+    val owner: String,
+    val bank: Long,
+    val createdAtEpochMs: Long,
+    val members: List<ClanMemberEntry>,
+)

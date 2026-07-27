@@ -15,9 +15,10 @@ import org.helix.api.message.Messages
  * Provides the in-game `/clan` command (create, info, invite flow, roles,
  * kick/promote/demote, ownership transfer, tag change, shared bank and a
  * clan list), a `[TAG]` display-name suffix via a display resolver (shown
- * in chat, tab and the name tag), and admin actions for a future dashboard
- * panel. The shared bank moves real coins through the economy addon so its
- * counter never drifts from the players' balances.
+ * in chat, tab and the name tag), and a dashboard panel with the full clan
+ * list and admin management (tag, members, ownership, disband). The shared
+ * bank moves real coins through the economy addon so its counter never
+ * drifts from the players' balances.
  */
 class ClanAddon : AddonBase() {
     private val json = Json { prettyPrint = true }
@@ -96,8 +97,71 @@ class ClanAddon : AddonBase() {
             val token = invocation.arguments.firstOrNull()
                 ?: return@action ActionResult.error("usage: clan.disband <clan>")
             val id = store.resolveId(token) ?: return@action ActionResult.error("no such clan")
-            if (store.disband(id)) ActionResult.ok("clan $id disbanded") else ActionResult.error("no such clan")
+            val affected = store.clanById(id)?.members?.keys?.toList().orEmpty()
+            if (store.disband(id)) {
+                affected.forEach(::publishTag)
+                ActionResult.ok("clan $id disbanded")
+            } else {
+                ActionResult.error("no such clan")
+            }
         }
+        action("clan.detail", "Shows a clan with its member list as JSON (panel).", "clan.detail <clan>") { invocation ->
+            val token = invocation.arguments.firstOrNull()
+                ?: return@action ActionResult.error("usage: clan.detail <clan>")
+            val id = store.resolveId(token) ?: return@action ActionResult.error("no such clan")
+            val clan = store.clanById(id) ?: return@action ActionResult.error("no such clan")
+            val members = clan.members.entries
+                .sortedWith(compareByDescending<Map.Entry<String, ClanRole>> { it.value.rank }.thenBy { it.key })
+                .map { ClanMemberEntry(it.key, it.value) }
+            ActionResult.ok(
+                json.encodeToString(
+                    ClanDetail(id, clan.name, clan.tag, clan.owner, clan.bank, clan.createdAtEpochMs, members),
+                ),
+            )
+        }
+        action("clan.settag", "Changes a clan's tag (admin).", "clan.settag <clan> <TAG>") { invocation ->
+            val token = invocation.arguments.getOrNull(0)
+                ?: return@action ActionResult.error("usage: clan.settag <clan> <TAG>")
+            val tag = invocation.arguments.getOrNull(1)
+                ?: return@action ActionResult.error("usage: clan.settag <clan> <TAG>")
+            val id = store.resolveId(token) ?: return@action ActionResult.error("no such clan")
+            if (!TAG_PATTERN.matches(tag)) {
+                return@action ActionResult.error("tag must be 2-5 alphanumeric characters")
+            }
+            if (!store.setTag(id, tag)) {
+                return@action ActionResult.error("tag is already taken")
+            }
+            store.clanById(id)?.members?.keys?.forEach(::publishTag)
+            ActionResult.ok("tag of $id changed to ${tag.uppercase()}")
+        }
+        action("clan.remove", "Removes a member from their clan (admin).", "clan.remove <player>") { invocation ->
+            val player = invocation.arguments.firstOrNull()
+                ?: return@action ActionResult.error("usage: clan.remove <player>")
+            val clan = store.clanOf(player) ?: return@action ActionResult.error("$player is in no clan")
+            if (clan.owner.equals(player, ignoreCase = true)) {
+                return@action ActionResult.error("the owner cannot be removed — transfer ownership or disband")
+            }
+            store.removeMember(player)
+            publishTag(player)
+            ActionResult.ok("$player removed from ${clan.name}")
+        }
+        action("clan.transfer", "Transfers clan ownership (admin).", "clan.transfer <clan> <player>") { invocation ->
+            val token = invocation.arguments.getOrNull(0)
+                ?: return@action ActionResult.error("usage: clan.transfer <clan> <player>")
+            val player = invocation.arguments.getOrNull(1)
+                ?: return@action ActionResult.error("usage: clan.transfer <clan> <player>")
+            val id = store.resolveId(token) ?: return@action ActionResult.error("no such clan")
+            if (!store.setOwner(id, player)) {
+                return@action ActionResult.error("$player is not a member of that clan")
+            }
+            ActionResult.ok("${player.lowercase()} now owns $id")
+        }
+        panel(
+            "clan",
+            "Clans",
+            "/panel.html",
+            "<path d=\"M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><path d=\"M23 21v-2a4 4 0 00-3-3.87\"/><path d=\"M16 3.13a4 4 0 010 7.75\"/>",
+        )
     }
 
     /** Publishes a player's clan tag as the `clan.tag.<name>` bridge value (empty when clanless). */
