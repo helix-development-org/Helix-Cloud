@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.55.1 — 2026-07-27
+
+### Nick: Nametag-Rewrite robuster + diagnostizierbar
+- **Hide/Show über zwei Ticks gestreckt** statt im selben Tick, damit der
+  Client garantiert die saubere REMOVE → ADD(+Nick) → SPAWN-Sequenz
+  verarbeitet (Live-Wechsel ohne Rejoin).
+- **Klare Diagnose-Logs entlang der ganzen Kette:** Beim Bridge-Start
+  „packetevents found/not installed", bei jedem Nick-Wechsel
+  „Nick display for X: '…' → '…'" plus „re-sent to N viewers (profile
+  rewrites so far: M)". Läuft ein Nick ohne installiertes packetevents,
+  warnt die Bridge einmalig deutlich (Nametag bleibt dann Realname,
+  Chat/Tab funktionieren) — packetevents kommt über das Guard-HXA
+  (`paper/packetevents.jar`) auf den Server.
+- Ohne packetevents wird der sinnlose Hide/Show-Zyklus übersprungen.
+
 ## 0.55.0 — 2026-07-27
 
 ### Nick = echte Verkleidung (inkl. Name über dem Kopf)

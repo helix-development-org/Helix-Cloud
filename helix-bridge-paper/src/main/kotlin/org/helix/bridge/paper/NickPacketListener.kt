@@ -20,6 +20,9 @@ import java.util.concurrent.ConcurrentHashMap
  * the bridge degrades to chat/tab-only nicks without it.
  */
 class NickPacketListener(private val nicks: ConcurrentHashMap<UUID, String>) : PacketListenerAbstract() {
+    /** Rewritten profile entries since startup (surfaced in the bridge's nick log lines). */
+    val rewrites = java.util.concurrent.atomic.AtomicLong()
+
     override fun onPacketSend(event: PacketSendEvent) {
         if (event.packetType != PacketType.Play.Server.PLAYER_INFO_UPDATE || nicks.isEmpty()) return
         val viewer = event.user.uuid
@@ -32,6 +35,7 @@ class NickPacketListener(private val nicks: ConcurrentHashMap<UUID, String>) : P
             if (profile.name != nick) {
                 profile.name = nick
                 changed = true
+                rewrites.incrementAndGet()
             }
         }
         if (changed) event.markForReEncode(true)

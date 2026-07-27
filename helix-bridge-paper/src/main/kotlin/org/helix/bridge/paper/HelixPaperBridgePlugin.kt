@@ -45,6 +45,14 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     /** Player uuid to assumed name; read by the packet listener on the netty threads. */
     private val nickNames = ConcurrentHashMap<java.util.UUID, String>()
 
+    /** The registered PLAYER_INFO rewriter, or null when packetevents is absent. */
+    @Volatile
+    private var nickPacketListener: NickPacketListener? = null
+
+    /** Ensures the "nick without packetevents" warning is logged only once. */
+    @Volatile
+    private var warnedMissingPacketRewrite = false
+
     @Volatile
     private var bridgeValues: Map<String, String> = emptyMap()
 
@@ -102,8 +110,9 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
      */
     private fun registerNickPacketListener() {
         runCatching {
-            com.github.retrooper.packetevents.PacketEvents.getAPI().eventManager
-                .registerListener(NickPacketListener(nickNames))
+            val listener = NickPacketListener(nickNames)
+            com.github.retrooper.packetevents.PacketEvents.getAPI().eventManager.registerListener(listener)
+            nickPacketListener = listener
             logger.info("packetevents found — nicks rewrite the name tag above players")
         }.onFailure {
             logger.info("packetevents not installed — nicks show in chat/tab only, name tags keep the real name")
@@ -528,6 +537,7 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
             player.displayName(composed)
         }
         if (previousNick != profile.name) {
+            logger.info("Nick display for ${player.name}: '$previousNick' → '${profile.name}'")
             rescopePlayer(player)
         }
     }
@@ -536,13 +546,37 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
      * Re-sends PLAYER_INFO and spawn packets of [player] to every viewer via
      * Bukkit's hide/show cycle. The packet listener rewrites the fresh
      * packets in flight, so a changed (or removed) nick reaches clients that
-     * already knew the player. Must run on the main server thread.
+     * already knew the player. Hide and show are spread over two ticks so
+     * the client processes a clean REMOVE → ADD → SPAWN sequence. Must run
+     * on the main server thread.
      */
     private fun rescopePlayer(player: Player) {
-        server.onlinePlayers.filter { it !== player }.forEach { viewer ->
-            viewer.hidePlayer(this, player)
-            viewer.showPlayer(this, player)
+        val listener = nickPacketListener
+        if (listener == null) {
+            if (!warnedMissingPacketRewrite) {
+                warnedMissingPacketRewrite = true
+                logger.warning(
+                    "A nick is active but packetevents is not installed on this server — " +
+                        "name tags keep the real name (nick shows in chat/tab only). " +
+                        "packetevents ships with the Helix-Guard addon (paper/packetevents.jar).",
+                )
+            }
+            return
         }
+        val viewers = server.onlinePlayers.filter { it !== player }
+        viewers.forEach { viewer -> viewer.hidePlayer(this, player) }
+        server.scheduler.runTaskLater(
+            this,
+            Runnable {
+                val target = server.getPlayerExact(player.name) ?: return@Runnable
+                viewers.forEach { viewer -> if (viewer.isOnline) viewer.showPlayer(this, target) }
+                logger.info(
+                    "Nick display for ${player.name} re-sent to ${viewers.size} viewers " +
+                        "(profile rewrites so far: ${listener.rewrites.get()})",
+                )
+            },
+            2L,
+        )
     }
 
     /**
