@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.59.0 — 2026-07-28
+
+### Audit-Trail: echte Spieler-Attribution + filterbare Audit-Seite
+- **Spieler-Commands werden jetzt mit dem echten Namen auditiert** statt
+  generisch als „bridge". Jeder In-Game-Befehl (Kick, Ban, Clan, …) landet
+  im Audit-Log unter dem Namen des ausführenden Spielers, nicht mehr
+  anonym.
+- **Neue Panel-Seite „Audit"**: filterbar nach Kategorie, Spieler/Actor
+  und freier Suche (Aktion, Service-ID, Details). Die Node-Route
+  `GET /audit` unterstützt dafür neu `actor`- und `search`-Parameter.
+- **Navigation umbenannt**: „Logs" → „Launcher-Logs" (die rohe
+  Node-Konsole, unverändert), bisheriges „Audit" → „Logs" (die einfache,
+  ungefilterte Tabelle bleibt erhalten), neue „Audit"-Seite mit den
+  Filtern oben.
+
+### Bann-Snapshot mit TTL: Bans wirken auch bei kurzem Node-Ausfall
+- Die Velocity-Bridge cached jetzt alle 5 Sekunden eine Kopie der aktiven
+  Bans (`GET /internal/ban-snapshot`, proxied vom Bans-Addon, leer ohne
+  Addon). Schlägt die Live-Prüfung beim Login fehl (Node kurzzeitig
+  unerreichbar), wird zuerst der bis zu 2 Minuten alte Cache geprüft —
+  ein bekanntermaßen gebannter Spieler kommt damit nicht mehr durch das
+  Neustart-Fenster. Unbekannte Namen bleiben wie bisher fail-open.
+
 ## 0.58.0 — 2026-07-27
 
 ### Clans: Tag-Verifizierung

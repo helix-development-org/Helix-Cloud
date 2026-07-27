@@ -21,6 +21,7 @@ import com.velocitypowered.api.scheduler.ScheduledTask
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.minimessage.MiniMessage
@@ -93,6 +94,15 @@ class HelixVelocityBridgePlugin @Inject constructor(
     private var polling = false
     private var pollThread: Thread? = null
 
+    // Locally cached ban list (name -> expiry), refreshed every heartbeat cycle. Consulted only
+    // when the live join-check call itself fails (node unreachable), so a known ban still holds
+    // through a restart window instead of the join failing wide open.
+    @Volatile
+    private var banSnapshot: List<CachedBan> = emptyList()
+
+    @Volatile
+    private var banSnapshotAt: Long = 0L
+
     /**
      * Boots the bridge after the proxy initialized.
      *
@@ -122,6 +132,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
                     syncBridgeValues(loaded, httpClient)
                     syncTranslations(httpClient)
                     syncNetworkPack(httpClient)
+                    syncBanSnapshot(httpClient)
                 },
             )
             .delay(Duration.ofSeconds(1))
@@ -279,7 +290,24 @@ class HelixVelocityBridgePlugin @Inject constructor(
             )?.let { json.decodeFromString<JoinDecision>(it) }
         }.onFailure {
             logger.warn("Helix join gate failed for {} ({}): fail-open", name, it.message)
-        }.getOrNull() ?: return
+        }.getOrNull() ?: run {
+            // The live check failed (node unreachable) — consult the cached ban snapshot so a
+            // player already known to be banned still cannot slip through the restart window;
+            // anyone not on that (fresh enough) cached list still joins as before (fail-open).
+            val cachedReason = cachedBan(name)
+            if (cachedReason != null) {
+                event.result = ResultedEvent.ComponentResult.denied(
+                    translate(
+                        event.player,
+                        "helix.translations.velocity.join.denied_cached",
+                        "You are banned from this network ({reason}). The panel is temporarily unreachable to confirm details.",
+                        mapOf("reason" to cachedReason),
+                    ),
+                )
+                logger.info("Denied join of {} via {}: cached ban snapshot ({})", name, activeSettings.serviceId, cachedReason)
+            }
+            return
+        }
         if (!decision.allowed) {
             val message = decision.message
             event.result = ResultedEvent.ComponentResult.denied(
@@ -456,6 +484,34 @@ class HelixVelocityBridgePlugin @Inject constructor(
             configuredPackUrl = values["network.pack_url"]
                 ?.takeIf { it.isNotBlank() && !it.contains("0.0.0.0") }
         }.onFailure { logger.warn("Helix bridge value sync failed: {}", it.message) }
+    }
+
+    /**
+     * Refreshes the locally cached ban snapshot. Addon-agnostic on purpose: the node proxies the
+     * bans addon's own export verbatim (an empty array without it), so this bridge never needs to
+     * know the ban entry's shape beyond `player`/`expiresAtEpochMs`.
+     */
+    private fun syncBanSnapshot(client: NodeHttpClient) {
+        runCatching {
+            val body = client.getJson("/api/v1/internal/ban-snapshot") ?: return@runCatching
+            banSnapshot = json.decodeFromString<List<CachedBan>>(body)
+            banSnapshotAt = System.currentTimeMillis()
+        }.onFailure { logger.warn("Helix ban snapshot sync failed: {}", it.message) }
+    }
+
+    /**
+     * Looks up [name] in the cached ban snapshot, honoring the cache's TTL and each entry's
+     * expiry. Used only as a fallback when the live join-check call could not reach the node.
+     *
+     * @param name player name to look up (matched case-insensitively).
+     * @return the reason the player is (still) banned per the cache, or `null` when the cache is
+     *   stale or carries no matching active ban.
+     */
+    private fun cachedBan(name: String): String? {
+        if (System.currentTimeMillis() - banSnapshotAt > BAN_SNAPSHOT_TTL_MILLIS) return null
+        val now = System.currentTimeMillis()
+        return banSnapshot.firstOrNull { it.player.equals(name, ignoreCase = true) && (it.expiresAtEpochMs == null || it.expiresAtEpochMs > now) }
+            ?.reason
     }
 
     /**
@@ -749,5 +805,11 @@ class HelixVelocityBridgePlugin @Inject constructor(
 
         /** Length of a hex-encoded SHA-1 hash. */
         const val SHA1_HEX_LENGTH = 40
+
+        /**
+         * How long the cached ban snapshot is trusted after its last successful refresh (heartbeat
+         * cycle is 5s; this covers several missed cycles without trusting a stale list forever).
+         */
+        const val BAN_SNAPSHOT_TTL_MILLIS = 120_000L
     }
 }

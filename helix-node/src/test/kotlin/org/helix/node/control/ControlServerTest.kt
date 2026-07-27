@@ -9,6 +9,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
@@ -21,6 +22,7 @@ import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
 import org.helix.api.bridge.HeartbeatReport
@@ -293,6 +295,22 @@ class ControlServerTest {
             client.get("/api/v1/internal/bridge-values?serviceId=Lobby-1") { bearerAuth("secret") }.body()
         assertTrue(scoped.containsKey("tablist.header"))
         assertTrue(!scoped.containsKey("chat.format"))
+    }
+
+    @Test
+    fun `ban snapshot proxies the bans addon's export, empty when not installed`() = testApplication {
+        val client = apiClient()
+
+        assertEquals("[]", client.get("/api/v1/internal/ban-snapshot") { bearerAuth("secret") }.bodyAsText())
+
+        registry.register(ActionDescriptor("ban.export", "test export", "ban.export")) {
+            ActionResult.ok("""[{"player":"griefer","reason":"spam","createdAtEpochMs":1,"expiresAtEpochMs":null}]""")
+        }
+
+        assertEquals(
+            """[{"player":"griefer","reason":"spam","createdAtEpochMs":1,"expiresAtEpochMs":null}]""",
+            client.get("/api/v1/internal/ban-snapshot") { bearerAuth("secret") }.bodyAsText(),
+        )
     }
 
     @Test

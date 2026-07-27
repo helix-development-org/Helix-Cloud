@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react"
 import {
-  Archive, Blocks, Clock, FolderTree, Languages, LayoutDashboard, ListChecks, LogOut, Moon, Network,
+  Archive, Blocks, Clock, ClipboardList, FolderTree, Languages, LayoutDashboard, ListChecks, LogOut, Moon, Network,
   Puzzle, ScrollText, Server, Settings, ShieldCheck, Sun, Users, Zap,
 } from "lucide-react"
 import type { Identity, PanelInfo } from "@/lib/api"
@@ -21,8 +21,9 @@ const NAV: NavItem[] = [
   { id: "players", label: "Players", icon: Users, group: "Platform" },
   { id: "proxy", label: "Proxy", icon: Network, group: "Platform" },
   { id: "events", label: "Events", icon: Zap, group: "Observability" },
-  { id: "logs", label: "Logs", icon: ScrollText, group: "Observability" },
-  { id: "audit", label: "Audit", icon: ShieldCheck, group: "Observability" },
+  { id: "logs", label: "Launcher-Logs", icon: ScrollText, group: "Observability" },
+  { id: "audit", label: "Logs", icon: ClipboardList, group: "Observability" },
+  { id: "audit-log", label: "Audit", icon: ShieldCheck, group: "Observability" },
   { id: "addons", label: "Addons", icon: Blocks, group: "System" },
   { id: "schedules", label: "Schedules", icon: Clock, group: "System" },
   { id: "backups", label: "Backups", icon: Archive, group: "System" },
@@ -44,7 +45,9 @@ export function AppShell(props: {
 }) {
   const { identity, panels } = props
   const [dark, setDark] = useState(document.documentElement.classList.contains("dark"))
-  const allowed = (id: string) => identity.admin || identity.views.includes(id)
+  // "audit-log" is a second, filterable view of the same /audit endpoint as "audit" — both are
+  // gated by the one existing helix.panel.audit permission, not a separate node.
+  const allowed = (id: string) => identity.admin || identity.views.includes(id === "audit-log" ? "audit" : id)
   const groups = ["Platform", "Observability", "System"]
 
   const toggleTheme = () => {

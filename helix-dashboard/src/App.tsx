@@ -8,7 +8,7 @@ import { ServicesView } from "@/views/services"
 import { TasksView } from "@/views/tasks"
 import { PlayersView } from "@/views/players"
 import { ProxyPageView } from "@/views/proxy"
-import { EventsView, LogsView, AuditView } from "@/views/feeds"
+import { EventsView, LogsView, AuditView, AuditLogView } from "@/views/feeds"
 import { AddonsView } from "@/views/addons"
 import { SchedulesView } from "@/views/schedules"
 import { BackupsView } from "@/views/backups"
@@ -19,8 +19,8 @@ import { AddonPanelView } from "@/views/addon-panel"
 
 const TITLES: Record<string, string> = {
   overview: "Overview", tasks: "Tasks", services: "Services", players: "Players", proxy: "Proxy",
-  events: "Events", logs: "Logs", audit: "Audit", addons: "Addons", schedules: "Schedules", backups: "Backups", files: "Files",
-  translations: "Translations", settings: "Settings",
+  events: "Events", logs: "Launcher-Logs", audit: "Logs", "audit-log": "Audit", addons: "Addons",
+  schedules: "Schedules", backups: "Backups", files: "Files", translations: "Translations", settings: "Settings",
 }
 
 export function App() {
@@ -76,6 +76,7 @@ export function App() {
         {current === "events" && <EventsView />}
         {current === "logs" && <LogsView />}
         {current === "audit" && <AuditView />}
+        {current === "audit-log" && <AuditLogView />}
         {current === "addons" && <AddonsView />}
         {current === "schedules" && <SchedulesView />}
         {current === "backups" && <BackupsView />}

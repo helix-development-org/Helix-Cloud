@@ -52,16 +52,22 @@ class AuditLog(
     }
 
     /**
-     * Returns the newest entries first, optionally filtered by category.
+     * Returns the newest entries first, optionally filtered by category,
+     * actor and/or a free-text search across the summary (action name,
+     * affected player, service id — whatever the invocation carried).
      *
      * @param limit maximum number of entries.
      * @param category category to filter by, or `null` for all.
+     * @param actor actor substring to filter by (case-insensitive), or `null` for all.
+     * @param search summary substring to filter by (case-insensitive), or `null` for all.
      * @return matching entries, newest first.
      */
     @Synchronized
-    fun recent(limit: Int, category: String? = null): List<AuditEntry> =
+    fun recent(limit: Int, category: String? = null, actor: String? = null, search: String? = null): List<AuditEntry> =
         entries.toList()
             .let { list -> if (category == null) list else list.filter { it.category == category } }
+            .let { list -> if (actor.isNullOrBlank()) list else list.filter { it.actor.contains(actor, ignoreCase = true) } }
+            .let { list -> if (search.isNullOrBlank()) list else list.filter { it.summary.contains(search, ignoreCase = true) } }
             .takeLast(limit)
             .asReversed()
 }

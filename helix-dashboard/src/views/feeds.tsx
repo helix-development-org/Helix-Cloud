@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { api, type AuditEntry, type EventEntry } from "@/lib/api"
 import { streamLines } from "@/lib/sse"
 import { usePoll } from "@/lib/use-poll"
 import { ago } from "@/lib/format"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 /** Event timeline. */
@@ -55,7 +57,7 @@ export function LogsView() {
   )
 }
 
-/** Complete audit trail. */
+/** Plain, unfiltered activity trail (nav: "Logs" — the former simple Audit view). */
 export function AuditView() {
   const { data } = usePoll(() => api<AuditEntry[]>("/audit?limit=300"), 5000)
   return (
@@ -76,5 +78,70 @@ export function AuditView() {
         </TableBody>
       </Table>
     </CardContent></Card>
+  )
+}
+
+/**
+ * Full, filterable audit trail (nav: "Audit"). Fetches a generous unfiltered
+ * window and filters client-side so the category list and the other filters
+ * never fight each other, and so typing in a filter never needs a round-trip.
+ */
+export function AuditLogView() {
+  const [category, setCategory] = useState("all")
+  const [actor, setActor] = useState("")
+  const [search, setSearch] = useState("")
+  const { data } = usePoll(() => api<AuditEntry[]>("/audit?limit=1000"), 5000)
+
+  const categories = useMemo(
+    () => Array.from(new Set((data ?? []).map((e) => e.category))).sort(),
+    [data],
+  )
+  const filtered = useMemo(() => {
+    const a = actor.trim().toLowerCase()
+    const s = search.trim().toLowerCase()
+    return (data ?? []).filter((e) =>
+      (category === "all" || e.category === category) &&
+      (!a || e.actor.toLowerCase().includes(a)) &&
+      (!s || e.summary.toLowerCase().includes(s)),
+    )
+  }, [data, category, actor, search])
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Card>
+        <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">Filter</CardTitle></CardHeader>
+        <CardContent className="flex flex-wrap items-center gap-3">
+          <div className="w-48">
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All categories</SelectItem>
+                {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <Input className="w-56" placeholder="Player / actor…" value={actor} onChange={(e) => setActor(e.target.value)} />
+          <Input className="w-72" placeholder="Search action, service, details…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <span className="text-xs text-muted-foreground">{filtered.length} of {data?.length ?? 0} entries</span>
+        </CardContent>
+      </Card>
+      <Card><CardContent className="p-0">
+        <Table>
+          <TableHeader><TableRow><TableHead>Time</TableHead><TableHead>Category</TableHead><TableHead>Actor</TableHead><TableHead>Summary</TableHead><TableHead>Outcome</TableHead></TableRow></TableHeader>
+          <TableBody>
+            {filtered.map((e, i) => (
+              <TableRow key={i}>
+                <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{ago(e.epochMs)}</TableCell>
+                <TableCell><Badge variant="secondary">{e.category}</Badge></TableCell>
+                <TableCell className="text-sm">{e.actor}</TableCell>
+                <TableCell className="max-w-md text-sm">{e.summary}</TableCell>
+                <TableCell><Badge variant={e.outcome === "ok" ? "success" : e.outcome === "denied" ? "warning" : e.outcome === "error" ? "destructive" : "secondary"}>{e.outcome}</Badge></TableCell>
+              </TableRow>
+            ))}
+            {data && !filtered.length && <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">No matching audit entries.</TableCell></TableRow>}
+          </TableBody>
+        </Table>
+      </CardContent></Card>
+    </div>
   )
 }

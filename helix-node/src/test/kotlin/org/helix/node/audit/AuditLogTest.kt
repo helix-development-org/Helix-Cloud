@@ -22,6 +22,20 @@ class AuditLogTest {
     }
 
     @Test
+    fun `filters by actor and free-text search`() {
+        var now = 0L
+        val log = AuditLog(FileAuditSink(file), clock = { now })
+        now = 1; log.record("action", "steve", "ban.set griefer 7d spamming")
+        now = 2; log.record("action", "alex", "service.stop Lobby-1")
+        now = 3; log.record("action", "steve", "kick griefer flooding chat")
+
+        assertEquals(2, log.recent(10, actor = "steve").size)
+        assertEquals(listOf("kick griefer flooding chat", "ban.set griefer 7d spamming"), log.recent(10, actor = "STEVE").map { it.summary })
+        assertEquals(1, log.recent(10, search = "Lobby-1").size)
+        assertEquals(1, log.recent(10, actor = "steve", search = "ban.set").size)
+    }
+
+    @Test
     fun `persists to file and reloads across instances`() {
         AuditLog(file).record("node", "system", "Node started")
 

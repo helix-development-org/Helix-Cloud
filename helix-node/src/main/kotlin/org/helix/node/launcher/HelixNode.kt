@@ -5,6 +5,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.system.exitProcess
+import org.helix.api.action.ActionSource
 import org.helix.api.execution.ExecutorType
 import org.helix.node.actions.ActionRegistry
 import org.helix.node.actions.BuiltinActions
@@ -861,10 +862,20 @@ class HelixNode(
             eventLog.record(category, plain)
             audit.record(category, "addon", plain)
         }
-        // Every action invocation is audited (CLI, REST, bridge, addon).
+        // Every action invocation is audited (CLI, REST, bridge, addon). A BRIDGE-sourced
+        // invocation is always a player-issued in-game command (PlayerCommandService.execute
+        // puts the player's name first, by contract) — attribute it to that player instead of
+        // the generic "bridge" label, so the audit trail shows WHO ran a command, not just that
+        // some proxy relayed one.
         registry.onInvocation { invocation, result ->
+            val actor = if (invocation.source == ActionSource.BRIDGE) {
+                invocation.arguments.firstOrNull()?.lowercase()?.takeIf { it.isNotBlank() }
+                    ?: invocation.source.name.lowercase()
+            } else {
+                invocation.source.name.lowercase()
+            }
             val summary = (invocation.action + " " + invocation.arguments.joinToString(" ")).trim()
-            audit.record("action", invocation.source.name.lowercase(), summary, if (result.success) "ok" else "error")
+            audit.record("action", actor, summary, if (result.success) "ok" else "error")
         }
         // Any change to registered actions may add/remove a player-command,
         // so wake long-polling proxies to re-register instantly.

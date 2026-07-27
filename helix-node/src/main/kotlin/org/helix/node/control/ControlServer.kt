@@ -360,7 +360,9 @@ private fun io.ktor.server.routing.Route.observabilityRoutes(dependencies: Contr
         if (!authorize(dependencies, "helix.panel.audit")) return@get
         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 300
         val category = call.request.queryParameters["category"]
-        call.respond(dependencies.audit.recent(limit, category))
+        val actor = call.request.queryParameters["actor"]
+        val search = call.request.queryParameters["search"]
+        call.respond(dependencies.audit.recent(limit, category, actor, search))
     }
 }
 
@@ -959,6 +961,18 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
             dependencies.bridgeValues.all { owner -> task.isAddonActive(owner) }
         }
         call.respond(values)
+    }
+    // Lets a bridge cache the active ban list locally (with its own TTL) so a join can still be
+    // denied for a KNOWN ban while the node is briefly unreachable, instead of failing wide open.
+    // Addon-agnostic by design: proxies the bans addon's own `ban.export` JSON verbatim (empty
+    // array when the addon is not installed) rather than the node knowing BanEntry's shape.
+    get("/internal/ban-snapshot") {
+        if (!requireAdmin(dependencies)) return@get
+        val result = dependencies.registry.invoke(ActionInvocation("ban.export", emptyList(), ActionSource.SYSTEM))
+        call.respondText(
+            if (result.success) result.lines.firstOrNull() ?: "[]" else "[]",
+            ContentType.Application.Json,
+        )
     }
 }
 
