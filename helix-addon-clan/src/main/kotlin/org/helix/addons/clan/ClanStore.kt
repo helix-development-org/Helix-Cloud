@@ -207,7 +207,8 @@ class ClanStore(private val storage: AddonStorage) {
     }
 
     /**
-     * Changes a clan's tag.
+     * Changes a clan's tag. The verification is reset — a changed tag is
+     * new content and needs fresh admin approval before it is displayed.
      *
      * @param clanId clan id.
      * @param tag new tag (stored uppercase).
@@ -221,7 +222,23 @@ class ClanStore(private val storage: AddonStorage) {
         if (clans.any { (otherId, other) -> otherId != id && other.tag.equals(tag, ignoreCase = true) }) {
             return false
         }
-        clans[id] = clan.copy(tag = tag.uppercase())
+        clans[id] = clan.copy(tag = tag.uppercase(), verified = false)
+        persist()
+        return true
+    }
+
+    /**
+     * Sets a clan's verification state (admin approval of the tag).
+     *
+     * @param clanId clan id.
+     * @param verified `true` when the tag is approved for display.
+     * @return `false` when the clan is unknown.
+     */
+    @Synchronized
+    fun setVerified(clanId: String, verified: Boolean): Boolean {
+        val id = clanId.lowercase()
+        val clan = clans[id] ?: return false
+        clans[id] = clan.copy(verified = verified)
         persist()
         return true
     }

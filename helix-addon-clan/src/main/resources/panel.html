@@ -32,14 +32,18 @@ function render() {
   if (!clans.length) { box.innerHTML = '<div class="empty">No clans yet — players create them with /clan create</div>'; return; }
   if (!visible.length) { box.innerHTML = '<div class="empty">No clans match the search</div>'; return; }
   const sorted = [...visible].sort((a, b) => b.memberCount - a.memberCount || a.name.localeCompare(b.name));
-  box.innerHTML = `<table><thead><tr><th>Tag</th><th>Name</th><th>Owner</th><th>Members</th><th>Bank</th><th></th></tr></thead><tbody>${
+  box.innerHTML = `<table><thead><tr><th>Tag</th><th>Name</th><th>Owner</th><th>Members</th><th>Bank</th><th>Status</th><th></th></tr></thead><tbody>${
     sorted.map(c => `<tr>
       <td><span class="tag">${esc(c.tag)}</span></td>
       <td><strong>${esc(c.name)}</strong></td>
       <td class="mono">${esc(c.owner)}</td>
       <td class="mono">${c.memberCount}</td>
       <td class="mono">${c.bank}</td>
+      <td>${c.verified ? '<span class="badge good">verified</span>' : '<span class="badge">pending</span>'}</td>
       <td style="text-align:right">
+        ${c.verified
+          ? `<button class="btn sm subtle" data-unverify="${esc(c.id)}">Unverify</button>`
+          : `<button class="btn sm" data-verify="${esc(c.id)}">Verify</button>`}
         <button class="btn sm subtle" data-manage="${esc(c.id)}">Manage</button>
         <button class="btn sm danger" data-disband="${esc(c.id)}">Disband</button>
       </td>
@@ -47,6 +51,14 @@ function render() {
   }</tbody></table>`;
   box.querySelectorAll("[data-manage]").forEach(b => b.onclick = () => openDetail(b.dataset.manage));
   box.querySelectorAll("[data-disband]").forEach(b => b.onclick = () => disband(b.dataset.disband));
+  box.querySelectorAll("[data-verify]").forEach(b => b.onclick = () => setVerified(b.dataset.verify, true));
+  box.querySelectorAll("[data-unverify]").forEach(b => b.onclick = () => setVerified(b.dataset.unverify, false));
+}
+
+async function setVerified(id, verified) {
+  const r = await Helix.action(verified ? "clan.verify" : "clan.unverify", id);
+  Helix.toast(r.lines[0] || (r.success ? "saved" : "failed"));
+  load();
 }
 
 async function disband(id) {
@@ -63,15 +75,18 @@ async function openDetail(id) {
   let c; try { c = JSON.parse(r.lines[0]); } catch (e) { return; }
   openId = c.id;
   document.getElementById("detail-card").classList.remove("hidden");
-  document.getElementById("detail-title").textContent = `${c.name} [${c.tag}]`;
+  document.getElementById("detail-title").innerHTML =
+    `${esc(c.name)} [${esc(c.tag)}] ` +
+    (c.verified ? '<span class="badge good">verified</span>' : '<span class="badge">pending verification</span>');
   const created = c.createdAtEpochMs ? new Date(c.createdAtEpochMs).toLocaleDateString() : "—";
   const roleBadge = r0 => r0 === "OWNER" ? '<span class="badge good">owner</span>'
     : r0 === "OFFICER" ? '<span class="badge">officer</span>' : '<span class="muted">member</span>';
   document.getElementById("detail").innerHTML = `
     <div class="grid c2">
-      <div class="field"><label>Tag</label>
+      <div class="field"><label>Tag (admin changes count as verified)</label>
         <div class="row"><input id="d-tag" class="mono" value="${esc(c.tag)}" maxlength="5" style="max-width:100px">
-        <button class="btn sm" id="d-settag">Save</button></div></div>
+        <button class="btn sm" id="d-settag">Save</button>
+        <button class="btn sm ${c.verified ? "subtle" : ""}" id="d-verify">${c.verified ? "Unverify" : "Verify"}</button></div></div>
       <div class="field"><label>Info</label>
         <div class="muted">Bank: <span class="mono">${c.bank}</span> coins · created ${esc(created)} · id <span class="mono">${esc(c.id)}</span></div></div>
     </div>
@@ -85,6 +100,7 @@ async function openDetail(id) {
              <button class="btn sm danger" data-kick="${esc(m.name)}">Remove</button>`}</td>
         </tr>`).join("")
       }</tbody></table></div>`;
+  document.getElementById("d-verify").onclick = () => setVerified(c.id, !c.verified);
   document.getElementById("d-settag").onclick = async () => {
     const tag = document.getElementById("d-tag").value.trim();
     if (!tag || tag.toUpperCase() === c.tag.toUpperCase()) return;

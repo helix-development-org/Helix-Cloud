@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.58.0 — 2026-07-27
+
+### Clans: Tag-Verifizierung
+- **Clan-Tags müssen verifiziert werden, bevor sie sichtbar sind:**
+  Nametag-Suffix und Sidebar-`{clan}` zeigen den Tag erst, nachdem ein
+  Admin ihn freigegeben hat. Frische Clans und jede spielerseitige
+  Tag-Änderung (`/clan tag`) starten unverifiziert; die Spieler sehen
+  einen Pending-Hinweis (auch in `/clan info`), Online-Mitglieder werden
+  bei der Freigabe benachrichtigt (de/en).
+- **Freigabe:** Verify/Unverify-Buttons im Clans-Panel (Liste + Detail,
+  Status-Spalte) bzw. Actions `clan.verify <clan>` /
+  `clan.unverify <clan>`. Ein Admin-`clan.settag` gilt automatisch als
+  freigegeben. Bestehende Clans starten nach dem Update unverifiziert und
+  müssen einmalig freigegeben werden.
+
 ## 0.57.0 — 2026-07-27
 
 ### Clans: Panel-Seite mit Verwaltung

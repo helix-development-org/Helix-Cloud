@@ -28,6 +28,10 @@ enum class ClanRole(val rank: Int) {
  * @property members map of lowercase member name to their [ClanRole].
  * @property bank shared coin balance held by the clan.
  * @property createdAtEpochMs creation timestamp in epoch milliseconds.
+ * @property verified whether an admin approved the tag. Only verified
+ *   tags are displayed to other players (name-tag suffix, sidebar
+ *   `{clan}`); a fresh clan and every player-driven tag change start
+ *   unverified.
  */
 @Serializable
 data class Clan(
@@ -37,6 +41,7 @@ data class Clan(
     val members: Map<String, ClanRole> = emptyMap(),
     val bank: Long = 0,
     val createdAtEpochMs: Long = 0,
+    val verified: Boolean = false,
 )
 
 /**
@@ -62,6 +67,7 @@ data class ClanDocument(
  * @property owner lowercase owner name.
  * @property memberCount number of members.
  * @property bank shared bank balance.
+ * @property verified whether the tag is admin-approved and displayed.
  */
 @Serializable
 data class ClanSummary(
@@ -71,6 +77,7 @@ data class ClanSummary(
     val owner: String,
     val memberCount: Int,
     val bank: Long,
+    val verified: Boolean = false,
 )
 
 /**
@@ -94,6 +101,7 @@ data class ClanMemberEntry(
  * @property owner lowercase owner name.
  * @property bank shared bank balance.
  * @property createdAtEpochMs creation timestamp in epoch milliseconds.
+ * @property verified whether the tag is admin-approved and displayed.
  * @property members members with their roles, owner first, then by role.
  */
 @Serializable
@@ -104,5 +112,6 @@ data class ClanDetail(
     val owner: String,
     val bank: Long,
     val createdAtEpochMs: Long,
-    val members: List<ClanMemberEntry>,
+    val verified: Boolean = false,
+    val members: List<ClanMemberEntry> = emptyList(),
 )

@@ -37,8 +37,10 @@ class ClanAddon : AddonBase() {
         msg = context.localizedMessages(messages())
         // The clan tag is the SUFFIX component of the display name (the prefix belongs to
         // permission groups, the name to the nick addon); the node merges the components.
+        // Only VERIFIED tags are displayed — a fresh or renamed tag stays invisible to other
+        // players until an admin approves it (clan.verify / panel).
         context.registerDisplayResolver { name ->
-            store.clanOf(name)?.let { DisplayProfile(suffix = " &8[&b${it.tag}&8]") }
+            store.clanOf(name)?.takeIf { it.verified }?.let { DisplayProfile(suffix = " &8[&b${it.tag}&8]") }
         }
         // Expose each player's clan tag as a bridge value for the sidebar {clan}
         // placeholder; refreshed on join and after every clan command.
@@ -77,7 +79,7 @@ class ClanAddon : AddonBase() {
             ActionResult.ok(
                 json.encodeToString(
                     store.allClans().map { (id, clan) ->
-                        ClanSummary(id, clan.name, clan.tag, clan.owner, clan.members.size, clan.bank)
+                        ClanSummary(id, clan.name, clan.tag, clan.owner, clan.members.size, clan.bank, clan.verified)
                     },
                 ),
             )
@@ -89,7 +91,7 @@ class ClanAddon : AddonBase() {
             val clan = store.clanById(id) ?: return@action ActionResult.error("no such clan")
             ActionResult.ok(
                 json.encodeToString(
-                    ClanSummary(id, clan.name, clan.tag, clan.owner, clan.members.size, clan.bank),
+                    ClanSummary(id, clan.name, clan.tag, clan.owner, clan.members.size, clan.bank, clan.verified),
                 ),
             )
         }
@@ -115,7 +117,7 @@ class ClanAddon : AddonBase() {
                 .map { ClanMemberEntry(it.key, it.value) }
             ActionResult.ok(
                 json.encodeToString(
-                    ClanDetail(id, clan.name, clan.tag, clan.owner, clan.bank, clan.createdAtEpochMs, members),
+                    ClanDetail(id, clan.name, clan.tag, clan.owner, clan.bank, clan.createdAtEpochMs, clan.verified, members),
                 ),
             )
         }
@@ -131,8 +133,10 @@ class ClanAddon : AddonBase() {
             if (!store.setTag(id, tag)) {
                 return@action ActionResult.error("tag is already taken")
             }
+            // An admin-chosen tag is approved by definition; setTag reset the flag.
+            store.setVerified(id, true)
             store.clanById(id)?.members?.keys?.forEach(::publishTag)
-            ActionResult.ok("tag of $id changed to ${tag.uppercase()}")
+            ActionResult.ok("tag of $id changed to ${tag.uppercase()} (verified)")
         }
         action("clan.remove", "Removes a member from their clan (admin).", "clan.remove <player>") { invocation ->
             val player = invocation.arguments.firstOrNull()
@@ -156,6 +160,12 @@ class ClanAddon : AddonBase() {
             }
             ActionResult.ok("${player.lowercase()} now owns $id")
         }
+        action("clan.verify", "Approves a clan tag for display (admin).", "clan.verify <clan>") { invocation ->
+            setVerification(invocation.arguments.firstOrNull(), verified = true)
+        }
+        action("clan.unverify", "Revokes a clan tag's approval (admin).", "clan.unverify <clan>") { invocation ->
+            setVerification(invocation.arguments.firstOrNull(), verified = false)
+        }
         panel(
             "clan",
             "Clans",
@@ -164,9 +174,15 @@ class ClanAddon : AddonBase() {
         )
     }
 
-    /** Publishes a player's clan tag as the `clan.tag.<name>` bridge value (empty when clanless). */
+    /**
+     * Publishes a player's clan tag as the `clan.tag.<name>` bridge value —
+     * empty when clanless or while the tag awaits verification.
+     */
     private fun publishTag(player: String) {
-        context.publishBridgeValue("clan.tag.${player.lowercase()}", store.clanOf(player)?.tag ?: "")
+        context.publishBridgeValue(
+            "clan.tag.${player.lowercase()}",
+            store.clanOf(player)?.takeIf { it.verified }?.tag ?: "",
+        )
     }
 
     private fun handleClanCommand(invocation: ActionInvocation): ActionResult {
@@ -213,7 +229,10 @@ class ClanAddon : AddonBase() {
         }
         val clan = store.create(tag, name, executor, System.currentTimeMillis())
             ?: return ActionResult.error(msg.formatFor(executor, "error.inclan"))
-        return ActionResult.ok(msg.formatFor(executor, "create.ok", "name" to clan.name, "tag" to clan.tag))
+        return ActionResult.ok(
+            msg.formatFor(executor, "create.ok", "name" to clan.name, "tag" to clan.tag),
+            msg.formatFor(executor, "verify.pending"),
+        )
     }
 
     private fun info(executor: String, token: String?): ActionResult {
@@ -228,6 +247,7 @@ class ClanAddon : AddonBase() {
             msg.formatFor(executor, "info.owner", "owner" to clan.owner),
             msg.formatFor(executor, "info.members", "count" to clan.members.size.toString()),
             msg.formatFor(executor, "info.bank", "bank" to clan.bank.toString()),
+            msg.formatFor(executor, if (clan.verified) "info.verified" else "info.pending"),
         )
     }
 
@@ -402,8 +422,11 @@ class ClanAddon : AddonBase() {
         if (!store.setTag(store.clanIdOf(executor)!!, newTag)) {
             return ActionResult.error(msg.formatFor(executor, "error.tagtaken"))
         }
+        // setTag reset the verification; the old (verified) tag must vanish from displays now.
+        store.clanById(store.clanIdOf(executor)!!)?.members?.keys?.forEach(::publishTag)
         return ActionResult.ok(
             msg.formatFor(executor, "tag.ok", "tag" to newTag.uppercase(), "name" to clan.name),
+            msg.formatFor(executor, "verify.pending"),
         )
     }
 
@@ -487,6 +510,22 @@ class ClanAddon : AddonBase() {
     private fun canManage(clan: Clan, player: String): Boolean =
         roleOf(clan, player)?.let { it.rank >= ClanRole.OFFICER.rank } == true
 
+    /**
+     * Applies a verification decision: gates the tag display, refreshes the
+     * members' bridge values and tells online members about an approval.
+     */
+    private fun setVerification(token: String?, verified: Boolean): ActionResult {
+        val input = token ?: return ActionResult.error("usage: clan.${if (verified) "verify" else "unverify"} <clan>")
+        val id = store.resolveId(input) ?: return ActionResult.error("no such clan")
+        val clan = store.clanById(id) ?: return ActionResult.error("no such clan")
+        store.setVerified(id, verified)
+        clan.members.keys.forEach(::publishTag)
+        if (verified) {
+            broadcast(clan, except = "", key = "verify.notified", "name" to clan.name, "tag" to clan.tag)
+        }
+        return ActionResult.ok("clan $id ${if (verified) "verified — tag is now visible" else "unverified — tag is hidden"}")
+    }
+
     /** Delivers a clan-chat line to every online member (including the sender). */
     private fun chat(executor: String, text: String): ActionResult {
         if (text.isBlank()) {
@@ -557,6 +596,10 @@ class ClanAddon : AddonBase() {
             "setowner.notified" to "&aYou are now the owner of &f{name}&a.",
             "tag.usage" to "&cUsage: /clan tag \\<TAG>",
             "tag.ok" to "&aTag changed to &f[{tag}]&a.",
+            "verify.pending" to "&7The tag is &epending verification &7— it becomes visible to other players once a team member approves it.",
+            "verify.notified" to "&aYour clan &f{name} &awas verified — the tag &f[{tag}] &ais now visible.",
+            "info.verified" to "&7Status: &averified",
+            "info.pending" to "&7Status: &epending verification",
             "bank.usage" to "&cUsage: /clan bank [deposit|withdraw \\<amount>]",
             "bank.balance" to "&7Clan bank: &f{bank} &7coins.",
             "bank.amount" to "&cAmount must be a positive number.",
@@ -616,6 +659,10 @@ class ClanAddon : AddonBase() {
             "setowner.notified" to "&aDu bist jetzt der Besitzer von &f{name}&a.",
             "tag.usage" to "&cVerwendung: /clan tag \\<TAG>",
             "tag.ok" to "&aTag geändert zu &f[{tag}]&a.",
+            "verify.pending" to "&7Der Tag ist &enoch nicht verifiziert &7— er wird für andere Spieler sichtbar, sobald ein Teammitglied ihn freigibt.",
+            "verify.notified" to "&aEuer Clan &f{name} &awurde verifiziert — der Tag &f[{tag}] &aist jetzt sichtbar.",
+            "info.verified" to "&7Status: &averifiziert",
+            "info.pending" to "&7Status: &ewartet auf Verifizierung",
             "bank.usage" to "&cVerwendung: /clan bank [deposit|withdraw \\<amount>]",
             "bank.balance" to "&7Clan-Bank: &f{bank} &7Coins.",
             "bank.amount" to "&cDer Betrag muss eine positive Zahl sein.",

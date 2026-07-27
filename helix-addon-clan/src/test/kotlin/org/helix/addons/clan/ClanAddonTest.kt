@@ -194,11 +194,44 @@ class ClanAddonTest {
     }
 
     @Test
-    fun `display resolver returns the tag for members and null otherwise`() {
+    fun `display resolver returns the tag only after verification`() {
         createClan()
         val resolver = context.displayResolvers.single()
 
+        assertNull(resolver.resolve("Steve"), "unverified tags stay invisible")
+        assertTrue(context.run("clan.verify", "STV").success)
         assertEquals(" &8[&bSTV&8]", resolver.resolve("Steve")?.suffix)
         assertNull(resolver.resolve("Nobody"))
+    }
+
+    @Test
+    fun `verification gates the tag lifecycle`() {
+        createClan()
+        context.online += org.helix.api.player.OnlinePlayer(name = "Steve")
+
+        // fresh clan: pending — bridge value empty, create response carries the hint
+        assertEquals("", context.bridgeValues["clan.tag.steve"])
+
+        // verify: tag visible, members notified
+        context.invocations.clear()
+        assertTrue(context.run("clan.verify", "STV").success)
+        assertEquals("STV", context.bridgeValues["clan.tag.steve"])
+        assertTrue(
+            context.invocations.any { it.action == "player.message" && it.arguments.first() == "steve" },
+            "online members are notified about the approval",
+        )
+
+        // player-driven tag change resets the verification and hides the tag again
+        assertTrue(context.run("clan", "Steve", "tag", "ABC").success)
+        assertEquals("", context.bridgeValues["clan.tag.steve"])
+        assertNull(context.displayResolvers.single().resolve("Steve"))
+
+        // admin settag counts as approved
+        assertTrue(context.run("clan.settag", "ABC", "XYZ").success)
+        assertEquals("XYZ", context.bridgeValues["clan.tag.steve"])
+
+        // unverify hides it again
+        assertTrue(context.run("clan.unverify", "XYZ").success)
+        assertEquals("", context.bridgeValues["clan.tag.steve"])
     }
 }
