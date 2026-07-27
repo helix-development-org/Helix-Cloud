@@ -22,7 +22,7 @@
 #   --no-start        install everything but do not start the service
 set -euo pipefail
 
-REPO="Tytoss/Helix-Cloud"
+REPO="helix-development-org/Helix-Cloud"
 JAVA_MAJOR=24
 DIR="/opt/helix"
 RUN_USER="helix"
