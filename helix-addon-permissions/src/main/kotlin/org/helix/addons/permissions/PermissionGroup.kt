@@ -11,6 +11,11 @@ import kotlinx.serialization.Serializable
  * @property permissions permission nodes; `*` and `prefix.*` wildcards,
  *   `-node` negates.
  * @property parents names of inherited groups.
+ * @property prefix display prefix members carry in chat/tab/name tag, for
+ *   example `&cAdmin &f`. The player's highest-weight group with a prefix
+ *   wins — deliberately independent of permission nodes, so a `*` grant
+ *   never changes how someone is displayed.
+ * @property color display name color code, for example `&c`.
  */
 @Serializable
 data class PermissionGroup(
@@ -19,4 +24,6 @@ data class PermissionGroup(
     val default: Boolean = false,
     val permissions: List<String> = emptyList(),
     val parents: List<String> = emptyList(),
+    val prefix: String = "",
+    val color: String = "",
 )

@@ -3,29 +3,30 @@ package org.helix.addons.chat
 import kotlinx.serialization.json.Json
 import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionResult
-import org.helix.api.display.DisplayProfile
 
 /**
  * Pretty chat addon.
  *
  * Publishes the chat format as a bridge value (rendered by the paper
- * bridge) and resolves per-player prefixes through the display resolver,
- * matching prefix rules against the permission system.
+ * bridge). The `{prefix}`/`{color}` placeholders are filled by the
+ * display pipeline — group prefixes live in the permissions addon
+ * (`perm.group.prefix`), the nick in the nick addon, the clan tag in the
+ * clan addon; this addon only owns the line format.
  */
 class PrettyChatAddon : AddonBase() {
-    private val json = Json { prettyPrint = true }
+    // Stored configs from before 0.56 carry a legacy "rules" list — ignore it on decode.
+    private val json = Json {
+        prettyPrint = true
+        ignoreUnknownKeys = true
+    }
     private lateinit var config: ChatConfig
 
     /**
-     * Publishes the format, registers the display resolver and actions.
+     * Publishes the format and registers the format actions.
      */
     override fun enable() {
         config = load()
         context.publishBridgeValue("chat.format", config.format)
-        context.registerDisplayResolver { name ->
-            config.rules.firstOrNull { rule -> context.hasPermission(name, rule.permission) }
-                ?.let { rule -> DisplayProfile(prefix = rule.prefix, color = rule.color) }
-        }
         action(
             "chat.format",
             "Sets the chat format. Placeholders: {prefix} {color} {name} {suffix} {message}.",
@@ -39,46 +40,6 @@ class PrettyChatAddon : AddonBase() {
                 save()
                 context.publishBridgeValue("chat.format", format)
                 ActionResult.ok("chat format updated")
-            }
-        }
-        action(
-            "chat.prefix.add",
-            "Adds a prefix rule: players with the permission get the prefix. First rule wins.",
-            "chat.prefix.add <permission> <color> <prefix...>",
-        ) { invocation ->
-            val permission = invocation.arguments.getOrNull(0)
-            val color = invocation.arguments.getOrNull(1)
-            val prefix = invocation.arguments.drop(2).joinToString(" ")
-            if (permission == null || color == null || prefix.isBlank()) {
-                ActionResult.error("usage: chat.prefix.add <permission> <color> <prefix...>")
-            } else {
-                config = config.copy(
-                    rules = config.rules.filter { it.permission != permission } +
-                        PrefixRule(permission, "$prefix ", color),
-                )
-                save()
-                ActionResult.ok("prefix rule for $permission added")
-            }
-        }
-        action("chat.prefix.remove", "Removes a prefix rule.", "chat.prefix.remove <permission>") { invocation ->
-            val permission = invocation.arguments.firstOrNull()
-                ?: return@action ActionResult.error("usage: chat.prefix.remove <permission>")
-            val remaining = config.rules.filter { it.permission != permission }
-            if (remaining.size == config.rules.size) {
-                ActionResult.error("no rule for $permission")
-            } else {
-                config = config.copy(rules = remaining)
-                save()
-                ActionResult.ok("prefix rule for $permission removed")
-            }
-        }
-        action("chat.prefix.list", "Lists all prefix rules in match order.", "chat.prefix.list") {
-            if (config.rules.isEmpty()) {
-                ActionResult.ok("no prefix rules — chat uses the plain format")
-            } else {
-                ActionResult.ok(
-                    *config.rules.map { "${it.permission} → '${it.prefix}' color='${it.color}'" }.toTypedArray(),
-                )
             }
         }
         action("chat.export", "Exports the chat configuration as JSON (dashboard).", "chat.export") {

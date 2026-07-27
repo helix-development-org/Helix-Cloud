@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.56.0 — 2026-07-27
+
+### Prefixes gehören jetzt den Permission-Gruppen
+- **Gruppen haben Prefix & Namensfarbe** (`perm.group.prefix <gruppe>
+  [prefix...]`, `perm.group.color <gruppe> [&c]`, editierbar im
+  Permissions-Panel im Gruppen-Editor, Anzeige in der Gruppentabelle).
+  Angezeigt wird die **höchstgewichtige Gruppe des Spielers** (inkl.
+  vererbter Eltern; Spieler ohne Prefix-Gruppe fallen auf die
+  Default-Gruppe zurück).
+- **Bewusst entkoppelt von Permission-Nodes:** Die alte Lösung matchte
+  Chat-Prefix-Regeln gegen Permissions — wer `*` hatte, bekam damit
+  automatisch irgendeinen (den erstbesten) Prefix. Jetzt entscheidet
+  ausschließlich die Gruppenzugehörigkeit + Gewicht.
+- **Chat-Addon verschlankt:** Die permission-basierten Prefix-Regeln
+  (`chat.prefix.add/list/remove`) sind entfernt; das Addon besitzt nur
+  noch das Zeilenformat. Bestehende Regeln werden ignoriert (Legacy-Feld
+  wird beim Laden übersprungen) — Prefixes bitte einmalig den Gruppen
+  zuordnen.
+
 ## 0.55.2 — 2026-07-27
 
 ### Nick: Pre-Login-Prewarm + klarere Logs

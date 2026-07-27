@@ -161,6 +161,36 @@ class PermissionStore(
     }
 
     /**
+     * The group whose prefix/color a player displays: the player's
+     * memberships (explicit and timed, falling back to the default groups)
+     * by descending weight, each expanded through its parents — the first
+     * group carrying a prefix or color wins. Permission nodes play no role
+     * here, so a `*` grant never changes how someone is displayed.
+     *
+     * @param player player name.
+     * @return the display group, or `null` when no group defines a prefix.
+     */
+    @Synchronized
+    fun displayGroup(player: String): PermissionGroup? {
+        val profile = user(player)
+        val memberships = (profile.groups + profile.timedGroups.map { it.value })
+            .distinct()
+            .mapNotNull { groups[it] }
+            .sortedByDescending { it.weight }
+        // Default groups close the chain: a player whose groups define no prefix still displays
+        // as a regular default player instead of falling back to nothing.
+        val defaults = groups.values.filter { it.default }.sortedByDescending { it.weight }
+        (memberships + defaults).distinctBy { it.name }.forEach { membership ->
+            expand(membership).forEach { level ->
+                if (level.prefix.isNotEmpty() || level.color.isNotEmpty()) {
+                    return level
+                }
+            }
+        }
+        return null
+    }
+
+    /**
      * Effective group chain of a group: itself, then its parents
      * depth-first, cycles skipped.
      *

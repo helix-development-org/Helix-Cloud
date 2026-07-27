@@ -2,43 +2,22 @@
   <div class="card-head"><h2>Chat format</h2><div class="sub">placeholders: {prefix} {color} {name} {suffix} {message}</div></div>
   <div class="card-body">
     <div class="row"><input id="format" class="mono" style="max-width:520px"><button class="btn" id="save-format">Save</button></div>
-  </div>
-</div>
-<div class="card">
-  <div class="card-head"><h2>Prefix rules</h2><div class="sub">first matching rule wins</div></div>
-  <div class="card-body">
-    <div class="row">
-      <input id="perm" placeholder="Permission (chat.rank.admin)" style="max-width:240px">
-      <input id="color" placeholder="&amp;c" style="max-width:90px">
-      <input id="prefix" placeholder="Prefix (&amp;cAdmin)" style="max-width:200px">
-      <button class="btn" id="add">Add rule</button>
+    <div class="muted" style="margin-top:12px">
+      {prefix} and {color} come from the player's permission group (Permissions panel → group editor → Display),
+      {name} is the (nick) name, {suffix} is the clan tag.
     </div>
-    <div id="rules" style="margin-top:14px"></div>
   </div>
 </div>
 <script>
 "use strict";
-const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 async function load() {
   const r = await Helix.action("chat.export");
-  let c = { format: "", rules: [] }; try { c = JSON.parse(r.lines[0] || "{}"); } catch (e) {}
+  let c = { format: "" }; try { c = JSON.parse(r.lines[0] || "{}"); } catch (e) {}
   document.getElementById("format").value = c.format || "";
-  const box = document.getElementById("rules");
-  box.innerHTML = (c.rules || []).length ? `<table><thead><tr><th>Permission</th><th>Prefix</th><th>Color</th><th></th></tr></thead><tbody>${
-    (c.rules).map(x => `<tr><td class="mono">${esc(x.permission)}</td><td class="mono">${esc(x.prefix)}</td><td class="mono">${esc(x.color)}</td>
-      <td style="text-align:right"><button class="btn sm danger" data-rm="${esc(x.permission)}">Remove</button></td></tr>`).join("")
-  }</tbody></table>` : '<div class="empty">No prefix rules — chat uses the plain format</div>';
-  box.querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => { await Helix.action("chat.prefix.remove", b.dataset.rm); load(); });
 }
 document.getElementById("save-format").onclick = async () => {
   const f = document.getElementById("format").value.trim(); if (!f) return;
   const r = await Helix.action("chat.format", ...f.split(" ")); Helix.toast(r.lines[0] || "saved");
-};
-document.getElementById("add").onclick = async () => {
-  const p = document.getElementById("perm").value.trim(), c = document.getElementById("color").value.trim() || "&f", pre = document.getElementById("prefix").value.trim();
-  if (!p || !pre) return Helix.toast("permission and prefix required");
-  const r = await Helix.action("chat.prefix.add", p, c, ...pre.split(" ")); Helix.toast(r.lines[0] || "added");
-  document.getElementById("perm").value = document.getElementById("prefix").value = ""; load();
 };
 Helix.ready(load);
 </script>

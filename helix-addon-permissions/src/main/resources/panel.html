@@ -159,10 +159,11 @@ function renderGroups() {
   const box = document.getElementById("groups");
   if (!doc.groups.length) { box.innerHTML = '<div class="empty">No groups yet — create one</div>'; return; }
   const sorted = [...doc.groups].sort((a, b) => (b.weight||0) - (a.weight||0));
-  box.innerHTML = `<table><thead><tr><th>Group</th><th>Weight</th><th>Default</th><th>Parents</th><th>Permissions</th><th></th></tr></thead><tbody>${
+  box.innerHTML = `<table><thead><tr><th>Group</th><th>Weight</th><th>Prefix</th><th>Default</th><th>Parents</th><th>Permissions</th><th></th></tr></thead><tbody>${
     sorted.map(g => `<tr>
       <td><strong>${esc(g.name)}</strong></td>
       <td class="mono">${g.weight||0}</td>
+      <td class="mono">${g.prefix ? esc(g.prefix) : '<span class="muted">—</span>'}</td>
       <td>${g.default ? '<span class="badge good">default</span>' : '<span class="muted">—</span>'}</td>
       <td>${(g.parents||[]).length ? (g.parents||[]).map(p=>`<span class="tag">${esc(p)}</span>`).join(" ") : '<span class="muted">—</span>'}</td>
       <td>${(g.permissions||[]).length ? `<span class="tag">${(g.permissions||[]).length} nodes</span>` : '<span class="muted">—</span>'}</td>
@@ -175,13 +176,19 @@ function renderGroups() {
 }
 
 function groupEditor(g) {
-  return `<tr><td colspan="6" style="background:var(--surface-2)"><div class="card-body">
+  return `<tr><td colspan="7" style="background:var(--surface-2)"><div class="card-body">
     <div class="grid c2">
-      <div class="field"><label>Permissions</label>
-        <div class="row"><button class="btn sm" data-grant="${esc(g.name)}">＋ Add permissions</button></div></div>
+      <div class="field"><label>Display — prefix &amp; name color (chat, tab, name tag)</label>
+        <div class="row">
+          <input id="gprefix-${esc(g.name)}" class="mono" placeholder="&amp;cAdmin &amp;f" value="${esc(g.prefix||"")}" style="max-width:200px">
+          <input id="gcolor-${esc(g.name)}" class="mono" placeholder="&amp;c" value="${esc(g.color||"")}" style="max-width:70px">
+          <button class="btn sm" data-display="${esc(g.name)}">Save</button>
+        </div></div>
       <div class="field"><label>Add parent group</label>
         <div class="row"><select id="parent-in-${esc(g.name)}" style="max-width:220px">${doc.groups.filter(x=>x.name!==g.name).map(x=>`<option>${esc(x.name)}</option>`).join("")}</select><button class="btn sm subtle" data-addparent="${esc(g.name)}">Add</button></div></div>
     </div>
+    <div class="field" style="margin-top:12px"><label>Permissions</label>
+      <div class="row"><button class="btn sm" data-grant="${esc(g.name)}">＋ Add permissions</button></div></div>
     <div style="margin-top:12px">${(g.permissions||[]).length ? (g.permissions||[]).map(p=>`<span class="chip">${esc(p)}<button data-revoke="${esc(g.name)}|${esc(p)}">×</button></span>`).join("") : '<span class="muted">no permissions</span>'}</div>
     <div style="margin-top:8px">${(g.parents||[]).map(p=>`<span class="chip">⤷ ${esc(p)}<button data-rmparent="${esc(g.name)}|${esc(p)}">×</button></span>`).join("")}</div>
   </div></td></tr>`;
@@ -189,6 +196,15 @@ function groupEditor(g) {
 
 function bindEditors() {
   const box = document.getElementById("groups");
+  box.querySelectorAll("[data-display]").forEach(b => b.onclick = async () => {
+    const group = b.dataset.display;
+    const prefix = document.getElementById("gprefix-" + group).value;
+    const color = document.getElementById("gcolor-" + group).value.trim();
+    const p = prefix.trim() ? await Helix.action("perm.group.prefix", group, ...prefix.trim().split(" ")) : await Helix.action("perm.group.prefix", group);
+    const c = color ? await Helix.action("perm.group.color", group, color) : await Helix.action("perm.group.color", group);
+    Helix.toast(p.success && c.success ? "display of " + group + " saved" : (p.lines[0] || c.lines[0] || "failed"));
+    load();
+  });
   box.querySelectorAll("[data-grant]").forEach(b => b.onclick = () => {
     const group = doc.groups.find(x => x.name === b.dataset.grant);
     openPermModal(`Grant to group ${b.dataset.grant}`, group?.permissions || [], async nodes => {

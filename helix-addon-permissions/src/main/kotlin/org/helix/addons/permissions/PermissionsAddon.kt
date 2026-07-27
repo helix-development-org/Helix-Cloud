@@ -13,6 +13,9 @@ import org.helix.api.action.ActionSource
  * wildcard (`*`, `prefix.*`) and negation (`-node`) support. Registers a
  * permission resolver so bridges (for example the maintenance bypass) and
  * other addons can ask the node — the platform stays permission-agnostic.
+ * Groups also own the display prefix/color (`perm.group.prefix`): the
+ * player's highest-weight group with a prefix decides how they appear in
+ * chat, tab list and the name tag.
  */
 class PermissionsAddon : AddonBase() {
     /** Export JSON with every field present, so panel code needs no guards. */
@@ -30,6 +33,13 @@ class PermissionsAddon : AddonBase() {
             store.saveGroup(PermissionGroup(name = "default", default = true))
         }
         context.registerPermissionResolver { request -> store.has(request.name, request.permission) }
+        // Group prefixes are DISPLAY state, deliberately decoupled from permission nodes: the
+        // player's highest-weight group with a prefix wins, so a `*` grant never changes looks.
+        context.registerDisplayResolver { name ->
+            store.displayGroup(name)?.let { group ->
+                org.helix.api.display.DisplayProfile(prefix = group.prefix, color = group.color)
+            }
+        }
 
         action(
             "perm.group.create",
@@ -60,9 +70,42 @@ class PermissionsAddon : AddonBase() {
             ActionResult.ok(
                 "name: ${group.name}",
                 "weight: ${group.weight}, default: ${group.default}",
+                "prefix: '${group.prefix}'${if (group.color.isNotEmpty()) ", color: '${group.color}'" else ""}",
                 "parents: ${group.parents.joinToString().ifEmpty { "-" }}",
                 "permissions: ${group.permissions.joinToString().ifEmpty { "-" }}",
             )
+        }
+        action(
+            "perm.group.prefix",
+            "Sets a group's display prefix (chat/tab/name tag); no prefix clears it.",
+            "perm.group.prefix <group> [prefix...]",
+        ) { invocation ->
+            val group = invocation.arguments.firstOrNull()?.let(store::group)
+                ?: return@action ActionResult.error("unknown group: ${invocation.arguments.firstOrNull()}")
+            val raw = invocation.arguments.drop(1).joinToString(" ")
+            // A trailing space separates the prefix from the name (unless the operator styles it).
+            val prefix = if (raw.isEmpty() || raw.endsWith(" ")) raw else "$raw "
+            store.saveGroup(group.copy(prefix = prefix))
+            if (prefix.isEmpty()) {
+                ActionResult.ok("prefix of ${group.name} cleared")
+            } else {
+                ActionResult.ok("prefix of ${group.name} set to '$prefix'")
+            }
+        }
+        action(
+            "perm.group.color",
+            "Sets a group's display name color (for example &c); no color clears it.",
+            "perm.group.color <group> [&color]",
+        ) { invocation ->
+            val group = invocation.arguments.firstOrNull()?.let(store::group)
+                ?: return@action ActionResult.error("unknown group: ${invocation.arguments.firstOrNull()}")
+            val color = invocation.arguments.getOrNull(1).orEmpty()
+            store.saveGroup(group.copy(color = color))
+            if (color.isEmpty()) {
+                ActionResult.ok("color of ${group.name} cleared")
+            } else {
+                ActionResult.ok("color of ${group.name} set to '$color'")
+            }
         }
         action("perm.group.grant", "Adds a permission to a group.", "perm.group.grant <group> <permission>") {
             groupPermission(it, add = true)

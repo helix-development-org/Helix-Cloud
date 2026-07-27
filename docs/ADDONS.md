@@ -224,11 +224,14 @@ Referenz-Implementierungen in diesem Repo:
 - `helix-addon-tablist` — konfigurierbarer Tablist-Header/-Footer
   (`tablist.header`, `tablist.footer`, `tablist.show`), Platzhalter
   `{online}`/`{max}`.
-- `helix-addon-chat` — Chat-Format (`chat.format`) plus permission-basierte
-  Prefix-Regeln (`chat.prefix.add/list/remove`), gerendert von der
-  Paper-Bridge. Das aufgelöste Display-Profil (Prefix/Suffix/Farbe) färbt
-  zusätzlich den **Namen über dem Kopf** (per Scoreboard-Team) und den
-  **Tablist-Namen** des Spielers.
+- `helix-addon-chat` — Chat-Zeilenformat (`chat.format`), gerendert von der
+  Paper-Bridge. Die Display-Komponenten kommen aus den anderen Addons:
+  `{prefix}`/`{color}` aus der Permission-**Gruppe** des Spielers
+  (`perm.group.prefix`/`perm.group.color`, höchstes Gewicht gewinnt —
+  bewusst unabhängig von Permission-Nodes, eine `*`-Permission ändert die
+  Anzeige nicht), `{name}` aus dem Nick-Addon, `{suffix}` aus dem
+  Clan-Addon. Das aufgelöste Display-Profil färbt zusätzlich den **Namen
+  über dem Kopf** (per Scoreboard-Team) und den **Tablist-Namen**.
 - `helix-addon-economy` — Coins mit `/balance` und `/pay` sowie
   `eco.give/take/set/get`.
 - `helix-addon-moderation` — permission-gated `/kick`, `/warn`, `/warns`,

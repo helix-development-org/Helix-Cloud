@@ -3,5 +3,5 @@
   "name": "Helix Pretty Chat",
   "version": "1.0.0",
   "main": "org.helix.addons.chat.PrettyChatAddon",
-  "description": "Chat formatting with permission-based prefixes and name colors."
+  "description": "Chat line format ({prefix}{color}{name}{suffix} {message}), rendered by the paper bridge."
 }

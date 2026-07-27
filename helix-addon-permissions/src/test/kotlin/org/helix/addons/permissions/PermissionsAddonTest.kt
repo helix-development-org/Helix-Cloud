@@ -41,11 +41,19 @@ private class FakeContext(override val dataDirectory: Path) : AddonContext {
         resolvers += resolver
     }
 
+    override fun registerDisplayResolver(resolver: org.helix.api.addon.DisplayResolver) {
+        displayResolvers += resolver
+    }
+
+    val displayResolvers = mutableListOf<org.helix.api.addon.DisplayResolver>()
+
     fun run(action: String, vararg args: String): ActionResult =
         handlers.getValue(action).execute(ActionInvocation(action, args.toList()))
 
     fun has(player: String, permission: String): Boolean =
         resolvers.single().has(PermissionCheckRequest(player, permission))
+
+    fun display(player: String) = displayResolvers.single().resolve(player)
 }
 
 class PermissionsAddonTest {
@@ -92,6 +100,42 @@ class PermissionsAddonTest {
         context.run("perm.user.addgroup", "steve", "muted")
 
         assertFalse(context.has("steve", "chat.send"))
+    }
+
+    @Test
+    fun `group prefix is display state independent of permission nodes`() {
+        context.run("perm.group.create", "admin", "weight=100")
+        context.run("perm.group.prefix", "admin", "&cAdmin")
+        context.run("perm.group.create", "member", "weight=0")
+        context.run("perm.group.prefix", "member", "&7Member")
+        // a * grant on the low-weight group must not change anyone's display
+        context.run("perm.group.grant", "member", "*")
+        context.run("perm.user.addgroup", "steve", "member")
+        context.run("perm.user.addgroup", "steve", "admin")
+        context.run("perm.user.addgroup", "alex", "member")
+
+        assertEquals("&cAdmin ", context.display("steve")?.prefix, "highest-weight group wins the prefix")
+        assertEquals("&7Member ", context.display("alex")?.prefix)
+    }
+
+    @Test
+    fun `default group prefix applies and parents are inherited`() {
+        context.run("perm.group.prefix", "default", "&7Spieler")
+        assertEquals("&7Spieler ", context.display("random")?.prefix)
+
+        context.run("perm.group.create", "vipplus", "weight=20")
+        context.run("perm.group.create", "vip", "weight=10")
+        context.run("perm.group.prefix", "vip", "&6VIP")
+        context.run("perm.group.color", "vip", "&6")
+        context.run("perm.group.addparent", "vipplus", "vip")
+        context.run("perm.user.addgroup", "steve", "vipplus")
+
+        assertEquals("&6VIP ", context.display("steve")?.prefix, "prefix inherits through parents")
+        assertEquals("&6", context.display("steve")?.color)
+
+        context.run("perm.group.prefix", "vip")
+        context.run("perm.group.color", "vip")
+        assertEquals("&7Spieler ", context.display("steve")?.prefix, "cleared prefix falls back")
     }
 
     @Test
