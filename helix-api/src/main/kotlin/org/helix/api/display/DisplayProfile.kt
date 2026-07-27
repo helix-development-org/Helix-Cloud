@@ -18,6 +18,10 @@ import kotlinx.serialization.Serializable
  * @property name display name override (nick); empty keeps the real name.
  * @property suffix text after the player name, for example a clan tag.
  * @property color name color code, for example `&c`.
+ * @property exclusive when `true` this profile replaces the merge result
+ *   entirely — no other resolver contributes a component. Used by
+ *   disguises (nick): the group prefix and clan tag must not leak through
+ *   an assumed identity.
  */
 @Serializable
 data class DisplayProfile(
@@ -25,6 +29,7 @@ data class DisplayProfile(
     val name: String = "",
     val suffix: String = "",
     val color: String = "",
+    val exclusive: Boolean = false,
 ) {
     /**
      * The name component to render for a player.

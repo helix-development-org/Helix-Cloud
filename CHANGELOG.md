@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.55.0 — 2026-07-27
+
+### Nick = echte Verkleidung (inkl. Name über dem Kopf)
+- **Exklusives Display-Profil:** Ein Nick ersetzt jetzt das komplette
+  Profil statt nur der Namens-Komponente — Gruppen-Prefix und Clan-Tag
+  der echten Identität leaken nicht mehr. Genickte Spieler erscheinen
+  als Default-Spieler; der Disguise-Prefix ist konfigurierbar
+  (`nick.disguise &7Spieler` / `nick.disguise clear`, Default: kein
+  Prefix).
+- **Nick über dem Kopf:** Die Paper-Bridge rewritet ausgehende
+  `PLAYER_INFO_UPDATE`-Pakete via packetevents (softdepend, liegt durch
+  IGuard ohnehin auf den Servern) — der Nametag zeigt den Nick, für
+  bereits sichtbare Spieler erzwingt ein Hide/Show-Zyklus das Re-Senden.
+  Beim Login wird die Nick-Map vorgewärmt, damit kein Echtname-Blitzer
+  entsteht. Das eigene Info-Entry bleibt unangetastet (Chat-Session/
+  Skin-Konsistenz). Ohne packetevents degradiert der Nick sauber auf
+  Chat + Tablist.
+- **Schnelle Propagation:** Das Nick-Addon publiziert
+  `nick.name.<spieler>`-Bridge-Values; die Bridge gleicht sie jeden Puls
+  (5 s) ab statt auf den 30-s-Display-Zyklus zu warten. Die
+  Nametag-Teams hängen am *angezeigten* Namen, damit Prefix/Farbe auch
+  am Nick-Tag kleben.
+
 ## 0.54.0 — 2026-07-27
 
 ### Chat-Kanäle: @team und @clan

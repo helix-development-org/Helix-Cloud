@@ -42,9 +42,13 @@ class DisplayResolverRegistry {
     /**
      * Resolves a player's display profile by merging all resolver results.
      *
+     * An [DisplayProfile.exclusive] profile short-circuits the merge and is
+     * returned alone — a disguise (nick) must not leak the group prefix or
+     * clan tag of the real identity.
+     *
      * @param name player name.
-     * @return the merged profile (first non-empty value per component), or
-     *   the empty profile.
+     * @return the exclusive profile if any resolver claims one, otherwise
+     *   the merged profile (first non-empty value per component).
      */
     fun resolve(name: String): DisplayProfile {
         var merged = DisplayProfile()
@@ -52,6 +56,9 @@ class DisplayResolverRegistry {
             val profile = runCatching { resolver.resolve(name) }
                 .onFailure { logger.error("display resolver failed for {}", name, it) }
                 .getOrNull() ?: return@forEach
+            if (profile.exclusive) {
+                return profile
+            }
             merged = DisplayProfile(
                 prefix = merged.prefix.ifEmpty { profile.prefix },
                 name = merged.name.ifEmpty { profile.name },

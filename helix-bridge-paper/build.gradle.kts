@@ -12,11 +12,18 @@ repositories {
         name = "papermc"
         url = uri("https://repo.papermc.io/repository/maven-public/")
     }
+    maven {
+        name = "codemc"
+        url = uri("https://repo.codemc.io/repository/maven-releases/")
+    }
 }
 
 dependencies {
     implementation(rootProject.project("helix-api"))
     compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
+    // Optional at runtime (softdepend): used to rewrite PLAYER_INFO names so a nick shows in the
+    // name tag above the player. Ships as its own plugin via the guard HXA.
+    compileOnly("com.github.retrooper:packetevents-spigot:2.13.0")
 }
 
 tasks.withType<JavaCompile>().configureEach {

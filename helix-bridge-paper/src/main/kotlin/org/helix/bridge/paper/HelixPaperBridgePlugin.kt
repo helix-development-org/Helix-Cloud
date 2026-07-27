@@ -42,6 +42,9 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     private val miniMessage = MiniMessage.miniMessage()
     private val displayProfiles = ConcurrentHashMap<String, DisplayProfile>()
 
+    /** Player uuid to assumed name; read by the packet listener on the netty threads. */
+    private val nickNames = ConcurrentHashMap<java.util.UUID, String>()
+
     @Volatile
     private var bridgeValues: Map<String, String> = emptyMap()
 
@@ -89,7 +92,22 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
             ANIMATION_PERIOD_TICKS,
             ANIMATION_PERIOD_TICKS,
         )
+        registerNickPacketListener()
         logger.info("Helix bridge enabled for ${loaded.serviceId} → ${loaded.controlUrl}")
+    }
+
+    /**
+     * Registers the PLAYER_INFO rewriter when the packetevents plugin is
+     * installed; without it nicks show in chat and tab list only.
+     */
+    private fun registerNickPacketListener() {
+        runCatching {
+            com.github.retrooper.packetevents.PacketEvents.getAPI().eventManager
+                .registerListener(NickPacketListener(nickNames))
+            logger.info("packetevents found — nicks rewrite the name tag above players")
+        }.onFailure {
+            logger.info("packetevents not installed — nicks show in chat/tab only, name tags keep the real name")
+        }
     }
 
     /**
@@ -106,6 +124,21 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     }
 
     /**
+     * Pre-warms the nick mapping before the join broadcasts go out, so the
+     * very first PLAYER_INFO other players receive already carries the
+     * assumed name (no real-name flash).
+     *
+     * @param event the login event.
+     */
+    @EventHandler
+    fun onLogin(event: org.bukkit.event.player.PlayerLoginEvent) {
+        val nick = bridgeValues["nick.name.${event.player.name.lowercase()}"].orEmpty()
+        if (nick.isNotEmpty()) {
+            nickNames[event.player.uniqueId] = nick
+        }
+    }
+
+    /**
      * Fetches the display profile of a joining player.
      *
      * @param event the join event.
@@ -117,6 +150,17 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
             this,
             Runnable { refreshDisplay(httpClient, event.player.name) },
         )
+    }
+
+    /**
+     * Drops the cached display state of a quitting player.
+     *
+     * @param event the quit event.
+     */
+    @EventHandler
+    fun onQuit(event: org.bukkit.event.player.PlayerQuitEvent) {
+        displayProfiles.remove(event.player.name.lowercase())
+        nickNames.remove(event.player.uniqueId)
     }
 
     /**
@@ -210,6 +254,17 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         ensureScoreboardTask()
         if (pollCounter++ % DISPLAY_REFRESH_CYCLES == 0) {
             server.onlinePlayers.forEach { player -> refreshDisplay(client, player.name) }
+        } else {
+            // Nick changes must not wait for the slow display cycle: the nick addon publishes
+            // nick.name.<player> bridge values, so a mismatch against the cached profile
+            // triggers an immediate refresh (one poll = 5s worst case).
+            server.onlinePlayers.forEach { player ->
+                val expected = bridgeValues["nick.name.${player.name.lowercase()}"].orEmpty()
+                val current = displayProfiles[player.name.lowercase()]?.name.orEmpty()
+                if (expected != current) {
+                    refreshDisplay(client, player.name)
+                }
+            }
         }
     }
 
@@ -457,37 +512,59 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     private fun applyDisplay(player: Player, profile: DisplayProfile) {
         val main = server.scoreboardManager?.mainScoreboard ?: return
         val boards = listOf(main) + playerBoards.values
+        val previousNick = nickNames[player.uniqueId].orEmpty()
+        if (profile.name.isEmpty()) nickNames.remove(player.uniqueId) else nickNames[player.uniqueId] = profile.name
         if (profile.isPlain()) {
             val teamName = displayTeamName(player.name)
             boards.forEach { board ->
-                board.getTeam(teamName)?.takeIf { it.hasEntry(player.name) }?.removeEntry(player.name)
+                board.getTeam(teamName)?.let { team -> team.entries.toList().forEach(team::removeEntry) }
             }
             player.playerListName(null)
             player.displayName(null)
-            return
+        } else {
+            boards.forEach { board -> applyDisplayTeam(board, player.name, profile) }
+            val composed = colored(profile.displayName(player.name))
+            player.playerListName(composed)
+            player.displayName(composed)
         }
-        boards.forEach { board -> applyDisplayTeam(board, player.name, profile) }
-        val composed = colored(profile.displayName(player.name))
-        player.playerListName(composed)
-        player.displayName(composed)
+        if (previousNick != profile.name) {
+            rescopePlayer(player)
+        }
+    }
+
+    /**
+     * Re-sends PLAYER_INFO and spawn packets of [player] to every viewer via
+     * Bukkit's hide/show cycle. The packet listener rewrites the fresh
+     * packets in flight, so a changed (or removed) nick reaches clients that
+     * already knew the player. Must run on the main server thread.
+     */
+    private fun rescopePlayer(player: Player) {
+        server.onlinePlayers.filter { it !== player }.forEach { viewer ->
+            viewer.hidePlayer(this, player)
+            viewer.showPlayer(this, player)
+        }
     }
 
     /**
      * Creates or updates the player's display team (name-tag prefix/suffix/
-     * color) on one scoreboard.
+     * color) on one scoreboard. The team entry is the DISPLAYED name — for
+     * a nicked player the client only knows the entity under its assumed
+     * name, so the entry must match that for the tag to attach.
      *
      * @param board the scoreboard to hold the team.
-     * @param playerName the player the team entry belongs to.
+     * @param playerName the player's account name.
      * @param profile the resolved display profile.
      */
     private fun applyDisplayTeam(board: Scoreboard, playerName: String, profile: DisplayProfile) {
         val teamName = displayTeamName(playerName)
+        val entry = profile.nameOr(playerName)
         val team = board.getTeam(teamName) ?: board.registerNewTeam(teamName)
+        team.entries.filter { it != entry }.forEach(team::removeEntry)
         team.prefix(colored(profile.prefix))
         team.suffix(colored(profile.suffix))
         namedColor(profile.color)?.let { team.color(it) }
-        if (!team.hasEntry(playerName)) {
-            team.addEntry(playerName)
+        if (!team.hasEntry(entry)) {
+            team.addEntry(entry)
         }
     }
 

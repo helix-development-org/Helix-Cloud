@@ -12,12 +12,14 @@ import org.helix.api.message.Messages
 /**
  * Nick addon.
  *
- * Provides the in-game `/nick <name|off>` command. A nick replaces the
- * NAME component of the player's display name (prefix stays with the
- * permission groups, suffix with the clans) and therefore shows in chat,
- * tab list and the name tag through the display-resolver pipeline. Nicks
- * persist across restarts and are protected against impersonation: no
- * account name or nick that is already taken can be chosen.
+ * Provides the in-game `/nick <name|off>` command. A nick is a full
+ * disguise: the display profile it resolves is EXCLUSIVE, so the group
+ * prefix and the clan tag of the real identity never leak — a nicked
+ * player appears as a default player (configurable disguise prefix via
+ * `nick.disguise`) under the assumed name in chat, tab list and the name
+ * tag. Nicks persist across restarts and are protected against
+ * impersonation: no account name or nick that is already taken can be
+ * chosen.
  */
 class NickAddon : AddonBase() {
     private val json = Json { prettyPrint = true }
@@ -27,15 +29,24 @@ class NickAddon : AddonBase() {
     /** Lowercase account name to nick. */
     private var nicks: Map<String, String> = emptyMap()
 
+    /** Disguise settings (prefix shown instead of the real group prefix). */
+    private var config: NickConfig = NickConfig()
+
     /**
      * Registers the `/nick` command, the display resolver and admin actions.
      */
     override fun enable() {
         nicks = load()
+        config = loadConfig()
         msg = context.localizedMessages(messages())
         context.registerDisplayResolver { name ->
-            nicks[name.lowercase()]?.let { DisplayProfile(name = it) }
+            nicks[name.lowercase()]?.let {
+                DisplayProfile(prefix = config.prefix, name = it, color = config.color, exclusive = true)
+            }
         }
+        // Bridge value per player so the paper bridges notice a nick change within one poll
+        // instead of waiting for the slow display-refresh cycle.
+        nicks.keys.forEach(::publishNick)
         action(
             name = "nick",
             description = "Changes your display name. '/nick off' restores the real name.",
@@ -58,7 +69,27 @@ class NickAddon : AddonBase() {
                 ActionResult.error("no nick for $player")
             } else {
                 save(nicks - player.lowercase())
+                publishNick(player)
                 ActionResult.ok("nick of $player removed")
+            }
+        }
+        action(
+            "nick.disguise",
+            "Shows or sets the disguise prefix nicked players get instead of their group prefix.",
+            "nick.disguise [prefix...] | nick.disguise clear",
+        ) { invocation ->
+            when {
+                invocation.arguments.isEmpty() ->
+                    ActionResult.ok("disguise prefix: '${config.prefix}'", "disguise color: '${config.color}'")
+                invocation.arguments.first() == "clear" -> {
+                    saveConfig(NickConfig())
+                    ActionResult.ok("disguise prefix cleared — nicked players appear plain")
+                }
+                else -> {
+                    // Trailing space separates the prefix from the name, mirroring the chat rules.
+                    saveConfig(config.copy(prefix = invocation.arguments.joinToString(" ") + " "))
+                    ActionResult.ok("disguise prefix set to '${config.prefix}'")
+                }
             }
         }
     }
@@ -73,6 +104,7 @@ class NickAddon : AddonBase() {
                 return ActionResult.error(msg.formatFor(executor, "off.none"))
             }
             save(nicks - executor.lowercase())
+            publishNick(executor)
             return ActionResult.ok(msg.formatFor(executor, "off.ok"))
         }
         if (!NICK_PATTERN.matches(argument)) {
@@ -82,7 +114,13 @@ class NickAddon : AddonBase() {
             return ActionResult.error(msg.formatFor(executor, "error.taken"))
         }
         save(nicks + (executor.lowercase() to argument))
+        publishNick(executor)
         return ActionResult.ok(msg.formatFor(executor, "set.ok", "nick" to argument))
+    }
+
+    /** Publishes the player's nick as the `nick.name.<name>` bridge value (empty = no nick). */
+    private fun publishNick(player: String) {
+        context.publishBridgeValue("nick.name.${player.lowercase()}", nicks[player.lowercase()] ?: "")
     }
 
     /**
@@ -103,6 +141,14 @@ class NickAddon : AddonBase() {
     private fun save(updated: Map<String, String>) {
         nicks = updated
         context.storage().write("nicks", json.encodeToString(mapSerializer, updated))
+    }
+
+    private fun loadConfig(): NickConfig =
+        context.storage().read("config")?.let { json.decodeFromString<NickConfig>(it) } ?: NickConfig()
+
+    private fun saveConfig(updated: NickConfig) {
+        config = updated
+        context.storage().write("config", json.encodeToString(updated))
     }
 
     private fun messages(): Map<String, Map<String, String>> = mapOf(
@@ -129,3 +175,16 @@ class NickAddon : AddonBase() {
         val NICK_PATTERN = Regex("^[A-Za-z0-9_]{3,16}$")
     }
 }
+
+/**
+ * Disguise settings for nicked players.
+ *
+ * @property prefix prefix shown instead of the real group prefix, for
+ *   example `&7Spieler &f` — empty appears as a plain default player.
+ * @property color name color code for the assumed name.
+ */
+@kotlinx.serialization.Serializable
+data class NickConfig(
+    val prefix: String = "",
+    val color: String = "",
+)

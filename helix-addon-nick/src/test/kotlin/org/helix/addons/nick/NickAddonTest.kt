@@ -16,12 +16,27 @@ class NickAddonTest {
     private fun resolve(name: String) = context.displayResolvers.single().resolve(name)
 
     @Test
-    fun `nick resolves as the display name component`() {
+    fun `nick resolves as an exclusive disguise profile`() {
         assertTrue(context.run("nick", "Steve", "Herobrine").success)
 
-        assertEquals("Herobrine", resolve("Steve")?.name)
-        assertEquals("", resolve("Steve")?.prefix)
+        val profile = resolve("Steve")
+        assertEquals("Herobrine", profile?.name)
+        assertEquals("", profile?.prefix, "default disguise is a plain player")
+        assertTrue(profile?.exclusive == true, "group prefix and clan tag must not leak")
+        assertEquals("Herobrine", context.bridgeValues["nick.name.steve"], "bridges are notified")
         assertNull(resolve("Alex"))
+    }
+
+    @Test
+    fun `disguise prefix is configurable and applied to nicked players`() {
+        assertTrue(context.run("nick.disguise", "&7Spieler").success)
+        context.run("nick", "Steve", "Herobrine")
+
+        assertEquals("&7Spieler ", resolve("Steve")?.prefix)
+        assertEquals("&7Spieler Herobrine", resolve("Steve")?.displayName("Steve"))
+
+        assertTrue(context.run("nick.disguise", "clear").success)
+        assertEquals("", resolve("Steve")?.prefix)
     }
 
     @Test
@@ -30,6 +45,7 @@ class NickAddonTest {
 
         assertTrue(context.run("nick", "Steve", "off").success)
         assertNull(resolve("Steve"))
+        assertEquals("", context.bridgeValues["nick.name.steve"], "bridges see the removal")
         assertFalse(context.run("nick", "Steve", "off").success)
     }
 

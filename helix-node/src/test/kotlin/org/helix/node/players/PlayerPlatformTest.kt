@@ -104,6 +104,15 @@ class PlayerPlatformTest {
         assertEquals("&cAdmin Herobrine [STV]", merged.displayName("steve"))
         assertEquals(DisplayProfile(), displays.resolve("alex"))
 
+        // An exclusive profile (nick disguise) replaces the merge entirely: no group prefix
+        // and no clan tag may leak through the assumed identity.
+        displays.register("disguise") { name ->
+            if (name == "steve") DisplayProfile(prefix = "&7Player ", name = "Sneaky", exclusive = true) else null
+        }
+        val disguised = displays.resolve("steve")
+        assertEquals("&7Player Sneaky", disguised.displayName("steve"))
+        assertEquals("", disguised.suffix, "clan tag must not leak into a disguise")
+
         val values = BridgeValueStore()
         values.publish("tablist", "tablist.header", "&6Helix")
         values.publish("chat", "chat.format", "{name}: {message}")
