@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.70.0 — 2026-07-28
+
+Fünfte und letzte Etappe von Phase 2: Ops & Release-Governance.
+
+### CI + Governance-Dokumente
+- **Neue GitHub-Actions-Pipeline** (`./gradlew build` +
+  `verifyKDocAvailability` bei jedem Push/PR).
+- **Neue `SECURITY.md`** (Pre-1.0/Beta-Status, Melde-Weg für
+  Sicherheitslücken) und **`CONTRIBUTING.md`** (Modul-Übersicht,
+  Build/Test-Befehle, KDoc-Gate).
+- **Stale Org-Referenz korrigiert**: `tools/install.sh` und die
+  README-Installationszeile zeigten noch auf einen falschen
+  Platzhalter-Org-Namen aus einem früheren, fehlerhaften Commit — jetzt
+  konsistent auf `Tytoss/Helix-Cloud`.
+
+### Gradle Version Catalog
+- **Alle bisher pro Modul verstreuten Abhängigkeitsversionen** sind jetzt
+  in `gradle/libs.versions.toml` zentralisiert; dabei eine echte
+  Versions-Divergenz gefunden und behoben (`kotlinx-serialization-json`
+  war in einem Addon eine Minor-Version voraus).
+
+### Doku
+- **Kurze englische Zusammenfassung** oben in der README für
+  englischsprachige Leser, der Rest bleibt vorerst deutsch.
+
 ## 0.69.0 — 2026-07-28
 
 Vierte Etappe von Phase 2, komplett neuer Scope: eine eigene
