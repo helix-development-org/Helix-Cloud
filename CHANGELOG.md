@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.68.0 — 2026-07-28
+
+Dritte Etappe von Phase 2: Ökosystem & Compliance.
+
+### Echter Bukkit-Permission-Provider
+- **Das eigene Permissions-System wird jetzt als echter Bukkit-Permission-
+  Provider registriert** (`HelixPermissionProvider`), sodass
+  Drittanbieter-Plugins, die `Player#hasPermission(...)` aufrufen,
+  transparent die Netzwerk-Entscheidung sehen — kein LuckPerms nötig.
+
+### Whitelist
+- **Neue netzwerkweite, betreiberkonfigurierbare Whitelist** (`whitelist
+  mode|add|remove|list`), unabhängig vom bestehenden Wartungsmodus.
+
+### DSGVO-Export/-Löschung + Audit-Aufbewahrung
+- **Neue `player.gdpr-export`/`player.gdpr-delete`-Aktionen**, die alle
+  personenbezogenen Daten eines Spielers über Bans, Rechte, Freunde, Clan,
+  Wirtschaft und Verwarnungen hinweg aggregieren bzw. entfernen (ein
+  Clan-Owner wird dabei nie automatisch gelöscht — Übergabe/Auflösung
+  zuerst).
+- **Das Audit-Log erzwingt jetzt eine konfigurierbare harte
+  Aufbewahrungsfrist** (`[audit].retentionDays`, Standard 180 Tage),
+  stündlich durchgesetzt — vorher wuchs es unbegrenzt.
+
+### Staff-Spieler-Lookup
+- **Neue Dashboard-Ansicht**: Staff kann einen Spieler per Name/UUID
+  suchen und sieht Online-Status plus die aggregierten Daten jedes
+  installierten Addons an einem Ort.
+
+### Vorbereitet, aber noch nicht abgeschlossen
+- **Vault-Economy-Provider und PlaceholderAPI-Expansion**: ein
+  wiederverwendbarer Platzhalter-Resolver ist fertig und getestet, die
+  eigentliche Anbindung an die beiden externen APIs konnte in dieser
+  Umgebung nicht abgeschlossen werden (kein Netzwerkzugriff auf die
+  benötigten Artefakt-Repositories). Folgt, sobald verfügbar.
+
 ## 0.67.0 — 2026-07-28
 
 Zweite Etappe von Phase 2: Moderations- und Anticheat-Baseline.
