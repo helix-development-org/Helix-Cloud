@@ -3,8 +3,8 @@ import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 
 plugins {
-    kotlin("jvm") version "2.3.10" apply false
-    kotlin("plugin.serialization") version "2.3.10" apply false
+    alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.kotlin.serialization) apply false
 }
 
 allprojects {
@@ -135,7 +135,7 @@ subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
 
     dependencies {
-        "implementation"("org.slf4j:slf4j-api:2.0.18")
+        "implementation"(rootProject.libs.slf4j.api)
         "testImplementation"(kotlin("test"))
     }
 

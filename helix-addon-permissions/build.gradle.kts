@@ -7,7 +7,7 @@ plugins {
 
 dependencies {
     implementation(rootProject.project("helix-addon-sdk"))
-    implementation("org.yaml:snakeyaml:2.3")
+    implementation(libs.snakeyaml)
 }
 
 // snakeyaml is bundled into the addon jar (plugin.yml catalog scanning); the

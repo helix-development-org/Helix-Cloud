@@ -20,10 +20,10 @@ repositories {
 
 dependencies {
     implementation(rootProject.project("helix-api"))
-    compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
+    compileOnly(libs.paper.api)
     // Optional at runtime (softdepend): used to rewrite PLAYER_INFO names so a nick shows in the
     // name tag above the player. Ships as its own plugin via the guard HXA.
-    compileOnly("com.github.retrooper:packetevents-spigot:2.13.0")
+    compileOnly(libs.packetevents.spigot)
 }
 
 tasks.withType<JavaCompile>().configureEach {

@@ -6,7 +6,7 @@ plugins {
 
 dependencies {
     implementation(rootProject.project("helix-addon-sdk"))
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
+    implementation(libs.kotlinx.serialization.json)
 }
 
 /**

@@ -7,7 +7,7 @@ plugins {
 
 dependencies {
     implementation(rootProject.project("helix-addon-sdk"))
-    implementation("dev.kord:kord-core:0.15.0")
+    implementation(libs.kord.core)
 }
 
 // Kord and its dependencies are bundled into the addon jar; the node only

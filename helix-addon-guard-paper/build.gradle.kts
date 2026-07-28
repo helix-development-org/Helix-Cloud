@@ -19,22 +19,22 @@ repositories {
 }
 
 dependencies {
-    compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
+    compileOnly(libs.paper.api)
     // packetevents ships as its own Bukkit plugin (bundled into the HXA under paper/), so the API
     // is compile-only here; the movement tests exercise packetevents types, hence the test dependency.
-    compileOnly("com.github.retrooper:packetevents-spigot:2.13.0")
-    testImplementation("com.github.retrooper:packetevents-spigot:2.13.0")
+    compileOnly(libs.packetevents.spigot)
+    testImplementation(libs.packetevents.spigot)
     // IGui resolves through the composite build (../IGui). Its PostgreSQL texture database is unused —
     // IGuard ships a file-backed one — so the driver and pool stay out of the plugin jar.
     // kotlinx-coroutines-core arrives transitively as an api dependency of IGui.
-    implementation("de.tytoss:igui:1.0.0-SNAPSHOT") {
+    implementation(libs.igui) {
         exclude(group = "org.postgresql")
         exclude(group = "com.zaxxer")
     }
     // Rune snapshot/copy model for the world reconstruction used by the incident replay (vendored jar).
     implementation(files("libs/rune-base-0.0.1.jar"))
     // JSON runtime for the Helix node action bridge + the file-backed GUI texture store.
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
+    implementation(libs.kotlinx.serialization.json)
 }
 
 tasks.withType<JavaCompile>().configureEach {

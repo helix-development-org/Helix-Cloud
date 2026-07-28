@@ -17,7 +17,7 @@ val packetevents: Configuration by configurations.creating
 
 dependencies {
     implementation(rootProject.project("helix-addon-sdk"))
-    packetevents("com.github.retrooper:packetevents-spigot:2.13.0")
+    packetevents(libs.packetevents.spigot)
 }
 
 /**

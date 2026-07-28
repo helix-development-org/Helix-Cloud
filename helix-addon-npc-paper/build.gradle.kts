@@ -15,7 +15,7 @@ repositories {
 }
 
 dependencies {
-    compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
+    compileOnly(libs.paper.api)
     // INpc is vendored as its prebuilt, Mojang-mapped library jar. It carries
     // no server classes; modern Paper (1.21.11) resolves its Mojang-named NMS
     // references at runtime. Building it here would drag in paperweight +
@@ -23,8 +23,8 @@ dependencies {
     implementation(files("libs/inpc-1.0.0-SNAPSHOT.jar"))
     // INpc's own runtime dependencies (declared api in its build) — vendored
     // as normal maven deps because the files(...) jar carries no metadata.
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.serialization.json)
 }
 
 tasks.withType<JavaCompile>().configureEach {

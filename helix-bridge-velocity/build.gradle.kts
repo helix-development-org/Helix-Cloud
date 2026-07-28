@@ -16,7 +16,7 @@ repositories {
 
 dependencies {
     implementation(rootProject.project("helix-api"))
-    compileOnly("com.velocitypowered:velocity-api:3.4.0")
+    compileOnly(libs.velocity.api)
 }
 
 tasks.withType<JavaCompile>().configureEach {
