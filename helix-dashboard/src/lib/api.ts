@@ -140,6 +140,15 @@ export interface OnlinePlayer {
   proxyServiceId: string
   joinedAtEpochMs: number
 }
+/** Aggregate staff view of one player: presence plus every addon's data. */
+export interface PlayerLookupView {
+  name: string
+  online: boolean
+  uuid: string | null
+  proxyServiceId: string | null
+  joinedAtEpochMs: number | null
+  sources: Record<string, string>
+}
 export interface EventEntry {
   epochMs: number
   category: string

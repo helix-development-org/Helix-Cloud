@@ -36,6 +36,7 @@ import org.helix.node.gates.NativePermissionCache
 import org.helix.node.gates.NativePermissionProvider
 import org.helix.node.gates.PermissionResolverRegistry
 import org.helix.node.gates.PermissionService
+import org.helix.node.gates.PlayerDataRegistry
 import org.helix.node.identity.IdentityRegistry
 import org.helix.node.messages.MessageBundle
 import org.helix.node.messages.MessageRegistry
@@ -57,6 +58,7 @@ import org.slf4j.LoggerFactory
  * @property registry action registry addons register into.
  * @property joinGates join gate registry addons register into.
  * @property permissionResolvers permission registry addons register into.
+ * @property playerData GDPR export/delete provider registry addons register into.
  * @property permissionService node-wide permission decisions (addon or native).
  * @property playerRegistry online players and player event fan-out.
  * @property displayResolvers display profile registry addons register into.
@@ -82,6 +84,7 @@ class AddonManager(
     private val registry: ActionRegistry,
     private val joinGates: JoinGateRegistry = JoinGateRegistry(),
     private val permissionResolvers: PermissionResolverRegistry = PermissionResolverRegistry(),
+    private val playerData: PlayerDataRegistry = PlayerDataRegistry(),
     private val permissionService: PermissionService =
         PermissionService(permissionResolvers, NativePermissionProvider(NativePermissionCache())),
     private val playerRegistry: PlayerRegistry = PlayerRegistry(),
@@ -357,6 +360,7 @@ class AddonManager(
     private fun unregisterEverywhere(id: String) {
         joinGates.unregisterOwner(id)
         permissionResolvers.unregisterOwner(id)
+        playerData.unregisterOwner(id)
         playerRegistry.unregisterOwner(id)
         displayResolvers.unregisterOwner(id)
         bridgeValues.unpublishOwner(id)
@@ -459,6 +463,10 @@ class AddonManager(
 
         override fun registerPermissionResolver(resolver: PermissionResolver) {
             permissionResolvers.register(record.manifest.id, resolver)
+        }
+
+        override fun registerPlayerDataProvider(provider: org.helix.api.addon.PlayerDataProvider) {
+            playerData.register(record.manifest.id, provider)
         }
 
         override fun hasPermission(player: String, permission: String): Boolean =

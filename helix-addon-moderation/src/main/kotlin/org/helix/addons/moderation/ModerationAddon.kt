@@ -327,6 +327,16 @@ class ModerationAddon : AddonBase() {
                 msg.formatFor(executor, "modlookup.incidents", "value" to lookupIncidentCount(executor, target)),
             )
         }
+        context.registerPlayerDataProvider(
+            /** Exports the player's warn history; clears it on delete. */
+            object : org.helix.api.addon.PlayerDataProvider {
+                override fun export(player: String): String? =
+                    store.warnsOf(player).takeIf { it.isNotEmpty() }
+                        ?.let { kotlinx.serialization.json.Json.encodeToString(it) }
+
+                override fun delete(player: String): Boolean = store.clear(player)
+            },
+        )
         publishMutes()
         publishBlocklist()
         publishMuteMessages()

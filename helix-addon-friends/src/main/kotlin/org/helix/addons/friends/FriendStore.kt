@@ -172,6 +172,32 @@ class FriendStore(
     fun requestsFor(player: String): List<String> =
         requests[keyOf(player)]?.map(::nameOf)?.sorted() ?: emptyList()
 
+    /**
+     * Removes every trace of a player: all their friendships and every
+     * pending request in either direction. Used by GDPR delete requests.
+     *
+     * @param player the player.
+     * @return `true` when anything was actually removed.
+     */
+    @Synchronized
+    fun forget(player: String): Boolean {
+        val key = player.lowercase()
+        val removedFriendships = friendships.removeAll { key in it }
+        val removedIncoming = requests.remove(key) != null
+        val removedOutgoing = requests.entries.toList().fold(false) { changed, (to, from) ->
+            val had = from.remove(key)
+            if (had && from.isEmpty()) {
+                requests.remove(to)
+            }
+            changed || had
+        }
+        val changed = removedFriendships || removedIncoming || removedOutgoing
+        if (changed) {
+            persist()
+        }
+        return changed
+    }
+
     private fun removeRequest(from: String, to: String): Boolean {
         val toKey = keyOf(to)
         val set = requests[toKey] ?: return false

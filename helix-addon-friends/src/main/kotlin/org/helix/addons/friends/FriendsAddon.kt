@@ -94,6 +94,23 @@ class FriendsAddon : AddonBase() {
                 }
             },
         )
+        context.registerPlayerDataProvider(
+            /** Exports the player's friends/requests; forgets all of it on delete. */
+            object : org.helix.api.addon.PlayerDataProvider {
+                override fun export(player: String): String? {
+                    val friends = store.friendsOf(player)
+                    val requests = store.requestsFor(player)
+                    if (friends.isEmpty() && requests.isEmpty()) {
+                        return null
+                    }
+                    return kotlinx.serialization.json.Json.encodeToString(
+                        FriendExport(friends = friends, incomingRequests = requests),
+                    )
+                }
+
+                override fun delete(player: String): Boolean = store.forget(player)
+            },
+        )
     }
 
     private fun handleFriendCommand(invocation: ActionInvocation): ActionResult {

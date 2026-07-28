@@ -64,4 +64,16 @@ class EconomyAddonTest {
         assertTrue(context.run("eco.get", "Newbie").lines.single().contains("1000"))
     }
 
+    @Test
+    fun `player-data provider exports and resets a balance`() {
+        val provider = context.playerDataProviders.single()
+        assertEquals(null, provider.export("newbie"))
+
+        context.run("eco.give", "Steve", "100")
+
+        assertTrue(provider.export("steve")!!.contains("1100"))
+        assertTrue(provider.delete("steve"))
+        assertTrue(context.run("eco.get", "Steve").lines.single().contains("1000"))
+        assertEquals(null, provider.export("newbie"), "players who never transacted stay unexported")
+    }
 }

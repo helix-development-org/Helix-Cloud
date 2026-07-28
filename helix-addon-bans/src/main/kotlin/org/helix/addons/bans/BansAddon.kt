@@ -4,6 +4,7 @@ import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
 import org.helix.api.action.ActionSource
+import org.helix.api.addon.PlayerDataProvider
 import org.helix.api.message.Messages
 import org.helix.api.proxy.JoinDecision
 
@@ -81,6 +82,15 @@ class BansAddon : AddonBase() {
                 ?.let { JoinDecision.deny(banMessage(it)) }
                 ?: JoinDecision.allow()
         }
+        context.registerPlayerDataProvider(
+            /** Exports/pardons the player's active ban for GDPR requests. */
+            object : PlayerDataProvider {
+                override fun export(player: String): String? =
+                    store.activeBan(player)?.let { kotlinx.serialization.json.Json.encodeToString(it) }
+
+                override fun delete(player: String): Boolean = store.pardon(player)
+            },
+        )
         action(
             "ban.set",
             "Bans a player, optionally temporary (30m, 12h, 7d).",

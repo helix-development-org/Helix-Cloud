@@ -3,6 +3,7 @@ package org.helix.node.audit
 import java.io.RandomAccessFile
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -50,6 +51,19 @@ class FileAuditSink(
         return runCatching { decodeLines(tailLines(file, limit)) }
             .onFailure { logger.warn("Could not load audit history: {}", it.message) }
             .getOrDefault(emptyList())
+    }
+
+    override fun prune(olderThanEpochMs: Long) {
+        if (Files.notExists(file)) {
+            return
+        }
+        runCatching {
+            val kept = Files.readAllLines(file)
+                .filter { it.isNotBlank() && json.decodeFromString<AuditEntry>(it).epochMs >= olderThanEpochMs }
+            val temp = file.resolveSibling("${file.fileName}.tmp")
+            Files.write(temp, kept)
+            Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        }.onFailure { logger.warn("Could not prune audit history: {}", it.message) }
     }
 
     /** Rolls the current file aside once it reaches [maxFileSizeBytes]. */

@@ -57,6 +57,8 @@ class AuditLogTest {
             }
 
             override fun loadRecent(limit: Int): List<org.helix.api.audit.AuditEntry> = emptyList()
+
+            override fun prune(olderThanEpochMs: Long) {}
         }
         val log = AuditLog(slowSink)
 
@@ -88,6 +90,8 @@ class AuditLogTest {
             }
 
             override fun loadRecent(limit: Int): List<org.helix.api.audit.AuditEntry> = emptyList()
+
+            override fun prune(olderThanEpochMs: Long) {}
         }
         // A tiny queue so a couple of extra records overflow it while the writer
         // thread is stuck on the first (slow) append.
@@ -105,5 +109,34 @@ class AuditLogTest {
         assertTrue(appended.contains("entry-1"))
         assertTrue(appended.contains("entry-3"))
         assertTrue(appended.contains("entry-4"))
+    }
+
+    @Test
+    fun `pruneExpired drops entries older than the retention window, in memory and on disk`() {
+        var now = 0L
+        val log = AuditLog(FileAuditSink(file), retentionDays = 1, clock = { now })
+        now = 0; log.record("node", "system", "old entry")
+        now = 2 * DAY_MS; log.record("node", "system", "recent entry")
+
+        log.pruneExpired()
+
+        assertEquals(listOf("recent entry"), log.recent(10).map { it.summary })
+        assertTrue(!file.toFile().readText().contains("old entry"))
+    }
+
+    @Test
+    fun `pruneExpired is a no-op when retention is disabled`() {
+        var now = 0L
+        val log = AuditLog(FileAuditSink(file), retentionDays = 0, clock = { now })
+        log.record("node", "system", "kept forever")
+        now = 365 * DAY_MS
+
+        log.pruneExpired()
+
+        assertEquals(listOf("kept forever"), log.recent(10).map { it.summary })
+    }
+
+    private companion object {
+        const val DAY_MS = 86_400_000L
     }
 }

@@ -647,4 +647,29 @@ class ControlServerTest {
         assertEquals("DENY", response.headers["X-Frame-Options"])
         assertEquals("frame-ancestors 'none'", response.headers["Content-Security-Policy"])
     }
+
+    @Test
+    fun `player lookup aggregates presence and every addon's player data`() = testApplication {
+        val client = apiClient()
+        dependencies.playerData.register(
+            "bans",
+            object : org.helix.api.addon.PlayerDataProvider {
+                override fun export(player: String) = """{"reason":"griefing"}"""
+                override fun delete(player: String) = true
+            },
+        )
+
+        val offline: PlayerLookupView = client.get("/api/v1/players/lookup?name=Steve") {
+            bearerAuth("secret")
+        }.body()
+        assertEquals(false, offline.online)
+        assertEquals(mapOf("bans" to """{"reason":"griefing"}"""), offline.sources)
+
+        dependencies.playerRegistry.handle(org.helix.api.player.PlayerEvent("join", "Steve", proxyServiceId = "Proxy-1"))
+        val online: PlayerLookupView = client.get("/api/v1/players/lookup?name=steve") {
+            bearerAuth("secret")
+        }.body()
+        assertEquals(true, online.online)
+        assertEquals("Proxy-1", online.proxyServiceId)
+    }
 }

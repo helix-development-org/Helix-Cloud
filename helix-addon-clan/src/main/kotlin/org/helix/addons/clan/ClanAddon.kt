@@ -50,6 +50,27 @@ class ClanAddon : AddonBase() {
                 override fun onJoin(player: org.helix.api.player.OnlinePlayer) = publishTag(player.name)
             },
         )
+        context.registerPlayerDataProvider(
+            /** Exports the player's clan membership; refuses to delete an owner. */
+            object : org.helix.api.addon.PlayerDataProvider {
+                override fun export(player: String): String? =
+                    store.clanOf(player)?.let { clan ->
+                        json.encodeToString(
+                            mapOf("clan" to clan.name, "tag" to clan.tag, "role" to clan.members[player.lowercase()].toString()),
+                        )
+                    }
+
+                override fun delete(player: String): Boolean {
+                    // Owners must transfer ownership or disband first — auto-deleting an
+                    // owner would leave the clan without a valid owner reference.
+                    val clan = store.clanOf(player) ?: return false
+                    if (clan.members[player.lowercase()] == ClanRole.OWNER) {
+                        return false
+                    }
+                    return store.removeMember(player)
+                }
+            },
+        )
         action(
             name = "clan",
             description = "Clan system: create, invite, roles, bank and more.",

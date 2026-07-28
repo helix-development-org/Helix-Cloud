@@ -1,6 +1,7 @@
 package org.helix.node.audit
 
 import com.mongodb.client.MongoDatabase
+import com.mongodb.client.model.Filters
 import com.mongodb.client.model.Sorts
 import org.bson.Document
 import org.helix.api.audit.AuditEntry
@@ -52,4 +53,10 @@ class MongoAuditSink(database: MongoDatabase) : AuditSink {
                 .asReversed()
         }.onFailure { logger.warn("Could not load audit history: {}", it.message) }
             .getOrDefault(emptyList())
+
+    override fun prune(olderThanEpochMs: Long) {
+        runCatching {
+            collection.deleteMany(Filters.lt("epochMs", olderThanEpochMs))
+        }.onFailure { logger.warn("Could not prune audit history: {}", it.message) }
+    }
 }

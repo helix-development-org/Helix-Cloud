@@ -59,4 +59,26 @@ class FileAuditSinkTest {
 
         assertEquals(listOf("entry-496", "entry-497", "entry-498", "entry-499", "entry-500"), recent.map { it.summary })
     }
+
+    @Test
+    fun `prune removes entries older than the cutoff`() {
+        val sink = FileAuditSink(file)
+        sink.append(entry(epochMs = 1))
+        sink.append(entry(epochMs = 5))
+        sink.append(entry(epochMs = 10))
+
+        sink.prune(olderThanEpochMs = 5)
+
+        assertEquals(listOf(5L, 10L), sink.loadRecent(10).map { it.epochMs })
+    }
+
+    @Test
+    fun `prune on a missing file is a no-op`() {
+        val emptyFile = createTempDirectory("audit-empty").resolve("audit.jsonl")
+
+        FileAuditSink(emptyFile).prune(olderThanEpochMs = 1000)
+    }
+
+    private fun entry(epochMs: Long) =
+        AuditEntry(epochMs, "test", "actor", "summary", "ok")
 }

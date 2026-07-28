@@ -67,6 +67,9 @@ class NodeConfigLoader {
                 accept = toml.getBoolean("eula.accept") ?: defaults.eula.accept,
                 acceptedBy = toml.getString("eula.acceptedBy") ?: defaults.eula.acceptedBy,
             ),
+            audit = NodeConfig.AuditSettings(
+                retentionDays = toml.getLong("audit.retentionDays")?.toInt() ?: defaults.audit.retentionDays,
+            ),
         )
     }
 }

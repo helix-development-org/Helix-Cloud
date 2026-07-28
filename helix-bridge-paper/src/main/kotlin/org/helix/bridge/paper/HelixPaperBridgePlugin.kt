@@ -43,6 +43,9 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     private val miniMessage = MiniMessage.miniMessage()
     private val displayProfiles = ConcurrentHashMap<String, DisplayProfile>()
 
+    /** Mirrors the node's permission decisions onto Bukkit permission attachments. */
+    private val permissionProvider by lazy { HelixPermissionProvider(this) }
+
     /** Player uuid to assumed name; read by the packet listener on the netty threads. */
     private val nickNames = ConcurrentHashMap<java.util.UUID, String>()
 
@@ -182,15 +185,18 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         val httpClient = client ?: return
         server.scheduler.runTaskAsynchronously(
             this,
-            Runnable { refreshDisplay(httpClient, event.player.name) },
+            Runnable {
+                refreshDisplay(httpClient, event.player.name)
+                refreshPermissions(httpClient, event.player.name)
+            },
         )
     }
 
     /**
-     * Drops the cached display state of a quitting player and unregisters
-     * their scoreboard display team everywhere it was registered — without
-     * this the team (and its entry) leaks forever, persisted to
-     * `scoreboard.dat` on non-templated servers.
+     * Drops the cached display and permission state of a quitting player and
+     * unregisters their scoreboard display team everywhere it was
+     * registered — without that the team (and its entry) leaks forever,
+     * persisted to `scoreboard.dat` on non-templated servers.
      *
      * @param event the quit event.
      */
@@ -199,6 +205,7 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         displayProfiles.remove(event.player.name.lowercase())
         nickNames.remove(event.player.uniqueId)
         removeDisplayTeam(event.player.name)
+        permissionProvider.clear(event.player)
     }
 
     /**
@@ -390,6 +397,7 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         }
         if (pollCounter++ % DISPLAY_REFRESH_CYCLES == 0) {
             refreshAllDisplays(client, server.onlinePlayers.map { it.name })
+            server.onlinePlayers.forEach { player -> refreshPermissions(client, player.name) }
         } else {
             // Nick changes must not wait for the slow display cycle: the nick addon publishes
             // nick.name.<player> bridge values, so a mismatch against the cached profile
@@ -591,11 +599,14 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         val location = player.location
         val now = LocalTime.now()
         val profile = displayProfiles[player.name.lowercase()] ?: DisplayProfile()
+        /** Resolves a shared network placeholder for this player, defaulting to empty. */
+        fun placeholder(identifier: String, onlineCount: Int = 0) =
+            NetworkPlaceholders.resolve(identifier, player.name, bridgeValues, profile, onlineCount) ?: ""
         return text
             .replace("{player}", player.name)
-            .replace("{displayname}", profile.displayName(player.name))
-            .replace("{nick}", profile.nameOr(player.name))
-            .replace("{online}", (bridgeValues["network.online"]?.toIntOrNull() ?: server.onlinePlayers.size).toString())
+            .replace("{displayname}", placeholder("displayname"))
+            .replace("{nick}", placeholder("nick"))
+            .replace("{online}", placeholder("online", server.onlinePlayers.size))
             .replace("{max}", server.maxPlayers.toString())
             .replace("{server}", settings?.serviceId ?: "")
             .replace("{task}", settings?.task ?: "")
@@ -607,10 +618,10 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
             .replace("{z}", location.blockZ.toString())
             .replace("{date}", LocalDate.now().toString())
             .replace("{time}", String.format(java.util.Locale.ROOT, "%02d:%02d", now.hour, now.minute))
-            .replace("{network}", bridgeValues["network.name"] ?: "")
-            .replace("{prefix}", bridgeValues["network.prefix"] ?: "")
-            .replace("{balance}", bridgeValues["economy.balance.${player.name.lowercase()}"] ?: "")
-            .replace("{clan}", bridgeValues["clan.tag.${player.name.lowercase()}"] ?: "")
+            .replace("{network}", placeholder("network"))
+            .replace("{prefix}", placeholder("prefix"))
+            .replace("{balance}", placeholder("balance"))
+            .replace("{clan}", placeholder("clan"))
     }
 
     private fun placeholders(text: String): String = text
@@ -664,6 +675,27 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
                 }
             }
         }.onFailure { logger.warning("Helix bulk display fetch failed: ${it.message}") }
+    }
+
+    /**
+     * Fetches the player's resolved permission set and mirrors it onto their
+     * Bukkit permission attachment, so third-party plugins calling
+     * `Player#hasPermission` transparently see the node's decisions.
+     *
+     * @param client the node HTTP client.
+     * @param playerName the player to refresh.
+     */
+    private fun refreshPermissions(client: NodeHttpClient, playerName: String) {
+        runCatching {
+            client.getJson("/api/v1/internal/player-permissions?name=${java.net.URLEncoder.encode(playerName, "UTF-8")}")
+                ?.let { body ->
+                    val snapshot = json.decodeFromString<org.helix.api.proxy.PlayerPermissionsSnapshot>(body)
+                    server.getPlayerExact(playerName)?.let { player ->
+                        val granted = snapshot.granted.toSet()
+                        server.scheduler.runTask(this, Runnable { permissionProvider.sync(player, granted) })
+                    }
+                }
+        }.onFailure { logger.warning("Helix permission fetch failed: ${it.message}") }
     }
 
     /**

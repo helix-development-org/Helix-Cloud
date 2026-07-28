@@ -6,6 +6,7 @@ import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
 import org.helix.api.action.ActionSource
+import org.helix.api.addon.PlayerDataProvider
 
 /**
  * Economy addon.
@@ -95,6 +96,22 @@ class EconomyAddon : AddonBase() {
             /** Publishes the joining player's balance for the sidebar `{balance}` placeholder. */
             object : org.helix.api.addon.PlayerListener {
                 override fun onJoin(player: org.helix.api.player.OnlinePlayer) = publishBalance(player.name)
+            },
+        )
+        context.registerPlayerDataProvider(
+            /** Exports the player's balance; resets it to the starting balance on delete. */
+            object : PlayerDataProvider {
+                override fun export(player: String): String? =
+                    store.all()[player.lowercase()]?.let { Json.encodeToString(mapOf("balance" to it)) }
+
+                override fun delete(player: String): Boolean {
+                    val existed = store.all().containsKey(player.lowercase())
+                    if (existed) {
+                        store.set(player, STARTING_BALANCE)
+                        publishBalance(player)
+                    }
+                    return existed
+                }
             },
         )
     }

@@ -21,6 +21,8 @@ import org.slf4j.LoggerFactory
  *
  * @property sink durable backend the trail is written to and read from.
  * @property capacity in-memory ring buffer size.
+ * @property retentionDays hard cap on how long entries are kept, enforced
+ *  by [pruneExpired]; `0` disables pruning (unlimited retention).
  * @property clock epoch millis source, injectable for tests.
  * @property queueCapacity bound of the pending-write queue; once full, the
  *   oldest pending write is dropped to make room for the newest.
@@ -28,6 +30,7 @@ import org.slf4j.LoggerFactory
 class AuditLog(
     private val sink: AuditSink,
     private val capacity: Int = 5000,
+    private val retentionDays: Int = 0,
     private val clock: () -> Long = System::currentTimeMillis,
     private val queueCapacity: Int = 2000,
 ) {
@@ -90,6 +93,21 @@ class AuditLog(
             .let { list -> if (search.isNullOrBlank()) list else list.filter { it.summary.contains(search, ignoreCase = true) } }
             .takeLast(limit)
             .asReversed()
+
+    /**
+     * Enforces the hard retention cap: entries older than [retentionDays]
+     * are dropped from both the in-memory ring buffer and the durable sink.
+     * A no-op when retention is disabled (`retentionDays <= 0`).
+     */
+    @Synchronized
+    fun pruneExpired() {
+        if (retentionDays <= 0) {
+            return
+        }
+        val cutoff = clock() - retentionDays * MILLIS_PER_DAY
+        entries.removeAll { it.epochMs < cutoff }
+        sink.prune(cutoff)
+    }
 
     /**
      * Blocks until every entry queued so far has been handed to the durable
@@ -170,5 +188,8 @@ class AuditLog(
     private companion object {
         /** Minimum gap between overflow warnings, to avoid log spam under sustained overload. */
         const val OVERFLOW_WARN_INTERVAL_MS = 30_000L
+
+        /** Milliseconds in a day, used to turn [retentionDays] into a cutoff. */
+        const val MILLIS_PER_DAY = 86_400_000L
     }
 }

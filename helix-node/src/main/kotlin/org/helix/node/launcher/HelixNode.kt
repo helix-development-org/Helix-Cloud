@@ -38,7 +38,12 @@ import org.helix.node.gates.NativePermissionCache
 import org.helix.node.gates.NativePermissionProvider
 import org.helix.node.gates.PermissionResolverRegistry
 import org.helix.node.gates.PermissionService
+import org.helix.node.gates.PlayerDataRegistry
 import org.helix.node.identity.IdentityRegistry
+import org.helix.node.privacy.PlayerDataActions
+import org.helix.node.whitelist.WhitelistActions
+import org.helix.node.whitelist.WhitelistStore
+import org.helix.api.proxy.JoinDecision
 import org.helix.node.notifications.NotificationBus
 import org.helix.node.packs.NetworkPackService
 import org.helix.api.platform.MetricSample
@@ -112,7 +117,7 @@ class HelixNode(
         StorageBackend.create(config.storage, paths.root.resolve("audit/audit.jsonl"))
 
     /** Complete, durable audit trail (file, PostgreSQL or MongoDB). */
-    val audit: AuditLog = AuditLog(storageBackend.auditSink)
+    val audit: AuditLog = AuditLog(storageBackend.auditSink, retentionDays = config.audit.retentionDays)
 
     /** Configured tasks. */
     val taskStore: TaskStore = TaskStore(paths.tasks)
@@ -160,11 +165,25 @@ class HelixNode(
     /** Aggregated join gates of all addons. */
     val joinGates: JoinGateRegistry = JoinGateRegistry()
 
+    /** Operator-configurable network whitelist, independent of addons. */
+    val whitelist: WhitelistStore = WhitelistStore(paths.config.resolve("whitelist.json")).also { store ->
+        joinGates.register("core.whitelist") { request ->
+            if (!store.isEnabled() || store.contains(request.name)) {
+                JoinDecision.allow()
+            } else {
+                JoinDecision.deny("You are not whitelisted on this network.")
+            }
+        }
+    }
+
     /** Pending commands for proxy bridges. */
     val commandQueue: ProxyCommandQueue = ProxyCommandQueue()
 
     /** Aggregated permission resolvers of all addons. */
     val permissionResolvers: PermissionResolverRegistry = PermissionResolverRegistry()
+
+    /** Aggregated GDPR export/delete providers of all addons. */
+    val playerData: PlayerDataRegistry = PlayerDataRegistry()
 
     /** Per-player Minecraft-native permission snapshots reported by bridges. */
     val nativePermissions: NativePermissionCache = NativePermissionCache()
@@ -385,6 +404,7 @@ class HelixNode(
         registry,
         joinGates,
         permissionResolvers,
+        playerData,
         permissionService,
         playerRegistry,
         displayResolvers,
@@ -499,6 +519,8 @@ class HelixNode(
         overviewService = overviewService,
         addonManager = addonManager,
         joinGates = joinGates,
+        whitelist = whitelist,
+        playerData = playerData,
         commandQueue = commandQueue,
         permissionResolvers = permissionResolvers,
         nativePermissions = nativePermissions,
@@ -608,6 +630,8 @@ class HelixNode(
         addonActions.registerAll(registry)
         BackupActions(backups).registerAll(registry)
         registerControlActions()
+        WhitelistActions(whitelist).registerAll(registry)
+        PlayerDataActions(playerData).registerAll(registry)
         addonManager.loadAll()
         rebuildNetworkPack()
         registerEventSources()
@@ -650,6 +674,12 @@ class HelixNode(
             { runCatching(jobScheduler::tick).onFailure { logger.error("job scheduler tick failed", it) } },
             JOB_PERIOD_SECONDS,
             JOB_PERIOD_SECONDS,
+            TimeUnit.SECONDS,
+        )
+        scheduler.scheduleAtFixedRate(
+            { runCatching(audit::pruneExpired).onFailure { logger.error("audit prune failed", it) } },
+            AUDIT_PRUNE_PERIOD_SECONDS,
+            AUDIT_PRUNE_PERIOD_SECONDS,
             TimeUnit.SECONDS,
         )
         Runtime.getRuntime().addShutdownHook(
@@ -1142,6 +1172,9 @@ class HelixNode(
          * rather than serially.
          */
         const val DEFAULT_SHUTDOWN_WAIT_MILLIS = 40_000L
+
+        /** Seconds between audit-retention sweeps. */
+        const val AUDIT_PRUNE_PERIOD_SECONDS = 3_600L
 
         /** File name of the persisted runtime state during a restart. */
         const val RESTART_STATE_FILE = "restart-state.json"

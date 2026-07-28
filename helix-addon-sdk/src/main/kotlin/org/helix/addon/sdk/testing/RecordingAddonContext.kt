@@ -11,6 +11,7 @@ import org.helix.api.addon.DisplayResolver
 import org.helix.api.addon.JoinGate
 import org.helix.api.addon.NotificationListener
 import org.helix.api.addon.PermissionResolver
+import org.helix.api.addon.PlayerDataProvider
 import org.helix.api.addon.PlayerListener
 import org.helix.api.player.OnlinePlayer
 import org.helix.api.storage.AddonStorage
@@ -36,6 +37,9 @@ class RecordingAddonContext(
 
     /** Registered permission resolvers. */
     val permissionResolvers = mutableListOf<PermissionResolver>()
+
+    /** Registered GDPR export/delete providers. */
+    val playerDataProviders = mutableListOf<PlayerDataProvider>()
 
     /** Registered display resolvers. */
     val displayResolvers = mutableListOf<DisplayResolver>()
@@ -113,6 +117,10 @@ class RecordingAddonContext(
 
     override fun registerPermissionResolver(resolver: PermissionResolver) {
         permissionResolvers += resolver
+    }
+
+    override fun registerPlayerDataProvider(provider: PlayerDataProvider) {
+        playerDataProviders += provider
     }
 
     override fun hasPermission(player: String, permission: String): Boolean =

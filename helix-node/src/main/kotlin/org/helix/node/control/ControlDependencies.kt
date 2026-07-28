@@ -20,6 +20,7 @@ import org.helix.node.gates.NativePermissionCache
 import org.helix.node.gates.NativePermissionProvider
 import org.helix.node.gates.PermissionResolverRegistry
 import org.helix.node.gates.PermissionService
+import org.helix.node.gates.PlayerDataRegistry
 import org.helix.node.identity.IdentityRegistry
 import org.helix.node.logging.LogBuffer
 import org.helix.node.audit.AuditLog
@@ -37,6 +38,7 @@ import org.helix.node.proxy.ProxyEventHub
 import org.helix.node.proxy.ProxyRoutingService
 import org.helix.node.services.ServiceManager
 import org.helix.node.tasks.TaskStore
+import org.helix.node.whitelist.WhitelistStore
 
 /**
  * Dependencies of the control API routes.
@@ -49,6 +51,9 @@ import org.helix.node.tasks.TaskStore
  * @property overviewService aggregated platform counters.
  * @property addonManager installed addons.
  * @property joinGates aggregated join gates of all addons.
+ * @property whitelist the operator-configurable network whitelist.
+ * @property playerData aggregated GDPR export/delete providers of all addons,
+ *  reused by the staff player-lookup view.
  * @property commandQueue pending commands for proxy bridges.
  * @property permissionResolvers aggregated permission resolvers of all addons.
  * @property nativePermissions per-player Minecraft-native permission snapshots.
@@ -90,6 +95,8 @@ data class ControlDependencies(
     val overviewService: PlatformOverviewService,
     val addonManager: AddonManager,
     val joinGates: JoinGateRegistry = JoinGateRegistry(),
+    val whitelist: WhitelistStore = WhitelistStore(java.nio.file.Path.of("whitelist.json")),
+    val playerData: PlayerDataRegistry = PlayerDataRegistry(),
     val commandQueue: ProxyCommandQueue = ProxyCommandQueue(),
     val permissionResolvers: PermissionResolverRegistry = PermissionResolverRegistry(),
     val nativePermissions: NativePermissionCache = NativePermissionCache(),

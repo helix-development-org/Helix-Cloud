@@ -128,6 +128,21 @@ class WarnStore(
         migrator.write(storage, DOCUMENT, json.encodeToJsonElement(warns.toList()))
     }
 
+    /**
+     * Removes every warning of a player. Used by GDPR delete requests.
+     *
+     * @param player the player.
+     * @return `true` when any warning was removed.
+     */
+    @Synchronized
+    fun clear(player: String): Boolean {
+        val removed = warns.removeAll { it.player == player.lowercase() }
+        if (removed) {
+            storage.write(DOCUMENT, json.encodeToString(warns.toList()))
+        }
+        return removed
+    }
+
     private companion object {
         /** Document key holding the warn history. */
         const val DOCUMENT = "warns"

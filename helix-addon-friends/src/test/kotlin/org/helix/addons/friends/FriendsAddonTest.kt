@@ -131,4 +131,20 @@ class FriendsAddonTest {
         now = 10_001
         assertEquals(FriendRequestOutcome.SENT, store.request("steve", "alex"))
     }
+
+    @Test
+    fun `player-data provider exports friends and requests, delete forgets both`() {
+        context.run("friend", "Steve", "add", "Alex")
+        context.run("friend", "Alex", "accept", "Steve")
+        context.run("friend", "Steve", "add", "Bob")
+        val provider = context.playerDataProviders.single()
+
+        val export = provider.export("bob")!!
+        assertTrue(export.contains("steve"))
+
+        assertTrue(provider.delete("steve"))
+        assertFalse(FriendStore(context.storage).areFriends("Steve", "Alex"))
+        assertEquals(null, provider.export("steve"))
+        assertFalse(provider.delete("steve"))
+    }
 }

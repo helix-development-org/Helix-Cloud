@@ -5,6 +5,7 @@ import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
 import org.helix.api.action.ActionSource
+import org.helix.api.addon.PlayerDataProvider
 
 /**
  * Permission system addon.
@@ -40,6 +41,19 @@ class PermissionsAddon : AddonBase() {
                 org.helix.api.display.DisplayProfile(prefix = group.prefix, color = group.color)
             }
         }
+        context.registerPlayerDataProvider(
+            /** Exports the player's personal grants/groups; clears the profile on delete. */
+            object : PlayerDataProvider {
+                override fun export(player: String): String? =
+                    store.user(player).takeUnless { it.isEmpty() }?.let { json.encodeToString(it) }
+
+                override fun delete(player: String): Boolean {
+                    val existed = !store.user(player).isEmpty()
+                    store.saveUser(PermissionUser(name = player))
+                    return existed
+                }
+            },
+        )
 
         action(
             "perm.group.create",

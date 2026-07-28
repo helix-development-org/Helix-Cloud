@@ -234,4 +234,17 @@ class ClanAddonTest {
         assertTrue(context.run("clan.unverify", "XYZ").success)
         assertEquals("", context.bridgeValues["clan.tag.steve"])
     }
+
+    @Test
+    fun `player-data provider exports membership, but refuses to delete an owner`() {
+        createClan()
+        context.run("clan", "Steve", "invite", "Alex")
+        context.run("clan", "Alex", "accept", "STV")
+        val provider = context.playerDataProviders.single()
+
+        assertTrue(provider.export("alex")!!.contains("STV"))
+        assertFalse(provider.delete("steve"), "an owner must transfer or disband first")
+        assertTrue(provider.delete("alex"))
+        assertNull(ClanStore(context.storage).clanOf("Alex"))
+    }
 }

@@ -159,4 +159,17 @@ class BansAddonTest {
 
         assertTrue(result.lines.first().contains("permanent"))
     }
+
+    @Test
+    fun `player-data provider exports and pardons an active ban`() {
+        val provider = context.playerDataProviders.single()
+        assertNull(provider.export("steve"))
+
+        context.run("ban.set", "Steve", "griefing")
+
+        assertTrue(provider.export("steve")!!.contains("griefing"))
+        assertTrue(provider.delete("steve"))
+        assertTrue(context.joinGates.single().check(JoinRequest("Steve")).allowed)
+        assertFalse(provider.delete("steve"))
+    }
 }

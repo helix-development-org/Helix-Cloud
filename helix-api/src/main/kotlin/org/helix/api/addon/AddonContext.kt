@@ -52,6 +52,15 @@ interface AddonContext {
     fun registerJoinGate(gate: JoinGate)
 
     /**
+     * Registers a player-data provider owned by this addon, backing GDPR
+     * export/delete requests. Removed when the addon is disabled.
+     *
+     * @param provider exports and deletes this addon's data for a player.
+     */
+    fun registerPlayerDataProvider(provider: PlayerDataProvider) {
+    }
+
+    /**
      * Registers a permission resolver owned by this addon.
      *
      * Bridges and other addons ask the node for permissions; the node

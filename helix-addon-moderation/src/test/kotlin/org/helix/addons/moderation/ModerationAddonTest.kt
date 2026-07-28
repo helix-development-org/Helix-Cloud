@@ -139,4 +139,17 @@ class ModerationAddonTest {
         assertTrue(result.lines.any { it.contains("not installed") }, "ban.check absence must not read as clean")
         assertTrue(result.lines.any { it.contains("none", ignoreCase = true) }, "mute status should be none")
     }
+
+    @Test
+    fun `player-data provider exports and clears warn history`() {
+        val provider = context.playerDataProviders.single()
+        assertEquals(null, provider.export("steve"))
+
+        context.run("warn", "Mod", "Steve", "language")
+
+        assertTrue(provider.export("steve")!!.contains("language"))
+        assertTrue(provider.delete("steve"))
+        assertTrue(context.run("warns", "Mod", "steve").lines.first().contains("no warnings"))
+        assertFalse(provider.delete("steve"))
+    }
 }

@@ -56,6 +56,7 @@ import org.helix.api.player.PlayerRosterReport
 import org.helix.api.proxy.JoinRequest
 import org.helix.api.proxy.PermissionCheckRequest
 import org.helix.api.proxy.PermissionDecision
+import org.helix.api.proxy.PlayerPermissionsSnapshot
 import org.helix.api.proxy.ProxyPoll
 import org.helix.api.service.ServiceState
 import org.helix.api.task.TaskDefinition
@@ -260,7 +261,41 @@ private fun knownPermissionNodes(dependencies: ControlDependencies): List<String
         .filter { it.playerCommand }
         .mapNotNull { it.permission }
         .forEach { add(it) }
+    dependencies.addonManager.addons().forEach { addAll(it.manifest.permissions) }
+    addAll(permissionCatalogNodes(dependencies))
 }.distinct()
+
+/**
+ * Nodes contributed by the permissions addon's full catalog (core, addons
+ * and backend plugin.yml scans), reusing its `perm.catalog` action instead
+ * of duplicating the scan in the node core. Empty when the addon is not
+ * installed.
+ *
+ * @param dependencies control API dependencies.
+ * @return the catalog's permission nodes, or empty on any failure.
+ */
+private fun permissionCatalogNodes(dependencies: ControlDependencies): List<String> {
+    val result = dependencies.registry.invoke(
+        ActionInvocation(action = "perm.catalog", arguments = emptyList(), source = ActionSource.SYSTEM),
+    )
+    if (!result.success) {
+        return emptyList()
+    }
+    return runCatching {
+        Json.decodeFromString<List<PermissionCatalogEntry>>(result.lines.firstOrNull() ?: "[]").map { it.node }
+    }.getOrDefault(emptyList())
+}
+
+/**
+ * Structural mirror of the permissions addon's `CatalogEntry` — the node
+ * core deliberately does not depend on addon modules, so the shared JSON
+ * shape (`node`, `source`) is decoded independently here.
+ *
+ * @property node the permission node.
+ * @property source where the node was discovered.
+ */
+@kotlinx.serialization.Serializable
+private data class PermissionCatalogEntry(val node: String, val source: String)
 
 /** Lines fetched per service-log poll while streaming. */
 private const val STREAM_TAIL = 400
@@ -568,6 +603,39 @@ private fun io.ktor.server.routing.Route.proxyRoutes(dependencies: ControlDepend
         )
         call.respond(MessageResponse("maintenance ${if (request.enabled) "enabled" else "disabled"}"))
     }
+    get("/proxy/whitelist") {
+        if (!authorize(dependencies, "helix.panel.proxy")) return@get
+        call.respond(WhitelistView(dependencies.whitelist.isEnabled(), dependencies.whitelist.all()))
+    }
+    post("/proxy/whitelist") {
+        if (!authorize(dependencies, "helix.panel.proxy")) return@post
+        val request = call.receive<WhitelistToggleRequest>()
+        dependencies.whitelist.setEnabled(request.enabled)
+        dependencies.eventLog.record(
+            "proxy",
+            if (request.enabled) "Whitelist enabled" else "Whitelist disabled",
+            if (request.enabled) "warn" else "info",
+        )
+        call.respond(MessageResponse("whitelist ${if (request.enabled) "enabled" else "disabled"}"))
+    }
+    post("/proxy/whitelist/add") {
+        if (!authorize(dependencies, "helix.panel.proxy")) return@post
+        val request = call.receive<WhitelistEntryRequest>()
+        if (dependencies.whitelist.add(request.player)) {
+            call.respond(MessageResponse("added ${request.player}"))
+        } else {
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("already whitelisted: ${request.player}"))
+        }
+    }
+    post("/proxy/whitelist/remove") {
+        if (!authorize(dependencies, "helix.panel.proxy")) return@post
+        val request = call.receive<WhitelistEntryRequest>()
+        if (dependencies.whitelist.remove(request.player)) {
+            call.respond(MessageResponse("removed ${request.player}"))
+        } else {
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("not whitelisted: ${request.player}"))
+        }
+    }
 }
 
 private fun io.ktor.server.routing.Route.taskRoutes(dependencies: ControlDependencies) {
@@ -810,6 +878,25 @@ private fun io.ktor.server.routing.Route.playerRoutes(dependencies: ControlDepen
         if (!authorize(dependencies, "helix.panel.players")) return@get
         call.respond(dependencies.playerRegistry.online())
     }
+    get("/players/lookup") {
+        if (!authorize(dependencies, "helix.panel.players")) return@get
+        val name = call.request.queryParameters["name"].orEmpty()
+        if (name.isBlank()) {
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("missing name"))
+            return@get
+        }
+        val online = dependencies.playerRegistry.find(name)
+        call.respond(
+            PlayerLookupView(
+                name = name,
+                online = online != null,
+                uuid = online?.uuid,
+                proxyServiceId = online?.proxyServiceId,
+                joinedAtEpochMs = online?.joinedAtEpochMs,
+                sources = dependencies.playerData.export(name),
+            ),
+        )
+    }
     post("/players/{name}/message") {
         if (!authorize(dependencies, "helix.panel.players")) return@post
         val name = call.parameters["name"].orEmpty()
@@ -836,6 +923,26 @@ private fun io.ktor.server.routing.Route.playerRoutes(dependencies: ControlDepen
         call.respond(
             dependencies.registry.invoke(ActionInvocation("ban.set", arguments, ActionSource.REST, actor = restActor())),
         )
+    }
+    get("/players/{name}/gdpr-export") {
+        if (!requireAdmin(dependencies)) return@get
+        val name = call.parameters["name"].orEmpty()
+        val result = dependencies.registry.invoke(
+            ActionInvocation("player.gdpr-export", listOf(name), ActionSource.REST),
+        )
+        if (result.success) {
+            call.respondText(result.lines.first(), ContentType.Application.Json)
+        } else {
+            call.respond(HttpStatusCode.InternalServerError, ErrorResponse(result.lines.firstOrNull() ?: "export failed"))
+        }
+    }
+    post("/players/{name}/gdpr-delete") {
+        if (!requireAdmin(dependencies)) return@post
+        val name = call.parameters["name"].orEmpty()
+        val result = dependencies.registry.invoke(
+            ActionInvocation("player.gdpr-delete", listOf(name), ActionSource.REST),
+        )
+        call.respond(MessageResponse(result.lines.firstOrNull() ?: "done"))
     }
 }
 
@@ -1039,6 +1146,21 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
         val report = call.receive<PlayerPermissionsReport>()
         dependencies.nativePermissions.update(report.name, report.permissions)
         call.respond(MessageResponse("ok"))
+    }
+    // Lets a bridge resolve a player's full granted-node snapshot, to mirror it onto a
+    // Bukkit PermissionAttachment (see HelixPermissionProvider) — a bridge route, so it
+    // authenticates like every other /internal/* route, not as an admin.
+    get("/internal/player-permissions") {
+        if (!requireBridge(dependencies)) return@get
+        val name = call.request.queryParameters["name"].orEmpty()
+        if (name.isBlank()) {
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("missing name"))
+            return@get
+        }
+        val granted = knownPermissionNodes(dependencies).filter { node ->
+            dependencies.permissionService.check(PermissionCheckRequest(name = name, permission = node))
+        }
+        call.respond(PlayerPermissionsSnapshot(name = name, granted = granted))
     }
     post("/internal/player-event") {
         val event = call.receive<PlayerEvent>()

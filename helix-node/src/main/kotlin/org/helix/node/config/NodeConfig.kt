@@ -9,6 +9,7 @@ package org.helix.node.config
  * @property network display settings of the network as a whole.
  * @property proxy backend/proxy forwarding trust settings.
  * @property eula operator acceptance of the Mojang EULA for Paper services.
+ * @property audit retention settings of the durable audit trail.
  */
 data class NodeConfig(
     val control: ControlSettings = ControlSettings(),
@@ -17,6 +18,7 @@ data class NodeConfig(
     val network: NetworkSettings = NetworkSettings(),
     val proxy: ProxySettings = ProxySettings(),
     val eula: EulaSettings = EulaSettings(),
+    val audit: AuditSettings = AuditSettings(),
 ) {
     /**
      * Network-wide display settings.
@@ -143,5 +145,16 @@ data class NodeConfig(
     data class EulaSettings(
         val accept: Boolean = false,
         val acceptedBy: String = "",
+    )
+
+    /**
+     * Audit trail retention settings.
+     *
+     * @property retentionDays hard cap on how long audit entries are kept,
+     *  enforced on a recurring sweep; `0` disables pruning (unlimited
+     *  retention).
+     */
+    data class AuditSettings(
+        val retentionDays: Int = 180,
     )
 }

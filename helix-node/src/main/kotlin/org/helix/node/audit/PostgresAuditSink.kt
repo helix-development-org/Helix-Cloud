@@ -70,4 +70,15 @@ class PostgresAuditSink(private val dataSource: DataSource) : AuditSink {
             }
         }.onFailure { logger.warn("Could not load audit history: {}", it.message) }
             .getOrDefault(emptyList())
+
+    override fun prune(olderThanEpochMs: Long) {
+        runCatching {
+            dataSource.connection.use { connection ->
+                connection.prepareStatement("DELETE FROM audit_log WHERE epoch_ms < ?").use { statement ->
+                    statement.setLong(1, olderThanEpochMs)
+                    statement.executeUpdate()
+                }
+            }
+        }.onFailure { logger.warn("Could not prune audit history: {}", it.message) }
+    }
 }

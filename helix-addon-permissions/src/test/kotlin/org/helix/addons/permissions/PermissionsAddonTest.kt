@@ -14,6 +14,7 @@ import org.helix.api.action.ActionResult
 import org.helix.api.addon.AddonContext
 import org.helix.api.addon.JoinGate
 import org.helix.api.addon.PermissionResolver
+import org.helix.api.addon.PlayerDataProvider
 import org.helix.api.proxy.PermissionCheckRequest
 
 /**
@@ -22,6 +23,7 @@ import org.helix.api.proxy.PermissionCheckRequest
 private class FakeContext(override val dataDirectory: Path) : AddonContext {
     val handlers = mutableMapOf<String, ActionHandler>()
     val resolvers = mutableListOf<PermissionResolver>()
+    val playerDataProviders = mutableListOf<PlayerDataProvider>()
 
     /** Simulated identity registry: lowercase name to uuid. */
     val uuidsByName = mutableMapOf<String, String>()
@@ -56,6 +58,10 @@ private class FakeContext(override val dataDirectory: Path) : AddonContext {
     }
 
     val displayResolvers = mutableListOf<org.helix.api.addon.DisplayResolver>()
+
+    override fun registerPlayerDataProvider(provider: PlayerDataProvider) {
+        playerDataProviders += provider
+    }
 
     fun run(action: String, vararg args: String): ActionResult =
         handlers.getValue(action).execute(ActionInvocation(action, args.toList()))
@@ -239,5 +245,18 @@ class PermissionsAddonTest {
 
         // and it stays theirs across a rename, since it is now keyed on the uuid
         assertTrue(context.has("Renamed", "helix.dangerous", uuid = "uuid-9"))
+    }
+
+    @Test
+    fun `player-data provider exports and clears a user's grants`() {
+        val provider = context.playerDataProviders.single()
+        assertEquals(null, provider.export("steve"))
+
+        context.run("perm.user.grant", "steve", "helix.fly")
+
+        assertTrue(provider.export("steve")!!.contains("helix.fly"))
+        assertTrue(provider.delete("steve"))
+        assertFalse(context.has("steve", "helix.fly"))
+        assertFalse(provider.delete("steve"))
     }
 }

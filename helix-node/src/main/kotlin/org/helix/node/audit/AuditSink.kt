@@ -20,4 +20,12 @@ interface AuditSink {
      * @return entries in chronological order.
      */
     fun loadRecent(limit: Int): List<AuditEntry>
+
+    /**
+     * Durably deletes every entry older than a cutoff, enforcing the
+     * configured hard retention cap so the trail does not grow forever.
+     *
+     * @param olderThanEpochMs cutoff; entries strictly older are removed.
+     */
+    fun prune(olderThanEpochMs: Long)
 }
