@@ -27,10 +27,19 @@ class ServerJarProvider(
     /**
      * Returns the cached server jar, downloading it on first use.
      *
+     * A jar resolved through the PaperMC API is verified against the
+     * sha256 checksum the API reports before it is cached or used, so a
+     * corrupted or tampered download fails the service start instead of
+     * silently running. A `versions.toml` URL override is trusted as
+     * configured (there is no checksum to compare against) but must be
+     * `https://`.
+     *
      * @param environment platform to provide.
      * @param version platform version to provide.
      * @return path of the cached jar.
-     * @throws IllegalArgumentException if the download fails.
+     * @throws IllegalArgumentException if the download fails, the override
+     *   URL is not `https://`, or the downloaded bytes don't match the
+     *   expected sha256.
      */
     fun ensureJar(environment: Environment, version: String): Path {
         val target = cacheDirectory.resolve("${environment.name.lowercase()}-$version.jar")
@@ -39,11 +48,26 @@ class ServerJarProvider(
         }
         Files.createDirectories(cacheDirectory)
         val override = catalog.find(environment, version)?.url
-        val uri = override?.let(URI::create) ?: resolver.resolve(environment, version)
+        val (uri, expectedSha256) = if (override != null) {
+            require(override.startsWith("https://", ignoreCase = true)) {
+                "versions.toml override for $environment $version must be an https:// url: $override"
+            }
+            URI.create(override) to null
+        } else {
+            val resolved = resolver.resolve(environment, version)
+            resolved.uri to resolved.sha256
+        }
         logger.info("Downloading {} {} from {}", environment, version, uri)
         val response = fetcher.get(uri, mapOf("User-Agent" to "helix-cloud"))
         require(response.statusCode in 200..299) {
             "download of $environment $version failed with HTTP ${response.statusCode}"
+        }
+        if (expectedSha256 != null) {
+            val actualSha256 = sha256Hex(response.body)
+            require(actualSha256.equals(expectedSha256, ignoreCase = true)) {
+                "download of $environment $version failed sha256 verification: " +
+                    "expected $expectedSha256, got $actualSha256"
+            }
         }
         val temp = Files.createTempFile(cacheDirectory, "download", ".part")
         Files.write(temp, response.body)
@@ -51,4 +75,7 @@ class ServerJarProvider(
         logger.info("Cached {} {} at {} ({} bytes)", environment, version, target, response.body.size)
         return target
     }
+
+    private fun sha256Hex(bytes: ByteArray): String =
+        java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 }

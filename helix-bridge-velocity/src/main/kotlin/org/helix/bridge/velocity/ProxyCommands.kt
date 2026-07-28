@@ -18,11 +18,14 @@ import net.kyori.adventure.text.Component
  * @property registry managed backends.
  * @property translate renders a translation key for a player: key, fallback
  *  template and extra placeholder values.
+ * @property hasBypass whether a player holds `helix.maintenance.bypass`,
+ *  exempting them from a maintenance-flagged backend's join rejection.
  */
 class ProxyCommands(
     private val proxy: ProxyServer,
     private val registry: BackendRegistry,
     private val translate: (Player?, String, String, Map<String, String>) -> Component,
+    private val hasBypass: (Player) -> Boolean,
 ) {
     /**
      * Registers all commands.
@@ -47,7 +50,10 @@ class ProxyCommands(
 
     private fun lobbyCommand() = SimpleCommand { invocation ->
         val player = invocation.source() as? Player ?: return@SimpleCommand
-        val lobby = registry.fallback(player.currentServer.map { it.serverInfo.name }.orElse(null))
+        val lobby = registry.fallback(
+            exclude = player.currentServer.map { it.serverInfo.name }.orElse(null),
+            bypassMaintenance = hasBypass(player),
+        )
         if (lobby == null) {
             message(player, "command.lobby.none", "No lobby available.")
         } else {
@@ -65,6 +71,8 @@ class ProxyCommands(
         val server = proxy.getServer(target).orElse(null)
         if (server == null) {
             message(player, "command.server.unknown", "Unknown server: {server}", mapOf("server" to target))
+        } else if (registry.isMaintenance(target) && !hasBypass(player)) {
+            message(player, "command.server.maintenance", "That server is under maintenance.", mapOf("server" to target))
         } else {
             player.createConnectionRequest(server).fireAndForget()
         }
@@ -72,7 +80,8 @@ class ProxyCommands(
 
     private fun serversCommand() = SimpleCommand { invocation ->
         val source = invocation.source()
-        val names = registry.backendNames()
+        val bypass = (source as? Player)?.let(hasBypass) ?: true
+        val names = registry.backendNames().filter { bypass || !registry.isMaintenance(it) }
         if (names.isEmpty()) {
             message(source, "command.servers.none", "No servers registered.")
             return@SimpleCommand

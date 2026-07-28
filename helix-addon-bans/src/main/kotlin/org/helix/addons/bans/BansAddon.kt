@@ -23,7 +23,7 @@ class BansAddon : AddonBase() {
      * Registers the ban actions and the join gate.
      */
     override fun enable() {
-        store = BanStore(context.storage())
+        store = BanStore(context.storage(), resolveUuid = context::resolvePlayerUuid)
         msg = context.localizedMessages(
             mapOf(
                 "en" to mapOf(
@@ -73,7 +73,9 @@ class BansAddon : AddonBase() {
             ),
         )
         context.registerJoinGate { request ->
-            store.activeBan(request.name)
+            // request.uuid is the bridge-reported uuid of the actual joining account — checking
+            // by it (not just the current name) is what stops a rename from evading a ban.
+            store.activeBan(request.name, request.uuid)
                 ?.let { JoinDecision.deny(banMessage(it)) }
                 ?: JoinDecision.allow()
         }

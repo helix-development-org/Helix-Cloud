@@ -30,6 +30,7 @@ class AutoScalerTest {
             paths = paths,
             internalResources = { ByteArrayInputStream(byteArrayOf(1)) },
             serverJar = { _, _ -> fakeJar },
+            eulaAccepted = true,
         ),
         executors = mapOf(ExecutorType.PROCESS to executor),
         clock = { now },
@@ -147,6 +148,7 @@ class AutoScalerTest {
                 paths = paths,
                 internalResources = { java.io.ByteArrayInputStream(byteArrayOf(1)) },
                 serverJar = { _, _ -> fakeJar },
+                eulaAccepted = true,
             ),
             executors = mapOf(
                 ExecutorType.DOCKER to ServiceExecutor {

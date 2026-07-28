@@ -7,12 +7,16 @@ package org.helix.node.config
  * @property docker settings of the docker execution backend.
  * @property storage settings of the addon storage backend.
  * @property network display settings of the network as a whole.
+ * @property proxy backend/proxy forwarding trust settings.
+ * @property eula operator acceptance of the Mojang EULA for Paper services.
  */
 data class NodeConfig(
     val control: ControlSettings = ControlSettings(),
     val docker: DockerSettings = DockerSettings(),
     val storage: StorageSettings = StorageSettings(),
     val network: NetworkSettings = NetworkSettings(),
+    val proxy: ProxySettings = ProxySettings(),
+    val eula: EulaSettings = EulaSettings(),
 ) {
     /**
      * Network-wide display settings.
@@ -33,7 +37,9 @@ data class NodeConfig(
      * @property loginPermission permission a player must hold to sign in to the
      *  web panel via their Minecraft account.
      * @property codeTtlSeconds how long an issued in-game login code stays valid.
-     * @property sessionTtlSeconds how long a web session stays valid.
+     * @property sessionTtlSeconds absolute lifetime of a web session.
+     * @property idleTimeoutSeconds a web session also expires after this long
+     *  without any authenticated request, independent of [sessionTtlSeconds].
      * @property loginMessage in-game message sent with the login code;
      *  `{code}` is replaced with the generated code.
      * @property tlsKeystore path to a PKCS12 keystore; when set, the control API
@@ -48,6 +54,7 @@ data class NodeConfig(
         val loginPermission: String = "helix.panel.login",
         val codeTtlSeconds: Long = 300,
         val sessionTtlSeconds: Long = 86_400,
+        val idleTimeoutSeconds: Long = 7_200,
         val loginMessage: String = "§b§lHelix §r§7» §fYour panel login code is §b{code}§7. It expires in 5 minutes.",
         val tlsKeystore: String = "",
         val tlsKeystorePassword: String = "",
@@ -107,4 +114,34 @@ data class NodeConfig(
          */
         fun isMongo(): Boolean = mode.equals("mongodb", ignoreCase = true) || mode.equals("mongo", ignoreCase = true)
     }
+
+    /**
+     * Trust settings between the proxy and the backend servers it forwards
+     * players to.
+     *
+     * @property forwardingSecret shared secret for Velocity's modern player
+     *  info forwarding, generated fresh per node on first init; written into
+     *  both the Velocity proxy's `forwarding.secret` file and every Paper
+     *  backend's `paper-global.yml`.
+     * @property legacyForwarding opt-in escape hatch back to unauthenticated
+     *  BungeeCord-style forwarding (no shared secret, trusts the handshake
+     *  identity as-is) — never the default, a loud warning is logged when set.
+     */
+    data class ProxySettings(
+        val forwardingSecret: String = "",
+        val legacyForwarding: Boolean = false,
+    )
+
+    /**
+     * Operator acceptance of the Mojang EULA (https://www.minecraft.net/eula),
+     * required before any Paper service may start.
+     *
+     * @property accept whether the operator accepted the EULA.
+     * @property acceptedBy free-form note of who accepted it, logged alongside
+     *  the acceptance for the audit trail.
+     */
+    data class EulaSettings(
+        val accept: Boolean = false,
+        val acceptedBy: String = "",
+    )
 }

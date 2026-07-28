@@ -23,7 +23,7 @@ class FriendsAddon : AddonBase() {
      * Registers the `/friend` player command and the join listener.
      */
     override fun enable() {
-        store = FriendStore(context.storage())
+        store = FriendStore(context.storage(), resolveUuid = context::resolvePlayerUuid)
         msg = context.localizedMessages(
             mapOf(
                 "en" to mapOf(

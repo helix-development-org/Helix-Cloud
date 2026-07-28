@@ -24,6 +24,7 @@ import org.bukkit.scoreboard.Objective
 import org.bukkit.scoreboard.Scoreboard
 import org.helix.api.bridge.HeartbeatReport
 import org.helix.api.bridge.ResourceProbe
+import org.helix.api.display.DisplayBulkRequest
 import org.helix.api.display.DisplayProfile
 import org.helix.api.message.LegacyToMini
 import org.helix.api.proxy.JoinRequest
@@ -75,6 +76,9 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     private var settings: BridgeSettings? = null
     private var pollCounter = 0
 
+    /** Paces retries and rate-limits the "unreachable" log while the node is down. */
+    private val reachability = NodeReachability()
+
     /**
      * Starts the sync scheduler when running under a Helix wrapper.
      */
@@ -120,7 +124,12 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     }
 
     /**
-     * Cancels the sync scheduler.
+     * Cancels the sync scheduler and undoes every change made to shared
+     * server state: leftover display teams and pre-login-fetched player
+     * names/list-names would otherwise persist (`scoreboard.dat` on
+     * non-templated servers) or go stale across a plugin reload, and a
+     * second [NickPacketListener] registration on reload would rewrite
+     * packets twice.
      */
     override fun onDisable() {
         heartbeatTask?.cancel()
@@ -130,6 +139,20 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         scoreboardTask?.cancel()
         scoreboardTask = null
         clearAllScoreboards()
+        server.scoreboardManager?.mainScoreboard?.teams
+            ?.filter { it.name.startsWith(DISPLAY_TEAM_PREFIX) }
+            ?.forEach { it.unregister() }
+        server.onlinePlayers.forEach { player ->
+            player.playerListName(null)
+            player.displayName(null)
+        }
+        nickPacketListener?.let { listener ->
+            runCatching {
+                com.github.retrooper.packetevents.PacketEvents.getAPI().eventManager.unregisterListener(listener)
+            }
+        }
+        nickPacketListener = null
+        nickNames.clear()
     }
 
     /**
@@ -164,7 +187,10 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     }
 
     /**
-     * Drops the cached display state of a quitting player.
+     * Drops the cached display state of a quitting player and unregisters
+     * their scoreboard display team everywhere it was registered — without
+     * this the team (and its entry) leaks forever, persisted to
+     * `scoreboard.dat` on non-templated servers.
      *
      * @param event the quit event.
      */
@@ -172,6 +198,19 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     fun onQuit(event: org.bukkit.event.player.PlayerQuitEvent) {
         displayProfiles.remove(event.player.name.lowercase())
         nickNames.remove(event.player.uniqueId)
+        removeDisplayTeam(event.player.name)
+    }
+
+    /**
+     * Unregisters a player's display team from the main scoreboard and
+     * every cached private board.
+     *
+     * @param playerName the player whose team is removed.
+     */
+    private fun removeDisplayTeam(playerName: String) {
+        val main = server.scoreboardManager?.mainScoreboard
+        val teamName = displayTeamName(playerName)
+        (listOfNotNull(main) + playerBoards.values).forEach { board -> board.getTeam(teamName)?.unregister() }
     }
 
     /**
@@ -259,12 +298,31 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     }
 
     private fun pulse(settings: BridgeSettings, client: NodeHttpClient) {
-        sendHeartbeat(settings, client)
-        syncBridgeValues(settings, client)
+        if (reachability.shouldAttempt()) {
+            val heartbeatOk = sendHeartbeat(settings, client)
+            val valuesOk = syncBridgeValues(settings, client)
+            if (heartbeatOk && valuesOk) {
+                if (reachability.isDown()) {
+                    logger.info("Helix node reachable again for ${settings.serviceId}")
+                }
+                reachability.recordSuccess()
+            } else {
+                val downSince = reachability.recordFailure()
+                logger.warning(
+                    "Helix node unreachable since ${java.time.Instant.ofEpochMilli(downSince)} — " +
+                        "using cached values, retrying with backoff",
+                )
+            }
+        }
         applyTablist()
         ensureScoreboardTask()
+        // The display cycle needs a live node round-trip per refresh, so it is skipped entirely
+        // while down — the last known-good cached profiles keep rendering instead of being cleared.
+        if (reachability.isDown()) {
+            return
+        }
         if (pollCounter++ % DISPLAY_REFRESH_CYCLES == 0) {
-            server.onlinePlayers.forEach { player -> refreshDisplay(client, player.name) }
+            refreshAllDisplays(client, server.onlinePlayers.map { it.name })
         } else {
             // Nick changes must not wait for the slow display cycle: the nick addon publishes
             // nick.name.<player> bridge values, so a mismatch against the cached profile
@@ -279,7 +337,7 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         }
     }
 
-    private fun sendHeartbeat(settings: BridgeSettings, client: NodeHttpClient) {
+    private fun sendHeartbeat(settings: BridgeSettings, client: NodeHttpClient): Boolean {
         val report = HeartbeatReport(
             serviceId = settings.serviceId,
             onlinePlayers = server.onlinePlayers.size,
@@ -289,23 +347,23 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
             memoryMaxMb = ResourceProbe.memoryMaxMb(),
             cpuPercent = ResourceProbe.cpuPercent(),
         )
-        runCatching { client.postJson("/api/v1/internal/heartbeat", json.encodeToString(report)) }
-            .onFailure { logger.warning("Helix heartbeat failed: ${it.message}") }
+        return runCatching { client.postJson("/api/v1/internal/heartbeat", json.encodeToString(report)) }
+            .getOrDefault(false)
     }
 
-    private fun syncBridgeValues(settings: BridgeSettings, client: NodeHttpClient) {
+    private fun syncBridgeValues(settings: BridgeSettings, client: NodeHttpClient): Boolean =
         runCatching {
-            client.getJson("/api/v1/internal/bridge-values?serviceId=${settings.serviceId}")?.let { body ->
-                bridgeValues = json.decodeFromString<Map<String, String>>(body)
-                tablist = bridgeValues["tablist.config"]?.let { raw ->
-                    runCatching { json.decodeFromString<TablistData>(raw) }.getOrNull()
-                }
-                scoreboards = bridgeValues["scoreboard.config"]?.let { raw ->
-                    runCatching { json.decodeFromString(scoreboardMapSerializer, raw) }.getOrNull()
-                } ?: emptyMap()
+            val body = client.getJson("/api/v1/internal/bridge-values?serviceId=${settings.serviceId}")
+                ?: return@runCatching false
+            bridgeValues = json.decodeFromString<Map<String, String>>(body)
+            tablist = bridgeValues["tablist.config"]?.let { raw ->
+                runCatching { json.decodeFromString<TablistData>(raw) }.getOrNull()
             }
-        }.onFailure { logger.warning("Helix bridge value sync failed: ${it.message}") }
-    }
+            scoreboards = bridgeValues["scoreboard.config"]?.let { raw ->
+                runCatching { json.decodeFromString(scoreboardMapSerializer, raw) }.getOrNull()
+            } ?: emptyMap()
+            true
+        }.getOrDefault(false)
 
     private fun applyTablist() {
         val config = tablist
@@ -510,6 +568,38 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     }
 
     /**
+     * Refreshes every online player's display profile with a single bulk
+     * call instead of one `POST /internal/display` per player, and only
+     * re-applies scoreboard teams/packets for a player whose resolved
+     * profile actually changed since the last cycle (avoids redundant
+     * packet spam on the default interval).
+     *
+     * @param client the node HTTP client.
+     * @param names online player names to refresh.
+     */
+    private fun refreshAllDisplays(client: NodeHttpClient, names: List<String>) {
+        if (names.isEmpty()) return
+        runCatching {
+            client.postJsonForBody(
+                "/api/v1/internal/display-bulk",
+                json.encodeToString(DisplayBulkRequest(names)),
+            )?.let { body ->
+                val profiles = json.decodeFromString<Map<String, DisplayProfile>>(body)
+                profiles.forEach { (name, profile) ->
+                    val key = name.lowercase()
+                    val changed = displayProfiles[key] != profile
+                    displayProfiles[key] = profile
+                    if (changed) {
+                        server.getPlayerExact(name)?.let { player ->
+                            server.scheduler.runTask(this, Runnable { applyDisplay(player, profile) })
+                        }
+                    }
+                }
+            }
+        }.onFailure { logger.warning("Helix bulk display fetch failed: ${it.message}") }
+    }
+
+    /**
      * Applies a display profile to the player's tab-list entry, display name
      * and the name shown above their head. Name tags render from the VIEWER's
      * scoreboard, and the sidebar gives every player a private board — so the
@@ -620,7 +710,7 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
 
     /** Stable scoreboard-safe team name for a player (16 char limit). */
     private fun displayTeamName(playerName: String) =
-        "hlx" + Integer.toHexString(playerName.lowercase().hashCode())
+        DISPLAY_TEAM_PREFIX + Integer.toHexString(playerName.lowercase().hashCode())
 
     /**
      * Maps a legacy `&`-color code to a named colour for scoreboard teams.
@@ -672,6 +762,9 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
 
         /** Team name prefix holding each sidebar line's text. */
         const val LINE_TEAM_PREFIX = "hline"
+
+        /** Team name prefix of a player's display (name-tag prefix/suffix/color) team. */
+        const val DISPLAY_TEAM_PREFIX = "hlx"
 
         /** Chat prefixes routed to node player-commands instead of public chat. */
         val CHAT_CHANNELS = mapOf("@team" to "tc", "@clan" to "cc")

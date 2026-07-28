@@ -80,4 +80,33 @@ class FriendsAddonTest {
 
         assertTrue(FriendStore(storage).areFriends("Steve", "Alex"))
     }
+
+    @Test
+    fun `a friendship survives a rename because it is keyed on uuid once known`() {
+        context.recordJoin("Steve", "uuid-1")
+        context.recordJoin("Alex", "uuid-2")
+        context.run("friend", "Steve", "add", "Alex")
+        context.run("friend", "Alex", "accept", "Steve")
+
+        // Steve renamed; the node still resolves "steve2" -> uuid-1, so the friendship holds
+        context.recordJoin("Steve2", "uuid-1")
+
+        assertTrue(context.run("friend", "Steve2", "list").lines.any { it.contains("alex") })
+        assertTrue(context.run("friend", "Alex", "list").lines.any { it.contains("steve2") })
+    }
+
+    @Test
+    fun `a freed name reused by someone else is not automatically friends with anyone`() {
+        context.recordJoin("Steve", "uuid-1")
+        context.recordJoin("Alex", "uuid-2")
+        context.run("friend", "Steve", "add", "Alex")
+        context.run("friend", "Alex", "accept", "Steve")
+        // Steve renames away, freeing the name
+        context.recordJoin("Steve2", "uuid-1")
+
+        // a new, unrelated account takes the freed name "steve"
+        context.recordJoin("Steve", "uuid-3")
+
+        assertTrue(context.run("friend", "Steve", "list").lines.first().contains("no friends"))
+    }
 }

@@ -21,7 +21,10 @@ import org.helix.node.players.PlayerRegistry
  * @property loginPermission permission required to sign in at all.
  * @property loginMessage in-game message template; `{code}` is substituted.
  * @property codeTtlMs lifetime of an issued login code.
- * @property sessionTtlMs lifetime of a minted session.
+ * @property sessionTtlMs absolute lifetime of a minted session, regardless of
+ *  activity.
+ * @property idleTtlMs a session also expires after this long without any
+ *  authenticated request, independent of [sessionTtlMs].
  * @property players online-player registry used to reach and identify players.
  * @property permissions permission service backing every permission check.
  * @property deliver sends a message to a player in-game, returning whether it
@@ -34,6 +37,7 @@ class PanelAuthService(
     private val loginMessage: String,
     private val codeTtlMs: Long,
     private val sessionTtlMs: Long,
+    private val idleTtlMs: Long = DEFAULT_IDLE_TTL_MS,
     private val players: PlayerRegistry,
     private val permissions: PermissionService,
     private val deliver: (String, String) -> Boolean,
@@ -50,17 +54,18 @@ class PanelAuthService(
      * @param rawName the entered Minecraft name.
      * @return a challenge acknowledgement.
      * @throws IllegalArgumentException if the player is offline, lacks the
-     *  login permission, or the code could not be delivered.
+     *  login permission, or the code could not be delivered. The offline and
+     *  lacks-permission cases share one message on purpose — an
+     *  unauthenticated caller must not be able to tell "offline" from "online
+     *  but not allowed" and enumerate which online players hold panel access.
      */
     @Synchronized
     fun requestCode(rawName: String): ChallengeResponse {
         val name = rawName.trim()
         require(name.isNotEmpty()) { "name must not be empty" }
         val player = players.find(name)
-        requireNotNull(player) { "player $name is not online" }
-        require(grantsPermission(player.name, loginPermission)) {
-            "player ${player.name} is not allowed to access the panel"
-        }
+        require(player != null) { LOGIN_CODE_DENIED_MESSAGE }
+        require(grantsPermission(player.name, loginPermission)) { LOGIN_CODE_DENIED_MESSAGE }
         val now = clock()
         val previous = lastCodeAt[player.name.lowercase()]
         require(previous == null || now - previous >= CODE_COOLDOWN_MS) {
@@ -107,27 +112,57 @@ class PanelAuthService(
         }
         pending.remove(key)
         val token = newToken()
-        sessions[token] = PanelSession(record.name, record.uuid, clock() + sessionTtlMs)
-        val principal = PanelPrincipal(record.name, admin = false)
+        val now = clock()
+        sessions[token] = PanelSession(record.name, record.uuid, now + sessionTtlMs, lastSeenAtMs = now)
+        val principal = PanelPrincipal(record.name, admin = grantsPermission(record.name, ADMIN_PERMISSION))
         return SessionResponse(token, identity(principal))
     }
 
     /**
      * Resolves a presented bearer token to a principal.
      *
+     * Every call re-checks that the session's player still holds the login
+     * permission and refreshes the idle timer, so a demoted or banned staff
+     * member loses panel access on their very next request instead of
+     * waiting out the session's absolute TTL, and an idle session dies even
+     * if it has not yet hit that TTL.
+     *
      * @param presented the bearer token from the request.
-     * @return the caller, or `null` if the token is unknown or expired.
+     * @return the caller, or `null` if the token is unknown, expired, idle
+     *  too long, or the player no longer holds the login permission.
      */
+    @Synchronized
     fun authenticate(presented: String): PanelPrincipal? {
         if (presented.isNotEmpty() && presented == adminToken) {
-            return PanelPrincipal("admin", admin = true)
+            return PanelPrincipal("admin", admin = true, viaStaticToken = true)
         }
         val session = sessions[presented] ?: return null
-        if (clock() >= session.expiresAtMs) {
+        val now = clock()
+        if (now >= session.expiresAtMs || now >= session.lastSeenAtMs + idleTtlMs) {
             sessions.remove(presented)
             return null
         }
-        return PanelPrincipal(session.name, admin = false)
+        if (!grantsPermission(session.name, loginPermission)) {
+            sessions.remove(presented)
+            return null
+        }
+        sessions[presented] = session.copy(lastSeenAtMs = now)
+        return PanelPrincipal(session.name, admin = grantsPermission(session.name, ADMIN_PERMISSION))
+    }
+
+    /**
+     * Revokes every active session belonging to a player, for example after a
+     * demotion or ban, without waiting for the session to expire naturally.
+     *
+     * @param rawName the Minecraft name whose sessions to drop.
+     * @return the number of sessions that were revoked.
+     */
+    @Synchronized
+    fun revokeSessions(rawName: String): Int {
+        val key = rawName.trim().lowercase()
+        val tokens = sessions.filterValues { it.name.lowercase() == key }.keys
+        tokens.forEach(sessions::remove)
+        return tokens.size
     }
 
     /**
@@ -183,6 +218,17 @@ class PanelAuthService(
 
         /** Minimum delay between login-code requests for the same player. */
         private const val CODE_COOLDOWN_MS = 30_000L
+
+        /** Shared "no" answer for an offline player and an online player
+         *  without the login permission — keeps both indistinguishable. */
+        const val LOGIN_CODE_DENIED_MESSAGE = "no login code could be issued for that name"
+
+        /** Default idle timeout: 2 hours without a request expires a session. */
+        const val DEFAULT_IDLE_TTL_MS = 2 * 60 * 60 * 1000L
+
+        /** Permission node that makes a player's own session a full admin,
+         *  equivalent to the static token, without sharing that credential. */
+        const val ADMIN_PERMISSION = "helix.admin"
 
         /** View id to permission node for every built-in dashboard view. */
         val VIEW_NODES: Map<String, String> = linkedMapOf(

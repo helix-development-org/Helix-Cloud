@@ -22,6 +22,10 @@ class ProcessServiceHandle(
     override val pid: Long
         get() = process.pid()
 
+    /** OS start instant of the wrapper, when the platform reports it. */
+    override val startInstantEpochMs: Long?
+        get() = runCatching { process.info().startInstant().orElse(null)?.toEpochMilli() }.getOrNull()
+
     /**
      * Requests a graceful stop by terminating the wrapper, which forwards
      * the termination to the server.

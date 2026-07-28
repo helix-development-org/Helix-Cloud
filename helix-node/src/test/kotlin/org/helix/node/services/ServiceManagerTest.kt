@@ -26,6 +26,7 @@ class ServiceManagerTest {
         paths = paths,
         internalResources = { ByteArrayInputStream(byteArrayOf(7)) },
         serverJar = { _, _ -> fakeJar },
+        eulaAccepted = true,
     )
     private val manager = ServiceManager(
         taskStore = taskStore,
@@ -166,5 +167,29 @@ class ServiceManagerTest {
     @Test
     fun `unknown heartbeat is rejected`() {
         assertFalse(manager.handleHeartbeat(HeartbeatReport("Ghost-1", 0, 0)))
+    }
+
+    @Test
+    fun `watchdog kill always settles FAILED even on a clean exit code`() {
+        task()
+        val info = manager.startService("Lobby")
+
+        assertTrue(manager.watchdogFail(info.id, "stuck"))
+        assertTrue(executor.handles.first().killCalled)
+        executor.handles.first().exit(0)
+
+        assertEquals(ServiceState.FAILED, manager.find(info.id)?.state)
+    }
+
+    @Test
+    fun `watchdog kill on an unknown or inactive service is a no-op`() {
+        assertFalse(manager.watchdogFail("Ghost-1", "stuck"))
+
+        task(name = "Static", static = true)
+        val info = manager.startService("Static")
+        executor.handles.first().exit(0)
+        assertEquals(ServiceState.STOPPED, manager.find(info.id)?.state)
+
+        assertFalse(manager.watchdogFail(info.id, "stuck"))
     }
 }

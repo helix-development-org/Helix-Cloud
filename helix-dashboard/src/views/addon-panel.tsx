@@ -124,6 +124,10 @@ export function AddonPanelView({ panelId }: { panelId: string }) {
 
   useEffect(() => {
     const handler = async (e: MessageEvent) => {
+      // Only trust messages from this panel's own iframe — anything else (a
+      // window holding a stale reference to this tab, another frame) must
+      // not be able to forge helix:action calls against the real session.
+      if (e.source !== frameRef.current?.contentWindow) return
       const d = e.data || {}
       if (d.type === "helix:toast") {
         toast(String(d.message))

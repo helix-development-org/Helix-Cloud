@@ -27,6 +27,26 @@ class FallbackSelectorTest {
     }
 
     @Test
+    fun `a maintenance-flagged backend is skipped by default`() {
+        val withMaintenance = listOf(
+            FallbackCandidate("Lobby-1", players = 5, fallbackEligible = true),
+            FallbackCandidate("Lobby-2", players = 0, fallbackEligible = true, maintenance = true),
+        )
+
+        assertEquals("Lobby-1", FallbackSelector.select(withMaintenance))
+    }
+
+    @Test
+    fun `maintenance bypass still allows the flagged backend to be picked`() {
+        val withMaintenance = listOf(
+            FallbackCandidate("Lobby-1", players = 5, fallbackEligible = true),
+            FallbackCandidate("Lobby-2", players = 0, fallbackEligible = true, maintenance = true),
+        )
+
+        assertEquals("Lobby-2", FallbackSelector.select(withMaintenance, bypassMaintenance = true))
+    }
+
+    @Test
     fun `settings load from environment`() {
         val settings = BridgeSettings.fromEnvironment(
             mapOf(

@@ -45,8 +45,13 @@ class DockerServiceExecutor(
             add(settings.network)
             add("--add-host")
             add("host.docker.internal:host-gateway")
-            add("-p")
-            add("${spec.port}:${spec.port}")
+            // Only the proxy's port is published to the host: backend Paper containers
+            // stay reachable solely over the docker network (by the proxy container),
+            // never directly from outside the docker host.
+            if (spec.task.environment.proxy) {
+                add("-p")
+                add("${spec.port}:${spec.port}")
+            }
             add("-v")
             // :z relabels the mount for SELinux hosts (Fedora/RHEL) and is
             // a no-op elsewhere; without it the container cannot read the

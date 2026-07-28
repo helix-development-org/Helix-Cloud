@@ -63,6 +63,15 @@ class ManagedService(
     @Volatile
     var stopRequested: Boolean = false
 
+    /**
+     * Set by the heartbeat watchdog before killing a stuck/unresponsive
+     * service, so [ServiceManager] settles it as FAILED regardless of the
+     * exit code or [stopRequested] — feeding the auto-scaler's normal
+     * crash-cooldown/replace path instead of a silent STOPPED.
+     */
+    @Volatile
+    var watchdogKilled: Boolean = false
+
     /** Executor handle, present while the service runs. */
     @Volatile
     var handle: ServiceHandle? = null

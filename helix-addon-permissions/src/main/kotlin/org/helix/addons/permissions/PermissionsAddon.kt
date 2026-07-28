@@ -27,12 +27,12 @@ class PermissionsAddon : AddonBase() {
      * Registers the resolver and all `perm.*` actions.
      */
     override fun enable() {
-        store = PermissionStore(context.storage())
+        store = PermissionStore(context.storage(), resolveUuid = context::resolvePlayerUuid)
         catalog = PermissionCatalog(context)
         if (store.group("default") == null) {
             store.saveGroup(PermissionGroup(name = "default", default = true))
         }
-        context.registerPermissionResolver { request -> store.has(request.name, request.permission) }
+        context.registerPermissionResolver { request -> store.has(request.name, request.permission, request.uuid) }
         // Group prefixes are DISPLAY state, deliberately decoupled from permission nodes: the
         // player's highest-weight group with a prefix wins, so a `*` grant never changes looks.
         context.registerDisplayResolver { name ->

@@ -7,6 +7,7 @@ import java.nio.file.SimpleFileVisitor
 import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.BasicFileAttributes
 import org.helix.api.environment.Environment
+import org.helix.api.execution.ExecutorType
 import org.helix.api.task.TaskDefinition
 import org.helix.node.launcher.NodePaths
 import org.helix.node.resources.InternalResources
@@ -26,6 +27,13 @@ import org.slf4j.LoggerFactory
  * @property paperComponents Paper-side plugin components of enabled addons
  *   active for a task (addon id to jar path), installed into Paper
  *   workspaces and refreshed on every service start.
+ * @property eulaAccepted whether the operator accepted the Mojang EULA
+ *   ([NodeConfig.EulaSettings.accept][org.helix.node.config.NodeConfig.EulaSettings.accept]);
+ *   a Paper workspace refuses to prepare otherwise.
+ * @property forwardingSecret shared secret for Velocity modern player-info
+ *   forwarding, written into both proxy and backend configs.
+ * @property legacyForwarding opt-in escape hatch to unauthenticated
+ *   BungeeCord-style forwarding instead of modern forwarding.
  */
 class WorkspacePreparer(
     private val paths: NodePaths,
@@ -33,6 +41,9 @@ class WorkspacePreparer(
     private val serverJar: (Environment, String) -> Path,
     private val paperComponents: (taskName: String) -> List<Pair<String, Path>> = { emptyList() },
     private val velocityComponents: (taskName: String) -> List<Pair<String, Path>> = { emptyList() },
+    private val eulaAccepted: Boolean = false,
+    private val forwardingSecret: String = "",
+    private val legacyForwarding: Boolean = false,
 ) {
     private val logger = LoggerFactory.getLogger(WorkspacePreparer::class.java)
 
@@ -193,6 +204,11 @@ class WorkspacePreparer(
     private fun writePlatformDefaults(task: TaskDefinition, port: Int, workspace: Path) {
         when (task.environment) {
             Environment.PAPER -> {
+                check(eulaAccepted) {
+                    "cannot start a Paper service: the Mojang EULA (https://www.minecraft.net/eula) " +
+                        "has not been accepted — set accept = true under [eula] in config/node.toml " +
+                        "once you have read and agreed to it"
+                }
                 writeIfMissing(workspace.resolve("eula.txt"), "eula=true\n")
                 writeIfMissing(
                     workspace.resolve("server.properties"),
@@ -201,17 +217,54 @@ class WorkspacePreparer(
                         appendLine("max-players=${task.maxPlayers}")
                         appendLine("online-mode=false")
                         appendLine("motd=${task.name}")
+                        // Process-mode backends run on the node's own host: binding to
+                        // loopback keeps them unreachable from outside it. Docker-mode
+                        // backends still need their container-network address to be
+                        // reachable by the proxy container (port publishing to the host
+                        // is what DockerServiceExecutor restricts instead).
+                        if (task.executor == ExecutorType.PROCESS) {
+                            appendLine("server-ip=127.0.0.1")
+                        }
                     },
                 )
-                // Legacy proxy forwarding requires bungeecord mode, otherwise
-                // paper rejects players coming through velocity.
-                writeIfMissing(
-                    workspace.resolve("spigot.yml"),
-                    buildString {
-                        appendLine("settings:")
-                        appendLine("  bungeecord: true")
-                    },
-                )
+                if (legacyForwarding) {
+                    logger.warn(
+                        "Task {} uses legacy BungeeCord-style proxy forwarding — this trusts the " +
+                            "handshake identity with no shared secret; anyone who can reach the backend " +
+                            "port directly can impersonate ANY player, including staff. Modern forwarding " +
+                            "(the default) is strongly recommended instead.",
+                        task.name,
+                    )
+                    // Legacy proxy forwarding requires bungeecord mode, otherwise
+                    // paper rejects players coming through velocity.
+                    writeIfMissing(
+                        workspace.resolve("spigot.yml"),
+                        buildString {
+                            appendLine("settings:")
+                            appendLine("  bungeecord: true")
+                        },
+                    )
+                } else {
+                    writeIfMissing(
+                        workspace.resolve("spigot.yml"),
+                        buildString {
+                            appendLine("settings:")
+                            appendLine("  bungeecord: false")
+                        },
+                    )
+                    // Modern forwarding: the backend trusts only a proxy that knows
+                    // this shared secret, instead of trusting whatever connects to it.
+                    writeIfMissing(
+                        workspace.resolve("config/paper-global.yml"),
+                        buildString {
+                            appendLine("proxies:")
+                            appendLine("  velocity:")
+                            appendLine("    enabled: true")
+                            appendLine("    online-mode: false")
+                            appendLine("    secret: '$forwardingSecret'")
+                        },
+                    )
+                }
             }
             Environment.VELOCITY -> {
                 // The config must be complete: without config-version and an
@@ -226,7 +279,12 @@ class WorkspacePreparer(
                         appendLine("motd = \"${task.name}\"")
                         appendLine("show-max-players = ${task.maxPlayers}")
                         appendLine("online-mode = true")
-                        appendLine("player-info-forwarding-mode = \"legacy\"")
+                        if (legacyForwarding) {
+                            appendLine("player-info-forwarding-mode = \"legacy\"")
+                        } else {
+                            appendLine("player-info-forwarding-mode = \"modern\"")
+                            appendLine("forwarding-secret-file = \"forwarding.secret\"")
+                        }
                         appendLine()
                         appendLine("[servers]")
                         appendLine("try = []")
@@ -234,12 +292,16 @@ class WorkspacePreparer(
                         appendLine("[forced-hosts]")
                     },
                 )
+                if (!legacyForwarding) {
+                    writeIfMissing(workspace.resolve("forwarding.secret"), forwardingSecret)
+                }
             }
         }
     }
 
     private fun writeIfMissing(file: Path, content: String) {
         if (Files.notExists(file)) {
+            Files.createDirectories(file.parent)
             Files.writeString(file, content)
         }
     }

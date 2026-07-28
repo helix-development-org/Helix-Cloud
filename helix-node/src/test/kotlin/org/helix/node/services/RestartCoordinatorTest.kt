@@ -26,6 +26,7 @@ class RestartCoordinatorTest {
             paths = paths,
             internalResources = { ByteArrayInputStream(byteArrayOf(7)) },
             serverJar = { _, _ -> fakeJar },
+            eulaAccepted = true,
         ),
         executors = mapOf(ExecutorType.PROCESS to executor),
     )

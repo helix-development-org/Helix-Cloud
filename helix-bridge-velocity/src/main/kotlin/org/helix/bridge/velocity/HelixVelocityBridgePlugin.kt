@@ -32,6 +32,9 @@ import org.helix.api.i18n.TranslationsSnapshot
 import org.helix.api.message.LegacyToMini
 import org.helix.api.player.PlayerEvent
 import org.helix.api.player.PlayerLocaleReport
+import org.helix.api.player.PlayerPermissionsReport
+import org.helix.api.player.PlayerRosterReport
+import org.helix.api.player.RosterPlayer
 import org.helix.api.proxy.JoinDecision
 import org.helix.api.proxy.JoinRequest
 import org.helix.api.proxy.PermissionCheckRequest
@@ -120,7 +123,9 @@ class HelixVelocityBridgePlugin @Inject constructor(
         client = httpClient
         val backendRegistry = BackendRegistry(proxy, logger)
         registry = backendRegistry
-        ProxyCommands(proxy, backendRegistry, ::translate).register(this)
+        ProxyCommands(proxy, backendRegistry, ::translate) { player ->
+            hasPermission(player.username, "helix.maintenance.bypass")
+        }.register(this)
         // Heartbeat is the only periodic task; everything else (commands,
         // routing, player-command registration) is delivered instantly via
         // a long-poll the node answers the moment something changes.
@@ -133,6 +138,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
                     syncTranslations(httpClient)
                     syncNetworkPack(httpClient)
                     syncBanSnapshot(httpClient)
+                    syncRoster(loaded, httpClient)
                 },
             )
             .delay(Duration.ofSeconds(1))
@@ -161,11 +167,15 @@ class HelixVelocityBridgePlugin @Inject constructor(
         pollThread = Thread {
             var routingVersion = -1
             var catalogVersion = -1
+            // Confirms the PREVIOUS response's commands were received; the node only removes them
+            // from its queue on this ack, so a response lost in transit (proxy restart, connection
+            // reset) never silently drops a command — it simply reappears on the retried poll.
+            var ackUpTo = 0L
             while (polling) {
                 try {
                     val body = client.getJsonLong(
                         "/api/v1/internal/poll?proxyServiceId=${settings.serviceId}" +
-                            "&routingVersion=$routingVersion&commandCatalogVersion=$catalogVersion",
+                            "&routingVersion=$routingVersion&commandCatalogVersion=$catalogVersion&ackUpTo=$ackUpTo",
                     )
                     if (body == null) {
                         Thread.sleep(RECONNECT_DELAY_MS)
@@ -173,12 +183,15 @@ class HelixVelocityBridgePlugin @Inject constructor(
                     }
                     val poll = json.decodeFromString<ProxyPoll>(body)
                     poll.commands.forEach(::executeCommand)
+                    ackUpTo = poll.ackToken
                     if (poll.routingVersion != routingVersion) {
                         syncRouting(settings, client, registry)
+                        reapplyPermissionNodes()
                         routingVersion = poll.routingVersion
                     }
                     if (poll.commandCatalogVersion != catalogVersion) {
                         syncPlayerCommands(settings, client)
+                        reapplyPermissionNodes()
                         catalogVersion = poll.commandCatalogVersion
                     }
                 } catch (interrupt: InterruptedException) {
@@ -211,18 +224,56 @@ class HelixVelocityBridgePlugin @Inject constructor(
     /**
      * The Helix permission nodes to evaluate natively, fetched once and cached.
      *
-     * @return the nodes advertised by the node, or empty on failure.
+     * A failed fetch is never cached — an empty result would otherwise stick
+     * forever after a node hiccup at the very first call — so the next
+     * opportunity (the next join, or [reapplyPermissionNodes]) retries.
+     *
+     * @return the nodes advertised by the node, or empty while none are cached yet.
      */
     private fun permissionNodes(): List<String> {
         permissionNodes?.let { return it }
-        val httpClient = client ?: return emptyList()
+        return fetchPermissionNodes() ?: emptyList()
+    }
+
+    /**
+     * Fetches the permission-node list from the node and caches it only on
+     * success.
+     *
+     * @return the fetched nodes, or `null` on failure (nothing cached).
+     */
+    private fun fetchPermissionNodes(): List<String>? {
+        val httpClient = client ?: return null
         val nodes = runCatching {
             httpClient.getJson("/api/v1/internal/permission-nodes")
                 ?.let { json.decodeFromString<List<String>>(it) }
         }.onFailure { logger.warn("Helix permission-node fetch failed: {}", it.message) }
-            .getOrNull() ?: emptyList()
-        permissionNodes = nodes
+            .getOrNull()
+        if (nodes != null) {
+            permissionNodes = nodes
+        }
         return nodes
+    }
+
+    /**
+     * Re-fetches the permission-node list and re-reports every online
+     * player's granted set — called whenever the long-poll signals the
+     * command catalog or routing changed, since either may mean the set of
+     * natively-evaluated nodes changed too. Uses the dedicated
+     * player-permissions endpoint so this never re-fires join/leave side
+     * effects for players who never left.
+     */
+    private fun reapplyPermissionNodes() {
+        val httpClient = client ?: return
+        val nodes = fetchPermissionNodes() ?: return
+        proxy.allPlayers.forEach { player ->
+            val granted = nodes.filter { player.hasPermission(it) }
+            runCatching {
+                httpClient.postJson(
+                    "/api/v1/internal/player-permissions",
+                    json.encodeToString(PlayerPermissionsReport(player.username, granted)),
+                )
+            }.onFailure { logger.warn("Helix permission reapply failed for {}: {}", player.username, it.message) }
+        }
     }
 
     /**
@@ -330,7 +381,8 @@ class HelixVelocityBridgePlugin @Inject constructor(
     @Subscribe
     fun onChooseInitialServer(event: PlayerChooseInitialServerEvent) {
         val name = event.player.username
-        if (maintenance.get() && !hasPermission(name, "helix.maintenance.bypass")) {
+        val bypass = hasPermission(name, "helix.maintenance.bypass")
+        if (maintenance.get() && !bypass) {
             event.player.disconnect(
                 translate(
                     event.player,
@@ -340,7 +392,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
             )
             return
         }
-        registry?.fallback()?.let(event::setInitialServer)
+        registry?.fallback(bypassMaintenance = bypass)?.let(event::setInitialServer)
     }
 
     private fun hasPermission(player: String, permission: String): Boolean {
@@ -362,7 +414,8 @@ class HelixVelocityBridgePlugin @Inject constructor(
      */
     @Subscribe
     fun onKickedFromServer(event: KickedFromServerEvent) {
-        val fallback = registry?.fallback(exclude = event.server.serverInfo.name) ?: return
+        val bypass = hasPermission(event.player.username, "helix.maintenance.bypass")
+        val fallback = registry?.fallback(exclude = event.server.serverInfo.name, bypassMaintenance = bypass) ?: return
         event.result = KickedFromServerEvent.RedirectPlayer.create(
             fallback,
             translate(
@@ -512,6 +565,25 @@ class HelixVelocityBridgePlugin @Inject constructor(
         val now = System.currentTimeMillis()
         return banSnapshot.firstOrNull { it.player.equals(name, ignoreCase = true) && (it.expiresAtEpochMs == null || it.expiresAtEpochMs > now) }
             ?.reason
+    }
+
+    /**
+     * Reports this proxy's complete current player list, so the node can
+     * reconcile its player registry against reality — joins/leaves missed
+     * while the node was unreachable would otherwise desync it until each
+     * affected player manually reconnects.
+     *
+     * @param settings bridge settings (carries this proxy's service id).
+     * @param client the node HTTP client.
+     */
+    private fun syncRoster(settings: BridgeSettings, client: NodeHttpClient) {
+        runCatching {
+            val players = proxy.allPlayers.map { RosterPlayer(it.username, it.uniqueId.toString()) }
+            client.postJson(
+                "/api/v1/internal/player-roster",
+                json.encodeToString(PlayerRosterReport(settings.serviceId, players)),
+            )
+        }.onFailure { logger.warn("Helix roster reconciliation failed: {}", it.message) }
     }
 
     /**

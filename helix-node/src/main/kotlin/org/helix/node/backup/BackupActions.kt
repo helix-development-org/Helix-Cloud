@@ -13,8 +13,8 @@ import org.helix.node.actions.ActionRegistry
  */
 class BackupActions(private val backups: BackupService) {
     /**
-     * Registers `backup.create`, `backup.list`, `backup.restore` and
-     * `backup.delete`.
+     * Registers `backup.create`, `backup.list`, `backup.restore`,
+     * `backup.delete`, `backup.create-data` and `backup.restore-data`.
      *
      * @param registry target registry.
      */
@@ -71,6 +71,28 @@ class BackupActions(private val backups: BackupService) {
             } else {
                 ActionResult.error("unknown backup: $serviceId/$file")
             }
+        }
+        registry.register(
+            ActionDescriptor(
+                "backup.create-data",
+                "Creates a zip backup of the json-mode addon/task/translation/audit data.",
+                "backup.create-data",
+            ),
+        ) {
+            val info = backups.createData()
+            ActionResult.ok("created ${info.fileName} (${info.sizeBytes / 1024} KiB) addon-data backup")
+        }
+        registry.register(
+            ActionDescriptor(
+                "backup.restore-data",
+                "Restores a json-mode addon-data backup.",
+                "backup.restore-data <file>",
+            ),
+        ) { invocation ->
+            val file = invocation.arguments.firstOrNull()
+                ?: return@register ActionResult.error("usage: backup.restore-data <file>")
+            backups.restoreData(file)
+            ActionResult.ok("restored addon-data backup $file")
         }
     }
 }

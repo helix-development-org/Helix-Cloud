@@ -15,11 +15,21 @@ import org.helix.api.storage.AddonStorage
  * expiry) count like their permanent counterparts while active and are
  * pruned once expired.
  *
+ * Users are keyed on uuid once known, falling back to the lowercase name for
+ * players this node has never seen join. A name-keyed profile is migrated to
+ * its uuid the first time that uuid becomes resolvable — the fix for name
+ * succession inheriting another player's permissions, since a freed name
+ * resolves to whoever currently owns it, never the profile of whoever held
+ * it before.
+ *
  * @property storage addon-scoped document store.
+ * @property resolveUuid resolves a player name to its current owner's uuid,
+ *  typically the node's identity registry via `AddonContext.resolvePlayerUuid`.
  * @property clock epoch-millis source, injectable for tests.
  */
 class PermissionStore(
     private val storage: AddonStorage,
+    private val resolveUuid: (String) -> String? = { null },
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val json = Json { prettyPrint = true }
@@ -30,7 +40,7 @@ class PermissionStore(
         storage.read(DOCUMENT)?.let { raw ->
             val document = json.decodeFromString<PermissionDocument>(raw)
             document.groups.forEach { groups[it.name] = it }
-            document.users.forEach { users[it.name] = it }
+            document.users.forEach { users[it.uuid ?: it.name] = it }
         }
     }
 
@@ -62,9 +72,9 @@ class PermissionStore(
                 groups[group.name] = group.copy(parents = group.parents - key)
             }
         }
-        users.values.toList().forEach { user ->
+        users.entries.toList().forEach { (userKey, user) ->
             if (key in user.groups) {
-                users[user.name] = user.copy(groups = user.groups - key)
+                users[userKey] = user.copy(groups = user.groups - key)
             }
         }
         persist()
@@ -93,18 +103,22 @@ class PermissionStore(
      * Looks up a user profile; expired timed grants are pruned first.
      *
      * @param name player name.
+     * @param uuid the player's uuid, when known directly (for example from a
+     *  join or permission check); otherwise resolved from [resolveUuid].
      * @return the profile, or an empty profile for unknown players.
      */
     @Synchronized
-    fun user(name: String): PermissionUser {
-        val stored = users[name.lowercase()] ?: return PermissionUser(name = name.lowercase())
+    fun user(name: String, uuid: String? = null): PermissionUser {
+        val key = keyOf(name, uuid)
+        val resolved = uuid ?: resolveUuid(name.lowercase())
+        val stored = users[key] ?: return PermissionUser(name = name.lowercase(), uuid = resolved)
         val now = clock()
         val pruned = stored.copy(
             timedPermissions = stored.timedPermissions.filter { it.active(now) },
             timedGroups = stored.timedGroups.filter { it.active(now) },
         )
         if (pruned != stored) {
-            if (pruned.isEmpty()) users.remove(pruned.name) else users[pruned.name] = pruned
+            if (pruned.isEmpty()) users.remove(key) else users[key] = pruned
             persist()
         }
         return pruned
@@ -117,13 +131,41 @@ class PermissionStore(
      */
     @Synchronized
     fun saveUser(user: PermissionUser) {
-        val normalized = user.copy(name = user.name.lowercase())
-        if (normalized.isEmpty()) {
-            users.remove(normalized.name)
-        } else {
-            users[normalized.name] = normalized
+        val lower = user.name.lowercase()
+        val resolved = user.uuid ?: resolveUuid(lower)
+        val normalized = user.copy(name = lower, uuid = resolved)
+        users.remove(lower)
+        resolved?.let(users::remove)
+        if (!normalized.isEmpty()) {
+            users[resolved ?: lower] = normalized
         }
         persist()
+    }
+
+    /**
+     * Resolves the storage key for [name] and migrates a legacy name-keyed
+     * profile to its uuid the moment that uuid becomes known.
+     *
+     * @param name player name.
+     * @param uuidHint uuid supplied directly by the caller, preferred over
+     *  [resolveUuid].
+     * @return the map key to use: the uuid when known, else the lowercase name.
+     */
+    private fun keyOf(name: String, uuidHint: String?): String {
+        val lower = name.lowercase()
+        val resolved = uuidHint ?: resolveUuid(lower)
+        if (resolved == null) {
+            return lower
+        }
+        val legacy = users[lower]
+        if (legacy != null && legacy.uuid == null) {
+            users.remove(lower)
+            if (resolved !in users) {
+                users[resolved] = legacy.copy(uuid = resolved)
+            }
+            persist()
+        }
+        return resolved
     }
 
     /**
@@ -140,11 +182,13 @@ class PermissionStore(
      *
      * @param player player name.
      * @param permission requested permission node.
+     * @param uuid the player's uuid, when known directly; otherwise resolved
+     *  from [resolveUuid].
      * @return `true` when granted.
      */
     @Synchronized
-    fun has(player: String, permission: String): Boolean {
-        val profile = user(player)
+    fun has(player: String, permission: String, uuid: String? = null): Boolean {
+        val profile = user(player, uuid)
         val personal = profile.permissions + profile.timedPermissions.map { it.value }
         PermissionMatcher.decide(personal, permission)?.let { return it }
         val memberships = (profile.groups + profile.timedGroups.map { it.value })

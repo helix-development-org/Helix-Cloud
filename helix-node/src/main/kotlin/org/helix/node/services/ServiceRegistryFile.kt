@@ -38,6 +38,7 @@ class ServiceRegistryFile(private val file: Path) {
                 state = service.state,
                 pid = service.handle?.pid,
                 startedAtEpochMs = service.startedAtEpochMs,
+                processStartInstantEpochMs = service.handle?.startInstantEpochMs,
             )
         }
         runCatching {
@@ -74,6 +75,9 @@ class ServiceRegistryFile(private val file: Path) {
  * @property state last known lifecycle state.
  * @property pid wrapper process id for process services.
  * @property startedAtEpochMs epoch millis of the last start.
+ * @property processStartInstantEpochMs the wrapper process's OS start
+ *  instant, used to confirm a re-attached pid is still the same process
+ *  rather than one that reused the pid after a reboot.
  */
 @Serializable
 data class ServiceRegistryEntry(
@@ -85,4 +89,5 @@ data class ServiceRegistryEntry(
     val state: ServiceState,
     val pid: Long? = null,
     val startedAtEpochMs: Long? = null,
+    val processStartInstantEpochMs: Long? = null,
 )

@@ -6,18 +6,31 @@ import org.helix.api.storage.AddonStorage
 /**
  * Friendship persistence backed by the addon's document storage.
  *
+ * Friendships and requests are keyed on identity keys — a player's uuid once
+ * known, otherwise their lowercase name as a fallback for players this node
+ * has never seen join. A legacy name-keyed entry is migrated to its uuid the
+ * first time that uuid becomes resolvable, so a rename cannot be used to
+ * dodge an existing friendship or pending request.
+ *
  * @property storage addon-scoped document store.
+ * @property resolveUuid resolves a player name to its current owner's uuid,
+ *  typically the node's identity registry via `AddonContext.resolvePlayerUuid`.
  */
-class FriendStore(private val storage: AddonStorage) {
+class FriendStore(
+    private val storage: AddonStorage,
+    private val resolveUuid: (String) -> String? = { null },
+) {
     private val json = Json { prettyPrint = true }
     private val friendships = mutableSetOf<Set<String>>()
     private val requests = mutableMapOf<String, MutableSet<String>>()
+    private val displayNames = mutableMapOf<String, String>()
 
     init {
         storage.read(DOCUMENT)?.let { raw ->
             val document = json.decodeFromString<FriendDocument>(raw)
             document.friendships.forEach { friendships += it.toSet() }
             document.requests.forEach { (to, from) -> requests[to] = from.toMutableSet() }
+            displayNames += document.displayNames
         }
     }
 
@@ -30,7 +43,7 @@ class FriendStore(private val storage: AddonStorage) {
      */
     @Synchronized
     fun areFriends(a: String, b: String): Boolean =
-        setOf(a.lowercase(), b.lowercase()) in friendships
+        setOf(keyOf(a), keyOf(b)) in friendships
 
     /**
      * Records a friend request.
@@ -41,7 +54,7 @@ class FriendStore(private val storage: AddonStorage) {
      */
     @Synchronized
     fun request(from: String, to: String): Boolean {
-        val added = requests.getOrPut(to.lowercase()) { mutableSetOf() }.add(from.lowercase())
+        val added = requests.getOrPut(keyOf(to)) { mutableSetOf() }.add(keyOf(from))
         if (added) {
             persist()
         }
@@ -57,7 +70,7 @@ class FriendStore(private val storage: AddonStorage) {
      */
     @Synchronized
     fun hasRequest(from: String, to: String): Boolean =
-        requests[to.lowercase()]?.contains(from.lowercase()) == true
+        requests[keyOf(to)]?.contains(keyOf(from)) == true
 
     /**
      * Accepts a pending request and creates the friendship.
@@ -71,7 +84,7 @@ class FriendStore(private val storage: AddonStorage) {
         if (!removeRequest(from, to)) {
             return false
         }
-        friendships += setOf(from.lowercase(), to.lowercase())
+        friendships += setOf(keyOf(from), keyOf(to))
         persist()
         return true
     }
@@ -95,7 +108,7 @@ class FriendStore(private val storage: AddonStorage) {
      */
     @Synchronized
     fun remove(a: String, b: String): Boolean {
-        val removed = friendships.remove(setOf(a.lowercase(), b.lowercase()))
+        val removed = friendships.remove(setOf(keyOf(a), keyOf(b)))
         if (removed) {
             persist()
         }
@@ -110,8 +123,8 @@ class FriendStore(private val storage: AddonStorage) {
      */
     @Synchronized
     fun friendsOf(player: String): List<String> {
-        val key = player.lowercase()
-        return friendships.filter { key in it }.map { (it - key).single() }.sorted()
+        val key = keyOf(player)
+        return friendships.filter { key in it }.map { nameOf((it - key).single()) }.sorted()
     }
 
     /**
@@ -122,15 +135,70 @@ class FriendStore(private val storage: AddonStorage) {
      */
     @Synchronized
     fun requestsFor(player: String): List<String> =
-        requests[player.lowercase()]?.sorted() ?: emptyList()
+        requests[keyOf(player)]?.map(::nameOf)?.sorted() ?: emptyList()
 
     private fun removeRequest(from: String, to: String): Boolean {
-        val set = requests[to.lowercase()] ?: return false
-        val removed = set.remove(from.lowercase())
+        val toKey = keyOf(to)
+        val set = requests[toKey] ?: return false
+        val removed = set.remove(keyOf(from))
         if (set.isEmpty()) {
-            requests.remove(to.lowercase())
+            requests.remove(toKey)
         }
         return removed
+    }
+
+    /**
+     * Resolves the identity key of a player name — their uuid once known,
+     * else the lowercase name — migrating any legacy name-keyed friendships
+     * and requests to that uuid the moment it becomes resolvable.
+     *
+     * @param name player name.
+     * @return the identity key to use for lookups and storage.
+     */
+    private fun keyOf(name: String): String {
+        val lower = name.lowercase()
+        val resolved = resolveUuid(lower) ?: return lower
+        migrateIfKnown(lower, resolved)
+        displayNames[resolved] = lower
+        return resolved
+    }
+
+    /**
+     * The last-known display name of an identity key: itself for a
+     * name-keyed fallback entry, or the tracked name for a uuid key.
+     *
+     * @param key identity key.
+     * @return the name to show for it.
+     */
+    private fun nameOf(key: String): String = displayNames[key] ?: key
+
+    /**
+     * Moves every friendship and request referencing the legacy name key to
+     * the now-known uuid key, carrying the data forward unchanged.
+     *
+     * @param name the lowercase name a legacy entry may reference.
+     * @param resolved the now-known uuid.
+     */
+    private fun migrateIfKnown(name: String, resolved: String) {
+        var changed = false
+        friendships.filter { name in it }.toList().forEach { pair ->
+            friendships.remove(pair)
+            friendships += pair.map { if (it == name) resolved else it }.toSet()
+            changed = true
+        }
+        requests.remove(name)?.let { from ->
+            requests.getOrPut(resolved) { mutableSetOf() }.addAll(from)
+            changed = true
+        }
+        requests.values.forEach { from ->
+            if (from.remove(name)) {
+                from += resolved
+                changed = true
+            }
+        }
+        if (changed) {
+            persist()
+        }
     }
 
     private fun persist() {
@@ -140,6 +208,7 @@ class FriendStore(private val storage: AddonStorage) {
                 FriendDocument(
                     friendships = friendships.map { it.toList().sorted() },
                     requests = requests.mapValues { it.value.toSet() },
+                    displayNames = displayNames.toMap(),
                 ),
             ),
         )

@@ -1,5 +1,73 @@
 # Changelog
 
+## 0.60.0 — 2026-07-28
+
+Erste Etappe des Wegs zu v0.90.0-Beta: Sicherheit, Vertrauensstellung
+gegenüber PaperMC/Velocity, Storage-Haltbarkeit, spielerbezogene Identität
+und Node-Robustheit. Fünf Bereiche, gemeinsam entwickelt und verifiziert
+(442 Tests, KDoc-Gate grün), daher als ein Release gebündelt.
+
+### Sicherheit: Pro-Service-Tokens statt eines geteilten Admin-Tokens
+- **Jeder verwaltete Dienst bekommt sein eigenes, zufälliges Token**
+  (`ServiceTokenRegistry`, 32 Byte `SecureRandom`) statt des bisherigen
+  einen Admin-Tokens, das in jeden gestarteten Prozess injiziert wurde.
+  Ein kompromittierter Spielserver kann damit nicht mehr das ganze Netzwerk
+  administrieren (Tasks anlegen, Bans setzen, Dienste stoppen).
+- **Drei Berechtigungsstufen für Routen**: `authorize` (Dashboard-Routen
+  mit Permission-Node), `requireAdmin` (nur Admin-Token/Admin-Account),
+  neu `requireBridge` (nur `/internal/*`-Bridge-Routen, akzeptiert Admin-
+  Token oder das zur Route passende Service-Token). Alle 19 bestehenden
+  `/internal/*`-Routen sind auf `requireBridge` umgestellt.
+- **Benannte Admin-Accounts** über den Permission-Node `helix.admin`,
+  getrennt vom statischen Break-Glass-Token. `PanelPrincipal.viaStaticToken`
+  unterscheidet in Audit-Einträgen, ob über einen Account oder das
+  Notfall-Token gehandelt wurde.
+- **REST-Aktionen tragen jetzt einen echten `actor`**, statt generisch als
+  „rest" zu erscheinen.
+- **Neuer Rate-Limiter** und Sicherheits-Header (`X-Frame-Options: DENY`,
+  CSP `frame-ancestors 'none'`, HSTS bei TLS) auf allen Control-Routen.
+
+### Vertrauensstellung: moderne Velocity-Forwarding statt BungeeCord
+- **Modernes Velocity-Forwarding mit generiertem Secret** ersetzt das
+  veraltete BungeeCord-Forwarding.
+- **Backends binden nur noch auf Loopback**, PaperMC-Server-Jars werden
+  per SHA-256 gegen Mojangs Manifest verifiziert, und ein expliziter
+  EULA-Zustimmungs-Schritt ist jetzt Pflicht vor dem ersten Start.
+
+### Storage: atomare Schreibvorgänge
+- **Alle Storage-Schreibvorgänge sind jetzt atomar** (Temp-Datei + fsync +
+  `ATOMIC_MOVE`) mit einer Generation `.bak`-Fallback, falls ein Schreiben
+  mitten im Prozess abbricht — verhindert korrupte oder halb geschriebene
+  JSON-Dateien nach einem harten Node-Absturz.
+- **Neue `SchemaMigrator`-Konvention** in `helix-api` für zukünftige
+  Datenformat-Migrationen.
+
+### Identität: UUID statt Name als Primärschlüssel
+- **Neue node-weite Identitäts-Registry** (`IdentityRegistry`) bildet
+  UUID auf den zuletzt bekannten Namen ab und wird bei jedem Login
+  aktualisiert. Ein Namenswechsel oder ein von Mojang recycelter Name
+  erbt dadurch nicht mehr die Bans oder Rechte des Vorbesitzers.
+- **Bans, Rechte, Verwarnungen und Freundeslisten** werden schrittweise
+  von namensbasierten auf UUID-basierte Schlüssel umgestellt, sobald die
+  UUID eines Spielers bekannt ist.
+
+### Node-Robustheit
+- **Heartbeat-Watchdog** erkennt hängende Node-Zyklen.
+- **Scheduler in zwei Executors aufgeteilt**, damit ein langsamer Task
+  nicht den Heartbeat blockiert.
+- **Storage-Backend startet mit Backoff-Retry** statt sofort
+  aufzugeben, wenn der Datenspeicher beim Boot kurzzeitig nicht
+  erreichbar ist.
+- **Echte Port-Verfügbarkeitsprüfung** (`PortAllocator`) statt reiner
+  Annahme, ein Port sei frei.
+- **Verwaiste Service-Workspaces werden aufgeräumt**
+  (`OrphanWorkspaceSweeper`) — schließt die Lücke, in der ein hart
+  abgestürzter Dienst sein Temp-Verzeichnis für immer hinterlässt.
+- **Audit-Log schreibt jetzt asynchron mit Rotation**, blockiert den
+  Aufrufer nicht mehr bei einem langsamen Sink und verwirft im
+  Überlastfall den ältesten wartenden Eintrag statt zu blockieren.
+- **Shutdown parallelisiert** mit größerem Zeitbudget pro Dienst.
+
 ## 0.59.0 — 2026-07-28
 
 ### Audit-Trail: echte Spieler-Attribution + filterbare Audit-Seite

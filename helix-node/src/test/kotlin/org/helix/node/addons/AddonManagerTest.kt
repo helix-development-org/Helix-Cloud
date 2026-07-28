@@ -186,6 +186,41 @@ class AddonManagerTest {
     }
 
     @Test
+    fun `malicious paper entry names cannot escape the extracted directory`() {
+        // Resolves (pre-fix) to exactly `directory.parent/helix-evil-marker.jar`:
+        // one `..` cancels the fake "id-version-paper-.." segment, the other three
+        // walk up .extracted -> directory -> directory.parent.
+        val outsideMarker = directory.parent.resolve("helix-evil-marker.jar")
+        writeHxa(withPaperComponent = true, extraPaperJars = listOf("../../../../helix-evil-marker"))
+
+        manager.loadAll()
+
+        // the legitimate paper.jar still loads; the traversal attempt is skipped, not honored
+        val paper = manager.paperComponents("Lobby")
+        assertEquals(listOf("helix.test"), paper.map { it.first })
+        val extractedRoot = directory.resolve(".extracted").normalize()
+        paper.forEach { (_, path) -> assertTrue(path.normalize().startsWith(extractedRoot)) }
+        assertFalse(Files.exists(outsideMarker))
+    }
+
+    @Test
+    fun `manifest with an unsafe id or version is rejected`() {
+        val file = directory.resolve("evil.hxa")
+        ZipOutputStream(Files.newOutputStream(file)).use { zip ->
+            zip.putNextEntry(ZipEntry("addon.json"))
+            zip.write(
+                """{"id": "../../evil", "name": "Evil", "version": "1.0.0", "main": "does.not.Exist"}""".toByteArray(),
+            )
+            zip.closeEntry()
+            zip.putNextEntry(ZipEntry("addon.jar"))
+            zip.write(byteArrayOf(1))
+            zip.closeEntry()
+        }
+
+        assertTrue(manager.loadAll().isEmpty())
+    }
+
+    @Test
     fun `disable all runs on shutdown`() {
         writeHxa()
         manager.loadAll()

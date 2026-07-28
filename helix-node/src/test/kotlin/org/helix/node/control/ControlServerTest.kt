@@ -55,6 +55,7 @@ class ControlServerTest {
             paths = paths,
             internalResources = { ByteArrayInputStream(byteArrayOf(1)) },
             serverJar = { _, _ -> fakeJar },
+            eulaAccepted = true,
         ),
         executors = mapOf(ExecutorType.PROCESS to executor, ExecutorType.DOCKER to executor),
     )
@@ -85,6 +86,10 @@ class ControlServerTest {
             overviewService = PlatformOverviewService("1.0.0", taskStore, manager),
             versionCatalog = { VersionCatalog(emptyList()) },
             shutdown = {},
+            // shares the same registry as ControlDependencies so `player.message`
+            // (used by the panel login-code delivery) sees players marked online
+            // via `dependencies.playerRegistry` in tests that exercise real login.
+            playerRegistry = dependencies.playerRegistry,
         ).registerAll(registry)
     }
 
@@ -182,6 +187,83 @@ class ControlServerTest {
     }
 
     @Test
+    fun `a per-service token authenticates its own service's internal routes only`() = testApplication {
+        val client = apiClient()
+        client.put("/api/v1/tasks/Lobby") {
+            bearerAuth("secret"); contentType(ContentType.Application.Json); setBody(lobby)
+        }
+        client.post("/api/v1/tasks/Lobby/services") { bearerAuth("secret") }
+        client.post("/api/v1/tasks/Lobby/services") { bearerAuth("secret") }
+        val ownToken = dependencies.serviceTokens.mint("Lobby-1")
+
+        // heartbeats and other internal routes for its OWN service id succeed
+        val ownHeartbeat = client.post("/api/v1/internal/heartbeat") {
+            bearerAuth(ownToken)
+            contentType(ContentType.Application.Json)
+            setBody(HeartbeatReport("Lobby-1", 3, 100))
+        }
+        assertEquals(HttpStatusCode.OK, ownHeartbeat.status)
+
+        val ownRouting = client.get("/api/v1/internal/routing?proxyServiceId=Lobby-1") { bearerAuth(ownToken) }
+        assertEquals(HttpStatusCode.OK, ownRouting.status)
+
+        // a route that carries no service id at all (network-wide bridge info) is still reachable
+        val nodes = client.get("/api/v1/internal/permission-nodes") { bearerAuth(ownToken) }
+        assertEquals(HttpStatusCode.OK, nodes.status)
+    }
+
+    @Test
+    fun `a per-service token is rejected for another service's heartbeat`() = testApplication {
+        val client = apiClient()
+        client.put("/api/v1/tasks/Lobby") {
+            bearerAuth("secret"); contentType(ContentType.Application.Json); setBody(lobby)
+        }
+        client.post("/api/v1/tasks/Lobby/services") { bearerAuth("secret") }
+        client.post("/api/v1/tasks/Lobby/services") { bearerAuth("secret") }
+        val lobby1Token = dependencies.serviceTokens.mint("Lobby-1")
+
+        val crossServiceHeartbeat = client.post("/api/v1/internal/heartbeat") {
+            bearerAuth(lobby1Token)
+            contentType(ContentType.Application.Json)
+            setBody(HeartbeatReport("Lobby-2", 3, 100))
+        }
+        assertEquals(HttpStatusCode.Forbidden, crossServiceHeartbeat.status)
+
+        val crossServiceRouting = client.get("/api/v1/internal/routing?proxyServiceId=Lobby-2") {
+            bearerAuth(lobby1Token)
+        }
+        assertEquals(HttpStatusCode.Forbidden, crossServiceRouting.status)
+    }
+
+    @Test
+    fun `a per-service token cannot reach task, addon or file management routes`() = testApplication {
+        val client = apiClient()
+        client.put("/api/v1/tasks/Lobby") {
+            bearerAuth("secret"); contentType(ContentType.Application.Json); setBody(lobby)
+        }
+        client.post("/api/v1/tasks/Lobby/services") { bearerAuth("secret") }
+        val token = dependencies.serviceTokens.mint("Lobby-1")
+
+        // the per-service token DOES authenticate (it's a recognized bridge credential), but it
+        // grants no permission node, so every admin/panel route answers 403, never 200
+        assertEquals(HttpStatusCode.Forbidden, client.get("/api/v1/tasks") { bearerAuth(token) }.status)
+        assertEquals(
+            HttpStatusCode.Forbidden,
+            client.post("/api/v1/services/Lobby-1/stop") { bearerAuth(token) }.status,
+        )
+        assertEquals(HttpStatusCode.Forbidden, client.get("/api/v1/addons") { bearerAuth(token) }.status)
+        assertEquals(HttpStatusCode.Forbidden, client.get("/api/v1/files/roots") { bearerAuth(token) }.status)
+        assertEquals(
+            HttpStatusCode.Forbidden,
+            client.post("/api/v1/actions") {
+                bearerAuth(token)
+                contentType(ContentType.Application.Json)
+                setBody(ActionInvocation("task.create", listOf("Sneaky", "paper", "1.21.11")))
+            }.status,
+        )
+    }
+
+    @Test
     fun `unknown service yields 404`() = testApplication {
         val client = apiClient()
 
@@ -247,6 +329,21 @@ class ControlServerTest {
             setBody(org.helix.api.proxy.PermissionCheckRequest("alex", "helix.maintenance.bypass"))
         }.body()
         assertEquals(false, deniedPerm.allowed)
+    }
+
+    @Test
+    fun `a reported join feeds the identity registry`() = testApplication {
+        val client = apiClient()
+
+        val response = client.post("/api/v1/internal/player-event") {
+            bearerAuth("secret")
+            contentType(ContentType.Application.Json)
+            setBody(org.helix.api.player.PlayerEvent("join", "Steve", "uuid-1"))
+        }
+        assertEquals(HttpStatusCode.OK, response.status)
+
+        assertEquals("uuid-1", dependencies.identityRegistry.resolveUuid("steve"))
+        assertEquals("steve", dependencies.identityRegistry.lastKnownName("uuid-1"))
     }
 
     @Test
@@ -416,5 +513,132 @@ class ControlServerTest {
         assertEquals(HttpStatusCode.OK, response.status)
         // The React (shadcn) dashboard mounts into <div id="root">.
         assertTrue(response.body<String>().contains("id=\"root\""))
+    }
+
+    /** Logs a player in over the real REST flow and returns their session token. */
+    private suspend fun HttpClient.loginAs(name: String): String {
+        var code: String? = null
+        registry.onInvocation { invocation, _ ->
+            if (invocation.action == "player.message" && invocation.arguments.firstOrNull() == name) {
+                code = Regex("""\d{6}""").find(invocation.arguments.getOrNull(1).orEmpty())?.value ?: code
+            }
+        }
+        assertEquals(
+            HttpStatusCode.OK,
+            post("/api/v1/auth/request-code") {
+                contentType(ContentType.Application.Json)
+                setBody(org.helix.node.control.auth.LoginRequest(name))
+            }.status,
+        )
+        val verify: org.helix.node.control.auth.SessionResponse = post("/api/v1/auth/verify") {
+            contentType(ContentType.Application.Json)
+            setBody(org.helix.node.control.auth.VerifyRequest(name, requireNotNull(code)))
+        }.body()
+        return verify.token
+    }
+
+    @Test
+    fun `post actions enforces the invoked action's declared permission`() = testApplication {
+        val client = apiClient()
+        registry.register(
+            ActionDescriptor("test.gated", "gated action", "test.gated", permission = "test.gated.perm"),
+        ) { ActionResult.ok("ran") }
+        dependencies.playerRegistry.handle(
+            org.helix.api.player.PlayerEvent("join", "Steve", "u", proxyServiceId = "Proxy-1"),
+        )
+        dependencies.nativePermissions.update("steve", listOf("helix.panel.login"))
+        val token = client.loginAs("Steve")
+
+        // no gated permission yet -> 403, not silently allowed just for being logged in
+        val denied = client.post("/api/v1/actions") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(ActionInvocation("test.gated"))
+        }
+        assertEquals(HttpStatusCode.Forbidden, denied.status)
+
+        // grant the declared permission -> the action now succeeds
+        dependencies.nativePermissions.update("steve", listOf("helix.panel.login", "test.gated.perm"))
+        val allowed: ActionResult = client.post("/api/v1/actions") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(ActionInvocation("test.gated"))
+        }.body()
+        assertTrue(allowed.success)
+    }
+
+    @Test
+    fun `post actions requires admin for actions without a declared permission`() = testApplication {
+        val client = apiClient()
+        registry.register(ActionDescriptor("test.noperm", "ungated action", "test.noperm")) {
+            ActionResult.ok("ran")
+        }
+        dependencies.playerRegistry.handle(
+            org.helix.api.player.PlayerEvent("join", "Steve", "u", proxyServiceId = "Proxy-1"),
+        )
+        dependencies.nativePermissions.update("steve", listOf("helix.panel.login"))
+        val token = client.loginAs("Steve")
+
+        val denied = client.post("/api/v1/actions") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(ActionInvocation("test.noperm"))
+        }
+        assertEquals(HttpStatusCode.Forbidden, denied.status)
+
+        // the static admin token still works (safe default: admin-only, not open to everyone)
+        val allowed: ActionResult = client.post("/api/v1/actions") {
+            bearerAuth("secret")
+            contentType(ContentType.Application.Json)
+            setBody(ActionInvocation("test.noperm"))
+        }.body()
+        assertTrue(allowed.success)
+    }
+
+    @Test
+    fun `post actions attributes the real player as the invocation actor for a panel session`() = testApplication {
+        val client = apiClient()
+        var capturedActor: String? = null
+        registry.onInvocation { invocation, _ ->
+            if (invocation.action == "test.audited") capturedActor = invocation.actor
+        }
+        registry.register(ActionDescriptor("test.audited", "audited", "test.audited")) { ActionResult.ok("ran") }
+        dependencies.playerRegistry.handle(
+            org.helix.api.player.PlayerEvent("join", "Steve", "u", proxyServiceId = "Proxy-1"),
+        )
+        dependencies.nativePermissions.update("steve", listOf("helix.panel.login", "helix.admin"))
+        val token = client.loginAs("Steve")
+
+        client.post("/api/v1/actions") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(ActionInvocation("test.audited"))
+        }
+
+        assertEquals("Steve", capturedActor)
+    }
+
+    @Test
+    fun `sensitive routes are rate limited per ip`() = testApplication {
+        val client = apiClient()
+
+        val responses = (1..15).map {
+            client.post("/api/v1/auth/request-code") {
+                contentType(ContentType.Application.Json)
+                setBody(org.helix.node.control.auth.LoginRequest("nobody"))
+            }
+        }
+
+        assertTrue(responses.any { it.status == HttpStatusCode.TooManyRequests })
+    }
+
+    @Test
+    fun `baseline security headers are present on every response`() = testApplication {
+        val client = apiClient()
+
+        val response = client.get("/api/v1/tasks") { bearerAuth("secret") }
+
+        assertEquals("DENY", response.headers["X-Frame-Options"])
+        assertEquals("frame-ancestors 'none'", response.headers["Content-Security-Policy"])
     }
 }

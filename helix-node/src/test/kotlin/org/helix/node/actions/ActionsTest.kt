@@ -35,6 +35,7 @@ class ActionsTest {
             paths = paths,
             internalResources = { ByteArrayInputStream(byteArrayOf(1)) },
             serverJar = { _, _ -> fakeJar },
+            eulaAccepted = true,
         ),
         executors = mapOf(ExecutorType.PROCESS to executor, ExecutorType.DOCKER to executor),
     )

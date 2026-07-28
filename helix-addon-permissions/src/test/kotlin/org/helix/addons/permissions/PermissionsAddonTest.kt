@@ -23,6 +23,16 @@ private class FakeContext(override val dataDirectory: Path) : AddonContext {
     val handlers = mutableMapOf<String, ActionHandler>()
     val resolvers = mutableListOf<PermissionResolver>()
 
+    /** Simulated identity registry: lowercase name to uuid. */
+    val uuidsByName = mutableMapOf<String, String>()
+
+    override fun resolvePlayerUuid(name: String): String? = uuidsByName[name.lowercase()]
+
+    /** Simulates a join, recording which uuid currently owns a name. */
+    fun recordJoin(name: String, uuid: String) {
+        uuidsByName[name.lowercase()] = uuid
+    }
+
     override val actions: ActionInvoker = object : ActionInvoker {
         override fun invoke(invocation: ActionInvocation): ActionResult = ActionResult.ok()
 
@@ -50,8 +60,8 @@ private class FakeContext(override val dataDirectory: Path) : AddonContext {
     fun run(action: String, vararg args: String): ActionResult =
         handlers.getValue(action).execute(ActionInvocation(action, args.toList()))
 
-    fun has(player: String, permission: String): Boolean =
-        resolvers.single().has(PermissionCheckRequest(player, permission))
+    fun has(player: String, permission: String, uuid: String? = null): Boolean =
+        resolvers.single().has(PermissionCheckRequest(player, permission, uuid))
 
     fun display(player: String) = displayResolvers.single().resolve(player)
 }
@@ -202,5 +212,32 @@ class PermissionsAddonTest {
         context.run("perm.group.create", "vip")
 
         assertFalse(context.run("perm.group.create", "vip").success)
+    }
+
+    @Test
+    fun `a freed and recycled name does not inherit the previous owner's permissions`() {
+        context.recordJoin("Steve", "uuid-1")
+        context.run("perm.group.create", "admin", "weight=100")
+        context.run("perm.group.grant", "admin", "helix.dangerous")
+        context.run("perm.user.addgroup", "Steve", "admin")
+        assertTrue(context.has("steve", "helix.dangerous", uuid = "uuid-1"))
+
+        // "steve" is freed and Mojang reassigns it; the new account has a different uuid and
+        // must not see any of the permissions granted to the previous owner of the name
+        assertFalse(context.has("steve", "helix.dangerous", uuid = "uuid-2"))
+    }
+
+    @Test
+    fun `a permission granted before the uuid is known migrates on first join`() {
+        context.run("perm.group.create", "admin", "weight=100")
+        context.run("perm.group.grant", "admin", "helix.dangerous")
+        context.run("perm.user.addgroup", "Offline", "admin")
+
+        // the grant was recorded name-only (the player was never seen); once they do join
+        // and their uuid becomes known, the grant is still theirs
+        assertTrue(context.has("Offline", "helix.dangerous", uuid = "uuid-9"))
+
+        // and it stays theirs across a rename, since it is now keyed on the uuid
+        assertTrue(context.has("Renamed", "helix.dangerous", uuid = "uuid-9"))
     }
 }

@@ -25,6 +25,7 @@ import org.helix.api.addon.PlayerListener
 import org.helix.api.message.Messages
 import org.helix.api.player.OnlinePlayer
 import org.helix.api.storage.AddonStorage
+import org.helix.api.storage.InMemoryAddonStorage
 import org.helix.api.proxy.PermissionCheckRequest
 import org.helix.node.actions.ActionRegistry
 import org.helix.node.dashboard.DashboardPanelRegistry
@@ -35,6 +36,7 @@ import org.helix.node.gates.NativePermissionCache
 import org.helix.node.gates.NativePermissionProvider
 import org.helix.node.gates.PermissionResolverRegistry
 import org.helix.node.gates.PermissionService
+import org.helix.node.identity.IdentityRegistry
 import org.helix.node.messages.MessageBundle
 import org.helix.node.messages.MessageRegistry
 import org.helix.node.notifications.NotificationBus
@@ -70,6 +72,7 @@ import org.slf4j.LoggerFactory
  *  exposed to addons for plugin scanning.
  * @property defaultLanguage supplier of the network's default language.
  * @property languageOf resolver of a player's language preference.
+ * @property identityRegistry node-wide uuid to last-known-name identity registry.
  * @property onChange invoked after an addon was installed, enabled or
  *  disabled, so the node can rebuild derived state such as the merged
  *  network resource pack.
@@ -93,12 +96,18 @@ class AddonManager(
     private val serviceDirectories: () -> List<Path> = { emptyList() },
     private val defaultLanguage: () -> String = { "en" },
     private val languageOf: ((String) -> String)? = null,
+    private val identityRegistry: IdentityRegistry = IdentityRegistry(InMemoryAddonStorage()),
     private val storageConnection: () -> org.helix.api.addon.StorageConnection? = { null },
     private val onChange: () -> Unit = {},
 ) {
     private val logger = LoggerFactory.getLogger(AddonManager::class.java)
     private val json = Json { ignoreUnknownKeys = true }
     private val loaded = linkedMapOf<String, LoadedAddon>()
+
+    private companion object {
+        /** Charset an addon id/version must stick to: they become path segments. */
+        val SAFE_SEGMENT = Regex("[a-z0-9._-]+")
+    }
 
     private class LoadedAddon(
         val manifest: AddonManifest,
@@ -319,7 +328,10 @@ class AddonManager(
 
     private fun readManifest(file: Path): AddonManifest = ZipFile(file.toFile()).use { zip ->
         val entry = requireNotNull(zip.getEntry("addon.json")) { "$file misses addon.json" }
-        json.decodeFromString<AddonManifest>(zip.getInputStream(entry).readAllBytes().decodeToString())
+        val manifest = json.decodeFromString<AddonManifest>(zip.getInputStream(entry).readAllBytes().decodeToString())
+        require(SAFE_SEGMENT.matches(manifest.id)) { "$file has an unsafe addon id: ${manifest.id}" }
+        require(SAFE_SEGMENT.matches(manifest.version)) { "$file has an unsafe addon version: ${manifest.version}" }
+        manifest
     }
 
     private fun extractJar(file: Path, target: Path) {
@@ -358,12 +370,19 @@ class AddonManager(
                 .filter { !it.isDirectory && it.name.startsWith("paper/") && it.name.endsWith(".jar") }
                 .forEach { entry ->
                     val name = entry.name.removePrefix("paper/").removeSuffix(".jar")
-                    val target = extractedPath(manifest, "paper-$name.jar")
-                    Files.createDirectories(target.parent)
-                    zip.getInputStream(entry).use { stream ->
-                        Files.copy(stream, target, StandardCopyOption.REPLACE_EXISTING)
+                    // The component name is entirely attacker-controlled (it is the zip entry
+                    // name); confine() below is the real guard, but skip loudly on the common
+                    // "several ../ segments" attack instead of paying for a confine() per entry.
+                    runCatching {
+                        val target = extractedPath(manifest, "paper-$name.jar")
+                        Files.createDirectories(target.parent)
+                        zip.getInputStream(entry).use { stream ->
+                            Files.copy(stream, target, StandardCopyOption.REPLACE_EXISTING)
+                        }
+                        components += "${manifest.id}-$name" to target
+                    }.onFailure {
+                        logger.warn("Skipping unsafe paper component entry {} in {}", entry.name, file)
                     }
-                    components += "${manifest.id}-$name" to target
                 }
         }
         return components
@@ -380,10 +399,26 @@ class AddonManager(
         }
 
     private fun extractedJarPath(manifest: AddonManifest): Path =
-        directory.resolve(".extracted/${manifest.id}-${manifest.version}.jar")
+        confined(directory.resolve(".extracted/${manifest.id}-${manifest.version}.jar"))
 
     private fun extractedPath(manifest: AddonManifest, suffix: String): Path =
-        directory.resolve(".extracted/${manifest.id}-${manifest.version}-$suffix")
+        confined(directory.resolve(".extracted/${manifest.id}-${manifest.version}-$suffix"))
+
+    /**
+     * Rejects a computed extraction path that would land outside the addon
+     * manager's own `.extracted/` directory, the last line of defence against
+     * a crafted manifest id/version or zip entry name smuggling `..` segments.
+     *
+     * @param target the path an extraction would write to.
+     * @return [target], unchanged, once confirmed safe.
+     * @throws IllegalArgumentException if the path escapes `.extracted/`.
+     */
+    private fun confined(target: Path): Path {
+        val root = directory.resolve(".extracted").normalize()
+        val normalized = target.normalize()
+        require(normalized.startsWith(root)) { "extraction path escapes the addon directory: $target" }
+        return normalized
+    }
 
     private fun info(record: LoadedAddon): AddonInfo = AddonInfo(record.manifest, record.state)
 
@@ -420,6 +455,10 @@ class AddonManager(
             permissionService.check(PermissionCheckRequest(player, permission))
 
         override fun onlinePlayers(): List<OnlinePlayer> = playerRegistry.online()
+
+        override fun resolvePlayerUuid(name: String): String? = identityRegistry.resolveUuid(name)
+
+        override fun lastKnownName(uuid: String): String? = identityRegistry.lastKnownName(uuid)
 
         override fun installedAddons(): List<AddonInfo> = addons()
 

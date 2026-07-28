@@ -3,6 +3,8 @@ package org.helix.node.scheduler
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import org.helix.api.action.ActionInvocation
@@ -17,13 +19,17 @@ import org.slf4j.LoggerFactory
  * Jobs are persisted through the central [AddonStorage] (so they survive
  * restarts and work with every storage mode) and executed by invoking their
  * action through the [ActionInvoker]. [tick] is called periodically by the node
- * scheduler; due jobs run at most once per interval / once per day.
+ * scheduler; due jobs run at most once per interval / once per day. The
+ * action itself always runs on [jobExecutor], off whatever thread called
+ * [tick] or [runNow], so one long-running job (e.g. a backup) cannot stall
+ * the caller or any other due job.
  *
  * @property storage backing store for the job list.
  * @property actions action entry point used to run jobs.
  * @property eventSink receives `(category, level, message)` for the event log.
  * @property clock epoch-millis source, injectable for tests.
  * @property zone time zone used for daily schedules.
+ * @property jobExecutor runs each job's action, injectable for tests.
  */
 class JobScheduler(
     private val storage: AddonStorage,
@@ -31,6 +37,9 @@ class JobScheduler(
     private val eventSink: (String, String, String) -> Unit = { _, _, _ -> },
     private val clock: () -> Long = System::currentTimeMillis,
     private val zone: ZoneId = ZoneId.systemDefault(),
+    private val jobExecutor: Executor = Executors.newCachedThreadPool { runnable ->
+        Thread(runnable, "helix-job-runner").apply { isDaemon = true }
+    },
 ) {
     private val logger = LoggerFactory.getLogger(JobScheduler::class.java)
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
@@ -132,11 +141,13 @@ class JobScheduler(
 
     private fun execute(job: ScheduledJob) {
         lastRun[job.id] = clock()
-        val result = runCatching {
-            actions.invoke(ActionInvocation(job.action, job.arguments, ActionSource.SYSTEM))
-        }.onFailure { logger.error("scheduled job {} failed", job.id, it) }.getOrNull()
-        val ok = result?.success == true
-        eventSink("scheduler", if (ok) "info" else "warn", "Ran job ${job.id} (${job.action})")
+        jobExecutor.execute {
+            val result = runCatching {
+                actions.invoke(ActionInvocation(job.action, job.arguments, ActionSource.SYSTEM))
+            }.onFailure { logger.error("scheduled job {} failed", job.id, it) }.getOrNull()
+            val ok = result?.success == true
+            eventSink("scheduler", if (ok) "info" else "warn", "Ran job ${job.id} (${job.action})")
+        }
     }
 
     private fun parseTime(value: String): LocalTime? =

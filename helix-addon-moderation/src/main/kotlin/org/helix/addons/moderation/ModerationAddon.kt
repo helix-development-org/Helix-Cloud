@@ -21,7 +21,7 @@ class ModerationAddon : AddonBase() {
      * Registers the moderation player commands.
      */
     override fun enable() {
-        store = WarnStore(context.storage())
+        store = WarnStore(context.storage(), resolveUuid = context::resolvePlayerUuid)
         msg = context.localizedMessages(
             mapOf(
                 "en" to mapOf(

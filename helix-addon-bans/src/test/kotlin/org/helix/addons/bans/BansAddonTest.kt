@@ -74,6 +74,39 @@ class BansAddonTest {
     }
 
     @Test
+    fun `a ban survives a rename because the join gate checks the joining account's uuid`() {
+        context.recordJoin("Steve", "uuid-1")
+        context.run("ban.set", "Steve", "griefing")
+
+        // Steve renamed to Steve2 in Mojang's records, but their uuid never changes — the
+        // bridge reports the real uuid at login, which is what the ban must be keyed on.
+        val denied = context.joinGates.single().check(JoinRequest("Steve2", "uuid-1"))
+
+        assertFalse(denied.allowed)
+        assertTrue(denied.message!!.contains("griefing"))
+    }
+
+    @Test
+    fun `a ban set for a player never seen falls back to their name, then migrates on first join`() {
+        context.run("ban.set", "Offline", "banned while offline")
+
+        // not yet seen by this node: the join gate still enforces the name-keyed fallback
+        assertFalse(context.joinGates.single().check(JoinRequest("Offline", "uuid-9")).allowed)
+
+        // renaming again afterwards still doesn't help, now that the ban carried forward to the uuid
+        assertFalse(context.joinGates.single().check(JoinRequest("Renamed", "uuid-9")).allowed)
+    }
+
+    @Test
+    fun `a pardon by name still finds a ban already migrated to uuid`() {
+        context.recordJoin("Steve", "uuid-1")
+        context.run("ban.set", "Steve", "griefing")
+
+        assertTrue(context.run("ban.pardon", "steve").success)
+        assertTrue(context.joinGates.single().check(JoinRequest("Steve", "uuid-1")).allowed)
+    }
+
+    @Test
     fun `store persists across instances`() {
         val storage = InMemoryAddonStorage()
         BanStore(storage).set("steve", "griefing")

@@ -11,6 +11,7 @@ import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.bearer
 import io.ktor.server.auth.principal
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.httpMethod
 import io.ktor.server.request.path
 import io.ktor.server.engine.EmbeddedServer
@@ -40,6 +41,7 @@ import kotlinx.serialization.json.Json
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionSource
 import org.helix.api.action.PlayerCommandRequest
+import org.helix.api.display.DisplayBulkRequest
 import org.helix.node.control.auth.LoginRequest
 import org.helix.node.control.auth.PanelAuthService
 import org.helix.node.control.auth.PanelPrincipal
@@ -49,6 +51,8 @@ import org.helix.api.bridge.HeartbeatReport
 import org.helix.api.i18n.TranslationsSnapshot
 import org.helix.api.player.PlayerEvent
 import org.helix.api.player.PlayerLocaleReport
+import org.helix.api.player.PlayerPermissionsReport
+import org.helix.api.player.PlayerRosterReport
 import org.helix.api.proxy.JoinRequest
 import org.helix.api.proxy.PermissionCheckRequest
 import org.helix.api.proxy.PermissionDecision
@@ -57,6 +61,9 @@ import org.helix.api.service.ServiceState
 import org.helix.api.task.TaskDefinition
 import org.helix.node.config.NodeConfig
 import org.slf4j.LoggerFactory
+
+/** Logger for the top-level route builders (outside the [ControlServer] class). */
+private val logger = LoggerFactory.getLogger("org.helix.node.control.ControlRoutes")
 
 /** Maximum time a proxy long-poll is held open before returning empty. */
 private const val POLL_TIMEOUT_MS = 25_000L
@@ -71,8 +78,10 @@ private const val POLL_RECHECK_MS = 1_000L
  * assets at `/` are public and authenticate their API calls themselves.
  *
  * @param dependencies control API dependencies.
+ * @param isTls whether this instance is served over HTTPS, gating whether
+ *  `Strict-Transport-Security` is sent.
  */
-fun Application.controlModule(dependencies: ControlDependencies) {
+fun Application.controlModule(dependencies: ControlDependencies, isTls: Boolean = false) {
     install(ContentNegotiation) {
         json(Json { encodeDefaults = true })
     }
@@ -87,7 +96,12 @@ fun Application.controlModule(dependencies: ControlDependencies) {
     install(Authentication) {
         bearer("helix") {
             authenticate { credential ->
-                dependencies.panelAuth.authenticate(credential.token)
+                val scopedServiceId = dependencies.serviceTokens.serviceIdFor(credential.token)
+                if (scopedServiceId != null) {
+                    PanelPrincipal(name = "service:$scopedServiceId", admin = false, serviceId = scopedServiceId)
+                } else {
+                    dependencies.panelAuth.authenticate(credential.token)
+                }
             }
         }
     }
@@ -100,6 +114,14 @@ fun Application.controlModule(dependencies: ControlDependencies) {
                 call.response.header(HttpHeaders.CacheControl, "no-cache")
             path.startsWith("/assets/") ->
                 call.response.header(HttpHeaders.CacheControl, "public, max-age=31536000, immutable")
+        }
+        // Baseline hardening: the dashboard is never meant to be framed by another
+        // origin (defeats the addon-panel postMessage confinement otherwise), and
+        // HSTS only makes sense once we know we're actually serving over TLS.
+        call.response.header("X-Frame-Options", "DENY")
+        call.response.header("Content-Security-Policy", "frame-ancestors 'none'")
+        if (isTls) {
+            call.response.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         }
     }
     intercept(ApplicationCallPipeline.Monitoring) {
@@ -172,11 +194,13 @@ private suspend fun RoutingContext.authorize(dependencies: ControlDependencies, 
 /**
  * Ensures the caller authenticated with the static admin token, else `403`.
  *
- * Internal machine routes (bridges, wrappers) require the admin token; a
- * player session must never reach them.
+ * Internal machine routes (bridges, wrappers) require full admin: either the
+ * static token, or a signed-in player whose account holds `helix.admin` — an
+ * ordinary panel session never satisfies this.
  *
  * @param dependencies control API dependencies.
- * @return `true` if the caller is the admin token; `false` after a `403`.
+ * @return `true` for the admin token or a `helix.admin` session; `false`
+ *  after a `403`.
  */
 private suspend fun RoutingContext.requireAdmin(dependencies: ControlDependencies): Boolean {
     if (call.principal<PanelPrincipal>()?.admin == true) {
@@ -184,6 +208,36 @@ private suspend fun RoutingContext.requireAdmin(dependencies: ControlDependencie
     }
     call.respond(HttpStatusCode.Forbidden, ErrorResponse("admin token required"))
     return false
+}
+
+/**
+ * Authorizes an `/internal/` bridge route: the static admin token, or a
+ * per-service token — but ONLY when the route's own service id (if it names
+ * one) matches the token's scope. This is what lets a Paper/Velocity process
+ * carry a token minted just for it instead of the shared admin credential,
+ * without letting it act for a different service or escalate to a
+ * non-internal admin route (those go through [requireAdmin] or [authorize],
+ * neither of which a per-service principal — `admin == false` — ever passes).
+ *
+ * @param dependencies control API dependencies.
+ * @param serviceId the service id this specific call pertains to, or `null`
+ *  for routes that carry none (network-wide bridge info, safe for any
+ *  authenticated bridge to read).
+ * @return `true` if authorized; `false` after a `403` was written.
+ */
+private suspend fun RoutingContext.requireBridge(dependencies: ControlDependencies, serviceId: String? = null): Boolean {
+    val principal = call.principal<PanelPrincipal>()
+    val authorized = when {
+        principal == null -> false
+        principal.admin -> true
+        principal.serviceId == null -> false
+        serviceId == null -> true
+        else -> principal.serviceId == serviceId
+    }
+    if (!authorized) {
+        call.respond(HttpStatusCode.Forbidden, ErrorResponse("admin token or matching service token required"))
+    }
+    return authorized
 }
 
 /**
@@ -284,12 +338,35 @@ private fun newLines(previous: List<String>, current: List<String>): List<String
     return if (index >= 0) current.drop(index + 1) else current
 }
 
+/**
+ * The client IP a rate limiter keys on.
+ *
+ * @return the caller's remote host.
+ */
+private fun RoutingContext.clientIp(): String = call.request.origin.remoteHost
+
+/**
+ * Checks a rate limiter for the caller's IP, answering `429` when exceeded.
+ *
+ * @param limiter the limiter guarding this route.
+ * @return `true` if the request may proceed; `false` after a `429` was written.
+ */
+private suspend fun RoutingContext.withinRateLimit(limiter: RateLimiter): Boolean {
+    if (limiter.allow(clientIp())) {
+        return true
+    }
+    call.respond(HttpStatusCode.TooManyRequests, ErrorResponse("too many requests, try again later"))
+    return false
+}
+
 private fun io.ktor.server.routing.Route.publicAuthRoutes(dependencies: ControlDependencies) {
     post("/auth/request-code") {
+        if (!withinRateLimit(dependencies.authRateLimiter)) return@post
         val request = call.receive<LoginRequest>()
         call.respond(dependencies.panelAuth.requestCode(request.name))
     }
     post("/auth/verify") {
+        if (!withinRateLimit(dependencies.authRateLimiter)) return@post
         val request = call.receive<VerifyRequest>()
         call.respond(dependencies.panelAuth.verify(request.name, request.code))
     }
@@ -755,24 +832,43 @@ private fun io.ktor.server.routing.Route.playerRoutes(dependencies: ControlDepen
             request.duration?.takeIf { it.isNotBlank() }?.let { add(it) }
             if (request.value.isNotBlank()) add(request.value)
         }
-        call.respond(dependencies.registry.invoke(ActionInvocation("ban.set", arguments, ActionSource.REST)))
+        call.respond(
+            dependencies.registry.invoke(ActionInvocation("ban.set", arguments, ActionSource.REST, actor = restActor())),
+        )
     }
 }
 
-private fun playerAction(action: String, player: String, value: String): ActionInvocation =
+private fun RoutingContext.playerAction(action: String, player: String, value: String): ActionInvocation =
     ActionInvocation(
         action = action,
         arguments = if (value.isBlank()) listOf(player) else listOf(player, value),
         source = ActionSource.REST,
+        actor = restActor(),
     )
+
+/**
+ * The real player name behind a session-authenticated REST call, for audit
+ * attribution — `null` for the static admin token (kept as the generic `rest`
+ * label) so break-glass usage is not misattributed to a made-up name. A named
+ * admin session (a player holding `helix.admin`) still yields their real name.
+ *
+ * @return the calling player's name, or `null`.
+ */
+private fun RoutingContext.restActor(): String? =
+    call.principal<PanelPrincipal>()?.takeUnless { it.viaStaticToken }?.name
 
 private fun io.ktor.server.routing.Route.actionRoutes(dependencies: ControlDependencies) {
     get("/actions") {
         call.respond(dependencies.registry.descriptors())
     }
     post("/actions") {
+        if (!withinRateLimit(dependencies.actionsRateLimiter)) return@post
         val invocation = call.receive<ActionInvocation>()
-        call.respond(dependencies.registry.invoke(invocation.copy(source = ActionSource.REST)))
+        val descriptor = dependencies.registry.descriptors().firstOrNull { it.name == invocation.action }
+        val required = descriptor?.permission
+        val authorized = if (required != null) authorize(dependencies, required) else requireAdmin(dependencies)
+        if (!authorized) return@post
+        call.respond(dependencies.registry.invoke(invocation.copy(source = ActionSource.REST, actor = restActor())))
     }
 }
 
@@ -838,10 +934,33 @@ private fun io.ktor.server.routing.Route.addonRoutes(dependencies: ControlDepend
     }
 }
 
+/**
+ * Applies a bridge-reported join/leave to the registry and the derived
+ * native-permission/identity state, shared by the live `/internal/player-event`
+ * route and the outage-recovery `/internal/player-roster` reconciliation.
+ *
+ * @param dependencies control API dependencies.
+ * @param event the join or leave to apply.
+ * @return `true` when the event type was known.
+ */
+private fun applyPlayerEvent(dependencies: ControlDependencies, event: PlayerEvent): Boolean {
+    if (!dependencies.playerRegistry.handle(event)) {
+        return false
+    }
+    when (event.type) {
+        "join" -> {
+            dependencies.nativePermissions.update(event.name, event.permissions)
+            dependencies.identityRegistry.recordJoin(event.name, event.uuid)
+        }
+        "leave" -> dependencies.nativePermissions.clear(event.name)
+    }
+    return true
+}
+
 private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDependencies) {
     post("/internal/heartbeat") {
-        if (!requireAdmin(dependencies)) return@post
         val report = call.receive<HeartbeatReport>()
+        if (!requireBridge(dependencies, report.serviceId)) return@post
         if (dependencies.manager.handleHeartbeat(report)) {
             call.respond(MessageResponse("ok"))
         } else {
@@ -849,8 +968,8 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
         }
     }
     get("/internal/routing") {
-        if (!requireAdmin(dependencies)) return@get
         val proxyServiceId = call.request.queryParameters["proxyServiceId"].orEmpty()
+        if (!requireBridge(dependencies, proxyServiceId)) return@get
         call.respond(
             dependencies.routing.snapshot(proxyServiceId).copy(
                 networkName = dependencies.networkName(),
@@ -860,76 +979,134 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
         )
     }
     post("/internal/join-check") {
-        if (!requireAdmin(dependencies)) return@post
+        if (!requireBridge(dependencies)) return@post
         val request = call.receive<JoinRequest>()
         call.respond(dependencies.joinGates.evaluate(request))
     }
+    // Deprecated: drains the same queue as the /internal/poll long-poll, as a second
+    // uncoordinated consumer — kept only for stragglers still calling it, logging a warning so
+    // it can be tracked down and retired. New bridges must use /internal/poll's ack cursor.
     get("/internal/commands") {
-        if (!requireAdmin(dependencies)) return@get
         val proxyServiceId = call.request.queryParameters["proxyServiceId"].orEmpty()
+        if (!requireBridge(dependencies, proxyServiceId)) return@get
+        logger.warn(
+            "Deprecated /internal/commands hit by proxy '{}' — commands are delivered via " +
+                "/internal/poll's ack cursor now; this endpoint races with it and will be removed.",
+            proxyServiceId,
+        )
         call.respond(dependencies.commandQueue.drain(proxyServiceId))
     }
     get("/internal/poll") {
-        if (!requireAdmin(dependencies)) return@get
         val proxyServiceId = call.request.queryParameters["proxyServiceId"].orEmpty()
+        if (!requireBridge(dependencies, proxyServiceId)) return@get
         val seenRouting = call.request.queryParameters["routingVersion"]?.toIntOrNull() ?: -1
         val seenCatalog = call.request.queryParameters["commandCatalogVersion"]?.toIntOrNull() ?: -1
+        val ackUpTo = call.request.queryParameters["ackUpTo"]?.toLongOrNull() ?: 0L
+        // The PREVIOUS response's commands are only now confirmed delivered — remove them before
+        // computing what is still pending, so a lost response (proxy restart, connection reset)
+        // never drops a command: it simply reappears on the retried poll instead.
+        dependencies.commandQueue.acknowledge(proxyServiceId, ackUpTo)
         val hub = dependencies.proxyEvents
         val deadline = System.currentTimeMillis() + POLL_TIMEOUT_MS
         while (true) {
-            val commands = dependencies.commandQueue.drain(proxyServiceId)
+            val commands = dependencies.commandQueue.pending(proxyServiceId)
             val routing = hub.routingVersion.get()
             val catalog = hub.commandCatalogVersion.get()
             val changed = commands.isNotEmpty() || routing != seenRouting || catalog != seenCatalog
             if (changed || System.currentTimeMillis() >= deadline) {
-                call.respond(ProxyPoll(commands, routing, catalog))
+                val token = dependencies.commandQueue.tokenFor(proxyServiceId, ackUpTo)
+                call.respond(ProxyPoll(commands, routing, catalog, token))
                 break
             }
             hub.await((deadline - System.currentTimeMillis()).coerceIn(1, POLL_RECHECK_MS))
         }
     }
     post("/internal/permission-check") {
-        if (!requireAdmin(dependencies)) return@post
+        if (!requireBridge(dependencies)) return@post
         val request = call.receive<PermissionCheckRequest>()
         call.respond(PermissionDecision(dependencies.permissionService.check(request)))
     }
     get("/internal/permission-nodes") {
-        if (!requireAdmin(dependencies)) return@get
+        if (!requireBridge(dependencies)) return@get
         call.respond(knownPermissionNodes(dependencies))
     }
+    // Refreshes an already-online player's native permission snapshot after the advertised node
+    // list changed, without going through /internal/player-event (which would re-fire join/leave
+    // side effects for a player who never actually left).
+    post("/internal/player-permissions") {
+        if (!requireBridge(dependencies)) return@post
+        val report = call.receive<PlayerPermissionsReport>()
+        dependencies.nativePermissions.update(report.name, report.permissions)
+        call.respond(MessageResponse("ok"))
+    }
     post("/internal/player-event") {
-        if (!requireAdmin(dependencies)) return@post
         val event = call.receive<PlayerEvent>()
-        if (dependencies.playerRegistry.handle(event)) {
-            when (event.type) {
-                "join" -> dependencies.nativePermissions.update(event.name, event.permissions)
-                "leave" -> dependencies.nativePermissions.clear(event.name)
-            }
+        if (!requireBridge(dependencies, event.proxyServiceId.ifBlank { null })) return@post
+        if (applyPlayerEvent(dependencies, event)) {
             call.respond(MessageResponse("ok"))
         } else {
             call.respond(HttpStatusCode.BadRequest, ErrorResponse("unknown event type: ${event.type}"))
         }
     }
     get("/internal/players") {
-        if (!requireAdmin(dependencies)) return@get
+        if (!requireBridge(dependencies)) return@get
         call.respond(dependencies.playerRegistry.online())
     }
+    // Reconciles the node's roster with a proxy's actual current player list — recovers joins and
+    // leaves missed while the node was unreachable, which would otherwise desync PlayerRegistry
+    // (and the native-permission cache) until each affected player manually reconnects.
+    post("/internal/player-roster") {
+        val report = call.receive<PlayerRosterReport>()
+        if (!requireBridge(dependencies, report.proxyServiceId.ifBlank { null })) return@post
+        val reportedNames = report.players.map { it.name.lowercase() }.toSet()
+        val onlineViaProxy = dependencies.playerRegistry.online().filter { it.proxyServiceId == report.proxyServiceId }
+        val missingJoins = report.players.filter { it.name.lowercase() !in onlineViaProxy.map { p -> p.name.lowercase() }.toSet() }
+        val missingLeaves = onlineViaProxy.filter { it.name.lowercase() !in reportedNames }
+        missingJoins.forEach { player ->
+            applyPlayerEvent(
+                dependencies,
+                PlayerEvent(type = "join", name = player.name, uuid = player.uuid, proxyServiceId = report.proxyServiceId),
+            )
+        }
+        missingLeaves.forEach { player ->
+            applyPlayerEvent(
+                dependencies,
+                PlayerEvent(type = "leave", name = player.name, uuid = player.uuid, proxyServiceId = report.proxyServiceId),
+            )
+        }
+        if (missingJoins.isNotEmpty() || missingLeaves.isNotEmpty()) {
+            logger.info(
+                "Roster reconciliation for proxy '{}': +{} join(s), -{} leave(s) missed during an outage",
+                report.proxyServiceId,
+                missingJoins.size,
+                missingLeaves.size,
+            )
+        }
+        call.respond(MessageResponse("ok"))
+    }
     get("/internal/player-commands") {
-        if (!requireAdmin(dependencies)) return@get
+        if (!requireBridge(dependencies)) return@get
         call.respond(dependencies.playerCommands.commands())
     }
     post("/internal/player-command") {
-        if (!requireAdmin(dependencies)) return@post
+        if (!requireBridge(dependencies)) return@post
         val request = call.receive<PlayerCommandRequest>()
         call.respond(dependencies.playerCommands.execute(request))
     }
     post("/internal/display") {
-        if (!requireAdmin(dependencies)) return@post
+        if (!requireBridge(dependencies)) return@post
         val request = call.receive<JoinRequest>()
         call.respond(dependencies.displayResolvers.resolve(request.name))
     }
+    // Covers a full backend refresh cycle (every online player) with one HTTP call instead of
+    // one POST /internal/display per player, cutting request volume on the default interval.
+    post("/internal/display-bulk") {
+        if (!requireBridge(dependencies)) return@post
+        val request = call.receive<DisplayBulkRequest>()
+        call.respond(request.names.associateWith { name -> dependencies.displayResolvers.resolve(name) })
+    }
     get("/internal/translations") {
-        if (!requireAdmin(dependencies)) return@get
+        if (!requireBridge(dependencies)) return@get
         val online = dependencies.playerRegistry.online().map { it.name.lowercase() }.toSet()
         val languageList = dependencies.languages.languages()
         call.respond(
@@ -942,18 +1119,18 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
         )
     }
     post("/internal/player-language") {
-        if (!requireAdmin(dependencies)) return@post
+        if (!requireBridge(dependencies)) return@post
         val report = call.receive<PlayerLocaleReport>()
         dependencies.languages.applyClientLocale(report.name, report.locale)
         call.respond(MessageResponse("ok"))
     }
     get("/internal/pack") {
-        if (!requireAdmin(dependencies)) return@get
+        if (!requireBridge(dependencies)) return@get
         call.respond(NetworkPackInfo(sha1 = dependencies.networkPack.sha1()))
     }
     get("/internal/bridge-values") {
-        if (!requireAdmin(dependencies)) return@get
         val serviceId = call.request.queryParameters["serviceId"]
+        if (!requireBridge(dependencies, serviceId)) return@get
         val task = serviceId?.let { dependencies.manager.find(it)?.task }
         val values = if (task == null) {
             dependencies.bridgeValues.all()
@@ -967,7 +1144,7 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
     // Addon-agnostic by design: proxies the bans addon's own `ban.export` JSON verbatim (empty
     // array when the addon is not installed) rather than the node knowing BanEntry's shape.
     get("/internal/ban-snapshot") {
-        if (!requireAdmin(dependencies)) return@get
+        if (!requireBridge(dependencies)) return@get
         val result = dependencies.registry.invoke(ActionInvocation("ban.export", emptyList(), ActionSource.SYSTEM))
         call.respondText(
             if (result.success) result.lines.firstOrNull() ?: "[]" else "[]",
@@ -1005,7 +1182,7 @@ class ControlServer(
 
     private fun startPlain(): EmbeddedServer<*, *> =
         embeddedServer(Netty, port = settings.port, host = settings.host) {
-            controlModule(dependencies)
+            controlModule(dependencies, isTls = false)
         }.start(wait = false)
 
     private fun startTls(): EmbeddedServer<*, *> {
@@ -1026,7 +1203,7 @@ class ControlServer(
                     host = settings.host
                 }
             },
-            module = { controlModule(dependencies) },
+            module = { controlModule(dependencies, isTls = true) },
         ).start(wait = false)
     }
 

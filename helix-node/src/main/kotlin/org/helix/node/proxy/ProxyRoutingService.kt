@@ -55,6 +55,7 @@ class ProxyRoutingService(private val manager: ServiceManager) {
             host = host,
             port = backend.port,
             fallbackEligible = backend.task.fallbackEligible,
+            maintenance = backend.task.maintenance,
         )
     }
 }

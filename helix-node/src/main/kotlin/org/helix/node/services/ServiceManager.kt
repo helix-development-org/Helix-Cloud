@@ -152,6 +152,34 @@ class ServiceManager(
     }
 
     /**
+     * Kills a stuck or unresponsive service on behalf of the heartbeat
+     * watchdog: a service stuck in `STARTING` past its start deadline, or a
+     * `RUNNING` service that stopped heartbeating.
+     *
+     * Unlike [killService], the service always settles as `FAILED` once its
+     * process exits, so it is picked up by the same crash-cooldown/replace
+     * path as an ordinary crash — and it stops being `RUNNING` immediately,
+     * so routing excludes it right away.
+     *
+     * @param id the service id.
+     * @param reason human-readable reason, logged and put on the event log.
+     * @return `true` if the service was active and the kill was issued.
+     */
+    fun watchdogFail(id: String, reason: String): Boolean {
+        val managed = find(id) ?: return false
+        val handle = managed.handle ?: return false
+        if (!managed.active()) {
+            return false
+        }
+        managed.watchdogKilled = true
+        managed.state = ServiceState.STOPPING
+        logger.warn("Watchdog killing {}: {}", id, reason)
+        eventSink("service", "warn", "Watchdog killing ${managed.id}: $reason")
+        handle.kill()
+        return true
+    }
+
+    /**
      * Stops all active services, used on node shutdown.
      */
     fun stopAll() {
@@ -258,6 +286,11 @@ class ServiceManager(
         val managed = ManagedService(entry.id, task, java.nio.file.Path.of(entry.workspace), entry.port)
         managed.state = ServiceState.RUNNING
         managed.startedAtEpochMs = entry.startedAtEpochMs
+        // The confirmed-alive process/container check just above stands in for a
+        // heartbeat: without this the watchdog would see a "never heartbeated"
+        // service whose last-known start time is arbitrarily old and reap it
+        // before the bridge gets a chance to report in again.
+        managed.lastHeartbeatEpochMs = clock()
         managed.handle = handle
         services[managed.id] = managed
         handle.onExit { exitCode -> onExit(managed, exitCode) }
@@ -280,7 +313,9 @@ class ServiceManager(
     private fun onExit(managed: ManagedService, exitCode: Int) {
         managed.lastLogs = runCatching { managed.handle?.logs(FINAL_LOG_LINES) ?: emptyList() }
             .getOrDefault(emptyList())
-        managed.state = if (managed.stopRequested || exitCode == 0) {
+        managed.state = if (managed.watchdogKilled) {
+            ServiceState.FAILED
+        } else if (managed.stopRequested || exitCode == 0) {
             ServiceState.STOPPED
         } else {
             ServiceState.FAILED

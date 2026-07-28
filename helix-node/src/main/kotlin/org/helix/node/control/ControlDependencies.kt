@@ -10,6 +10,7 @@ import org.helix.node.actions.ActionRegistry
 import org.helix.node.actions.PlayerCommandService
 import org.helix.node.addons.AddonManager
 import org.helix.node.control.auth.PanelAuthService
+import org.helix.node.control.auth.ServiceTokenRegistry
 import org.helix.node.dashboard.DashboardPanelRegistry
 import org.helix.node.display.BridgeValueStore
 import org.helix.node.display.DisplayResolverRegistry
@@ -19,6 +20,7 @@ import org.helix.node.gates.NativePermissionCache
 import org.helix.node.gates.NativePermissionProvider
 import org.helix.node.gates.PermissionResolverRegistry
 import org.helix.node.gates.PermissionService
+import org.helix.node.identity.IdentityRegistry
 import org.helix.node.logging.LogBuffer
 import org.helix.node.audit.AuditLog
 import org.helix.node.backup.BackupService
@@ -53,13 +55,16 @@ import org.helix.node.tasks.TaskStore
  * @property permissionService node-wide permission decisions (addon or native).
  * @property loginPermission permission required to sign in to the web panel.
  * @property codeTtlSeconds lifetime of an in-game login code.
- * @property sessionTtlSeconds lifetime of a web session.
+ * @property sessionTtlSeconds absolute lifetime of a web session.
+ * @property idleTimeoutSeconds a web session also expires after this long
+ *  without any authenticated request.
  * @property loginMessage in-game message template (`{code}` substituted).
  * @property networkName provider of the network display name (`{network}`),
  *  panel-editable at runtime.
  * @property proxyScreens configurable proxy-level disconnect screens
  *  (`screen.maintenance`, `screen.server_full` of the `velocity` bundle).
  * @property languages network languages and player language preferences.
+ * @property identityRegistry node-wide uuid to last-known-name identity registry.
  * @property metrics bounded history of network metric samples for graphs.
  * @property apiMetrics rolling control-API performance stats.
  * @property onMessagesChanged invoked after a message bundle changed, with the
@@ -70,6 +75,11 @@ import org.helix.node.tasks.TaskStore
  * @property files file manager over workspaces and templates.
  * @property networkPack merged network resource pack of all enabled addons
  *  (the default is an empty service that serves nothing, for tests).
+ * @property authRateLimiter per-IP throttle for `/auth/request-code` and
+ *  `/auth/verify`.
+ * @property actionsRateLimiter per-IP throttle for `/actions`.
+ * @property serviceTokens per-service bridge tokens, scoped machine auth for
+ *  managed services instead of the shared static admin token.
  */
 data class ControlDependencies(
     val token: String,
@@ -97,10 +107,12 @@ data class ControlDependencies(
     val loginPermission: String = "helix.panel.login",
     val codeTtlSeconds: Long = 300,
     val sessionTtlSeconds: Long = 86_400,
+    val idleTimeoutSeconds: Long = PanelAuthService.DEFAULT_IDLE_TTL_MS / 1000,
     val loginMessage: String = "§b§lHelix §r§7» §fYour panel login code is §b{code}§7.",
     val networkName: () -> String = { "our network" },
     val proxyScreens: Messages = MapMessages(emptyMap()),
     val languages: LanguageRegistry = LanguageRegistry(InMemoryAddonStorage()),
+    val identityRegistry: IdentityRegistry = IdentityRegistry(InMemoryAddonStorage()),
     val metrics: MetricsHistory = MetricsHistory(),
     val apiMetrics: ApiMetrics = ApiMetrics(),
     val nodeHealth: (() -> org.helix.api.platform.NodeHealth)? = null,
@@ -119,6 +131,9 @@ data class ControlDependencies(
         registry,
     ),
     val networkPack: NetworkPackService = NetworkPackService(java.nio.file.Path.of("packs")),
+    val authRateLimiter: RateLimiter = RateLimiter(limit = 10, windowMs = 60_000),
+    val actionsRateLimiter: RateLimiter = RateLimiter(limit = 60, windowMs = 60_000),
+    val serviceTokens: ServiceTokenRegistry = ServiceTokenRegistry(),
 ) {
     /** Player command execution shared by the internal routes. */
     val playerCommands: PlayerCommandService = PlayerCommandService(registry, permissionService)
@@ -130,6 +145,7 @@ data class ControlDependencies(
         loginMessage = loginMessage,
         codeTtlMs = codeTtlSeconds * 1000,
         sessionTtlMs = sessionTtlSeconds * 1000,
+        idleTtlMs = idleTimeoutSeconds * 1000,
         players = playerRegistry,
         permissions = permissionService,
         deliver = { name, text ->

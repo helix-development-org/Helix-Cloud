@@ -3,6 +3,7 @@ package org.helix.node.audit
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class AuditLogTest {
@@ -37,11 +38,72 @@ class AuditLogTest {
 
     @Test
     fun `persists to file and reloads across instances`() {
-        AuditLog(file).record("node", "system", "Node started")
+        val log = AuditLog(file)
+        log.record("node", "system", "Node started")
+        log.flush()
 
         val reloaded = AuditLog(file)
 
         assertTrue(reloaded.recent(10).any { it.summary == "Node started" })
         assertTrue(file.toFile().readText().contains("Node started"))
+    }
+
+    @Test
+    fun `record does not block the caller on a slow sink`() {
+        val release = java.util.concurrent.CountDownLatch(1)
+        val slowSink = object : AuditSink {
+            override fun append(entry: org.helix.api.audit.AuditEntry) {
+                release.await(2, java.util.concurrent.TimeUnit.SECONDS)
+            }
+
+            override fun loadRecent(limit: Int): List<org.helix.api.audit.AuditEntry> = emptyList()
+        }
+        val log = AuditLog(slowSink)
+
+        val elapsedMs = kotlin.system.measureTimeMillis {
+            log.record("node", "system", "should not block")
+        }
+
+        assertTrue(elapsedMs < 500, "record() blocked for ${elapsedMs}ms on a stuck sink")
+        assertEquals(1, log.recent(10).size)
+        release.countDown()
+    }
+
+    @Test
+    fun `overflowing the write queue drops the oldest pending entry instead of blocking`() {
+        val started = java.util.concurrent.CountDownLatch(1)
+        val gate = java.util.concurrent.CountDownLatch(1)
+        val appended = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val blockingSink = object : AuditSink {
+            private var first = true
+
+            @Synchronized
+            override fun append(entry: org.helix.api.audit.AuditEntry) {
+                if (first) {
+                    first = false
+                    started.countDown()
+                    gate.await(2, java.util.concurrent.TimeUnit.SECONDS)
+                }
+                appended += entry.summary
+            }
+
+            override fun loadRecent(limit: Int): List<org.helix.api.audit.AuditEntry> = emptyList()
+        }
+        // A tiny queue so a couple of extra records overflow it while the writer
+        // thread is stuck on the first (slow) append.
+        val log = AuditLog(blockingSink, queueCapacity = 2)
+
+        log.record("node", "system", "entry-1") // picked up by the writer immediately, blocks it
+        assertTrue(started.await(1, java.util.concurrent.TimeUnit.SECONDS), "writer never picked up entry-1")
+        log.record("node", "system", "entry-2")
+        log.record("node", "system", "entry-3")
+        log.record("node", "system", "entry-4") // queue capacity 2 -> drops entry-2
+        gate.countDown()
+        log.flush()
+
+        assertFalse(appended.contains("entry-2"))
+        assertTrue(appended.contains("entry-1"))
+        assertTrue(appended.contains("entry-3"))
+        assertTrue(appended.contains("entry-4"))
     }
 }

@@ -15,6 +15,15 @@ interface ServiceHandle {
         get() = null
 
     /**
+     * OS start instant of the process, epoch millis, when the executor runs
+     * local processes and the OS reports it. Persisted alongside [pid] so a
+     * restarted node can tell a surviving process apart from an unrelated
+     * process that later reused the same pid.
+     */
+    val startInstantEpochMs: Long?
+        get() = null
+
+    /**
      * Requests a graceful stop.
      */
     fun stop()

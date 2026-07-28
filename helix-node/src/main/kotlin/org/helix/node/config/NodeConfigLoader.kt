@@ -36,6 +36,8 @@ class NodeConfigLoader {
                 codeTtlSeconds = toml.getLong("control.codeTtlSeconds") ?: defaults.control.codeTtlSeconds,
                 sessionTtlSeconds = toml.getLong("control.sessionTtlSeconds")
                     ?: defaults.control.sessionTtlSeconds,
+                idleTimeoutSeconds = toml.getLong("control.idleTimeoutSeconds")
+                    ?: defaults.control.idleTimeoutSeconds,
                 loginMessage = toml.getString("control.loginMessage") ?: defaults.control.loginMessage,
                 tlsKeystore = toml.getString("control.tlsKeystore") ?: defaults.control.tlsKeystore,
                 tlsKeystorePassword = toml.getString("control.tlsKeystorePassword")
@@ -56,6 +58,14 @@ class NodeConfigLoader {
             ),
             network = NodeConfig.NetworkSettings(
                 name = toml.getString("network.name") ?: defaults.network.name,
+            ),
+            proxy = NodeConfig.ProxySettings(
+                forwardingSecret = toml.getString("proxy.forwardingSecret") ?: defaults.proxy.forwardingSecret,
+                legacyForwarding = toml.getBoolean("proxy.legacyForwarding") ?: defaults.proxy.legacyForwarding,
+            ),
+            eula = NodeConfig.EulaSettings(
+                accept = toml.getBoolean("eula.accept") ?: defaults.eula.accept,
+                acceptedBy = toml.getString("eula.acceptedBy") ?: defaults.eula.acceptedBy,
             ),
         )
     }

@@ -64,10 +64,34 @@ class RecordingAddonContext(
     /** Players reported as online. */
     val online = mutableListOf<OnlinePlayer>()
 
+    /** Simulated identity registry: lowercase name to uuid. */
+    val uuidsByName = mutableMapOf<String, String>()
+
+    /** Simulated identity registry: uuid to last-known lowercase name. */
+    val namesByUuid = mutableMapOf<String, String>()
+
     /** Stable storage returned by [storage]. */
     val storage: AddonStorage get() = storageBackend
 
     override fun storage(): AddonStorage = storageBackend
+
+    override fun resolvePlayerUuid(name: String): String? = uuidsByName[name.lowercase()]
+
+    override fun lastKnownName(uuid: String): String? = namesByUuid[uuid]
+
+    /**
+     * Simulates a join: records the name/uuid pair like the node's identity
+     * registry would, including dropping a stale reverse mapping on rename.
+     *
+     * @param name player name as reported at join.
+     * @param uuid player uuid.
+     */
+    fun recordJoin(name: String, uuid: String) {
+        val lower = name.lowercase()
+        namesByUuid[uuid]?.let { previous -> if (previous != lower) uuidsByName.remove(previous) }
+        namesByUuid[uuid] = lower
+        uuidsByName[lower] = uuid
+    }
 
     override val actions: ActionInvoker = object : ActionInvoker {
         override fun invoke(invocation: ActionInvocation): ActionResult {

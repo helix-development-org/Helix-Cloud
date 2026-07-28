@@ -1,6 +1,7 @@
 package org.helix.node.launcher
 
 import java.nio.file.Path
+import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -22,6 +23,7 @@ import org.helix.node.config.NodeConfig
 import org.helix.node.config.NodeConfigLoader
 import org.helix.node.control.ControlDependencies
 import org.helix.node.control.ControlServer
+import org.helix.node.control.auth.ServiceTokenRegistry
 import org.helix.node.dashboard.DashboardPanelRegistry
 import org.helix.node.display.BridgeValueStore
 import org.helix.node.display.DisplayResolverRegistry
@@ -36,11 +38,13 @@ import org.helix.node.gates.NativePermissionCache
 import org.helix.node.gates.NativePermissionProvider
 import org.helix.node.gates.PermissionResolverRegistry
 import org.helix.node.gates.PermissionService
+import org.helix.node.identity.IdentityRegistry
 import org.helix.node.notifications.NotificationBus
 import org.helix.node.packs.NetworkPackService
 import org.helix.api.platform.MetricSample
 import org.helix.api.service.ServiceState
 import org.helix.node.platform.ApiMetrics
+import org.helix.node.platform.HeartbeatWatchdog
 import org.helix.node.platform.MetricsHistory
 import org.helix.node.platform.NodeHealthService
 import org.helix.node.platform.PlatformOverviewService
@@ -53,6 +57,7 @@ import org.helix.node.resources.ClasspathInternalResources
 import org.helix.node.scaling.AutoScaler
 import org.helix.node.services.AdoptedProcessHandle
 import org.helix.node.services.ManagedService
+import org.helix.node.services.ProcessIdentity
 import org.helix.node.services.ProcessServiceExecutor
 import org.helix.node.services.ServiceManager
 import org.helix.node.services.ServiceRegistryFile
@@ -73,10 +78,15 @@ import org.slf4j.LoggerFactory
  * API, auto-scaler, addons and CLI.
  *
  * @property dataDirectory the `Helix/` data directory root.
+ * @property shutdownWaitMillis total budget services get to stop gracefully
+ *   during SIGTERM/shutdown before the process moves on regardless; kept
+ *   comfortably above the wrapper's own 30s stop grace (and, for Docker, its
+ *   30s `docker stop` timeout) so a slow world-save is not cut off mid-write.
  */
 class HelixNode(
     private val dataDirectory: Path,
     private val logBuffer: LogBuffer = LogBuffer(),
+    private val shutdownWaitMillis: Long = DEFAULT_SHUTDOWN_WAIT_MILLIS,
 ) {
     private val logger = LoggerFactory.getLogger(HelixNode::class.java)
     private val stopping = AtomicBoolean(false)
@@ -125,6 +135,9 @@ class HelixNode(
             },
             paperComponents = { taskName -> addonManager.paperComponents(taskName) },
             velocityComponents = { taskName -> addonManager.velocityComponents(taskName) },
+            eulaAccepted = config.eula.accept,
+            forwardingSecret = config.proxy.forwardingSecret,
+            legacyForwarding = config.proxy.legacyForwarding,
         ),
         executors = mapOf(
             ExecutorType.PROCESS to ProcessServiceExecutor(),
@@ -137,6 +150,9 @@ class HelixNode(
 
     /** Proxy routing state. */
     val routing: ProxyRoutingService = ProxyRoutingService(manager)
+
+    /** Per-service bridge tokens minted for managed services (see [bridgeEnvironment]). */
+    private val serviceTokens: ServiceTokenRegistry = ServiceTokenRegistry()
 
     /** Wakes long-polling proxy bridges the instant something changes. */
     val proxyEvents: ProxyEventHub = ProxyEventHub()
@@ -181,6 +197,11 @@ class HelixNode(
     /** Network languages and per-player language preferences. */
     val languages: LanguageRegistry = LanguageRegistry(
         storageProvider.forAddon("translations", paths.root.resolve("translations")),
+    )
+
+    /** Node-wide uuid to last-known-name identity registry. */
+    val identityRegistry: IdentityRegistry = IdentityRegistry(
+        storageProvider.forAddon("identity", paths.root.resolve("identity")),
     )
 
     /**
@@ -388,6 +409,7 @@ class HelixNode(
         serviceDirectories = { listOf(paths.servicesStatic, paths.servicesTemp, paths.templates) },
         defaultLanguage = languages::defaultLanguage,
         languageOf = languages::languageOf,
+        identityRegistry = identityRegistry,
         storageConnection = {
             org.helix.api.addon.StorageConnection(
                 mode = config.storage.mode,
@@ -409,12 +431,30 @@ class HelixNode(
     /** Rolling control-API performance stats (avg/p95 response time, rate). */
     val apiMetrics: ApiMetrics = ApiMetrics()
 
-    /** Workspace backups of static services. */
+    /** Workspace backups of static services, plus addon-data backups in `json` storage mode. */
     val backups: BackupService = BackupService(
         backupsDir = paths.backups,
         staticServicesDir = paths.servicesStatic,
         isActive = { serviceId -> manager.find(serviceId)?.active() == true },
+        dataSources = jsonModeDataSources(),
     )
+
+    /**
+     * The `json`-mode data directories worth snapshotting alongside static
+     * workspaces — empty for `postgres`/`mongodb`, where the same documents
+     * live in the shared database instead (see [BackupService.createData]).
+     */
+    private fun jsonModeDataSources(): Map<String, Path> {
+        if (config.storage.isPostgres() || config.storage.isMongo()) {
+            return emptyMap()
+        }
+        return mapOf(
+            "addons" to paths.addons.resolve("data"),
+            "tasks" to paths.tasks,
+            "translations" to paths.root.resolve("translations"),
+            "audit" to paths.root.resolve("audit"),
+        )
+    }
 
     /** File manager over service workspaces and templates. */
     val files: FileManagerService =
@@ -431,57 +471,75 @@ class HelixNode(
     val nodeHealth: NodeHealthService =
         NodeHealthService(manager, playerRegistry, nativePermissions, jobScheduler)
     private val autoScaler = AutoScaler(taskStore, manager)
+
+    /** Reaps services stuck in `STARTING` or gone silent while `RUNNING` (see [HeartbeatWatchdog]). */
+    private val heartbeatWatchdog = HeartbeatWatchdog(manager)
     private val scheduler = Executors.newSingleThreadScheduledExecutor { runnable ->
         Thread(runnable, "helix-autoscaler").apply { isDaemon = true }
     }
-    private val controlServer = ControlServer(
-        settings = config.control,
-        dependencies = ControlDependencies(
-            token = config.control.token,
-            registry = registry,
-            taskStore = taskStore,
-            manager = manager,
-            routing = routing,
-            overviewService = overviewService,
-            addonManager = addonManager,
-            joinGates = joinGates,
-            commandQueue = commandQueue,
-            permissionResolvers = permissionResolvers,
-            nativePermissions = nativePermissions,
-            permissionService = permissionService,
-            playerRegistry = playerRegistry,
-            displayResolvers = displayResolvers,
-            bridgeValues = bridgeValues,
-            logBuffer = logBuffer,
-            eventLog = eventLog,
-            dashboardPanels = dashboardPanels,
-            messages = messages,
-            proxyEvents = proxyEvents,
-            audit = audit,
-            loginPermission = config.control.loginPermission,
-            codeTtlSeconds = config.control.codeTtlSeconds,
-            sessionTtlSeconds = config.control.sessionTtlSeconds,
-            loginMessage = config.control.loginMessage,
-            networkName = { networkMessages.raw("name") },
-            proxyScreens = velocityMessages,
-            languages = languages,
-            metrics = metrics,
-            apiMetrics = apiMetrics,
-            nodeHealth = nodeHealth::snapshot,
-            onMessagesChanged = { addonId ->
-                if (addonId == "network") {
-                    refreshNetworkPlaceholders()
-                }
-                // screens and the display name ride on the routing snapshot,
-                // everything else on the periodic bridge sync — wake proxies
-                proxyEvents.bumpRouting()
-            },
-            jobScheduler = jobScheduler,
-            backups = backups,
-            files = files,
-            networkPack = networkPack,
-        ),
+
+    /**
+     * Own executor for scheduled-job evaluation, separate from [scheduler]:
+     * without this, a slow job (e.g. a backup) run on the same thread as the
+     * auto-scaler/metrics ticks would stall scaling and metrics sampling for
+     * its whole duration.
+     */
+    private val jobSchedulerExecutor = Executors.newSingleThreadScheduledExecutor { runnable ->
+        Thread(runnable, "helix-job-scheduler").apply { isDaemon = true }
+    }
+    /** Control API dependencies, kept as its own property so the launcher can
+     *  reach [org.helix.node.control.auth.PanelAuthService] for the
+     *  `session.revoke` admin action without exposing it via [ControlServer]. */
+    private val controlDependencies = ControlDependencies(
+        token = config.control.token,
+        registry = registry,
+        taskStore = taskStore,
+        manager = manager,
+        routing = routing,
+        overviewService = overviewService,
+        addonManager = addonManager,
+        joinGates = joinGates,
+        commandQueue = commandQueue,
+        permissionResolvers = permissionResolvers,
+        nativePermissions = nativePermissions,
+        permissionService = permissionService,
+        playerRegistry = playerRegistry,
+        displayResolvers = displayResolvers,
+        bridgeValues = bridgeValues,
+        logBuffer = logBuffer,
+        eventLog = eventLog,
+        dashboardPanels = dashboardPanels,
+        messages = messages,
+        proxyEvents = proxyEvents,
+        audit = audit,
+        loginPermission = config.control.loginPermission,
+        codeTtlSeconds = config.control.codeTtlSeconds,
+        sessionTtlSeconds = config.control.sessionTtlSeconds,
+        idleTimeoutSeconds = config.control.idleTimeoutSeconds,
+        loginMessage = config.control.loginMessage,
+        networkName = { networkMessages.raw("name") },
+        proxyScreens = velocityMessages,
+        languages = languages,
+        identityRegistry = identityRegistry,
+        metrics = metrics,
+        apiMetrics = apiMetrics,
+        nodeHealth = nodeHealth::snapshot,
+        onMessagesChanged = { addonId ->
+            if (addonId == "network") {
+                refreshNetworkPlaceholders()
+            }
+            // screens and the display name ride on the routing snapshot,
+            // everything else on the periodic bridge sync — wake proxies
+            proxyEvents.bumpRouting()
+        },
+        jobScheduler = jobScheduler,
+        backups = backups,
+        files = files,
+        networkPack = networkPack,
+        serviceTokens = serviceTokens,
     )
+
+    private val controlServer = ControlServer(settings = config.control, dependencies = controlDependencies)
 
     /**
      * Boots the node: loads tasks and addons, registers actions, starts the
@@ -489,8 +547,36 @@ class HelixNode(
      */
     fun start() {
         logger.info("Booting Helix-Cloud {} from {}", version(), dataDirectory.toAbsolutePath())
+        if (config.control.token == DEFAULT_TOKEN_PLACEHOLDER) {
+            // Only reachable via a hand-edited/legacy node.toml — fresh installs get a
+            // random token from HelixDirectoryInitializer. Warn loudly instead of
+            // silently running with a publicly known admin credential.
+            logger.warn(
+                "control.token is still the well-known default \"{}\" — replace it with a " +
+                    "random secret, this token grants full admin access to the control API",
+                DEFAULT_TOKEN_PLACEHOLDER,
+            )
+        }
+        if (config.eula.accept) {
+            val by = config.eula.acceptedBy.takeIf { it.isNotBlank() }
+            logger.info("Mojang EULA (https://www.minecraft.net/eula) accepted{}", by?.let { " by $it" } ?: "")
+            audit.record("node", "system", "Mojang EULA accepted" + (by?.let { " (by $it)" } ?: ""))
+        } else {
+            logger.warn(
+                "eula.accept is false in config/node.toml — Paper services will refuse to start until " +
+                    "you read and accept the Mojang EULA (https://www.minecraft.net/eula) and set accept = true",
+            )
+        }
+        if (config.proxy.legacyForwarding) {
+            logger.warn(
+                "proxy.legacyForwarding is enabled — Paper/Velocity backends use unauthenticated " +
+                    "BungeeCord-style forwarding instead of Velocity modern forwarding; anyone reaching a " +
+                    "backend port directly can impersonate any player. Only use this if you understand the risk.",
+            )
+        }
         taskStore.reload()
         adoptSurvivingServices()
+        sweepOrphanedWorkspaces()
         restoreRestartState()
         migrateLegacyProxyScreens()
         languages.onChange { proxyEvents.bumpRouting() }
@@ -521,12 +607,16 @@ class HelixNode(
         ).registerAll(registry)
         addonActions.registerAll(registry)
         BackupActions(backups).registerAll(registry)
+        registerControlActions()
         addonManager.loadAll()
         rebuildNetworkPack()
         registerEventSources()
         refreshNetworkPlaceholders()
         controlServer.start()
         manager.onServiceTerminated { service: ManagedService ->
+            // A stopped service's token must not keep working once its id is
+            // reused by a later service instance.
+            serviceTokens.revoke(service.id)
             if (service.task.environment.proxy) {
                 playerRegistry.dropProxy(service.id)
             }
@@ -543,12 +633,20 @@ class HelixNode(
             TimeUnit.SECONDS,
         )
         scheduler.scheduleAtFixedRate(
+            { runCatching(heartbeatWatchdog::tick).onFailure { logger.error("heartbeat watchdog tick failed", it) } },
+            SCALER_INITIAL_DELAY_SECONDS,
+            SCALER_PERIOD_SECONDS,
+            TimeUnit.SECONDS,
+        )
+        scheduler.scheduleAtFixedRate(
             { runCatching(::sampleMetrics).onFailure { logger.error("metrics sample failed", it) } },
             METRICS_PERIOD_SECONDS,
             METRICS_PERIOD_SECONDS,
             TimeUnit.SECONDS,
         )
-        scheduler.scheduleAtFixedRate(
+        // Own executor (see jobSchedulerExecutor's doc) — a slow job must
+        // not delay the auto-scaler/metrics ticks above, nor vice versa.
+        jobSchedulerExecutor.scheduleAtFixedRate(
             { runCatching(jobScheduler::tick).onFailure { logger.error("job scheduler tick failed", it) } },
             JOB_PERIOD_SECONDS,
             JOB_PERIOD_SECONDS,
@@ -561,7 +659,15 @@ class HelixNode(
                     // otherwise it resurrects services while the hook stops them.
                     stopping.set(true)
                     scheduler.shutdownNow()
+                    jobSchedulerExecutor.shutdownNow()
                     stopServicesQuietly()
+                    // Reached on a raw SIGTERM (systemd, `kill`) that never went
+                    // through shutdown()/initiateRestart() — those already close
+                    // the storage backend themselves, this is the only path that
+                    // otherwise leaked the connection pool/client on exit.
+                    runCatching { audit.close() }
+                    runCatching { storageProvider.close() }
+                    runCatching { storageBackend.close() }
                 }
             },
         )
@@ -574,11 +680,13 @@ class HelixNode(
             )
             eventLog.record("node", "Backend restart completed", "info")
         }
+        // The admin token is never logged: GET /logs only requires the (non-admin)
+        // helix.panel.logs permission, so logging it would leak full admin access
+        // to anyone holding that view.
         logger.info(
-            "Node ready — dashboard: http://{}:{}/  token: {}",
+            "Node ready — dashboard: http://{}:{}/",
             config.control.host,
             config.control.port,
-            config.control.token,
         )
     }
 
@@ -613,9 +721,11 @@ class HelixNode(
         Thread({
             logger.info("Shutting down")
             scheduler.shutdownNow()
+            jobSchedulerExecutor.shutdownNow()
             stopServicesQuietly()
             addonManager.disableAll()
             controlServer.stop()
+            runCatching { audit.close() }
             runCatching { storageProvider.close() }
             runCatching { storageBackend.close() }
             exitProcess(0)
@@ -677,11 +787,13 @@ class HelixNode(
                     .onFailure { logger.warn("Could not persist the restart state: {}", it.message) }
             }
             scheduler.shutdownNow()
+            jobSchedulerExecutor.shutdownNow()
             if (!keepServices) {
                 stopServicesQuietly()
             }
             addonManager.disableAll()
             controlServer.stop()
+            runCatching { audit.close() }
             runCatching { storageProvider.close() }
             runCatching { storageBackend.close() }
             val exitCode = when {
@@ -707,9 +819,12 @@ class HelixNode(
 
     /**
      * Re-adopts services that survived a backend restart headless: process
-     * services via their persisted pid, Docker services via their
-     * deterministic container name. Entries whose process or container died
-     * are dropped; the auto-scaler starts replacements.
+     * services via their persisted pid — confirmed by [ProcessIdentity]
+     * against the persisted OS start instant, so a pid reused by an
+     * unrelated process after a reboot is not mistaken for the original —
+     * Docker services via their deterministic container name. Entries whose
+     * process or container died (or whose identity does not match) are
+     * dropped; the auto-scaler starts replacements.
      */
     private fun adoptSurvivingServices() {
         val entries = serviceRegistry.read().filter {
@@ -733,7 +848,7 @@ class HelixNode(
             val handle = when (entry.executor) {
                 ExecutorType.PROCESS -> entry.pid
                     ?.let { pid -> ProcessHandle.of(pid).orElse(null) }
-                    ?.takeIf { it.isAlive }
+                    ?.takeIf { ProcessIdentity.survived(it, entry.processStartInstantEpochMs) }
                     ?.let { AdoptedProcessHandle(it, workspace.resolve("service.log")) }
                 ExecutorType.DOCKER -> DockerServiceHandle(
                     containerName = DockerNames.containerName(entry.id),
@@ -750,6 +865,21 @@ class HelixNode(
         }
         logger.info("Adopted {}/{} surviving service(s)", adopted, entries.size)
         serviceRegistry.write(manager.managedServices())
+    }
+
+    /**
+     * Removes `services/temp` workspaces left behind by a service that never
+     * made it into [adoptSurvivingServices] (crashed before this boot, and
+     * its own [org.helix.node.services.ServiceManager] cleanup never ran).
+     * Must run after [adoptSurvivingServices] so genuinely-adopted workspaces
+     * are never mistaken for orphans.
+     */
+    private fun sweepOrphanedWorkspaces() {
+        val liveIds = manager.managedServices().map { it.id }.toSet()
+        val removed = OrphanWorkspaceSweeper.sweep(paths.servicesTemp, liveIds)
+        if (removed > 0) {
+            logger.info("Removed {} orphaned service workspace(s)", removed)
+        }
     }
 
     /** Writes the in-memory runtime state for the successor process. */
@@ -831,13 +961,58 @@ class HelixNode(
         logger.info("Migrated legacy proxy screens into the translation system")
     }
 
+    /**
+     * Stops every active service and waits up to [shutdownWaitMillis] total
+     * for them to actually terminate.
+     *
+     * Stop requests are issued in parallel, one thread per service: a
+     * Docker-backed service's [org.helix.node.services.ServiceHandle.stop]
+     * blocks for up to `docker stop`'s own 30s timeout, so issuing them one
+     * after another (as a plain `forEach` would) could burn through the
+     * entire shutdown budget on the first few containers alone, leaving none
+     * for the rest — or for actually waiting on a graceful world-save.
+     */
     private fun stopServicesQuietly() {
-        runCatching { manager.stopAll() }
-        val deadline = System.currentTimeMillis() + SHUTDOWN_WAIT_MILLIS
+        val deadline = System.currentTimeMillis() + shutdownWaitMillis
+        val toStop = manager.managedServices().filter { it.active() && it.handle != null }
+        if (toStop.isNotEmpty()) {
+            val pool = Executors.newFixedThreadPool(toStop.size) { runnable ->
+                Thread(runnable, "helix-shutdown-stop").apply { isDaemon = true }
+            }
+            try {
+                val tasks = toStop.map { service -> Callable { runCatching { manager.stopService(service.id) } } }
+                val remainingMs = (deadline - System.currentTimeMillis()).coerceAtLeast(0)
+                pool.invokeAll(tasks, remainingMs, TimeUnit.MILLISECONDS)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            } finally {
+                pool.shutdownNow()
+            }
+        }
         while (System.currentTimeMillis() < deadline &&
             manager.managedServices().any { it.active() && it.handle != null }
         ) {
             Thread.sleep(100)
+        }
+    }
+
+    /** Registers admin-only actions on the control API itself, not tied to
+     *  any single addon or the built-in platform action set. */
+    private fun registerControlActions() {
+        registry.register(
+            org.helix.api.action.ActionDescriptor(
+                name = "session.revoke",
+                description = "Revokes a player's active web-panel sessions.",
+                usage = "session.revoke <player>",
+            ),
+        ) { invocation ->
+            val player = invocation.arguments.firstOrNull()
+            if (player.isNullOrBlank()) {
+                org.helix.api.action.ActionResult.error("usage: session.revoke <player>")
+            } else {
+                val revoked = controlDependencies.panelAuth.revokeSessions(player)
+                org.helix.api.action.ActionResult.ok("revoked $revoked session(s) for $player")
+            }
         }
     }
 
@@ -866,13 +1041,15 @@ class HelixNode(
         // invocation is always a player-issued in-game command (PlayerCommandService.execute
         // puts the player's name first, by contract) — attribute it to that player instead of
         // the generic "bridge" label, so the audit trail shows WHO ran a command, not just that
-        // some proxy relayed one.
+        // some proxy relayed one. A REST invocation carries the same real name when it came from
+        // an authenticated panel session (set by ControlServer); the static admin token leaves it
+        // unset and keeps the generic label.
         registry.onInvocation { invocation, result ->
             val actor = if (invocation.source == ActionSource.BRIDGE) {
                 invocation.arguments.firstOrNull()?.lowercase()?.takeIf { it.isNotBlank() }
                     ?: invocation.source.name.lowercase()
             } else {
-                invocation.source.name.lowercase()
+                invocation.actor?.lowercase()?.takeIf { it.isNotBlank() } ?: invocation.source.name.lowercase()
             }
             val summary = (invocation.action + " " + invocation.arguments.joinToString(" ")).trim()
             audit.record("action", actor, summary, if (result.success) "ok" else "error")
@@ -899,9 +1076,14 @@ class HelixNode(
             ExecutorType.PROCESS -> "127.0.0.1"
             ExecutorType.DOCKER -> "host.docker.internal"
         }
+        // A per-service token, not the static admin token: any plugin on the
+        // managed game server can read its own process's environment, so
+        // handing out the admin token here would let it act as full
+        // node-admin (create tasks, read configs, stop the network). The
+        // scoped token only unlocks this exact service's /internal/ routes.
         return mapOf(
             "HELIX_CONTROL_URL" to "http://$host:${config.control.port}",
-            "HELIX_CONTROL_TOKEN" to config.control.token,
+            "HELIX_CONTROL_TOKEN" to serviceTokens.mint(service.id),
         )
     }
 
@@ -938,6 +1120,9 @@ class HelixNode(
     }
 
     private companion object {
+        /** The well-known default admin token, warned about if still in use. */
+        const val DEFAULT_TOKEN_PLACEHOLDER = "dev-token-change-me"
+
         /** Seconds before the first auto-scaler pass. */
         const val SCALER_INITIAL_DELAY_SECONDS = 3L
 
@@ -950,8 +1135,13 @@ class HelixNode(
         /** Seconds between scheduled-job evaluations. */
         const val JOB_PERIOD_SECONDS = 20L
 
-        /** Maximum milliseconds to wait for services during shutdown. */
-        const val SHUTDOWN_WAIT_MILLIS = 15_000L
+        /**
+         * Default milliseconds to wait for services during shutdown —
+         * comfortably above the wrapper's own 30s stop grace (and Docker's
+         * 30s `docker stop` timeout), since services now stop in parallel
+         * rather than serially.
+         */
+        const val DEFAULT_SHUTDOWN_WAIT_MILLIS = 40_000L
 
         /** File name of the persisted runtime state during a restart. */
         const val RESTART_STATE_FILE = "restart-state.json"

@@ -28,15 +28,16 @@ class PaperMcDownloadResolver(
     private val logger = LoggerFactory.getLogger(PaperMcDownloadResolver::class.java)
 
     /**
-     * Resolves the download URI of the latest stable build.
+     * Resolves the download of the latest stable build.
      *
      * @param environment platform to download.
      * @param version platform version, for example `1.21.11`.
-     * @return URI of the server jar.
+     * @return the download URI together with its expected sha256, so the
+     *   caller can verify the bytes it receives before trusting them.
      * @throws IllegalArgumentException if the API request fails or no stable
      *   build exists for the version.
      */
-    fun resolve(environment: Environment, version: String): URI {
+    fun resolve(environment: Environment, version: String): ResolvedDownload {
         require(version.isNotBlank()) { "cannot resolve a blank $environment version" }
         val project = when (environment) {
             Environment.PAPER -> "paper"
@@ -53,10 +54,21 @@ class PaperMcDownloadResolver(
             .filter { it["channel"]?.jsonPrimitive?.contentOrNull == "STABLE" }
             .maxByOrNull { it["id"]?.jsonPrimitive?.intOrNull ?: -1 }
             ?: throw IllegalArgumentException("no stable $project build for version $version")
-        val url = build["downloads"]?.jsonObject
-            ?.get("server:default")?.jsonObject
-            ?.get("url")?.jsonPrimitive?.contentOrNull
+        val download = build["downloads"]?.jsonObject?.get("server:default")?.jsonObject
+            ?: throw IllegalArgumentException("stable $project build has no server:default download")
+        val url = download["url"]?.jsonPrimitive?.contentOrNull
             ?: throw IllegalArgumentException("stable $project build has no server:default download url")
-        return URI.create(url)
+        val sha256 = download["checksums"]?.jsonObject?.get("sha256")?.jsonPrimitive?.contentOrNull
+            ?: throw IllegalArgumentException("stable $project build has no server:default sha256 checksum")
+        return ResolvedDownload(URI.create(url), sha256)
     }
 }
+
+/**
+ * A resolved download: the server jar URI and the sha256 the downloaded
+ * bytes must match before they are trusted.
+ *
+ * @property uri download URI of the server jar.
+ * @property sha256 expected sha256 checksum, lowercase hex.
+ */
+data class ResolvedDownload(val uri: URI, val sha256: String)

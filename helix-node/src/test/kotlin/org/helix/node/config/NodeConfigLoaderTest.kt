@@ -27,6 +27,14 @@ class NodeConfigLoaderTest {
 
             [docker]
             network = "helix-net"
+
+            [proxy]
+            forwardingSecret = "fwd-secret"
+            legacyForwarding = true
+
+            [eula]
+            accept = true
+            acceptedBy = "operator"
             """.trimIndent(),
         )
 
@@ -37,5 +45,9 @@ class NodeConfigLoaderTest {
         assertEquals("secret", config.control.token)
         assertEquals("helix-net", config.docker.network)
         assertEquals(NodeConfig.DockerSettings().image, config.docker.image)
+        assertEquals("fwd-secret", config.proxy.forwardingSecret)
+        assertEquals(true, config.proxy.legacyForwarding)
+        assertEquals(true, config.eula.accept)
+        assertEquals("operator", config.eula.acceptedBy)
     }
 }

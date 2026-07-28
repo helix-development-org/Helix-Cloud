@@ -23,6 +23,7 @@ class BackendRegistry(
 ) {
     private val managed = ConcurrentHashMap<String, InetSocketAddress>()
     private val fallbackEligible = ConcurrentHashMap.newKeySet<String>()
+    private val maintenanceBackends = ConcurrentHashMap.newKeySet<String>()
 
     /**
      * Applies a routing snapshot: registers new backends, updates changed
@@ -48,11 +49,17 @@ class BackendRegistry(
             } else {
                 fallbackEligible.remove(backend.serviceId)
             }
+            if (backend.maintenance) {
+                maintenanceBackends.add(backend.serviceId)
+            } else {
+                maintenanceBackends.remove(backend.serviceId)
+            }
         }
         managed.keys.filter { it !in desired }.forEach { vanished ->
             proxy.getServer(vanished).ifPresent { proxy.unregisterServer(it.serverInfo) }
             managed.remove(vanished)
             fallbackEligible.remove(vanished)
+            maintenanceBackends.remove(vanished)
             logger.info("Unregistered backend {}", vanished)
         }
     }
@@ -61,21 +68,32 @@ class BackendRegistry(
      * Picks the least loaded fallback backend.
      *
      * @param exclude server name to skip, for example the origin of a kick.
+     * @param bypassMaintenance whether a maintenance-flagged backend may
+     *  still be picked (holders of `helix.maintenance.bypass`).
      * @return the registered server, or `null` when no fallback exists.
      */
-    fun fallback(exclude: String? = null): RegisteredServer? {
+    fun fallback(exclude: String? = null, bypassMaintenance: Boolean = false): RegisteredServer? {
         val candidates = managed.keys.mapNotNull { name ->
             proxy.getServer(name).map { server ->
                 FallbackCandidate(
                     name = name,
                     players = server.playersConnected.size,
                     fallbackEligible = name in fallbackEligible,
+                    maintenance = name in maintenanceBackends,
                 )
             }.orElse(null)
         }
-        val selected = FallbackSelector.select(candidates, exclude) ?: return null
+        val selected = FallbackSelector.select(candidates, exclude, bypassMaintenance) ?: return null
         return proxy.getServer(selected).orElse(null)
     }
+
+    /**
+     * Whether a backend's task is currently flagged for maintenance.
+     *
+     * @param name the backend's registered server name.
+     * @return `true` when the backend rejects regular joins.
+     */
+    fun isMaintenance(name: String): Boolean = name in maintenanceBackends
 
     /**
      * Lists the names of all managed backends.

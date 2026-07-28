@@ -17,18 +17,29 @@ class PanelAuthServiceTest {
     private var now = 1_000L
     private var delivered: String? = null
 
-    private fun service(cache: NativePermissionCache, players: PlayerRegistry): PanelAuthService =
+    private fun service(
+        cache: NativePermissionCache,
+        players: PlayerRegistry,
+        idleTtlMs: Long = 3_600_000,
+    ): PanelAuthService =
         PanelAuthService(
             adminToken = "admin-token",
             loginPermission = "helix.panel.login",
             loginMessage = "code:{code}",
             codeTtlMs = 300_000,
             sessionTtlMs = 3_600_000,
+            idleTtlMs = idleTtlMs,
             players = players,
             permissions = PermissionService(PermissionResolverRegistry(), NativePermissionProvider(cache)),
             deliver = { _, text -> delivered = text; true },
             clock = { now },
         )
+
+    private fun login(auth: PanelAuthService, name: String): String {
+        auth.requestCode(name)
+        val code = delivered!!.removePrefix("code:")
+        return auth.verify(name, code).token
+    }
 
     @Test
     fun `full login flow issues a session scoped to the player permissions`() {
@@ -83,5 +94,77 @@ class PanelAuthServiceTest {
 
         auth.requestCode("steve")
         assertFailsWith<IllegalArgumentException> { auth.verify("steve", "000000-wrong") }
+    }
+
+    @Test
+    fun `offline and no-access denials are indistinguishable`() {
+        val players = PlayerRegistry().apply {
+            handle(PlayerEvent("join", "Steve", "u"))
+            handle(PlayerEvent("join", "Griefer", "g"))
+        }
+        val cache = NativePermissionCache().apply { update("steve", listOf("helix.panel.login")) }
+        val auth = service(cache, players)
+
+        val offline = assertFailsWith<IllegalArgumentException> { auth.requestCode("Alex") }
+        val noAccess = assertFailsWith<IllegalArgumentException> { auth.requestCode("Griefer") }
+
+        assertEquals(offline.message, noAccess.message)
+    }
+
+    @Test
+    fun `a session for a player holding helix-admin is treated as full admin`() {
+        val players = PlayerRegistry().apply { handle(PlayerEvent("join", "Steve", "u")) }
+        val cache = NativePermissionCache().apply {
+            update("steve", listOf("helix.panel.login", "helix.admin"))
+        }
+        val auth = service(cache, players)
+
+        val token = login(auth, "steve")
+
+        val principal = auth.authenticate(token)!!
+        assertTrue(principal.admin)
+        assertTrue(auth.grants(principal, "helix.panel.anything"))
+    }
+
+    @Test
+    fun `demoting a player revokes panel access on the very next request`() {
+        val players = PlayerRegistry().apply { handle(PlayerEvent("join", "Steve", "u")) }
+        val cache = NativePermissionCache().apply { update("steve", listOf("helix.panel.login")) }
+        val auth = service(cache, players)
+        val token = login(auth, "steve")
+        assertTrue(auth.authenticate(token) != null)
+
+        // the player is demoted (loses the login permission) without the session expiring
+        cache.update("steve", emptyList())
+
+        assertNull(auth.authenticate(token))
+    }
+
+    @Test
+    fun `a session idle past the idle timeout is rejected even before the absolute TTL`() {
+        val players = PlayerRegistry().apply { handle(PlayerEvent("join", "Steve", "u")) }
+        val cache = NativePermissionCache().apply { update("steve", listOf("helix.panel.login")) }
+        val auth = service(cache, players, idleTtlMs = 60_000)
+        val token = login(auth, "steve")
+
+        now += 30_000
+        assertTrue(auth.authenticate(token) != null) // still active, refreshes the idle clock
+
+        now += 60_000
+        assertNull(auth.authenticate(token)) // idle for 60s straight -> expired
+    }
+
+    @Test
+    fun `an admin can revoke a player's active sessions`() {
+        val players = PlayerRegistry().apply { handle(PlayerEvent("join", "Steve", "u")) }
+        val cache = NativePermissionCache().apply { update("steve", listOf("helix.panel.login")) }
+        val auth = service(cache, players)
+        val token = login(auth, "steve")
+        assertTrue(auth.authenticate(token) != null)
+
+        val revoked = auth.revokeSessions("STEVE")
+
+        assertEquals(1, revoked)
+        assertNull(auth.authenticate(token))
     }
 }

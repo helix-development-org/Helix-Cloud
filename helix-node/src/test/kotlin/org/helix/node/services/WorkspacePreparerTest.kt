@@ -7,9 +7,11 @@ import kotlin.io.path.readText
 import kotlin.io.path.writeText
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.helix.api.environment.Environment
+import org.helix.api.execution.ExecutorType
 import org.helix.api.task.TaskDefinition
 import org.helix.node.launcher.NodePaths
 
@@ -20,10 +22,12 @@ class WorkspacePreparerTest {
         paths = paths,
         internalResources = { name -> ByteArrayInputStream(name.toByteArray()) },
         serverJar = { _, _ -> fakeJar },
+        eulaAccepted = true,
+        forwardingSecret = "test-forwarding-secret",
     )
 
     @Test
-    fun `prepares paper workspace with wrapper bridge and defaults`() {
+    fun `prepares paper workspace with wrapper bridge and modern forwarding defaults`() {
         val task = TaskDefinition(
             name = "Lobby",
             environment = Environment.PAPER,
@@ -40,15 +44,73 @@ class WorkspacePreparerTest {
         assertTrue(Files.exists(workspace.resolve("server.jar")))
         assertTrue(Files.exists(workspace.resolve("plugins/HelixPaperBridge.jar")))
         assertEquals("world", workspace.resolve("data/level.txt").readText())
-        assertTrue(workspace.resolve("server.properties").readText().contains("server-port=30001"))
-        assertTrue(workspace.resolve("server.properties").readText().contains("max-players=42"))
+        val serverProperties = workspace.resolve("server.properties").readText()
+        assertTrue(serverProperties.contains("server-port=30001"))
+        assertTrue(serverProperties.contains("max-players=42"))
+        // process-mode backends only listen on loopback — the proxy is the only reachable door in
+        assertTrue(serverProperties.contains("server-ip=127.0.0.1"))
         assertTrue(workspace.resolve("eula.txt").readText().contains("eula=true"))
-        assertTrue(workspace.resolve("spigot.yml").readText().contains("bungeecord: true"))
+        // modern forwarding by default: no bungeecord flag, a shared secret in paper-global.yml
+        assertTrue(workspace.resolve("spigot.yml").readText().contains("bungeecord: false"))
+        val paperGlobal = workspace.resolve("config/paper-global.yml").readText()
+        assertTrue(paperGlobal.contains("enabled: true"))
+        assertTrue(paperGlobal.contains("online-mode: false"))
+        assertTrue(paperGlobal.contains("secret: 'test-forwarding-secret'"))
         assertTrue(workspace.resolve("wrapper.properties").readText().contains("serverArgs=--nogui"))
     }
 
     @Test
-    fun `prepares velocity workspace with velocity toml`() {
+    fun `paper service refuses to prepare without eula acceptance`() {
+        val notAccepted = WorkspacePreparer(
+            paths = paths,
+            internalResources = { name -> ByteArrayInputStream(name.toByteArray()) },
+            serverJar = { _, _ -> fakeJar },
+            eulaAccepted = false,
+        )
+        val task = TaskDefinition(name = "Lobby", environment = Environment.PAPER, version = "1.21.11")
+
+        assertFailsWith<IllegalStateException> {
+            notAccepted.prepare(task, "Lobby-2", 30002)
+        }
+    }
+
+    @Test
+    fun `docker-mode paper backend does not bind to loopback`() {
+        val task = TaskDefinition(
+            name = "Lobby",
+            environment = Environment.PAPER,
+            version = "1.21.11",
+            executor = ExecutorType.DOCKER,
+        )
+
+        val workspace = preparer.prepare(task, "Lobby-docker-1", 30003)
+
+        assertFalse(workspace.resolve("server.properties").readText().contains("server-ip"))
+    }
+
+    @Test
+    fun `legacy forwarding is an explicit opt-in`() {
+        val legacyPreparer = WorkspacePreparer(
+            paths = paths,
+            internalResources = { name -> ByteArrayInputStream(name.toByteArray()) },
+            serverJar = { _, _ -> fakeJar },
+            eulaAccepted = true,
+            legacyForwarding = true,
+        )
+        val paperTask = TaskDefinition(name = "Lobby", environment = Environment.PAPER, version = "1.21.11")
+        val velocityTask = TaskDefinition(name = "Proxy", environment = Environment.VELOCITY, version = "3.4.0")
+
+        val paperWorkspace = legacyPreparer.prepare(paperTask, "Lobby-legacy-1", 30004)
+        val velocityWorkspace = legacyPreparer.prepare(velocityTask, "Proxy-legacy-1", 25578)
+
+        assertTrue(paperWorkspace.resolve("spigot.yml").readText().contains("bungeecord: true"))
+        assertFalse(Files.exists(paperWorkspace.resolve("config/paper-global.yml")))
+        assertTrue(velocityWorkspace.resolve("velocity.toml").readText().contains("player-info-forwarding-mode = \"legacy\""))
+        assertFalse(Files.exists(velocityWorkspace.resolve("forwarding.secret")))
+    }
+
+    @Test
+    fun `prepares velocity workspace with modern forwarding by default`() {
         val task = TaskDefinition(
             name = "Proxy",
             environment = Environment.VELOCITY,
@@ -63,6 +125,9 @@ class WorkspacePreparerTest {
         assertTrue(velocityToml.contains("bind = \"0.0.0.0:25577\""))
         assertTrue(velocityToml.contains("config-version = \"2.7\""))
         assertTrue(velocityToml.contains("[forced-hosts]"))
+        assertTrue(velocityToml.contains("player-info-forwarding-mode = \"modern\""))
+        assertTrue(velocityToml.contains("forwarding-secret-file = \"forwarding.secret\""))
+        assertEquals("test-forwarding-secret", workspace.resolve("forwarding.secret").readText())
         assertFalse(Files.exists(workspace.resolve("eula.txt")))
     }
 
@@ -104,6 +169,7 @@ class WorkspacePreparerTest {
             internalResources = { name -> ByteArrayInputStream(name.toByteArray()) },
             serverJar = { _, _ -> fakeJar },
             paperComponents = { active },
+            eulaAccepted = true,
         )
         val task = TaskDefinition(
             name = "Lobby",

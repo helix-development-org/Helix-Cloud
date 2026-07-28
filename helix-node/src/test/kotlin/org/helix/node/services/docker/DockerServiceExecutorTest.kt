@@ -6,6 +6,7 @@ import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.helix.api.environment.Environment
 import org.helix.api.task.TaskDefinition
@@ -24,10 +25,10 @@ class DockerServiceExecutorTest {
         }
     }
 
-    private fun spec(): ServiceStartSpec {
+    private fun spec(environment: Environment = Environment.PAPER): ServiceStartSpec {
         val task = TaskDefinition(
             name = "Lobby",
-            environment = Environment.PAPER,
+            environment = environment,
             version = "1.21.11",
             memoryMb = 1024,
         )
@@ -41,7 +42,7 @@ class DockerServiceExecutorTest {
     }
 
     @Test
-    fun `start builds docker run with network mount ports and env`() {
+    fun `start builds docker run with network mount and env`() {
         val runner = FakeRunner()
         val executor = DockerServiceExecutor(NodeConfig.DockerSettings(), runner)
 
@@ -51,10 +52,31 @@ class DockerServiceExecutorTest {
         assertTrue(run.containsAll(listOf("--name", "helix-lobby-1")))
         assertTrue(run.any { it.endsWith(":/helix:z") }, "workspace mount must carry the selinux :z label")
         assertTrue(run.containsAll(listOf("--network", "helix")))
-        assertTrue(run.containsAll(listOf("-p", "30000:30000")))
         assertTrue(run.containsAll(listOf("-e", "HELIX_SERVICE_ID=Lobby-1")))
         assertTrue(run.containsAll(listOf("--memory", "1280m")))
         assertEquals(listOf("java", "-jar", "Wrapper.jar"), run.takeLast(3))
+    }
+
+    @Test
+    fun `paper backend port is not published to the host`() {
+        val runner = FakeRunner()
+        val executor = DockerServiceExecutor(NodeConfig.DockerSettings(), runner)
+
+        executor.start(spec(Environment.PAPER))
+
+        val run = runner.commands.first { it.take(2) == listOf("docker", "run") }
+        assertFalse(run.contains("-p"), "a Paper backend must only be reachable over the docker network")
+    }
+
+    @Test
+    fun `velocity proxy port is published to the host`() {
+        val runner = FakeRunner()
+        val executor = DockerServiceExecutor(NodeConfig.DockerSettings(), runner)
+
+        executor.start(spec(Environment.VELOCITY))
+
+        val run = runner.commands.first { it.take(2) == listOf("docker", "run") }
+        assertTrue(run.containsAll(listOf("-p", "30000:30000")))
     }
 
     @Test

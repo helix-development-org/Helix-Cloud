@@ -80,6 +80,29 @@ interface AddonContext {
     fun onlinePlayers(): List<OnlinePlayer> = emptyList()
 
     /**
+     * Resolves a player name to its current owner's uuid, from the node's
+     * identity registry (populated as players join).
+     *
+     * The primary defence against ban/permission evasion through renaming or
+     * Mojang name recycling: identity-sensitive addons should key their
+     * persisted data on this uuid instead of the name whenever it is known.
+     *
+     * @param name player name, case-insensitive.
+     * @return the uuid, or `null` when this node has never seen that name join.
+     */
+    fun resolvePlayerUuid(name: String): String? = null
+
+    /**
+     * The last-known name a uuid joined under, from the node's identity
+     * registry.
+     *
+     * @param uuid player uuid.
+     * @return the last-known name, or `null` when this node has never seen
+     *  that uuid join.
+     */
+    fun lastKnownName(uuid: String): String? = null
+
+    /**
      * Lists all installed addons with their manifests, including the
      * permission nodes each addon declares in its `addon.json`.
      *

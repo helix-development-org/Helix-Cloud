@@ -24,6 +24,16 @@ class BackupServiceTest {
         clock = { now },
     )
 
+    private val addonsDataDir = root.resolve("addons/data")
+    private val tasksDir = root.resolve("tasks")
+    private val dataService = BackupService(
+        backupsDir = backupsDir,
+        staticServicesDir = staticDir,
+        retention = 3,
+        clock = { now },
+        dataSources = mapOf("addons" to addonsDataDir, "tasks" to tasksDir),
+    )
+
     private fun workspace(id: String) = Files.createDirectories(staticDir.resolve(id))
 
     @Test
@@ -82,5 +92,31 @@ class BackupServiceTest {
 
         val states = service.workspaces()
         assertTrue(states.any { it.serviceId == "Lobby-4" && it.running })
+    }
+
+    @Test
+    fun `createData captures current addon-storage contents and restoreData round trips`() {
+        Files.createDirectories(addonsDataDir.resolve("economy"))
+        addonsDataDir.resolve("economy/balances.json").writeText("""{"Steve":100}""")
+        Files.createDirectories(tasksDir)
+        tasksDir.resolve("Lobby.toml").writeText("name = \"Lobby\"")
+
+        val info = dataService.createData()
+        assertEquals("_addon-data", info.serviceId)
+
+        // mutate the live data, then restore brings the captured snapshot back
+        addonsDataDir.resolve("economy/balances.json").writeText("""{"Steve":0}""")
+        addonsDataDir.resolve("economy/junk.json").writeText("should disappear")
+        dataService.restoreData(info.fileName)
+
+        assertEquals("""{"Steve":100}""", addonsDataDir.resolve("economy/balances.json").readText())
+        assertEquals("name = \"Lobby\"", tasksDir.resolve("Lobby.toml").readText())
+        assertFalse(Files.exists(addonsDataDir.resolve("economy/junk.json")))
+    }
+
+    @Test
+    fun `createData and restoreData fail without configured data sources`() {
+        assertFailsWith<IllegalStateException> { service.createData() }
+        assertFailsWith<IllegalStateException> { service.restoreData("whatever.zip") }
     }
 }

@@ -13,6 +13,8 @@ import kotlinx.serialization.Serializable
  * @property host hostname or ip reachable from the proxy.
  * @property port port reachable from the proxy.
  * @property fallbackEligible whether players may be sent here as fallback.
+ * @property maintenance whether this backend's task rejects regular joins
+ *  (holders of `helix.maintenance.bypass` are exempt).
  */
 @Serializable
 data class RoutingBackend(
@@ -21,4 +23,5 @@ data class RoutingBackend(
     val host: String,
     val port: Int,
     val fallbackEligible: Boolean,
+    val maintenance: Boolean = false,
 )
