@@ -279,6 +279,20 @@ Referenz-Implementierungen in diesem Repo:
   `maprotation.current`/`maprotation.next` zeigen den Stand. Reine
   Orchestrierung — das tatsächliche Weltladen/Teleportieren übernimmt eine
   Paper-seitige Bridge-Komponente oder das eigene Plugin des Servers.
+- `helix-addon-profile` (+ `helix-addon-profile-paper`) — zentrales
+  Spielerprofil: aggregiert, was beliebige andere Addons über
+  `AddonContext.registerProfileInfoProvider`/`registerProfileSettingProvider`
+  beisteuern (Statistiken read-only, interaktive Einstellungen wie
+  Cosmetics/Subtitles/Sprache als Toggle/Choice/FreeText), ohne dass diese
+  Addons sich kennen. Speichert den tatsächlich gewählten Wert selbst
+  zentral (`profile.setting.set`, gated; `profile.setting.admin-set` für
+  Staff-Override; `profile.setting.clear`). `/profile` ist ein
+  netzwerkweiter Text-Fallback über den node-geroutet Player-Command;
+  `/profilemenu` (Paper-seitig, IGui-basiert) öffnet ein grafisches Menü —
+  beide Namen sind bewusst getrennt, da Velocity `/profile` bereits als
+  Proxy-Befehl abfängt, bevor ein Paper-Plugin ihn sehen könnte.
+  Dashboard-Panel **Profiles** erlaubt Staff lesenden Zugriff plus
+  manuelles Setzen/Zurücksetzen.
 
 ## Lifecycle
 

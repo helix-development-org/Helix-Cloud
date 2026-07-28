@@ -1,12 +1,13 @@
-package org.helix.addons.profile
+package org.helix.api.addon
 
 import kotlinx.serialization.Serializable
-import org.helix.api.addon.ProfileInfoEntry
-import org.helix.api.addon.ProfileSettingDescriptor
 
 /**
- * Full rendering of one player's profile, returned by `profile.view` for
- * the in-game GUI and the dashboard panel to draw.
+ * Full rendering of one player's profile, returned by the profile addon's
+ * `profile.view` action for the in-game GUI and the dashboard panel to
+ * draw. Shared between the profile addon and any Paper-side GUI component
+ * (a separate HXA component, so it cannot reference the addon's own
+ * internal classes directly) as the wire contract between them.
  *
  * @property player player name the view was built for.
  * @property info owning addon id to that addon's read-only display lines.

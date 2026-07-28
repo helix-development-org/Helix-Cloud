@@ -6,6 +6,8 @@ import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
 import org.helix.api.addon.ProfileSettingDescriptor
 import org.helix.api.addon.ProfileSettingType
+import org.helix.api.addon.ProfileView
+import org.helix.api.addon.ResolvedSetting
 import org.helix.api.message.Messages
 
 /**
@@ -37,7 +39,7 @@ class ProfileAddon : AddonBase() {
                     "locked" to "&cThat option is locked for you.",
                     "rejected" to "&cRejected: {reason}",
                     "changed" to "&a{label} set to {value}.",
-                    "header" to "&b&lYour profile",
+                    "header" to "&b&lYour profile &7(try /profilemenu for a graphical menu)",
                     "info.line" to "&7{label}: &f{value}",
                     "setting.line" to "&7{label} ({key}): &f{value}",
                 ),
@@ -47,7 +49,7 @@ class ProfileAddon : AddonBase() {
                     "locked" to "&cDiese Option ist für dich gesperrt.",
                     "rejected" to "&cAbgelehnt: {reason}",
                     "changed" to "&a{label} auf {value} gesetzt.",
-                    "header" to "&b&lDein Profil",
+                    "header" to "&b&lDein Profil &7(probier /profilemenu für ein grafisches Menü)",
                     "info.line" to "&7{label}: &f{value}",
                     "setting.line" to "&7{label} ({key}): &f{value}",
                 ),
