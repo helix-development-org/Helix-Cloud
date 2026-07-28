@@ -1,0 +1,7 @@
+{
+  "id": "helix.maprotation",
+  "name": "Helix Map Rotation",
+  "version": "1.0.0",
+  "main": "org.helix.addons.maprotation.MapRotationAddon",
+  "description": "Node-coordinated map/world rotation orchestration for round-based tasks."
+}

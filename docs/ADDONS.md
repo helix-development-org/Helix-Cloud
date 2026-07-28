@@ -255,6 +255,30 @@ Referenz-Implementierungen in diesem Repo:
   Version-Text und Hover-Zeilen der Spielerzahl. Actions `motd.set`,
   `motd.show`, `motd.export`; Panel-Seite **MOTD** mit Live-Preview.
   Gerendert von der Velocity-Bridge beim Server-List-Ping.
+- `helix-addon-stats` — generisches Stats-/Leaderboard-System: `stats.add/
+  set/get` für beliebige numerische Stat-Keys (kein Enum, jeder Addon-/Paper-
+  Plugin-Aufrufer definiert seine eigenen Keys), `stats.top <stat> [limit]`
+  für sortierte Top-N-Leaderboards, `/stats <stat> [player]` bzw.
+  `/stats top <stat> [limit]` im Spiel. `stats.season.reset <stat>`
+  archiviert die aktuellen Platzierungen (nie destruktiv) und setzt den
+  Live-Stat zurück — gedacht zum Verdrahten in einen periodischen Job
+  (`POST /jobs`); vergangene Saisons bleiben über `stats.season.list`/
+  `stats.season.view <stat> <season>` einsehbar.
+- `helix-addon-parties` — leichtgewichtige, netzwerkweite Gruppen unterhalb
+  von Clans: Leader + Mitgliederliste, rein **im Speicher** (kein
+  Restart-Persistenz, kein Bank/Tag), gedacht für Queueing/Matchmaking.
+  `/party create|invite|accept|leave|kick|list`; verlässt der Leader die
+  Party, übernimmt das dienstälteste verbleibende Mitglied. `party.members
+  <player>` löst die aktuelle Gruppe eines Spielers auf (ohne Party = Party
+  aus einer Person) für andere Addons/Plugins.
+- `helix-addon-maprotation` — node-koordinierte Map-/Welt-Rotationen:
+  `maprotation.configure <id> <map1,map2,...>` legt eine benannte,
+  geordnete Liste an; `maprotation.advance <id>` schaltet weiter (per
+  Scheduler-Job oder direkt bei Rundenende aufgerufen) und broadcastet die
+  Änderung über die `maprotation`-Notification-Kategorie,
+  `maprotation.current`/`maprotation.next` zeigen den Stand. Reine
+  Orchestrierung — das tatsächliche Weltladen/Teleportieren übernimmt eine
+  Paper-seitige Bridge-Komponente oder das eigene Plugin des Servers.
 
 ## Lifecycle
 

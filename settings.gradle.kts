@@ -38,5 +38,8 @@ include(
     "helix-addon-motd",
     "helix-addon-npc",
     "helix-addon-npc-paper",
-    "helix-addon-nick"
+    "helix-addon-nick",
+    "helix-addon-stats",
+    "helix-addon-parties",
+    "helix-addon-maprotation"
 )

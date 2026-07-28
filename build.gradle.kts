@@ -82,6 +82,9 @@ val addonModules = listOf(
     "helix-addon-motd",
     "helix-addon-npc",
     "helix-addon-nick",
+    "helix-addon-stats",
+    "helix-addon-parties",
+    "helix-addon-maprotation",
 )
 
 tasks.register("releaseBundle") {

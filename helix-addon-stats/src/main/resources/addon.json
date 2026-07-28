@@ -1,0 +1,7 @@
+{
+  "id": "helix.stats",
+  "name": "Helix Stats",
+  "version": "1.0.0",
+  "main": "org.helix.addons.stats.StatsAddon",
+  "description": "Generic per-player stat tracking and leaderboards with seasonal archiving."
+}

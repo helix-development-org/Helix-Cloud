@@ -1,0 +1,7 @@
+{
+  "id": "helix.parties",
+  "name": "Helix Parties",
+  "version": "1.0.0",
+  "main": "org.helix.addons.parties.PartiesAddon",
+  "description": "Lightweight, network-wide player parties for queueing and matchmaking."
+}
