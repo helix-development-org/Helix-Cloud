@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.77.3 — 2026-07-28
+
+### Fix: `/profilemenu`-Titel ohne Resource-Pack-Font (leeres/kaputtes Menü)
+- **Der Menütitel nutzt IGuis `centeredText`, das auf resource-pack-eigene
+  Fonts angewiesen ist** (unsichtbare Abstands-Glyphen + zeilenweise
+  Vanilla-Ascii-Fonts, siehe `DisplayBuilder`/`SpacingRenderer`) — anders
+  als Guard und BetterMsgs hatte `helix-addon-profile-paper` dafür nie
+  einen eigenen Pack-Generator, `IGui.install` lief also mit dem
+  Default-Namespace `minecraft`, für den nirgends passende Font-Dateien
+  existierten. Ergebnis: das Menü öffnete sich ohne Fehler, aber der Titel
+  (und die unsichtbaren Zentrierungs-Glyphen) rendern ohne passende Fonts
+  kaputt/leer.
+- **Neuer `PackGenerator`** (analog zu Guard/BetterMsgs) erzeugt
+  `assets/helix_profile/font/spaces.json` + `text_row_0..6.json`;
+  `ProfileGuiService` konfiguriert `fonts = GuiFontConfiguration(namespace
+  = "helix_profile")`. Das Profile-HXA bündelt jetzt ebenfalls ein
+  `pack.zip`.
+
 ## 0.77.2 — 2026-07-28
 
 ### Fix: NPC und BetterMsgs hatten denselben per-Service-Token-403 wie Guard/Profile

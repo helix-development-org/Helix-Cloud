@@ -48,3 +48,21 @@ tasks.withType<Jar>().configureEach {
     })
     exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
 }
+
+// The profile menu's title uses IGui's font-based DisplayBuilder (centeredText), which needs a
+// resource-pack font under its own namespace (spacing glyphs + per-row vanilla-ascii text fonts) —
+// generated deterministically at build time and bundled into the HXA; the node merges it into the
+// network pack.
+sourceSets {
+    create("pack")
+}
+
+val generatePack by tasks.registering(JavaExec::class) {
+    group = "build"
+    description = "Assembles the profile menu's font resource pack (pack.zip)."
+    classpath = sourceSets["pack"].runtimeClasspath
+    mainClass.set("org.helix.addons.profile.pack.PackGeneratorKt")
+    val output = layout.buildDirectory.file("pack/pack.zip")
+    argumentProviders.add(CommandLineArgumentProvider { listOf(output.get().asFile.absolutePath) })
+    outputs.file(output)
+}

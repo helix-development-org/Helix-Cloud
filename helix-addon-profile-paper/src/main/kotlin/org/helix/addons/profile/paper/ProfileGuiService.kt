@@ -1,6 +1,7 @@
 package org.helix.addons.profile.paper
 
 import de.tytoss.igui.IGui
+import de.tytoss.igui.display.GuiFontConfiguration
 import de.tytoss.igui.gui.GuiClickContext
 import de.tytoss.igui.gui.GuiDefinition
 import de.tytoss.igui.gui.GuiInputCancelledException
@@ -46,9 +47,14 @@ class ProfileGuiService(
     /** Installs IGui and builds the menu definition; safe to call once on enable. */
     fun install() {
         scope.launch {
-            // No direct database connection: texture storage proxies through the node's
-            // profile.texture.* actions, like every other Paper-side component in this platform.
-            val gui = IGui.install(plugin) { database(NodeGuiTextureDatabase(client)) }
+            val gui = IGui.install(plugin) {
+                // Our own resource pack lives under the "helix_profile" namespace
+                // (assets/helix_profile/font/*) — needed for the title's centeredText.
+                fonts = GuiFontConfiguration(namespace = "helix_profile")
+                // No direct database connection: texture storage proxies through the node's
+                // profile.texture.* actions, like every other Paper-side component in this platform.
+                database(NodeGuiTextureDatabase(client))
+            }
             igui = gui
             menu = buildMenu(gui)
             plugin.logger.info("Profile menu (IGui) ready")

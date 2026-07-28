@@ -295,7 +295,10 @@ Referenz-Implementierungen in diesem Repo:
   manuelles Setzen/Zurücksetzen. Die IGui-Textur-Datenbank des Paper-Menüs
   (`NodeGuiTextureDatabase`) läuft über neue `profile.texture.*`-Actions
   statt einer direkten DB-Verbindung vom Spielserver aus — konsistent mit
-  jeder anderen Storage-Anbindung in diesem Projekt.
+  jeder anderen Storage-Anbindung in diesem Projekt. Das Menü selbst bündelt
+  ein eigenes `pack.zip` (`helix_profile`-Namespace, nur Fonts) für den
+  Titel, der IGuis `centeredText`/`SpacingRenderer` nutzt — analog zu
+  Guards/BetterMsgs' eigenen Pack-Generatoren.
 - `helix-addon-subtitles` (+ `helix-addon-subtitles-paper`) — eine zweite
   Anzeigezeile unter dem Namen, gewählt über das Profile-System: eine
   Betreiber-vordefinierte Liste (`subtitle.config.add/remove/list`, pro
