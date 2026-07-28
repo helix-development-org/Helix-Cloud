@@ -39,6 +39,8 @@ import org.helix.node.gates.NativePermissionProvider
 import org.helix.node.gates.PermissionResolverRegistry
 import org.helix.node.gates.PermissionService
 import org.helix.node.gates.PlayerDataRegistry
+import org.helix.node.gates.ProfileInfoRegistry
+import org.helix.node.gates.ProfileSettingRegistry
 import org.helix.node.identity.IdentityRegistry
 import org.helix.node.privacy.PlayerDataActions
 import org.helix.node.whitelist.WhitelistActions
@@ -184,6 +186,12 @@ class HelixNode(
 
     /** Aggregated GDPR export/delete providers of all addons. */
     val playerData: PlayerDataRegistry = PlayerDataRegistry()
+
+    /** Aggregated read-only profile-info providers of all addons. */
+    val profileInfo: ProfileInfoRegistry = ProfileInfoRegistry()
+
+    /** Aggregated interactive profile-setting providers of all addons. */
+    val profileSettings: ProfileSettingRegistry = ProfileSettingRegistry()
 
     /** Per-player Minecraft-native permission snapshots reported by bridges. */
     val nativePermissions: NativePermissionCache = NativePermissionCache()
@@ -405,6 +413,8 @@ class HelixNode(
         joinGates,
         permissionResolvers,
         playerData,
+        profileInfo,
+        profileSettings,
         permissionService,
         playerRegistry,
         displayResolvers,

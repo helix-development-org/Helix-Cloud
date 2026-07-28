@@ -264,4 +264,58 @@ interface AddonContext {
      */
     fun localizedMessages(defaultsByLanguage: Map<String, Map<String, String>>): Messages =
         MapMessages(defaultsByLanguage["en"] ?: defaultsByLanguage.values.firstOrNull() ?: emptyMap())
+
+    /**
+     * Registers a read-only profile-info provider owned by this addon.
+     * Removed when the addon is disabled.
+     *
+     * @param provider contributes display lines to a player's profile.
+     */
+    fun registerProfileInfoProvider(provider: ProfileInfoProvider) {
+    }
+
+    /**
+     * Registers an interactive profile-setting provider owned by this
+     * addon. Removed when the addon is disabled.
+     *
+     * @param provider contributes settings to a player's profile.
+     */
+    fun registerProfileSettingProvider(provider: ProfileSettingProvider) {
+    }
+
+    /**
+     * Aggregates every registered [ProfileInfoProvider]'s lines for a
+     * player, keyed by owning addon id — the profile addon reads this to
+     * render a full profile without knowing which addons exist.
+     *
+     * @param player player name, matched case-insensitively.
+     * @return owning addon id to that addon's display lines.
+     */
+    fun profileInfo(player: String): Map<String, List<ProfileInfoEntry>> = emptyMap()
+
+    /**
+     * Aggregates every registered [ProfileSettingProvider]'s settings for a
+     * player, keyed by owning addon id.
+     *
+     * @param player player name, matched case-insensitively.
+     * @return owning addon id to that addon's setting descriptors.
+     */
+    fun profileSettings(player: String): Map<String, List<ProfileSettingDescriptor>> = emptyMap()
+
+    /**
+     * Notifies the [ProfileSettingProvider] registered under [owner] that
+     * the profile addon persisted a new value for one of its settings.
+     *
+     * Addons cannot call each other directly (each runs in its own
+     * classloader), so a contributing addon that needs to react to a
+     * changed value — for example re-rendering an equipped cosmetic —
+     * receives it through this dispatch instead.
+     *
+     * @param owner the addon id that registered the changed setting.
+     * @param player player name.
+     * @param key the changed setting's key.
+     * @param value the newly persisted value.
+     */
+    fun notifyProfileSettingChanged(owner: String, player: String, key: String, value: String) {
+    }
 }

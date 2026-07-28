@@ -37,6 +37,8 @@ import org.helix.node.gates.NativePermissionProvider
 import org.helix.node.gates.PermissionResolverRegistry
 import org.helix.node.gates.PermissionService
 import org.helix.node.gates.PlayerDataRegistry
+import org.helix.node.gates.ProfileInfoRegistry
+import org.helix.node.gates.ProfileSettingRegistry
 import org.helix.node.identity.IdentityRegistry
 import org.helix.node.messages.MessageBundle
 import org.helix.node.messages.MessageRegistry
@@ -59,6 +61,8 @@ import org.slf4j.LoggerFactory
  * @property joinGates join gate registry addons register into.
  * @property permissionResolvers permission registry addons register into.
  * @property playerData GDPR export/delete provider registry addons register into.
+ * @property profileInfo read-only profile-info provider registry addons register into.
+ * @property profileSettings interactive profile-setting provider registry addons register into.
  * @property permissionService node-wide permission decisions (addon or native).
  * @property playerRegistry online players and player event fan-out.
  * @property displayResolvers display profile registry addons register into.
@@ -85,6 +89,8 @@ class AddonManager(
     private val joinGates: JoinGateRegistry = JoinGateRegistry(),
     private val permissionResolvers: PermissionResolverRegistry = PermissionResolverRegistry(),
     private val playerData: PlayerDataRegistry = PlayerDataRegistry(),
+    private val profileInfo: ProfileInfoRegistry = ProfileInfoRegistry(),
+    private val profileSettings: ProfileSettingRegistry = ProfileSettingRegistry(),
     private val permissionService: PermissionService =
         PermissionService(permissionResolvers, NativePermissionProvider(NativePermissionCache())),
     private val playerRegistry: PlayerRegistry = PlayerRegistry(),
@@ -361,6 +367,8 @@ class AddonManager(
         joinGates.unregisterOwner(id)
         permissionResolvers.unregisterOwner(id)
         playerData.unregisterOwner(id)
+        profileInfo.unregisterOwner(id)
+        profileSettings.unregisterOwner(id)
         playerRegistry.unregisterOwner(id)
         displayResolvers.unregisterOwner(id)
         bridgeValues.unpublishOwner(id)
@@ -467,6 +475,24 @@ class AddonManager(
 
         override fun registerPlayerDataProvider(provider: org.helix.api.addon.PlayerDataProvider) {
             playerData.register(record.manifest.id, provider)
+        }
+
+        override fun registerProfileInfoProvider(provider: org.helix.api.addon.ProfileInfoProvider) {
+            profileInfo.register(record.manifest.id, provider)
+        }
+
+        override fun registerProfileSettingProvider(provider: org.helix.api.addon.ProfileSettingProvider) {
+            profileSettings.register(record.manifest.id, provider)
+        }
+
+        override fun profileInfo(player: String): Map<String, List<org.helix.api.addon.ProfileInfoEntry>> =
+            profileInfo.infoFor(player)
+
+        override fun profileSettings(player: String): Map<String, List<org.helix.api.addon.ProfileSettingDescriptor>> =
+            profileSettings.settingsFor(player)
+
+        override fun notifyProfileSettingChanged(owner: String, player: String, key: String, value: String) {
+            profileSettings.notifyChanged(owner, player, key, value)
         }
 
         override fun hasPermission(player: String, permission: String): Boolean =

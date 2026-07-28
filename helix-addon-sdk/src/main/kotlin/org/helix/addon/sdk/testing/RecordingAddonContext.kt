@@ -13,6 +13,10 @@ import org.helix.api.addon.NotificationListener
 import org.helix.api.addon.PermissionResolver
 import org.helix.api.addon.PlayerDataProvider
 import org.helix.api.addon.PlayerListener
+import org.helix.api.addon.ProfileInfoEntry
+import org.helix.api.addon.ProfileInfoProvider
+import org.helix.api.addon.ProfileSettingDescriptor
+import org.helix.api.addon.ProfileSettingProvider
 import org.helix.api.player.OnlinePlayer
 import org.helix.api.storage.AddonStorage
 import org.helix.api.storage.InMemoryAddonStorage
@@ -40,6 +44,18 @@ class RecordingAddonContext(
 
     /** Registered GDPR export/delete providers. */
     val playerDataProviders = mutableListOf<PlayerDataProvider>()
+
+    /** Registered read-only profile-info providers. */
+    val profileInfoProviders = mutableListOf<ProfileInfoProvider>()
+
+    /** Registered interactive profile-setting providers. */
+    val profileSettingProviders = mutableListOf<ProfileSettingProvider>()
+
+    /** Changes delivered via [notifyProfileSettingChanged]. */
+    val profileSettingChanges = mutableListOf<ProfileSettingChange>()
+
+    /** One recorded [notifyProfileSettingChanged] call. */
+    data class ProfileSettingChange(val owner: String, val player: String, val key: String, val value: String)
 
     /** Registered display resolvers. */
     val displayResolvers = mutableListOf<DisplayResolver>()
@@ -121,6 +137,28 @@ class RecordingAddonContext(
 
     override fun registerPlayerDataProvider(provider: PlayerDataProvider) {
         playerDataProviders += provider
+    }
+
+    override fun registerProfileInfoProvider(provider: ProfileInfoProvider) {
+        profileInfoProviders += provider
+    }
+
+    override fun registerProfileSettingProvider(provider: ProfileSettingProvider) {
+        profileSettingProviders += provider
+    }
+
+    override fun profileInfo(player: String): Map<String, List<ProfileInfoEntry>> =
+        profileInfoProviders.mapIndexed { index, provider -> "provider-$index" to provider.infoFor(player) }
+            .filter { (_, lines) -> lines.isNotEmpty() }
+            .toMap()
+
+    override fun profileSettings(player: String): Map<String, List<ProfileSettingDescriptor>> =
+        profileSettingProviders.mapIndexed { index, provider -> "provider-$index" to provider.settingsFor(player) }
+            .filter { (_, descriptors) -> descriptors.isNotEmpty() }
+            .toMap()
+
+    override fun notifyProfileSettingChanged(owner: String, player: String, key: String, value: String) {
+        profileSettingChanges += ProfileSettingChange(owner, player, key, value)
     }
 
     override fun hasPermission(player: String, permission: String): Boolean =
