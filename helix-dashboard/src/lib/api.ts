@@ -156,6 +156,7 @@ export interface AuditEntry {
 export interface AddonInfo {
   manifest: { id: string; name: string; version: string }
   state: string
+  failureReason?: string | null
 }
 export interface PanelInfo {
   id: string

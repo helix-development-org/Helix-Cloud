@@ -36,7 +36,12 @@ export function AddonsView() {
                 <TableCell className="font-mono text-sm">{a.manifest.id}</TableCell>
                 <TableCell>{a.manifest.name}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{a.manifest.version}</TableCell>
-                <TableCell><Badge variant={stateVariant(a.state)}>{a.state}</Badge></TableCell>
+                <TableCell>
+                  <Badge variant={stateVariant(a.state)} title={a.failureReason ?? undefined}>{a.state}</Badge>
+                  {a.state === "FAILED" && a.failureReason && (
+                    <div className="mt-1 max-w-xs truncate text-xs text-muted-foreground" title={a.failureReason}>{a.failureReason}</div>
+                  )}
+                </TableCell>
                 <TableCell><div className="flex justify-end"><Button size="sm" variant={a.state === "ENABLED" ? "secondary" : "default"} onClick={() => toggle(a.manifest.id, a.state === "ENABLED")}>{a.state === "ENABLED" ? "Disable" : "Enable"}</Button></div></TableCell>
               </TableRow>
             ))}

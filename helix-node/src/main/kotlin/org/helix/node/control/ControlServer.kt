@@ -1131,11 +1131,15 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
     get("/internal/bridge-values") {
         val serviceId = call.request.queryParameters["serviceId"]
         if (!requireBridge(dependencies, serviceId)) return@get
-        val task = serviceId?.let { dependencies.manager.find(it)?.task }
-        val values = if (task == null) {
+        // serviceId absent entirely (legacy/global caller): the full unfiltered set, as before.
+        // serviceId given but no longer resolves (stopped/unknown service): fail closed with an
+        // empty map instead of silently falling back to the unfiltered set, which would leak
+        // every addon's values to a caller that could not be confirmed to belong to any task.
+        val values = if (serviceId == null) {
             dependencies.bridgeValues.all()
         } else {
-            dependencies.bridgeValues.all { owner -> task.isAddonActive(owner) }
+            val task = dependencies.manager.find(serviceId)?.task
+            if (task == null) emptyMap() else dependencies.bridgeValues.all { owner -> task.isAddonActive(owner) }
         }
         call.respond(values)
     }

@@ -148,6 +148,23 @@ class AddonManagerTest {
 
         manager.loadAll()
 
+        val info = manager.addons().single()
+        assertEquals(AddonState.FAILED, info.state)
+        assertTrue(info.failureReason?.isNotBlank() == true)
+    }
+
+    @Test
+    fun `onEnable throwing ends in FAILED state with a reason and can be retried`() {
+        writeHxa(id = "helix.throws", main = ThrowingTestAddon::class.java.name)
+
+        manager.loadAll()
+        val info = manager.addons().single()
+        assertEquals(AddonState.FAILED, info.state)
+        assertTrue(info.failureReason?.contains("boom") == true)
+
+        // retrying enable() must not fail differently (eg. because of a leaked classloader or
+        // stale instance reference from the previous failed attempt) — it fails the same way.
+        assertFalse(manager.enable("helix.throws"))
         assertEquals(AddonState.FAILED, manager.addons().single().state)
     }
 

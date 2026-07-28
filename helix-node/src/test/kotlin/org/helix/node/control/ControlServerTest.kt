@@ -392,6 +392,12 @@ class ControlServerTest {
             client.get("/api/v1/internal/bridge-values?serviceId=Lobby-1") { bearerAuth("secret") }.body()
         assertTrue(scoped.containsKey("tablist.header"))
         assertTrue(!scoped.containsKey("chat.format"))
+
+        // an unresolvable serviceId must fail closed (empty), never fall back to the full,
+        // unfiltered set — that would leak every addon's values to an unverified caller.
+        val unknown: Map<String, String> =
+            client.get("/api/v1/internal/bridge-values?serviceId=does-not-exist") { bearerAuth("secret") }.body()
+        assertTrue(unknown.isEmpty())
     }
 
     @Test

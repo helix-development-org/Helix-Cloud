@@ -132,6 +132,10 @@ class RecordingAddonContext(
         bridgeValues[key] = value
     }
 
+    override fun unpublishBridgeValue(key: String) {
+        bridgeValues.remove(key)
+    }
+
     override fun publishNotification(category: String, message: String) {
         notifications += category to message
         notificationListeners.forEach { it.onNotification(category, message) }

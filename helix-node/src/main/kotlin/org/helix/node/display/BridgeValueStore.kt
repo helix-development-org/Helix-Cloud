@@ -15,13 +15,33 @@ class BridgeValueStore {
     /**
      * Publishes or overwrites a value.
      *
+     * Republishing a key under a different owner transfers ownership: the
+     * previous owner relinquishes it, so that owner being disabled later
+     * does not delete a value it no longer actually owns.
+     *
      * @param owner owning addon id.
      * @param key value key.
      * @param value value text.
      */
     fun publish(owner: String, key: String, value: String) {
         values[key] = value
+        owners.forEach { (otherOwner, keys) -> if (otherOwner != owner) keys.remove(key) }
         owners.computeIfAbsent(owner) { ConcurrentHashMap.newKeySet() }.add(key)
+    }
+
+    /**
+     * Removes a single value, if it is owned by [owner].
+     *
+     * A no-op when [owner] does not currently own [key] — most commonly
+     * because another addon has since republished the same key.
+     *
+     * @param owner owning addon id.
+     * @param key value key.
+     */
+    fun unpublish(owner: String, key: String) {
+        if (owners[owner]?.remove(key) == true) {
+            values.remove(key)
+        }
     }
 
     /**

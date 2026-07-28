@@ -119,6 +119,7 @@ class AddonManager(
         var state: AddonState = AddonState.DISABLED
         var instance: HelixAddon? = null
         var classLoader: URLClassLoader? = null
+        var failureReason: String? = null
         val actionNames = mutableSetOf<String>()
     }
 
@@ -304,24 +305,33 @@ class AddonManager(
     fun addons(): List<AddonInfo> = loaded.values.map(::info).sortedBy { it.manifest.id }
 
     private fun enableRecord(record: LoadedAddon) {
+        var classLoader: URLClassLoader? = null
         runCatching {
-            val classLoader = URLClassLoader(
+            classLoader = URLClassLoader(
                 arrayOf(record.jar.toUri().toURL()),
                 javaClass.classLoader,
             )
-            val instance = classLoader.loadClass(record.manifest.main)
+            val instance = classLoader!!.loadClass(record.manifest.main)
                 .getDeclaredConstructor()
                 .newInstance() as HelixAddon
             record.classLoader = classLoader
             record.instance = instance
             instance.onEnable(ScopedContext(record))
             record.state = AddonState.ENABLED
+            record.failureReason = null
             logger.info("Enabled addon {} {}", record.manifest.id, record.manifest.version)
         }.onFailure { failure ->
             record.state = AddonState.FAILED
+            record.failureReason = failure.message ?: failure::class.simpleName ?: "unknown error"
             record.actionNames.forEach(registry::unregister)
             record.actionNames.clear()
             unregisterEverywhere(record.manifest.id)
+            // the classloader may have loaded and even partially initialized the addon
+            // before failing (a throwing onEnable is the common case) — close it here so
+            // a repeatedly-failing addon does not leak one classloader per enable attempt.
+            runCatching { classLoader?.close() }
+            record.classLoader = null
+            record.instance = null
             logger.error("Enabling addon {} failed", record.manifest.id, failure)
         }
     }
@@ -420,7 +430,7 @@ class AddonManager(
         return normalized
     }
 
-    private fun info(record: LoadedAddon): AddonInfo = AddonInfo(record.manifest, record.state)
+    private fun info(record: LoadedAddon): AddonInfo = AddonInfo(record.manifest, record.state, record.failureReason)
 
     private inner class ScopedContext(private val record: LoadedAddon) : AddonContext {
         override val dataDirectory: Path =
@@ -476,6 +486,10 @@ class AddonManager(
 
         override fun publishBridgeValue(key: String, value: String) {
             bridgeValues.publish(record.manifest.id, key, value)
+        }
+
+        override fun unpublishBridgeValue(key: String) {
+            bridgeValues.unpublish(record.manifest.id, key)
         }
 
         override fun publishNotification(category: String, message: String) {

@@ -168,6 +168,17 @@ interface AddonContext {
     }
 
     /**
+     * Removes a previously published bridge value.
+     *
+     * A no-op if this addon does not currently own [key] — for example
+     * because another addon has since published the same key.
+     *
+     * @param key value key to remove.
+     */
+    fun unpublishBridgeValue(key: String) {
+    }
+
+    /**
      * Publishes a notification to all registered listeners.
      *
      * Use this for events other addons may want to react to — bans,

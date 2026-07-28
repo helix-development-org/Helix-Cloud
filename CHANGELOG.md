@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.61.0 — 2026-07-28
+
+Nachgezogene sechste Etappe von Phase 1 (Addon-Plattform), die zuvor an
+einem Session-Limit gescheitert war.
+
+### Addon-Lifecycle: kein Classloader-Leck mehr bei fehlgeschlagenem Enable
+- **Ein Addon, dessen `onEnable` wirft (oder dessen Hauptklasse fehlt),
+  schließt jetzt seinen frisch erzeugten Classloader wieder**, statt ihn
+  bei jedem (wiederholten) Enable-Versuch stillschweigend zu leaken.
+- **`AddonInfo` trägt jetzt einen `failureReason`**, sichtbar auf der
+  Addon-Seite im Dashboard direkt unter dem `FAILED`-Badge, statt nur im
+  Node-Log nachschlagen zu müssen.
+
+### Bridge-Values: korrektes Ownership, kein fremdes Löschen mehr
+- **Published ein zweites Addon denselben Key, übernimmt es jetzt auch
+  dessen Ownership.** Vorher blieb der alte Besitzer im Ownership-Set
+  stehen — wurde er später deaktiviert, löschte `unpublishOwner` den
+  längst von einem anderen Addon übernommenen Wert mit.
+- **Neue `unpublishBridgeValue(key)`** auf `AddonContext`, um einen
+  einzelnen Wert gezielt zurückzuziehen, statt nur alle Werte eines
+  Addons auf einmal.
+- **`GET /internal/bridge-values?serviceId=…` fällt jetzt fail-closed
+  aus**, wenn sich die `serviceId` nicht auflösen lässt (unbekannter oder
+  bereits gestoppter Dienst): leere Antwort statt — wie zuvor — der
+  kompletten ungefilterten Werteliste aller Addons.
+
 ## 0.60.0 — 2026-07-28
 
 Erste Etappe des Wegs zu v0.90.0-Beta: Sicherheit, Vertrauensstellung

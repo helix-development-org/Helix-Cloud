@@ -7,9 +7,12 @@ import kotlinx.serialization.Serializable
  *
  * @property manifest the addon manifest.
  * @property state current lifecycle state.
+ * @property failureReason why [AddonState.FAILED] was reached, or `null` in
+ *  any other state.
  */
 @Serializable
 data class AddonInfo(
     val manifest: AddonManifest,
     val state: AddonState,
+    val failureReason: String? = null,
 )
