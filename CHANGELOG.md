@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.77.1 — 2026-07-28
+
+### Fix: `/internal/action` fehlte der `/api/v1`-Prefix (HTTP 404)
+- **0.77.0s neue Bridge-Route wurde von `ProfileNodeClient`/`HelixNodeStore`
+  als `<url>/internal/action` statt `<url>/api/v1/internal/action`
+  angesprochen** — alle anderen `/internal/*`-Routen hängen ebenfalls unter
+  `/api/v1`, dieser Prefix fehlte beim Umstellen von `/api/v1/actions`.
+  Führte zu `HTTP 404` statt der beabsichtigten `HTTP 200`.
+
 ## 0.77.0 — 2026-07-28
 
 ### Fix: per-Service-Tokens konnten keine eigenen Actions aufrufen (HTTP 403)
