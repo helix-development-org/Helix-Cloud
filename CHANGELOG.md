@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.74.0 — 2026-07-28
+
+Neues `helix-addon-cosmetics`: anziehbare Flügel und Kopfbedeckungen,
+letzte Etappe des Cosmetic-/Subtitle-/Profile-Features.
+
+### Sechs Flügel, sechs Kopfbedeckungen
+- **Gewählt über das Profile-System** als zwei Choice-Settings
+  (`wings`/`headwear`), rang-/permission-gated pro Eintrag — genau wie
+  bei Subtitles hält dieses Addon keinen eigenen Wertespeicher, sondern
+  liest/schreibt ausschließlich über `profile.setting.get`.
+- **Echte, handgeschriebene 3D-Item-Modelle statt Textur-Tricks**: jedes
+  Cosmetic ist ein `CustomModelData`-getaggter Carrier mit eigener
+  Geometrie (Flügel: zwei flache Panels; Kronen: Band + vier
+  Ecken-Zacken; Halos: flacher quadratischer Ring) und einer zur
+  Build-Zeit mit Java2D gezeichneten Textur — die exakt gleiche Technik,
+  die BetterMSGs schon für seine GUI-Texturen nutzt, hier aber für echte
+  Item-Modelle statt Font-Glyphen.
+- **Kein Rüstungs-/Elytra-Slot wird belegt**: eine Item-Display-Entity
+  pro Slot, jeden Tick neu positioniert und nach Blickrichtung rotiert —
+  echte Rüstung und ein echtes Elytra funktionieren unabhängig davon
+  weiter.
+
+### Bekannte Grenzen
+- Die Modell-Proportionen/Positionierung sind ohne Live-Server-Test nicht
+  pixelgenau verifiziert — sinnvoller erster Wurf, aber ggf. noch
+  visuelles Fine-Tuning nötig.
+- Ältere, per ViaVersion angebundene Clients: `CustomModelData`-Overrides
+  sind breit kompatibel, aber ebenfalls nicht gegen einen echten alten
+  Client getestet.
+
 ## 0.73.0 — 2026-07-28
 
 Neues `helix-addon-subtitles`: eine zweite Anzeigezeile unter dem
