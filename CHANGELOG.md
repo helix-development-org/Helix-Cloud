@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.77.2 — 2026-07-28
+
+### Fix: NPC und BetterMsgs hatten denselben per-Service-Token-403 wie Guard/Profile
+- **`NodeClient` in `helix-addon-npc-paper` und `helix-addon-bettermsgs-paper`
+  sprachen ebenfalls `POST /api/v1/actions` mit dem per-Service-Token an** —
+  demselben architektonischen Problem wie Guard/Profile (0.77.0/0.77.1)
+  zum Opfer gefallen, nur noch nicht gemeldet. Betroffen: `npc.save/delete/
+  list/get` und `bettermsgs.send/history/contacts/focus`.
+- Beide `NodeClient`s sprechen jetzt `/api/v1/internal/action` an; die
+  jeweiligen Actions sind als `bridgeInvocable` markiert.
+
 ## 0.77.1 — 2026-07-28
 
 ### Fix: `/internal/action` fehlte der `/api/v1`-Prefix (HTTP 404)

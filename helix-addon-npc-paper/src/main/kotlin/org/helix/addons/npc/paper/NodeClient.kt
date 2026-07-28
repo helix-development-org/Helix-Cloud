@@ -13,7 +13,8 @@ import kotlinx.serialization.json.Json
  * `HELIX_CONTROL_URL`/`HELIX_CONTROL_TOKEN` environment the bridge uses.
  *
  * @property controlUrl base URL of the node control API.
- * @property token admin bearer token.
+ * @property token per-service bearer token (`ServiceTokenRegistry`), scoped
+ *  to this service's bridge routes — not an admin token.
  */
 class NodeClient(
     val controlUrl: String,
@@ -45,13 +46,19 @@ class NodeClient(
     /**
      * Invokes a node action and returns its first result line.
      *
+     * Goes through `POST /api/v1/internal/action`, not `/api/v1/actions` —
+     * that route only ever accepts the admin token or a `helix.admin`
+     * session, which this client's per-service token can never satisfy. The
+     * node only lets `/internal/action` reach actions explicitly marked
+     * `bridgeInvocable` (see `NpcAddon`'s action registrations).
+     *
      * @param name action name, for example `npc.list`.
      * @param args action arguments.
      * @return the first line of a successful result, or `null`.
      */
     fun action(name: String, vararg args: String): String? {
         val invocation = ActionCall(name, args.toList())
-        val body = postJson("/api/v1/actions", json.encodeToString(invocation)) ?: return null
+        val body = postJson("/api/v1/internal/action", json.encodeToString(invocation)) ?: return null
         val result = runCatching { json.decodeFromString<ActionReply>(body) }.getOrNull() ?: return null
         return if (result.success) result.lines.firstOrNull() else null
     }
@@ -62,7 +69,7 @@ class NodeClient(
         .header("Authorization", "Bearer $token")
 
     /**
-     * Action invocation payload of `POST /api/v1/actions`.
+     * Action invocation payload of `POST /api/v1/internal/action`.
      *
      * @property action action name.
      * @property arguments action arguments.

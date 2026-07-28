@@ -71,16 +71,19 @@ class BetterMsgsAddon : AddonBase() {
             "bettermsgs.send",
             "Appends a private message and notifies the recipient.",
             "bettermsgs.send <from> <to> <text...>",
+            bridgeInvocable = true,
         ) { invocation -> send(invocation) }
         action(
             "bettermsgs.history",
             "Reads a window of a conversation, offset counted from the newest message.",
             "bettermsgs.history <a> <b> <offset> <limit>",
+            bridgeInvocable = true,
         ) { invocation -> history(invocation) }
         action(
             "bettermsgs.contacts",
             "Lists a player's contacts with unread counts and online status.",
             "bettermsgs.contacts <player>",
+            bridgeInvocable = true,
         ) { invocation -> contacts(invocation) }
         action(
             "bettermsgs.read",
@@ -91,6 +94,7 @@ class BetterMsgsAddon : AddonBase() {
             "bettermsgs.focus",
             "Records which conversation a player has open; '-' clears the focus.",
             "bettermsgs.focus <player> <peer|->",
+            bridgeInvocable = true,
         ) { invocation -> setFocus(invocation) }
     }
 

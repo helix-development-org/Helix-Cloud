@@ -25,21 +25,25 @@ class NpcAddon : AddonBase() {
             "npc.save",
             "Inserts or replaces an NPC definition from its JSON payload.",
             "npc.save <json>",
+            bridgeInvocable = true,
         ) { invocation -> save(invocation) }
         action(
             "npc.delete",
             "Removes an NPC definition by id.",
             "npc.delete <id>",
+            bridgeInvocable = true,
         ) { invocation -> delete(invocation) }
         action(
             "npc.list",
             "Lists NPC definitions as a JSON array, optionally scoped to a task.",
             "npc.list [task]",
+            bridgeInvocable = true,
         ) { invocation -> list(invocation) }
         action(
             "npc.get",
             "Reads a single NPC definition as JSON.",
             "npc.get <id>",
+            bridgeInvocable = true,
         ) { invocation -> get(invocation) }
     }
 
