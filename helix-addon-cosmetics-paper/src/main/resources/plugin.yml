@@ -1,0 +1,5 @@
+name: HelixCosmetics
+version: 1.0.0
+main: org.helix.addons.cosmetics.paper.CosmeticsPlugin
+api-version: '1.21'
+description: Renders equipped wings/headwear cosmetics as item display entities attached to the player.

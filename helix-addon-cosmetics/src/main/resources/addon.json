@@ -1,0 +1,7 @@
+{
+  "id": "helix.cosmetics",
+  "name": "Helix Cosmetics",
+  "version": "1.0.0",
+  "main": "org.helix.addons.cosmetics.CosmeticsAddon",
+  "description": "Wearable cosmetics (wings, headwear) chosen via the profile addon, rendered as attached item displays that never occupy a real equipment slot."
+}

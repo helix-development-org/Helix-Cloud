@@ -38,5 +38,7 @@ include(
     "helix-addon-profile",
     "helix-addon-profile-paper",
     "helix-addon-subtitles",
-    "helix-addon-subtitles-paper"
+    "helix-addon-subtitles-paper",
+    "helix-addon-cosmetics",
+    "helix-addon-cosmetics-paper"
 )

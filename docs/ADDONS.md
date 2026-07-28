@@ -304,6 +304,21 @@ Referenz-Implementierungen in diesem Repo:
   Bridge-Value. Paper-seitig rendert eine dem Spieler folgende, nicht
   persistente Text-Display-Entity knapp unter dem Namensschild (kein
   Passagier-Trick, um echtes Reiten nicht zu stören).
+- `helix-addon-cosmetics` (+ `helix-addon-cosmetics-paper`) — anziehbare
+  Flügel und Kopfbedeckungen (je 6, rang-/permission-gated), gewählt über
+  das Profile-System als zwei Choice-Settings (`wings`/`headwear`). Jedes
+  Cosmetic ist ein `CustomModelData`-getaggter `PAPER`-Carrier mit eigenem
+  handgeschriebenen Item-Modell (Flügel: zwei flache Panels; Kronen: Band
+  + vier Ecken-Zacken; Halos: flacher quadratischer Ring) und
+  Java2D-gezeichneter Textur, zur Build-Zeit generiert
+  (`:helix-addon-cosmetics-paper:generatePack`) — genau wie bei BetterMSGs,
+  nur mit echten Item-Modellen statt Font-Glyphen. Paper-seitig rendert
+  eine Item-Display-Entity pro Slot, jeden Tick neu positioniert/rotiert
+  nach Spieler-Blickrichtung — kein Rüstungs-/Elytra-Slot wird belegt,
+  also keine Kollision mit echter Ausrüstung. `CustomModelData`-Werte sind
+  bewusst als fester Katalog im Code hinterlegt (nicht zur Laufzeit
+  konfigurierbar), da die Modelle selbst zur Build-Zeit im Resource-Pack
+  gebacken werden.
 
 ## Lifecycle
 
