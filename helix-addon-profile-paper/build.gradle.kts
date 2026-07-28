@@ -17,8 +17,13 @@ repositories {
 dependencies {
     implementation(rootProject.project("helix-api"))
     compileOnly(libs.paper.api)
-    // helix-gui's own PostgreSQL texture database is unused — this plugin has no textures of its
-    // own (plain Material icons) — so the driver and pool stay out of the plugin jar.
+    // Only compileOnly at runtime (Paper provides it), but the texture-mapping test constructs a
+    // real Adventure Key, so the test task needs the actual classes on its runtime classpath.
+    testImplementation(libs.paper.api)
+    // helix-gui's own PostgreSQL texture database is unused — this plugin's NodeGuiTextureDatabase
+    // proxies texture storage through the node's actions instead of a direct DB connection (see
+    // helix-cloud-project convention: game servers never talk to a database directly) — so the
+    // driver and pool stay out of the plugin jar.
     implementation(project(":helix-gui")) {
         exclude(group = "org.postgresql")
         exclude(group = "com.zaxxer")

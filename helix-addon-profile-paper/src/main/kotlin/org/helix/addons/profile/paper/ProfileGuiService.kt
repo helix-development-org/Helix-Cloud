@@ -46,7 +46,9 @@ class ProfileGuiService(
     /** Installs IGui and builds the menu definition; safe to call once on enable. */
     fun install() {
         scope.launch {
-            val gui = IGui.install(plugin) { }
+            // No direct database connection: texture storage proxies through the node's
+            // profile.texture.* actions, like every other Paper-side component in this platform.
+            val gui = IGui.install(plugin) { database(NodeGuiTextureDatabase(client)) }
             igui = gui
             menu = buildMenu(gui)
             plugin.logger.info("Profile menu (IGui) ready")

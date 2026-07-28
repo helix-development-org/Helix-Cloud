@@ -69,6 +69,42 @@ class ProfileNodeClient(private val controlUrl: String, private val token: Strin
     }
 
     /**
+     * Lists every stored IGui texture definition, as raw per-record JSON.
+     *
+     * @return the stored definitions' JSON array text, or `null` if the
+     *  node is unreachable.
+     */
+    fun textureListJson(): String? = invoke("profile.texture.list", emptyList())?.takeIf { it.success }?.lines?.firstOrNull()
+
+    /**
+     * Reads one stored IGui texture definition.
+     *
+     * @param id the texture id.
+     * @return the definition's raw JSON, or `null` if it does not exist or
+     *  the node is unreachable.
+     */
+    fun textureGetJson(id: String): String? =
+        invoke("profile.texture.get", listOf(id))?.takeIf { it.success }?.lines?.firstOrNull()
+
+    /**
+     * Stores (or replaces) one IGui texture definition.
+     *
+     * @param id the texture id.
+     * @param recordJson the definition's raw JSON.
+     * @return `true` on success.
+     */
+    fun texturePut(id: String, recordJson: String): Boolean =
+        invoke("profile.texture.put", listOf(id, recordJson))?.success == true
+
+    /**
+     * Removes one stored IGui texture definition.
+     *
+     * @param id the texture id.
+     * @return `true` if a definition with that id existed and was removed.
+     */
+    fun textureRemove(id: String): Boolean = invoke("profile.texture.remove", listOf(id))?.success == true
+
+    /**
      * Invokes a node action over HTTP.
      *
      * @return the raw success flag and result lines, or `null` when the

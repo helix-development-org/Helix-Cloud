@@ -292,7 +292,10 @@ Referenz-Implementierungen in diesem Repo:
   beide Namen sind bewusst getrennt, da Velocity `/profile` bereits als
   Proxy-Befehl abfängt, bevor ein Paper-Plugin ihn sehen könnte.
   Dashboard-Panel **Profiles** erlaubt Staff lesenden Zugriff plus
-  manuelles Setzen/Zurücksetzen.
+  manuelles Setzen/Zurücksetzen. Die IGui-Textur-Datenbank des Paper-Menüs
+  (`NodeGuiTextureDatabase`) läuft über neue `profile.texture.*`-Actions
+  statt einer direkten DB-Verbindung vom Spielserver aus — konsistent mit
+  jeder anderen Storage-Anbindung in diesem Projekt.
 - `helix-addon-subtitles` (+ `helix-addon-subtitles-paper`) — eine zweite
   Anzeigezeile unter dem Namen, gewählt über das Profile-System: eine
   Betreiber-vordefinierte Liste (`subtitle.config.add/remove/list`, pro
