@@ -86,6 +86,33 @@ class ProfileSettingRegistryTest {
         registry.notifyChanged("cosmetics", "steve", "wings", "angel")
     }
 
+    @Test
+    fun `validate returns the first rejection reason from a provider registered under that owner`() {
+        registry.register("nick", object : ProfileSettingProvider {
+            override fun settingsFor(player: String): List<ProfileSettingDescriptor> = emptyList()
+            override fun validate(player: String, key: String, value: String): String? =
+                if (value == "Admin") "that name is reserved" else null
+        })
+
+        assertEquals("that name is reserved", registry.validate("nick", "steve", "nick", "Admin"))
+        assertEquals(null, registry.validate("nick", "steve", "nick", "Steve2"))
+    }
+
+    @Test
+    fun `validate for an unregistered owner accepts everything`() {
+        assertEquals(null, registry.validate("ghost", "steve", "wings", "angel"))
+    }
+
+    @Test
+    fun `a throwing validator rejects instead of silently accepting`() {
+        registry.register("nick", object : ProfileSettingProvider {
+            override fun settingsFor(player: String): List<ProfileSettingDescriptor> = emptyList()
+            override fun validate(player: String, key: String, value: String): String? = error("boom")
+        })
+
+        assertTrue(registry.validate("nick", "steve", "nick", "Steve2") != null)
+    }
+
     private fun settings(descriptors: (String) -> List<ProfileSettingDescriptor>) = object : ProfileSettingProvider {
         override fun settingsFor(player: String): List<ProfileSettingDescriptor> = descriptors(player)
     }

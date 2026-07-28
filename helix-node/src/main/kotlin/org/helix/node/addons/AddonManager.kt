@@ -495,6 +495,9 @@ class AddonManager(
             profileSettings.notifyChanged(owner, player, key, value)
         }
 
+        override fun validateProfileSetting(owner: String, player: String, key: String, value: String): String? =
+            profileSettings.validate(owner, player, key, value)
+
         override fun hasPermission(player: String, permission: String): Boolean =
             permissionService.check(PermissionCheckRequest(player, permission))
 

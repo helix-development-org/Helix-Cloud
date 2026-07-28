@@ -74,4 +74,29 @@ class ProfileSettingRegistry {
                 .onFailure { logger.error("profile-setting change notification failed for owner {}", owner, it) }
         }
     }
+
+    /**
+     * Asks every provider registered under [owner] to validate a candidate
+     * value, for checks a [org.helix.api.addon.ProfileSettingType] alone
+     * cannot express.
+     *
+     * A throwing validator rejects the value (fail-closed) instead of
+     * silently letting it through — validation exists to keep bad data
+     * out, so a broken check must not default to "valid".
+     *
+     * @param owner the addon id that registered the setting.
+     * @param player player name.
+     * @param key the setting's key.
+     * @param value the candidate value.
+     * @return the first rejection reason, or `null` when every provider
+     *  under [owner] accepts it (including when [owner] is unknown).
+     */
+    fun validate(owner: String, player: String, key: String, value: String): String? =
+        providers[owner]?.firstNotNullOfOrNull { provider ->
+            runCatching { provider.validate(player, key, value) }
+                .getOrElse {
+                    logger.error("profile-setting validation failed for owner {}", owner, it)
+                    "validation error"
+                }
+        }
 }

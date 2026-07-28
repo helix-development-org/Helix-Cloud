@@ -87,6 +87,20 @@ interface ProfileSettingProvider {
     fun settingsFor(player: String): List<ProfileSettingDescriptor>
 
     /**
+     * Validates a candidate value before the profile addon persists it,
+     * for checks the [ProfileSettingType] alone cannot express — for
+     * example a free-text value colliding with a known account or staff
+     * member. Called after the profile addon's own type/gating checks
+     * already passed. A no-op (always valid) by default.
+     *
+     * @param player player name.
+     * @param key the setting's [ProfileSettingDescriptor.key].
+     * @param value the candidate value.
+     * @return `null` when valid, or a player-facing rejection reason.
+     */
+    fun validate(player: String, key: String, value: String): String? = null
+
+    /**
      * Notified after the profile addon persists a new value for one of this
      * addon's settings, so it can react (for example re-rendering an
      * equipped cosmetic). A no-op by default.

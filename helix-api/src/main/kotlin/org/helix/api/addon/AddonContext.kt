@@ -318,4 +318,18 @@ interface AddonContext {
      */
     fun notifyProfileSettingChanged(owner: String, player: String, key: String, value: String) {
     }
+
+    /**
+     * Asks the [ProfileSettingProvider] registered under [owner] to
+     * validate a candidate value before the profile addon persists it, for
+     * checks a [ProfileSettingType] alone cannot express.
+     *
+     * @param owner the addon id that registered the setting.
+     * @param player player name.
+     * @param key the setting's key.
+     * @param value the candidate value.
+     * @return `null` when every registered provider under [owner] accepts
+     *  it, or the first rejection reason.
+     */
+    fun validateProfileSetting(owner: String, player: String, key: String, value: String): String? = null
 }

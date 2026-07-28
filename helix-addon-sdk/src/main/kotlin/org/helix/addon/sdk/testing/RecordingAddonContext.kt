@@ -161,6 +161,9 @@ class RecordingAddonContext(
         profileSettingChanges += ProfileSettingChange(owner, player, key, value)
     }
 
+    override fun validateProfileSetting(owner: String, player: String, key: String, value: String): String? =
+        profileSettingProviders.firstNotNullOfOrNull { it.validate(player, key, value) }
+
     override fun hasPermission(player: String, permission: String): Boolean =
         permissionCheck(player, permission)
 
