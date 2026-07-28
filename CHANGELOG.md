@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.71.0 — 2026-07-28
+
+Vorarbeit für das kommende Cosmetic-/Subtitle-/Profile-Feature.
+
+### IGui ins Monorepo geholt
+- **Die bisher als Sibling-Composite-Build eingebundene IGui-Library
+  (Resource-Pack-Font-GUIs) ist jetzt ein reguläres Modul** (`helix-gui`)
+  direkt im Repo, statt einen separaten `../IGui`-Checkout vorauszusetzen.
+  `helix-addon-guard-paper` und `helix-addon-bettermsgs-paper` hängen jetzt
+  von `project(":helix-gui")` statt vom externen Artefakt ab.
+- Die CI-Pipeline braucht dadurch keinen zweiten Checkout mehr; der
+  Gradle-Version-Catalog verliert den nun ungenutzten `igui`-Eintrag.
+- Alle öffentlichen Deklarationen der Library sind jetzt KDoc-dokumentiert
+  (vorher ohne die hiesige KDoc-Pflicht entwickelt).
+
 ## 0.70.0 — 2026-07-28
 
 Fünfte und letzte Etappe von Phase 2: Ops & Release-Governance.
