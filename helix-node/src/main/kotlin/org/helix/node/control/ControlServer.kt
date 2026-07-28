@@ -1216,6 +1216,16 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
         val request = call.receive<PlayerCommandRequest>()
         call.respond(dependencies.playerCommands.execute(request))
     }
+    // Lets a Paper/Velocity component holding a per-service token invoke its own
+    // bridge-invocable actions (e.g. a HXA's node-backed storage proxy) — unlike
+    // POST /api/v1/actions, which only ever accepts the admin token or a
+    // helix.admin session (see requireBridge's KDoc), so a per-service token could
+    // never call it at all.
+    post("/internal/action") {
+        if (!requireBridge(dependencies)) return@post
+        val invocation = call.receive<ActionInvocation>()
+        call.respond(dependencies.bridgeActions.invoke(invocation))
+    }
     post("/internal/display") {
         if (!requireBridge(dependencies)) return@post
         val request = call.receive<JoinRequest>()

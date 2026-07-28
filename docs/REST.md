@@ -7,7 +7,9 @@ Alle Endpunkte (außer `/auth/request-code` und `/auth/verify`) erfordern
 Admin-Zugriff, auch von Bridges/Wrapper genutzt) oder ein per Minecraft-Login
 ausgestelltes Session-Token. Für ein Session-Token wird jede Aktion zusätzlich
 gegen die Permissions des Spielers geprüft (`403` bei fehlender Permission);
-`/internal/*` ist ausschließlich dem Admin-Token vorbehalten.
+`/internal/*` akzeptiert daneben auch ein per-Service-Token (`ServiceTokenRegistry`,
+`HELIX_CONTROL_TOKEN` einer verwalteten Service-Instanz) — trägt die Route eine
+`serviceId`, muss sie zum Token passen, sonst `403`.
 
 Das Dashboard unter `/` ist statisch und nutzt dieselbe API.
 
@@ -165,6 +167,7 @@ alles, was die Konsole kann.
 | POST | `/internal/player-command` | Spieler-Command ausführen: `{player, command, arguments}` → ActionResult (Permission wird geprüft) |
 | POST | `/internal/display` | Display-Profil eines Spielers: `{name}` → `{prefix, name, suffix, color}` (komponentenweise über alle Resolver gemerged) |
 | GET | `/internal/bridge-values` | von Addons publizierte globale Werte (Tablist, Chat-Format) |
+| POST | `/internal/action` | Beliebige Action mit per-Service-Token ausführen: `{action, arguments}` → ActionResult — nur für Actions mit `bridgeInvocable = true` (z.B. `profile.texture.*`, `guard.store.*`); `POST /api/v1/actions` akzeptiert nur Admin-Token oder eine `helix.admin`-Session, niemals ein per-Service-Token |
 
 ## Beispiele
 

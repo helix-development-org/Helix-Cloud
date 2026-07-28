@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.77.0 — 2026-07-28
+
+### Fix: per-Service-Tokens konnten keine eigenen Actions aufrufen (HTTP 403)
+- **`profile.texture.list` (und jede andere `profile.texture.*`/`profile.setting.*`-Action)
+  schlug mit `HTTP 403` fehl**, sobald `ProfileNodeClient` sie über
+  `POST /api/v1/actions` aufrief: diese Route akzeptiert für Actions ohne
+  deklarierte Permission ausschließlich das statische Admin-Token oder eine
+  `helix.admin`-Session — ein per-Service-Token (`HELIX_CONTROL_TOKEN`) erfüllt
+  keins von beidem und wurde immer abgelehnt. Betraf ebenso Guards
+  `HelixNodeStore` (`guard.store.*`/`guard.query.*`), die denselben Endpunkt
+  mit demselben Tokentyp ansprach.
+- **Neue `POST /internal/action`**: Bridge-Route für per-Service-Token-Aufrufe,
+  erreicht nur Actions mit dem neuen `ActionDescriptor`-Flag
+  `bridgeInvocable = true` — ein bewusstes Opt-in pro Action (analog zu
+  `playerCommand`), damit ein kompromittierter Spielserver nicht plötzlich
+  jede beliebige Node-Action ausführen kann.
+- `ProfileNodeClient` und `HelixNodeStore` (Guard) sprechen jetzt
+  `/internal/action` statt `/api/v1/actions` an; die jeweils genutzten
+  Actions (`profile.view`, `profile.setting.set`, `profile.texture.*`,
+  `guard.store.*`, `guard.query.*`) sind als `bridgeInvocable` markiert.
+
 ## 0.76.0 — 2026-07-28
 
 ### Fix: IGui-Textur-Datenbank ohne direkte DB-Verbindung

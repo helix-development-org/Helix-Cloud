@@ -7,6 +7,7 @@ import org.helix.api.message.Messages
 import org.helix.api.storage.InMemoryAddonStorage
 import org.helix.node.languages.LanguageRegistry
 import org.helix.node.actions.ActionRegistry
+import org.helix.node.actions.BridgeActionService
 import org.helix.node.actions.PlayerCommandService
 import org.helix.node.addons.AddonManager
 import org.helix.node.control.auth.PanelAuthService
@@ -144,6 +145,9 @@ data class ControlDependencies(
 ) {
     /** Player command execution shared by the internal routes. */
     val playerCommands: PlayerCommandService = PlayerCommandService(registry, permissionService)
+
+    /** Bridge-invocable action execution shared by the internal routes. */
+    val bridgeActions: BridgeActionService = BridgeActionService(registry)
 
     /** Web-panel Minecraft-account login and per-view authorization. */
     val panelAuth: PanelAuthService = PanelAuthService(

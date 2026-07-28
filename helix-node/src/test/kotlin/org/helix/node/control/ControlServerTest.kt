@@ -264,6 +264,45 @@ class ControlServerTest {
     }
 
     @Test
+    fun `a per-service token can invoke a bridge-invocable action via internal action`() = testApplication {
+        registry.register(
+            ActionDescriptor("addon.echo", "test echo", "addon.echo <text>", bridgeInvocable = true),
+        ) { invocation -> ActionResult.ok(invocation.arguments.firstOrNull().orEmpty()) }
+        val client = apiClient()
+        client.put("/api/v1/tasks/Lobby") {
+            bearerAuth("secret"); contentType(ContentType.Application.Json); setBody(lobby)
+        }
+        client.post("/api/v1/tasks/Lobby/services") { bearerAuth("secret") }
+        val token = dependencies.serviceTokens.mint("Lobby-1")
+
+        val result: ActionResult = client.post("/api/v1/internal/action") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(ActionInvocation("addon.echo", listOf("hi")))
+        }.body()
+        assertTrue(result.success)
+        assertEquals("hi", result.lines.single())
+    }
+
+    @Test
+    fun `a per-service token cannot reach a non bridge-invocable action via internal action`() = testApplication {
+        val client = apiClient()
+        client.put("/api/v1/tasks/Lobby") {
+            bearerAuth("secret"); contentType(ContentType.Application.Json); setBody(lobby)
+        }
+        client.post("/api/v1/tasks/Lobby/services") { bearerAuth("secret") }
+        val token = dependencies.serviceTokens.mint("Lobby-1")
+
+        val result: ActionResult = client.post("/api/v1/internal/action") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(ActionInvocation("task.create", listOf("Sneaky", "paper", "1.21.11")))
+        }.body()
+        assertTrue(!result.success)
+        assertEquals(null, taskStore.find("Sneaky"))
+    }
+
+    @Test
     fun `unknown service yields 404`() = testApplication {
         val client = apiClient()
 

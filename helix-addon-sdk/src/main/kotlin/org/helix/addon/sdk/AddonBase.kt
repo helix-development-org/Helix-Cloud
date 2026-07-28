@@ -38,13 +38,19 @@ abstract class AddonBase : HelixAddon {
      *
      * Set [playerCommand] to expose it as an in-game command `/<name>` (the
      * name must be dot-free); the handler then receives the player name as
-     * first argument. [permission] gates the in-game command.
+     * first argument. [permission] gates the in-game command. Set
+     * [bridgeInvocable] when a Paper/Velocity component of this same addon
+     * needs to call it over HTTP with its per-service token, via
+     * `POST /internal/action` — otherwise only the CLI, an authorized
+     * dashboard session or the static admin token can reach it.
      *
      * @param name unique action name.
      * @param description one-line summary.
      * @param usage argument hint.
      * @param playerCommand whether proxy bridges register it as `/<name>`.
      * @param permission permission node required to run the in-game command.
+     * @param bridgeInvocable whether a per-service token may invoke it via
+     *   `POST /internal/action`.
      * @param handler executed on invocation.
      */
     protected fun action(
@@ -53,9 +59,13 @@ abstract class AddonBase : HelixAddon {
         usage: String = name,
         playerCommand: Boolean = false,
         permission: String? = null,
+        bridgeInvocable: Boolean = false,
         handler: (ActionInvocation) -> ActionResult,
     ) {
-        context.registerAction(ActionDescriptor(name, description, usage, playerCommand, permission), handler)
+        context.registerAction(
+            ActionDescriptor(name, description, usage, playerCommand, permission, bridgeInvocable),
+            handler,
+        )
     }
 
     /**

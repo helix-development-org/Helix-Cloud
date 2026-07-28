@@ -496,7 +496,7 @@ class GuardStoreActions(
     }
 
     private fun register(name: String, description: String, usage: String, handler: ActionHandler) {
-        context.registerAction(ActionDescriptor(name, description, usage), handler)
+        context.registerAction(ActionDescriptor(name, description, usage, bridgeInvocable = true), handler)
     }
 
     private fun storeViolation(invocation: ActionInvocation): ActionResult {

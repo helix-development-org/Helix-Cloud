@@ -62,6 +62,7 @@ class ProfileAddon : AddonBase() {
             "profile.view",
             "Builds a player's full profile view (info + settings + current values).",
             "profile.view <player>",
+            bridgeInvocable = true,
         ) { invocation ->
             val player = invocation.arguments.firstOrNull()
                 ?: return@action ActionResult.error("usage: profile.view <player>")
@@ -86,6 +87,7 @@ class ProfileAddon : AddonBase() {
             "profile.setting.set",
             "Sets a player's own chosen value for a setting (enforces per-option gating).",
             "profile.setting.set <player> <owner> <key> <value>",
+            bridgeInvocable = true,
         ) { invocation -> setSetting(invocation, asAdmin = false) }
 
         action(
@@ -119,13 +121,19 @@ class ProfileAddon : AddonBase() {
 
         // Backs a Paper-side IGui menu's GuiTextureDatabase over the action HTTP contract, so a
         // Paper plugin never opens a direct database connection of its own (see GuiTextureStore).
-        action("profile.texture.list", "Lists every stored IGui texture definition.", "profile.texture.list") {
+        action(
+            "profile.texture.list",
+            "Lists every stored IGui texture definition.",
+            "profile.texture.list",
+            bridgeInvocable = true,
+        ) {
             ActionResult.ok(json.encodeToString(textures.all()))
         }
         action(
             "profile.texture.get",
             "Reads one stored IGui texture definition.",
             "profile.texture.get <id>",
+            bridgeInvocable = true,
         ) { invocation ->
             val id = invocation.arguments.firstOrNull()
                 ?: return@action ActionResult.error("usage: profile.texture.get <id>")
@@ -136,6 +144,7 @@ class ProfileAddon : AddonBase() {
             "profile.texture.put",
             "Stores (or replaces) one IGui texture definition.",
             "profile.texture.put <id> <json>",
+            bridgeInvocable = true,
         ) { invocation ->
             val id = invocation.arguments.getOrNull(0)
             val recordJson = invocation.arguments.getOrNull(1)
@@ -151,6 +160,7 @@ class ProfileAddon : AddonBase() {
             "profile.texture.remove",
             "Removes one stored IGui texture definition.",
             "profile.texture.remove <id>",
+            bridgeInvocable = true,
         ) { invocation ->
             val id = invocation.arguments.firstOrNull()
                 ?: return@action ActionResult.error("usage: profile.texture.remove <id>")

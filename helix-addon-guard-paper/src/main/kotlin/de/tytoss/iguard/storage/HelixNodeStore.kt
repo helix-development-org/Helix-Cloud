@@ -48,9 +48,12 @@ private data class NodeAction(val action: String, val arguments: List<String>)
 /**
  * Database-less [GuardStore] backend for Helix-Cloud deployments: every write becomes a `guard.store.*`
  * node action and every read a `guard.query.*` action, both invoked over the node's control HTTP API
- * (`POST <url>/api/v1/actions` with a bearer token; the first response line carries a compact-JSON
- * payload for queries). Writes go through a bounded queue drained by a virtual-thread flusher that
- * retries the current action until the node is reachable again.
+ * (`POST <url>/internal/action` with the per-service bearer token; the first response line carries a
+ * compact-JSON payload for queries). This bridge endpoint — not `/api/v1/actions`, which only ever
+ * accepts the admin token or a `helix.admin` session — is what a per-service token can actually call;
+ * the node only lets it reach actions explicitly marked `bridgeInvocable` (see
+ * `GuardStoreActions.register`). Writes go through a bounded queue drained by a virtual-thread flusher
+ * that retries the current action until the node is reachable again.
  *
  * Intentional gaps, because the node owns enforcement and analytics:
  *  - outbox events, sanction records and network-ban rows are no-ops (logged once) — the node enforces
@@ -66,7 +69,7 @@ class HelixNodeStore(
     private val history: HistoryConfig,
     private val logger: Logger
 ) : GuardStore {
-    private val endpoint: URI = URI.create(controlUrl.trimEnd('/') + "/api/v1/actions")
+    private val endpoint: URI = URI.create(controlUrl.trimEnd('/') + "/internal/action")
     private val http: HttpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()
     private val json = Json { ignoreUnknownKeys = true }
     private val queue = ArrayBlockingQueue<NodeAction>(history.queueCapacity)

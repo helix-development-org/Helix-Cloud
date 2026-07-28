@@ -20,10 +20,14 @@ import org.slf4j.LoggerFactory
 private data class ActionOutcome(val success: Boolean, val lines: List<String>)
 
 /**
- * Talks to the node's `POST /api/v1/actions` endpoint on behalf of the
- * profile menu, the same HTTP action-invocation contract every addon
- * exposes — this plugin has no direct dependency on the profile addon's
- * own code, only on the shared [ProfileView] wire type.
+ * Talks to the node's `POST /internal/action` endpoint on behalf of the
+ * profile menu, the bridge action-invocation contract for components
+ * holding a per-service token — this plugin has no direct dependency on
+ * the profile addon's own code, only on the shared [ProfileView] wire
+ * type. Not `/api/v1/actions`: that route only ever accepts the admin
+ * token or a `helix.admin` session, which a per-service token can never
+ * satisfy; the node only lets `/internal/action` reach actions explicitly
+ * marked `bridgeInvocable` (see `ProfileAddon`'s action registrations).
  *
  * @property controlUrl base control API url, for example `http://127.0.0.1:8080`.
  * @property token bearer token for this service, from the `HELIX_CONTROL_TOKEN`
@@ -32,7 +36,7 @@ private data class ActionOutcome(val success: Boolean, val lines: List<String>)
 class ProfileNodeClient(private val controlUrl: String, private val token: String) {
     private val logger = LoggerFactory.getLogger(ProfileNodeClient::class.java)
     private val http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()
-    private val endpoint = URI.create(controlUrl.trimEnd('/') + "/api/v1/actions")
+    private val endpoint = URI.create(controlUrl.trimEnd('/') + "/internal/action")
     private val json = Json { ignoreUnknownKeys = true }
 
     /**
