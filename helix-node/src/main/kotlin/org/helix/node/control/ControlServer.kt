@@ -829,6 +829,7 @@ private fun io.ktor.server.routing.Route.playerRoutes(dependencies: ControlDepen
         val request = call.receive<PlayerActionRequest>()
         val arguments = buildList {
             add(name)
+            add(call.principal<PanelPrincipal>()?.name ?: "anonymous")
             request.duration?.takeIf { it.isNotBlank() }?.let { add(it) }
             if (request.value.isNotBlank()) add(request.value)
         }

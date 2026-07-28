@@ -39,11 +39,18 @@ class FriendsAddonTest {
     }
 
     @Test
-    fun `deny and remove work`() {
+    fun `deny works and an immediate re-request is rate-limited`() {
         context.run("friend", "Steve", "add", "Alex")
         assertTrue(context.run("friend", "Alex", "deny", "Steve").success)
         assertFalse(context.run("friend", "Alex", "accept", "Steve").success)
 
+        // Re-requesting the same target right after a denial is blocked by the anti-harassment
+        // cooldown (see FriendStore) — otherwise a sender could ping a victim on every deny.
+        assertFalse(context.run("friend", "Steve", "add", "Alex").success)
+    }
+
+    @Test
+    fun `remove ends an existing friendship`() {
         context.run("friend", "Steve", "add", "Alex")
         context.run("friend", "Alex", "accept", "Steve")
         assertTrue(context.run("friend", "Alex", "remove", "Steve").success)
@@ -108,5 +115,20 @@ class FriendsAddonTest {
         context.recordJoin("Steve", "uuid-3")
 
         assertTrue(context.run("friend", "Steve", "list").lines.first().contains("no friends"))
+    }
+
+    @Test
+    fun `request cooldown blocks a fast re-request but clears after it elapses`() {
+        var now = 0L
+        val store = FriendStore(org.helix.api.storage.InMemoryAddonStorage(), cooldownMillis = 10_000, clock = { now })
+
+        assertEquals(FriendRequestOutcome.SENT, store.request("steve", "alex"))
+        store.deny("alex", "steve")
+
+        now = 5_000
+        assertEquals(FriendRequestOutcome.COOLDOWN, store.request("steve", "alex"))
+
+        now = 10_001
+        assertEquals(FriendRequestOutcome.SENT, store.request("steve", "alex"))
     }
 }

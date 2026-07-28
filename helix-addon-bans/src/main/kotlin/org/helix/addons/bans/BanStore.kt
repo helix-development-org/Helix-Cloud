@@ -13,6 +13,10 @@ import org.helix.api.storage.AddonStorage
  * explicit [resolveUuid] hit), which is what stops a rename from evading a
  * ban — see [migrateIfKnown].
  *
+ * Pardoning or the natural expiry of a ban never deletes the record outright:
+ * it moves into a bounded history log ([historyOf]) instead, so staff can
+ * still see a player's past bans after they end.
+ *
  * @property storage addon-scoped document store.
  * @property resolveUuid resolves a player name to its current owner's uuid,
  *  typically the node's identity registry via `AddonContext.resolvePlayerUuid`.
@@ -40,10 +44,17 @@ class BanStore(
      * @param durationMs ban duration; `null` for permanent.
      * @param uuid the joining player's uuid, when set directly by a join
      *  gate check; otherwise resolved from [resolveUuid].
+     * @param issuedBy the staff member (or system/addon) issuing the ban.
      * @return the persisted entry.
      */
     @Synchronized
-    fun set(player: String, reason: String, durationMs: Long? = null, uuid: String? = null): BanEntry {
+    fun set(
+        player: String,
+        reason: String,
+        durationMs: Long? = null,
+        uuid: String? = null,
+        issuedBy: String = "",
+    ): BanEntry {
         val name = player.lowercase()
         val resolved = uuid ?: resolveUuid(name)
         val now = clock()
@@ -53,6 +64,7 @@ class BanStore(
             createdAtEpochMs = now,
             expiresAtEpochMs = durationMs?.let { now + it },
             uuid = resolved,
+            issuedBy = issuedBy,
         )
         bans.remove(name)
         bans[resolved ?: name] = entry
@@ -61,25 +73,25 @@ class BanStore(
     }
 
     /**
-     * Removes a ban.
+     * Lifts a ban, moving it into the history log instead of deleting it.
      *
      * @param player player name, matched case-insensitively.
      * @param uuid the player's uuid, when known directly; otherwise resolved
      *  from [resolveUuid].
+     * @param by the pardoning staff member; `null` when lifted automatically.
      * @return `true` if a ban existed.
      */
     @Synchronized
-    fun pardon(player: String, uuid: String? = null): Boolean {
+    fun pardon(player: String, uuid: String? = null, by: String? = null): Boolean {
         val key = keyOf(player, uuid)
-        val removed = bans.remove(key) != null
-        if (removed) {
-            persist()
-        }
-        return removed
+        val removed = bans.remove(key) ?: return false
+        appendHistory(removed.revoked(clock(), by))
+        persist()
+        return true
     }
 
     /**
-     * Looks up the active ban of a player, pruning it when expired.
+     * Looks up the active ban of a player, moving it to history when expired.
      *
      * @param player player name, matched case-insensitively.
      * @param uuid the joining player's uuid, when set directly by a join
@@ -91,8 +103,10 @@ class BanStore(
     fun activeBan(player: String, uuid: String? = null): BanEntry? {
         val key = keyOf(player, uuid)
         val entry = bans[key] ?: return null
-        if (!entry.active(clock())) {
+        val now = clock()
+        if (!entry.active(now)) {
             bans.remove(key)
+            appendHistory(entry.revoked(now, by = null))
             persist()
             return null
         }
@@ -100,20 +114,31 @@ class BanStore(
     }
 
     /**
-     * Lists all active bans, pruning expired ones.
+     * Lists all active bans, moving expired ones to history.
      *
      * @return active bans sorted by player name.
      */
     @Synchronized
     fun all(): List<BanEntry> {
         val now = clock()
-        val expired = bans.entries.filter { !it.value.active(now) }.map { it.key }
+        val expired = bans.entries.filter { !it.value.active(now) }.toList()
         if (expired.isNotEmpty()) {
-            expired.forEach(bans::remove)
+            expired.forEach { bans.remove(it.key) }
+            expired.forEach { appendHistory(it.value.revoked(now, by = null)) }
             persist()
         }
         return bans.values.sortedBy { it.player }
     }
+
+    /**
+     * Lists a player's past (expired or pardoned) bans, newest first.
+     *
+     * @param player player name, matched case-insensitively.
+     * @return the player's ban history, newest first.
+     */
+    @Synchronized
+    fun historyOf(player: String): List<BanEntry> =
+        readHistory().filter { it.player == player.lowercase() }.sortedByDescending { it.createdAtEpochMs }
 
     /**
      * Resolves the storage key for [player] and migrates a legacy name-keyed
@@ -154,12 +179,26 @@ class BanStore(
         return resolved
     }
 
+    private fun appendHistory(entry: BanEntry) {
+        val history = (readHistory() + entry).takeLast(HISTORY_CAP)
+        storage.write(HISTORY_DOCUMENT, json.encodeToString(history))
+    }
+
+    private fun readHistory(): List<BanEntry> =
+        storage.read(HISTORY_DOCUMENT)?.let { json.decodeFromString<List<BanEntry>>(it) } ?: emptyList()
+
     private fun persist() {
         storage.write(DOCUMENT, json.encodeToString(bans.values.toList()))
     }
 
     private companion object {
-        /** Document key holding the ban list. */
+        /** Document key holding the active ban list. */
         const val DOCUMENT = "bans"
+
+        /** Document key holding the ban history log. */
+        const val HISTORY_DOCUMENT = "bans-history"
+
+        /** Maximum history entries kept network-wide, oldest dropped first. */
+        const val HISTORY_CAP = 2000
     }
 }

@@ -22,6 +22,12 @@ private const val LAG_NOFALL_AIRTICKS = 12
 private const val FLY_OFFSET_REF = 0.1
 private const val SPEED_OFFSET_REF = 0.1
 
+// Elytra-fly ("no gravity while gliding") thresholds — see MovementEvaluator.elytraFailure for the
+// physics reasoning. Deliberately generous: a hair of positive dy is still "not descending" (numerical
+// jitter / a leveling-out glide), and the streak length survives realistic rocket-boost chaining.
+private const val ELYTRA_DESCENT_EPSILON = 0.02
+private const val ELYTRA_STREAK_FRAMES = 100
+
 private data class HorizontalProjection(
     val limit: Double,
     val nextVelocity: Double,
@@ -153,6 +159,52 @@ internal class MovementEvaluator {
                 "support" to false,
                 "packet" to "ground-only"
             )
+        )
+    }
+
+    /**
+     * Elytra glide-hack check ("no-fall"/hover flight while wearing an elytra).
+     *
+     * Vanilla elytra flight is never gravity-free. Every tick while gliding, the entity's vertical
+     * motion still has gravity (`EnvironmentFrame.gravity`, 0.08 blocks/tick²) subtracted from it
+     * before the glide's own lift/drag terms are applied (vanilla's `LivingEntity#travel` elytra
+     * branch) — a firework rocket boost only ADDS a short burst of upward acceleration on top of that
+     * pull for the few ticks the rocket burns, it does not remove the pull itself. The practical
+     * result: a legitimate glider's vertical delta always dips back to flat-or-falling within a tick
+     * or two once a boost's burn ends, even when chaining rockets to climb — there is no way to keep
+     * `delta.y` non-negative on every single tick, indefinitely, without something removing gravity
+     * outright. A hacked client that fakes "still gliding, immune to gravity" is exactly that: it
+     * reports a vertical delta that stays flat-or-rising tick after tick for as long as the hack is
+     * active, with none of the brief negative dips a real rocket-chaining player cannot avoid.
+     *
+     * The streak threshold below is deliberately generous specifically so it survives normal
+     * boost-chaining and network jitter; per the false-positive-bar directive this trades detection
+     * speed for near-certainty. It is frame-based (consecutive qualifying MOVEMENT PACKETS), matching
+     * every other streak check in this file (e.g. [CheckEngine]'s sprint-backwards streak) rather than
+     * wall-clock time, so it is insensitive to a client's exact packet rate.
+     *
+     * Deliberately does not touch [PlayerState.predictedHorizontal]/[PlayerState.predictedVertical]
+     * (the shared dry-land motion predictor): this check runs independently of the fly/speed checks
+     * (see `CheckEngine.processMovement`), so it must not perturb their state for the frame after the
+     * player lands.
+     *
+     * @param delta this frame's position delta.
+     * @param state the player's check state (reads/writes [PlayerState.elytraLevelStreak]).
+     * @return a failure once the non-descending streak crosses the threshold, else `null`.
+     */
+    fun elytraFailure(delta: Vec3, state: PlayerState): CheckFailure? {
+        if (delta.y < -ELYTRA_DESCENT_EPSILON) {
+            state.elytraLevelStreak = 0
+            return null
+        }
+        state.elytraLevelStreak++
+        if (state.elytraLevelStreak < ELYTRA_STREAK_FRAMES) {
+            return null
+        }
+        return CheckFailure(
+            "movement.elytrafly.a",
+            1.0,
+            mapOf("dy" to delta.y.rounded(), "streak" to state.elytraLevelStreak),
         )
     }
 

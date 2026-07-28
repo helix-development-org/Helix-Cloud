@@ -148,7 +148,8 @@ data class IGuardConfig(
             "combat.noswing.a",
             "combat.snapaim.a",
             "movement.fastladder.a",
-            "movement.highjump.a"
+            "movement.highjump.a",
+            "movement.elytrafly.a"
         )
 
         // Fallback per-signal confidence (0..1) when confidence.signal.<id> is not set in config.
@@ -166,6 +167,7 @@ data class IGuardConfig(
             "movement.sprintbackwards.a" to 0.55,
             "movement.fastladder.a" to 0.62,
             "movement.highjump.a" to 0.66,
+            "movement.elytrafly.a" to 0.65,
             "combat.reach.a" to 0.60,
             "combat.rotation.a" to 0.52,
             "combat.multitarget.a" to 0.68,

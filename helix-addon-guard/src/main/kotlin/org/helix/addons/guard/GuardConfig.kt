@@ -60,6 +60,7 @@ object GuardConfig {
         CheckDefaults("world.nofacing.a", "4.0", "-1.0", "0.2"),
         CheckDefaults("movement.fastladder.a", "5.0", "-1.0", "0.2"),
         CheckDefaults("movement.highjump.a", "4.0", "-1.0", "0.2"),
+        CheckDefaults("movement.elytrafly.a", "4.0", "-1.0", "0.2"),
     )
 
     /** All editable settings in the order of IGuard's bundled config.yml. */

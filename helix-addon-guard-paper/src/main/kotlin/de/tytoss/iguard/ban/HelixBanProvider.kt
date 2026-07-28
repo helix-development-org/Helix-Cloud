@@ -17,7 +17,22 @@ class HelixBanProvider(private val storage: HelixNodeStore) : BanProvider {
         storage.submitBan(playerId, playerName, hours, reason, actor)
     }
 
+    /**
+     * Lifts the ban, working whether or not [playerId] is currently online and whether or not the
+     * node is reachable at this exact moment.
+     *
+     * Tries [HelixNodeStore.revokeBanBlocking] first: a synchronous `guard.store.unban` call (built
+     * for exactly this — see its KDoc — but never actually invoked before this fix, so an offline
+     * unban silently fell through to the fire-and-forget path below on every call). When that
+     * immediate attempt fails (node briefly unreachable), it falls back to
+     * [HelixNodeStore.submitUnban], which queues the action for the writer thread to retry against
+     * the node indefinitely (see `HelixNodeStore.writerLoop`) instead of the unban being lost outright.
+     * Neither path depends on [playerId] being online: the node's ban table is keyed by uuid, and
+     * `revokeBanBlocking` resolves the player's last-known name from Bukkit's offline-player cache.
+     */
     override fun unban(playerId: UUID, playerName: String, actor: String) {
-        storage.submitUnban(playerId, playerName)
+        if (!storage.revokeBanBlocking(playerId)) {
+            storage.submitUnban(playerId, playerName)
+        }
     }
 }

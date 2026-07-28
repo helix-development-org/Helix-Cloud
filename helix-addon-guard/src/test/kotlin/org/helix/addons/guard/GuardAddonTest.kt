@@ -53,9 +53,9 @@ class GuardAddonTest {
 
     @Test
     fun `registry mirrors the full iguard schema`() {
-        // 48 plain settings + 31 checks x 4 fields; server-id and storage.mode
+        // 44 plain settings + 32 checks x 4 fields; server-id and storage.mode
         // are fixed and not editable
-        assertEquals(44 + 31 * 4, GuardConfig.settings.size)
+        assertEquals(44 + 32 * 4, GuardConfig.settings.size)
         assertEquals(GuardConfig.settings.size, GuardConfig.byPath.size)
         assertFalse("server-id" in GuardConfig.byPath)
         assertFalse("storage.mode" in GuardConfig.byPath)
@@ -208,11 +208,15 @@ class GuardAddonTest {
     @Test
     fun `violations round-trip through history and cap at 500`() {
         val uuid = "11111111-1111-1111-1111-111111111111"
+        // Recent-but-distinct timestamps: GuardStore also prunes by history.retention-days (default
+        // 30 days) against a real clock, so epochMs must stay within that window for this test to
+        // isolate the count cap specifically, not incidentally trigger age-based pruning too.
+        val base = System.currentTimeMillis() - 100_000L
         repeat(505) { i ->
             val result = recording.run(
                 "guard.store.violation",
                 """{"serverId":"paper-1","uuid":"$uuid","name":"Steve","check":"movement.fly.a",""" +
-                    """"vl":${i + 1}.0,"confidence":0.5,"epochMs":${1000L + i},"details":"t$i"}""",
+                    """"vl":${i + 1}.0,"confidence":0.5,"epochMs":${base + i},"details":"t$i"}""",
             )
             assertTrue(result.success)
             assertEquals("""{"ok":true}""", result.lines.single())
@@ -221,13 +225,13 @@ class GuardAddonTest {
         // capped at the newest 500 entries, oldest dropped
         val stored = json.decodeFromString<List<GuardViolation>>(recording.storage.read("violations.$uuid")!!)
         assertEquals(500, stored.size)
-        assertEquals(1005L, stored.first().epochMs)
+        assertEquals(base + 5, stored.first().epochMs)
 
         // newest first, requested limit honored
         val history = json.parseToJsonElement(recording.run("guard.query.history", uuid, "10").lines.single())
         val violations = history.jsonObject.getValue("violations").jsonArray
         assertEquals(10, violations.size)
-        assertEquals(1504L, violations.first().jsonObject.getValue("epochMs").jsonPrimitive.long)
+        assertEquals(base + 504, violations.first().jsonObject.getValue("epochMs").jsonPrimitive.long)
 
         // limit is capped at 100
         val capped = json.parseToJsonElement(recording.run("guard.query.history", uuid, "1000").lines.single())

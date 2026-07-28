@@ -82,6 +82,9 @@ internal class PlayerState {
     var noSwingStreak = 0
     var snapAimStreak = 0
     var sprintBackStreak = 0
+
+    /** Consecutive movement frames spent gliding without a net-descending tick; see [MovementEvaluator.elytraFailure]. */
+    var elytraLevelStreak = 0
     var sprinting = false
     var sneaking = false
     var clientFlying = false
@@ -167,6 +170,7 @@ internal class PlayerState {
         positionGapTicks = 0
         physicalSupporting = true
         sprintBackStreak = 0
+        elytraLevelStreak = 0
     }
 }
 
@@ -349,6 +353,15 @@ class CheckEngine(
         }
     }
 
+    /**
+     * Whether the elytra-fly check may run this tick: gliding must be the ONLY unusual environment
+     * factor. A player who is also flying/creative/riding/etc. legitimately moves outside normal glide
+     * physics for that other reason, so piling the elytra check on top there would just re-introduce
+     * the false positives the "flight"/"game-mode"/"vehicle" exemptions already exist to prevent.
+     */
+    private fun elytraCheckable(environment: EnvironmentFrame): Boolean =
+        environment.environmentTags.none { it != "elytra" && it !in TELEMETRY_ONLY_TAGS }
+
     private fun processMovement(
         incoming: MovementFrame,
         state: PlayerState,
@@ -501,6 +514,21 @@ class CheckEngine(
                 movementEvaluator.idle(environment, state)
                 state.positionGapTicks = 0
             }
+        }
+        // Elytra-fly runs independently of the exempt/non-exempt split above: gliding is (correctly)
+        // an exemption from every dry-land check — fly/speed/nofall assume ground-relative physics
+        // that do not apply mid-glide — but that left glide-hacking (faking "still gliding" while
+        // ignoring gravity) with zero coverage. This check never touches the shared motion predictor
+        // (state.predictedHorizontal/Vertical), so it cannot destabilize the dry-land checks for the
+        // frame after landing. See MovementEvaluator.elytraFailure for the physics reasoning.
+        if ("elytra" in environment.environmentTags && incoming.positionChanged && previous != null &&
+            !laggy && elytraCheckable(environment)
+        ) {
+            val delta = frame.position - previous.position
+            val failure = movementEvaluator.elytraFailure(delta, state)
+            applyResults(incoming, state, environment, playerName, listOfNotNull(failure), setOf("movement.elytrafly.a"))
+        } else if ("elytra" !in environment.environmentTags) {
+            state.elytraLevelStreak = 0
         }
         if (!state.explicitClientTicks && supportReliable) {
             // Only accumulate/clear airborne ticks when the support snapshot is trustworthy; with a

@@ -18,14 +18,22 @@ import org.helix.api.storage.SchemaMigrator
  * is tagged the first time that name's uuid becomes resolvable, so a rename
  * afterwards does not detach the player from their own warn history.
  *
+ * Warns expire after [expiryMillis]: [warnsOf] (and therefore every active-warn
+ * count derived from it) excludes entries older than the configured window,
+ * so a warning from months ago no longer counts towards escalation, while the
+ * full record stays on disk for as long as the underlying entry is retained.
+ *
  * @property storage addon-scoped document store.
  * @property resolveUuid resolves a player name to its current owner's uuid,
  *  typically the node's identity registry via `AddonContext.resolvePlayerUuid`.
+ * @property expiryMillis how long a warning stays active; re-read on every
+ *   call so a live config change takes effect immediately.
  * @property clock epoch millis source, injectable for tests.
  */
 class WarnStore(
     private val storage: AddonStorage,
     private val resolveUuid: (String) -> String? = { null },
+    private val expiryMillis: () -> Long = { DEFAULT_EXPIRY_MILLIS },
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val json = Json { prettyPrint = true }
@@ -65,7 +73,11 @@ class WarnStore(
     }
 
     /**
-     * Lists all warnings of a player, newest first.
+     * Lists a player's still-active warnings, newest first.
+     *
+     * Warnings older than [expiryMillis] are excluded (but not deleted, so
+     * they still stand as a permanent record if ever needed) — every caller
+     * that derives an active-warn count reads through this method.
      *
      * Matched on uuid once known — a legacy name-only entry is tagged with
      * it first, so the history follows the player through a rename.
@@ -73,15 +85,17 @@ class WarnStore(
      * @param player the player.
      * @param uuid the player's uuid, when known directly; otherwise resolved
      *  from [resolveUuid].
-     * @return warnings sorted by time descending.
+     * @return active warnings sorted by time descending.
      */
     @Synchronized
     fun warnsOf(player: String, uuid: String? = null): List<WarnEntry> {
         val name = player.lowercase()
         val resolved = uuid ?: resolveUuid(name)
         migrateIfKnown(name, resolved)
+        val cutoff = clock() - expiryMillis()
         return warns
             .filter { if (resolved != null) it.uuid == resolved else it.player == name }
+            .filter { it.atEpochMs >= cutoff }
             .sortedByDescending { it.atEpochMs }
     }
 
@@ -120,5 +134,8 @@ class WarnStore(
 
         /** Current schema version of the `warns` document. */
         const val SCHEMA_VERSION = 1
+
+        /** Fallback active-warn window when the addon config carries no override. */
+        const val DEFAULT_EXPIRY_MILLIS = 30L * 24 * 3_600_000
     }
 }

@@ -20,19 +20,19 @@ class BansAddonTest {
 
     @Test
     fun `ban blocks join and pardon unblocks`() {
-        context.run("ban.set", "Steve", "griefing")
+        context.run("ban.set", "Steve", "Mod", "griefing")
 
         val denied = context.joinGates.single().check(JoinRequest("steve"))
         assertFalse(denied.allowed)
         assertTrue(denied.message!!.contains("griefing"))
 
-        assertTrue(context.run("ban.pardon", "STEVE").success)
+        assertTrue(context.run("ban.pardon", "STEVE", "Mod").success)
         assertTrue(context.joinGates.single().check(JoinRequest("Steve")).allowed)
     }
 
     @Test
     fun `ban kicks online player through generic action`() {
-        context.run("ban.set", "Alex", "7d", "cheating")
+        context.run("ban.set", "Alex", "Mod", "7d", "cheating")
 
         val kick = context.invocations.single()
         assertEquals("player.kick", kick.action)
@@ -42,8 +42,8 @@ class BansAddonTest {
 
     @Test
     fun `ban and pardon publish moderation notifications`() {
-        context.run("ban.set", "Alex", "7d", "cheating")
-        context.run("ban.pardon", "Alex")
+        context.run("ban.set", "Alex", "Mod", "7d", "cheating")
+        context.run("ban.pardon", "Alex", "Mod")
 
         assertEquals(listOf("moderation", "moderation"), context.notifications.map { it.first })
         assertTrue(context.notifications[0].second.contains("[Ban]"))
@@ -53,12 +53,41 @@ class BansAddonTest {
 
     @Test
     fun `temp ban parses duration and lists with expiry`() {
-        val result = context.run("ban.set", "Alex", "7d", "cheating")
+        val result = context.run("ban.set", "Alex", "Mod", "7d", "cheating")
 
         assertTrue(result.success)
         assertTrue(result.lines.first().contains("expires in 6d 23h") || result.lines.first().contains("expires in 7d"))
         assertTrue(context.run("ban.list").lines.single().contains("alex"))
         assertTrue(context.run("ban.check", "alex").lines.single().contains("cheating"))
+    }
+
+    @Test
+    fun `ban records issuedBy and history survives a pardon`() {
+        context.run("ban.set", "Alex", "Mod", "cheating")
+
+        assertTrue(context.run("ban.check", "Alex").lines.single().contains("by Mod"))
+
+        context.run("ban.pardon", "Alex", "Mod")
+
+        val history = context.run("ban.history", "Alex")
+        assertTrue(history.success)
+        assertTrue(history.lines.single().contains("issued by Mod"))
+        assertTrue(history.lines.single().contains("pardoned by Mod"))
+    }
+
+    @Test
+    fun `expired ban moves to history instead of disappearing`() {
+        var now = 1_000L
+        val backingStore = BanStore(InMemoryAddonStorage(), clock = { now })
+        backingStore.set("steve", "bye", durationMs = 60_000, issuedBy = "Mod")
+
+        now = 100_000
+        assertNull(backingStore.activeBan("steve"))
+
+        val history = backingStore.historyOf("steve")
+        assertEquals(1, history.size)
+        assertEquals("Mod", history.single().issuedBy)
+        assertNull(history.single().revokedBy)
     }
 
     @Test
@@ -76,7 +105,7 @@ class BansAddonTest {
     @Test
     fun `a ban survives a rename because the join gate checks the joining account's uuid`() {
         context.recordJoin("Steve", "uuid-1")
-        context.run("ban.set", "Steve", "griefing")
+        context.run("ban.set", "Steve", "Mod", "griefing")
 
         // Steve renamed to Steve2 in Mojang's records, but their uuid never changes — the
         // bridge reports the real uuid at login, which is what the ban must be keyed on.
@@ -88,7 +117,7 @@ class BansAddonTest {
 
     @Test
     fun `a ban set for a player never seen falls back to their name, then migrates on first join`() {
-        context.run("ban.set", "Offline", "banned while offline")
+        context.run("ban.set", "Offline", "Mod", "banned while offline")
 
         // not yet seen by this node: the join gate still enforces the name-keyed fallback
         assertFalse(context.joinGates.single().check(JoinRequest("Offline", "uuid-9")).allowed)
@@ -100,7 +129,7 @@ class BansAddonTest {
     @Test
     fun `a pardon by name still finds a ban already migrated to uuid`() {
         context.recordJoin("Steve", "uuid-1")
-        context.run("ban.set", "Steve", "griefing")
+        context.run("ban.set", "Steve", "Mod", "griefing")
 
         assertTrue(context.run("ban.pardon", "steve").success)
         assertTrue(context.joinGates.single().check(JoinRequest("Steve", "uuid-1")).allowed)

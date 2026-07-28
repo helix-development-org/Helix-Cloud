@@ -37,6 +37,7 @@ class FriendsAddon : AddonBase() {
                     "error.self" to "&cYou cannot add yourself.",
                     "error.already" to "&cYou are already friends with {target}.",
                     "error.duplicate" to "&cYou already sent a request to {target}.",
+                    "error.cooldown" to "&cYou must wait a bit before sending another request to {target}.",
                     "error.norequest" to "&cNo pending request from {target}.",
                     "error.notfriends" to "&cYou are not friends with {target}.",
                     "requests.none" to "&7No pending friend requests.",
@@ -58,6 +59,7 @@ class FriendsAddon : AddonBase() {
                     "error.self" to "&cDu kannst dich nicht selbst hinzufügen.",
                     "error.already" to "&cDu bist bereits mit {target} befreundet.",
                     "error.duplicate" to "&cDu hast {target} bereits eine Anfrage gesendet.",
+                    "error.cooldown" to "&cDu musst kurz warten, bevor du {target} erneut anfragen kannst.",
                     "error.norequest" to "&cKeine offene Anfrage von {target}.",
                     "error.notfriends" to "&cDu bist nicht mit {target} befreundet.",
                     "requests.none" to "&7Keine offenen Freundschaftsanfragen.",
@@ -122,8 +124,12 @@ class FriendsAddon : AddonBase() {
             message(target, msg.formatFor(target, "accepted.other", "player" to executor))
             return ActionResult.ok(msg.formatFor(executor, "accepted.self", "target" to target))
         }
-        if (!store.request(executor, target)) {
-            return ActionResult.error(msg.formatFor(executor, "error.duplicate", "target" to target))
+        when (store.request(executor, target)) {
+            FriendRequestOutcome.ALREADY_PENDING ->
+                return ActionResult.error(msg.formatFor(executor, "error.duplicate", "target" to target))
+            FriendRequestOutcome.COOLDOWN ->
+                return ActionResult.error(msg.formatFor(executor, "error.cooldown", "target" to target))
+            FriendRequestOutcome.SENT -> Unit
         }
         message(target, msg.formatFor(target, "request.received", "sender" to executor))
         return ActionResult.ok(msg.formatFor(executor, "request.sent", "target" to target))

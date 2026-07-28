@@ -48,6 +48,7 @@ class BansAddon : AddonBase() {
                     "help.pardon" to "&f/bans pardon <player>",
                     "help.check" to "&f/bans check <player>",
                     "help.list" to "&f/bans list",
+                    "help.history" to "&f/bans history <player>",
                 ),
                 "de" to mapOf(
                     "banned" to (
@@ -69,6 +70,7 @@ class BansAddon : AddonBase() {
                     "help.pardon" to "&f/bans pardon <player>",
                     "help.check" to "&f/bans check <player>",
                     "help.list" to "&f/bans list",
+                    "help.history" to "&f/bans history <player>",
                 ),
             ),
         )
@@ -82,12 +84,13 @@ class BansAddon : AddonBase() {
         action(
             "ban.set",
             "Bans a player, optionally temporary (30m, 12h, 7d).",
-            "ban.set <player> [duration] [reason...]",
+            "ban.set <player> <issuedBy> [duration] [reason...]",
         ) { invocation -> setBan(invocation) }
-        action("ban.pardon", "Lifts a ban.", "ban.pardon <player>") { invocation ->
+        action("ban.pardon", "Lifts a ban.", "ban.pardon <player> [issuedBy]") { invocation ->
             val player = invocation.arguments.firstOrNull()
-                ?: return@action ActionResult.error("usage: ban.pardon <player>")
-            if (store.pardon(player)) {
+                ?: return@action ActionResult.error("usage: ban.pardon <player> [issuedBy]")
+            val by = invocation.arguments.getOrNull(1)
+            if (store.pardon(player, by = by)) {
                 context.publishNotification("moderation", msg.format("notify.pardon", "player" to player))
                 ActionResult.ok("pardoned $player")
             } else {
@@ -109,13 +112,23 @@ class BansAddon : AddonBase() {
                 ?.let { ActionResult.ok(describe(it)) }
                 ?: ActionResult.ok("$player is not banned")
         }
+        action("ban.history", "Shows a player's past (expired/pardoned) bans.", "ban.history <player>") { invocation ->
+            val player = invocation.arguments.firstOrNull()
+                ?: return@action ActionResult.error("usage: ban.history <player>")
+            val history = store.historyOf(player)
+            if (history.isEmpty()) {
+                ActionResult.ok("no ban history for $player")
+            } else {
+                ActionResult.ok(*history.map(::describeHistory).toTypedArray())
+            }
+        }
         action("ban.export", "Exports all active bans as JSON (used by the dashboard).", "ban.export") {
             ActionResult.ok(kotlinx.serialization.json.Json.encodeToString(store.all()))
         }
         action(
             "bans",
             "Manage bans in-game.",
-            "bans <set|pardon|check|list> ...",
+            "bans <set|pardon|check|list|history> ...",
             playerCommand = true,
             permission = "helix.bans",
         ) { invocation ->
@@ -141,16 +154,18 @@ class BansAddon : AddonBase() {
     private fun bansCommand(executor: String, args: List<String>): ActionResult {
         val rest = args.drop(1)
         return when (args.firstOrNull()?.lowercase()) {
-            "set" -> delegate("ban.set", rest)
-            "pardon" -> delegate("ban.pardon", rest)
+            "set" -> delegate("ban.set", rest.take(1) + executor + rest.drop(1))
+            "pardon" -> delegate("ban.pardon", rest.take(1) + executor)
             "check" -> delegate("ban.check", rest)
             "list" -> delegate("ban.list", emptyList())
+            "history" -> delegate("ban.history", rest)
             else -> ActionResult.ok(
                 msg.formatFor(executor, "help.header"),
                 msg.formatFor(executor, "help.set"),
                 msg.formatFor(executor, "help.pardon"),
                 msg.formatFor(executor, "help.check"),
                 msg.formatFor(executor, "help.list"),
+                msg.formatFor(executor, "help.history"),
             )
         }
     }
@@ -161,13 +176,15 @@ class BansAddon : AddonBase() {
     private fun setBan(invocation: ActionInvocation): ActionResult {
         val arguments = invocation.arguments
         val player = arguments.firstOrNull()
-            ?: return ActionResult.error("usage: ban.set <player> [duration] [reason...]")
-        val durationToken = arguments.getOrNull(1)?.takeIf(BanDuration::isDurationToken)
+            ?: return ActionResult.error("usage: ban.set <player> <issuedBy> [duration] [reason...]")
+        val issuedBy = arguments.getOrNull(1).orEmpty()
+        val rest = arguments.drop(2)
+        val durationToken = rest.getOrNull(0)?.takeIf(BanDuration::isDurationToken)
         val durationMs = durationToken?.let(BanDuration::parseMillis)
-        val reason = arguments.drop(if (durationToken != null) 2 else 1)
+        val reason = rest.drop(if (durationToken != null) 1 else 0)
             .joinToString(" ")
             .ifBlank { "misconduct" }
-        val entry = store.set(player, reason, durationMs)
+        val entry = store.set(player, reason, durationMs, issuedBy = issuedBy)
         context.publishNotification(
             "moderation",
             msg.format("notify.set", "player" to entry.player, "reason" to reason, "expiry" to expiryText(entry)),
@@ -185,8 +202,16 @@ class BansAddon : AddonBase() {
         )
     }
 
-    private fun describe(entry: BanEntry): String =
-        "${entry.player} — ${entry.reason} (${expiryText(entry)})"
+    private fun describe(entry: BanEntry): String {
+        val by = entry.issuedBy.ifBlank { "unknown" }
+        return "${entry.player} — ${entry.reason} (${expiryText(entry)}) — by $by"
+    }
+
+    private fun describeHistory(entry: BanEntry): String {
+        val by = entry.issuedBy.ifBlank { "unknown" }
+        val lifted = entry.revokedBy?.let { "pardoned by $it" } ?: "expired"
+        return "${entry.player} — ${entry.reason} — issued by $by, $lifted"
+    }
 
     private fun expiryText(entry: BanEntry): String = entry.expiresAtEpochMs
         ?.let { "expires in ${BanDuration.format(it - System.currentTimeMillis())}" }

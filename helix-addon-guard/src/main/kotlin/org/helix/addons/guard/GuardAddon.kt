@@ -42,7 +42,11 @@ class GuardAddon : AddonBase() {
      */
     override fun enable() {
         store = GuardConfigStore(context.storage())
-        guardStore = GuardStore(context.storage())
+        guardStore = GuardStore(
+            context.storage(),
+            violationRetentionDays = { effectiveInt("history.retention-days", 30) },
+            replayRetentionDays = { effectiveInt("detection.replay-retention-days", 7) },
+        )
         msg = context.localizedMessages(
             mapOf(
                 "en" to mapOf(
@@ -104,6 +108,18 @@ class GuardAddon : AddonBase() {
         // boot — services must never start on IGuard's bundled default
         // (wrong server-id, unresolvable env placeholders)
         runCatching { applyConfig(emptyList()) }
+    }
+
+    /**
+     * The effective (override or default) value of an INT config path.
+     *
+     * @param path dotted config path.
+     * @param fallback used when neither an override nor a known default parses.
+     * @return the live effective value.
+     */
+    private fun effectiveInt(path: String, fallback: Int): Int {
+        val raw = store.overrides()[path] ?: GuardConfig.byPath[path]?.default
+        return raw?.toIntOrNull() ?: fallback
     }
 
     private fun configGet(): ActionResult {

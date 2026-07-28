@@ -1,9 +1,9 @@
 package org.helix.addons.moderation
 
-import org.helix.api.storage.InMemoryAddonStorage
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import org.helix.api.storage.InMemoryAddonStorage
 
 class WarnStoreTest {
     @Test
@@ -16,7 +16,7 @@ class WarnStoreTest {
         store.warn("Alex", "Mod", "griefing")
 
         assertEquals(2, store.warnsOf("STEVE").size)
-        assertEquals(1, WarnStore(storage).warnsOf("alex").size)
+        assertEquals(1, WarnStore(storage, clock = { 1_000L }).warnsOf("alex").size)
     }
 
     @Test
@@ -27,7 +27,7 @@ class WarnStoreTest {
             """[{"player":"steve","by":"Mod","reason":"legacy","atEpochMs":1}]""",
         )
 
-        val store = WarnStore(storage)
+        val store = WarnStore(storage, clock = { 1_000L })
 
         assertEquals(1, store.warnsOf("steve").size)
         assertEquals("legacy", store.warnsOf("steve").first().reason)
@@ -85,5 +85,33 @@ class WarnStoreTest {
         store.warn("Alex", "Mod", "griefing")
 
         assertTrue(storage.read("warns")!!.contains("\"schemaVersion\""))
+    }
+
+    @Test
+    fun `warns expire out of the active list after the configured window`() {
+        var now = 0L
+        val store = WarnStore(InMemoryAddonStorage(), expiryMillis = { 60_000 }, clock = { now })
+
+        store.warn("steve", "Mod", "griefing")
+        assertEquals(1, store.warnsOf("steve").size)
+
+        now = 30_000
+        assertEquals(1, store.warnsOf("Steve").size, "still within the expiry window")
+
+        now = 60_001
+        assertTrue(store.warnsOf("STEVE").isEmpty(), "past the expiry window")
+    }
+
+    @Test
+    fun `newest warns come first and old ones do not hide new ones`() {
+        var now = 0L
+        val store = WarnStore(InMemoryAddonStorage(), expiryMillis = { 1_000 }, clock = { now })
+
+        store.warn("steve", "Mod", "first")
+        now = 2_000
+        store.warn("steve", "Mod", "second")
+
+        val active = store.warnsOf("steve")
+        assertEquals(listOf("second"), active.map { it.reason })
     }
 }

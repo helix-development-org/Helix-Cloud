@@ -339,6 +339,42 @@ class MovementEvaluatorTest {
         assertTrue(evaluation.failed("movement.phase.a"))
     }
 
+    @Test
+    fun `a brief non-descending glide burst does not trigger elytra-fly`() {
+        val state = PlayerState()
+
+        // A single rocket-boost burst: several non-descending ticks, well short of the sustained
+        // no-gravity streak the check requires.
+        repeat(10) {
+            assertEquals(null, evaluator.elytraFailure(Vec3(0.0, 0.05, 1.0), state))
+        }
+    }
+
+    @Test
+    fun `sustained non-descending glide triggers elytra-fly`() {
+        val state = PlayerState()
+        var failure: CheckFailure? = null
+
+        repeat(150) {
+            failure = evaluator.elytraFailure(Vec3(0.0, 0.02, 1.0), state)
+        }
+
+        assertEquals("movement.elytrafly.a", failure?.checkId)
+    }
+
+    @Test
+    fun `a real descending tick resets the elytra-fly streak`() {
+        val state = PlayerState()
+        repeat(90) { evaluator.elytraFailure(Vec3(0.0, 0.02, 1.0), state) }
+
+        // Vanilla gravity reasserting itself for one tick must clear the streak entirely, not just
+        // pause it — a hacked client alternating one real tick per 99 fake ones must not slip through.
+        evaluator.elytraFailure(Vec3(0.0, -0.1, 1.0), state)
+        assertEquals(0, state.elytraLevelStreak)
+
+        repeat(90) { assertEquals(null, evaluator.elytraFailure(Vec3(0.0, 0.02, 1.0), state)) }
+    }
+
     private fun MovementEvaluation.failed(checkId: String) = failures.any { it.checkId == checkId }
 
     private fun movement(position: Vec3, onGround: Boolean) = MovementFrame(

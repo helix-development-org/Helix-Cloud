@@ -114,6 +114,15 @@ data class GuardBan(
     val expiresAtEpochMs: Long,
 )
 
+/**
+ * One tracked `replay.<incidentId>` write, backing retention pruning.
+ *
+ * @property incidentId the incident id (matches the `replay.<id>` document key).
+ * @property epochMs when the replay was stored on the node.
+ */
+@Serializable
+private data class ReplayIndexEntry(val incidentId: String, val epochMs: Long)
+
 /** Wire payload of `guard.store.ban` — duration in hours, not yet an expiry. */
 @Serializable
 private data class GuardBanRequest(
@@ -131,12 +140,20 @@ private data class GuardBanRequest(
  *
  * Document layout (all values kotlinx-serialization JSON):
  * - `violations.<uuid>` — list of [GuardViolation], oldest first, capped at
- *   the newest [VIOLATION_CAP] entries per player.
+ *   the newest [VIOLATION_CAP] entries per player AND pruned of anything
+ *   older than [violationRetentionDays] (`history.retention-days`) —
+ *   enforced lazily on every write, the same way ban expiry already is.
  * - `incidents.<uuid>` — list of [GuardIncident] per player, capped at
  *   [INCIDENT_CAP].
  * - `incidents.recent` — network-global ring of the newest incidents,
  *   capped at [RECENT_CAP].
  * - `replay.<incidentId>` — raw base64 replay payload of one incident.
+ *   Unbounded per-entry storage is a real disk-exhaustion risk on a live
+ *   server, so `replay.index` (a [ReplayIndexEntry] list, see [writeReplay])
+ *   tracks every write and prunes both by [replayRetentionDays]
+ *   (`detection.replay-retention-days`) and by [REPLAY_INDEX_CAP] as a hard
+ *   backstop, deleting the pruned payload documents themselves (not just
+ *   their index entry) so nothing leaks.
  * - `punishments` — list of [GuardPunishment], capped at [PUNISHMENT_CAP].
  * - `bans` — map of lowercase uuid to [GuardBan]; expired entries are
  *   pruned lazily on every ban lookup.
@@ -144,20 +161,34 @@ private data class GuardBanRequest(
  * All methods are synchronized because actions may be invoked concurrently.
  *
  * @property storage addon-scoped document store.
+ * @property violationRetentionDays effective `history.retention-days`,
+ *   read live so a config change applies without a restart.
+ * @property replayRetentionDays effective `detection.replay-retention-days`,
+ *   read live so a config change applies without a restart.
+ * @property clock epoch millis source, injectable for tests.
  */
-class GuardStore(private val storage: AddonStorage) {
+class GuardStore(
+    private val storage: AddonStorage,
+    private val violationRetentionDays: () -> Int = { DEFAULT_VIOLATION_RETENTION_DAYS },
+    private val replayRetentionDays: () -> Int = { DEFAULT_REPLAY_RETENTION_DAYS },
+    private val clock: () -> Long = System::currentTimeMillis,
+) {
     private val json = Json { ignoreUnknownKeys = true }
 
     /**
-     * Appends a violation to the player's violation log.
+     * Appends a violation to the player's violation log, pruning entries
+     * older than [violationRetentionDays] in addition to the count cap.
      *
      * @param violation the reported violation.
      */
     @Synchronized
     fun addViolation(violation: GuardViolation) {
         val key = "violations.${violation.uuid.lowercase()}"
-        val entries = readList<GuardViolation>(key) + violation
-        storage.write(key, json.encodeToString(entries.takeLast(VIOLATION_CAP)))
+        val cutoff = clock() - violationRetentionDays().toLong() * DAY_MS
+        val entries = (readList<GuardViolation>(key) + violation)
+            .filter { it.epochMs >= cutoff }
+            .takeLast(VIOLATION_CAP)
+        storage.write(key, json.encodeToString(entries))
     }
 
     /**
@@ -214,7 +245,8 @@ class GuardStore(private val storage: AddonStorage) {
             .take(limit.coerceIn(1, QUERY_LIMIT))
 
     /**
-     * Stores (creates or replaces) the replay payload of an incident.
+     * Stores (creates or replaces) the replay payload of an incident, then
+     * prunes replays outside [replayRetentionDays]/[REPLAY_INDEX_CAP].
      *
      * @param incidentId the incident id.
      * @param payload base64 encoded replay data.
@@ -222,6 +254,7 @@ class GuardStore(private val storage: AddonStorage) {
     @Synchronized
     fun writeReplay(incidentId: String, payload: String) {
         storage.write("replay.$incidentId", payload)
+        pruneReplays(incidentId)
     }
 
     /**
@@ -307,6 +340,26 @@ class GuardStore(private val storage: AddonStorage) {
         }
     }
 
+    /**
+     * Prunes `replay.<id>` payload documents outside [replayRetentionDays]
+     * or beyond [REPLAY_INDEX_CAP], deleting both the index entry and the
+     * payload document itself — the count cap alone (as every other capped
+     * list here uses) would silently orphan payload documents forever,
+     * since a replay isn't a JSON array element but its own keyed document.
+     *
+     * @param newId the incident id just written, indexed alongside the rest.
+     */
+    private fun pruneReplays(newId: String) {
+        val now = clock()
+        val cutoff = now - replayRetentionDays().toLong() * DAY_MS
+        val index = readList<ReplayIndexEntry>(REPLAY_INDEX_DOCUMENT) + ReplayIndexEntry(newId, now)
+        val fresh = index.filter { it.epochMs >= cutoff }
+        val overflow = (fresh.size - REPLAY_INDEX_CAP).coerceAtLeast(0)
+        val kept = fresh.drop(overflow)
+        (index - kept.toSet()).forEach { storage.delete("replay.${it.incidentId}") }
+        storage.write(REPLAY_INDEX_DOCUMENT, json.encodeToString(kept))
+    }
+
     private companion object {
         /** Maximum violations kept per player, newest win. */
         const val VIOLATION_CAP = 500
@@ -331,6 +384,21 @@ class GuardStore(private val storage: AddonStorage) {
 
         /** Document holding the active bans, lowercase uuid to entry. */
         const val BANS_DOCUMENT = "bans"
+
+        /** Document holding the [ReplayIndexEntry] list backing replay retention. */
+        const val REPLAY_INDEX_DOCUMENT = "replay.index"
+
+        /** Hard cap on tracked replay entries regardless of configured retention days. */
+        const val REPLAY_INDEX_CAP = 500
+
+        /** Milliseconds in a day, for retention-day math. */
+        const val DAY_MS = 86_400_000L
+
+        /** Fallback violation retention when the addon config carries no override. */
+        const val DEFAULT_VIOLATION_RETENTION_DAYS = 30
+
+        /** Fallback replay retention when the addon config carries no override. */
+        const val DEFAULT_REPLAY_RETENTION_DAYS = 7
     }
 }
 

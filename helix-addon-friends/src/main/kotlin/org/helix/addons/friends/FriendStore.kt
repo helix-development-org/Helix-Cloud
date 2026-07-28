@@ -4,6 +4,20 @@ import kotlinx.serialization.json.Json
 import org.helix.api.storage.AddonStorage
 
 /**
+ * Outcome of [FriendStore.request].
+ */
+enum class FriendRequestOutcome {
+    /** A new request was recorded. */
+    SENT,
+
+    /** A request from this sender to this target is already pending. */
+    ALREADY_PENDING,
+
+    /** The sender must wait out [FriendStore]'s cooldown before retrying this target. */
+    COOLDOWN,
+}
+
+/**
  * Friendship persistence backed by the addon's document storage.
  *
  * Friendships and requests are keyed on identity keys — a player's uuid once
@@ -12,18 +26,29 @@ import org.helix.api.storage.AddonStorage
  * first time that uuid becomes resolvable, so a rename cannot be used to
  * dodge an existing friendship or pending request.
  *
+ * Request cooldown is not persisted (it resets on restart): losing a few
+ * seconds of an in-progress cooldown window on the rare service restart is
+ * harmless, and skipping it keeps the storage schema unchanged.
+ *
  * @property storage addon-scoped document store.
  * @property resolveUuid resolves a player name to its current owner's uuid,
  *  typically the node's identity registry via `AddonContext.resolvePlayerUuid`.
+ * @property cooldownMillis minimum time a sender must wait before
+ *   re-requesting the same target once no request is pending (blocks
+ *   request/deny/re-request spam used to repeatedly ping a victim).
+ * @property clock epoch millis source, injectable for tests.
  */
 class FriendStore(
     private val storage: AddonStorage,
     private val resolveUuid: (String) -> String? = { null },
+    private val cooldownMillis: Long = DEFAULT_REQUEST_COOLDOWN_MILLIS,
+    private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val json = Json { prettyPrint = true }
     private val friendships = mutableSetOf<Set<String>>()
     private val requests = mutableMapOf<String, MutableSet<String>>()
     private val displayNames = mutableMapOf<String, String>()
+    private val lastRequestAt = mutableMapOf<String, Long>()
 
     init {
         storage.read(DOCUMENT)?.let { raw ->
@@ -46,20 +71,30 @@ class FriendStore(
         setOf(keyOf(a), keyOf(b)) in friendships
 
     /**
-     * Records a friend request.
+     * Records a friend request, subject to the per-sender/target cooldown.
      *
      * @param from requesting player.
      * @param to requested player.
-     * @return `false` when the request already existed.
+     * @return the outcome (sent, already pending, or on cooldown).
      */
     @Synchronized
-    fun request(from: String, to: String): Boolean {
-        val added = requests.getOrPut(keyOf(to)) { mutableSetOf() }.add(keyOf(from))
-        if (added) {
-            persist()
+    fun request(from: String, to: String): FriendRequestOutcome {
+        val key = requestKey(from, to)
+        val now = clock()
+        val last = lastRequestAt[key]
+        if (last != null && now - last < cooldownMillis) {
+            return FriendRequestOutcome.COOLDOWN
         }
-        return added
+        val added = requests.getOrPut(keyOf(to)) { mutableSetOf() }.add(keyOf(from))
+        if (!added) {
+            return FriendRequestOutcome.ALREADY_PENDING
+        }
+        lastRequestAt[key] = now
+        persist()
+        return FriendRequestOutcome.SENT
     }
+
+    private fun requestKey(from: String, to: String) = "${from.lowercase()}|${to.lowercase()}"
 
     /**
      * Whether a pending request exists.
@@ -217,5 +252,8 @@ class FriendStore(
     private companion object {
         /** Document key holding the friendship state. */
         const val DOCUMENT = "friends"
+
+        /** Default cooldown between requests from the same sender to the same target. */
+        const val DEFAULT_REQUEST_COOLDOWN_MILLIS = 60_000L
     }
 }

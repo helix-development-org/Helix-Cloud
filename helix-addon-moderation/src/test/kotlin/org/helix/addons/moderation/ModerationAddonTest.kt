@@ -6,6 +6,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.helix.addon.sdk.testing.RecordingAddonContext
+import org.helix.api.action.ActionDescriptor
+import org.helix.api.action.ActionResult
 
 class ModerationAddonTest {
     private val context = RecordingAddonContext(createTempDirectory("moderation"))
@@ -16,7 +18,7 @@ class ModerationAddonTest {
         val commands = context.handlers.values.map { it.first }.filter { it.playerCommand }
 
         assertEquals(
-            setOf("kick", "warn", "warns", "announce", "tempban"),
+            setOf("kick", "warn", "warns", "announce", "tempban", "mute", "unmute", "mutes", "blocklist", "modlookup"),
             commands.map { it.name }.toSet(),
         )
         assertTrue(commands.all { it.permission!!.startsWith("helix.mod.") })
@@ -60,7 +62,7 @@ class ModerationAddonTest {
         context.run("tempban", "Mod", "Griefer", "7d", "cheating")
 
         val ban = context.invocations.single { it.action == "ban.set" }
-        assertEquals(listOf("Griefer", "7d", "cheating"), ban.arguments)
+        assertEquals(listOf("Griefer", "Mod", "7d", "cheating"), ban.arguments)
     }
 
     @Test
@@ -79,5 +81,62 @@ class ModerationAddonTest {
         assertFalse(context.run("kick", "Mod").success)
         assertFalse(context.run("warn", "Mod", "Steve").success)
         assertFalse(context.run("tempban", "Mod", "Griefer").success)
+    }
+
+    @Test
+    fun `mute and unmute message the target and publish the bridge mute map`() {
+        assertTrue(context.run("mute", "Mod", "Steve", "spamming").success)
+        assertTrue(
+            context.invocations.single { it.action == "player.message" }.arguments[1].contains("muted"),
+        )
+        assertTrue(context.bridgeValues["moderation.mutes"]!!.contains("steve"))
+
+        assertTrue(context.run("unmute", "Mod", "Steve").success)
+        assertFalse(context.bridgeValues["moderation.mutes"]!!.contains("steve"))
+    }
+
+    @Test
+    fun `unmute without an active mute fails`() {
+        assertFalse(context.run("unmute", "Mod", "Steve").success)
+    }
+
+    @Test
+    fun `blocklist add remove and list round-trip and publish to the bridge`() {
+        assertTrue(context.run("blocklist", "Mod", "add", "badword").success)
+        assertTrue(context.bridgeValues["moderation.blocklist"]!!.contains("badword"))
+        assertTrue(context.run("blocklist", "Mod", "list").lines.first().contains("badword"))
+
+        assertTrue(context.run("blocklist", "Mod", "remove", "badword").success)
+        assertFalse(context.bridgeValues["moderation.blocklist"]!!.contains("badword"))
+        assertFalse(context.run("blocklist", "Mod", "remove", "badword").success)
+    }
+
+    @Test
+    fun `modlookup aggregates ban mute warn and incident status across addons`() {
+        context.registerAction(ActionDescriptor("ban.check", "d", "u")) { invocation ->
+            ActionResult.ok("${invocation.arguments.first().lowercase()} — griefing (permanent) — by Admin")
+        }
+        context.registerAction(ActionDescriptor("guard.query.incidents", "d", "u")) {
+            ActionResult.ok("""{"incidents":[{"name":"steve"},{"name":"steve"},{"name":"alex"}]}""")
+        }
+        context.run("warn", "Mod", "Steve", "test")
+        context.run("mute", "Mod", "Steve", "spam")
+
+        val result = context.run("modlookup", "Mod", "Steve")
+
+        assertTrue(result.success)
+        assertTrue(result.lines.any { it.contains("griefing") }, "ban status missing")
+        assertTrue(result.lines.any { it.contains("spam") }, "mute status missing")
+        assertTrue(result.lines.any { it.contains("Active warns") && it.contains("1") }, "warn count missing")
+        assertTrue(result.lines.any { it.contains("Guard incidents") && it.contains("2") }, "incident count missing")
+    }
+
+    @Test
+    fun `modlookup reports addons that are not installed instead of guessing`() {
+        val result = context.run("modlookup", "Mod", "Ghost")
+
+        assertTrue(result.success)
+        assertTrue(result.lines.any { it.contains("not installed") }, "ban.check absence must not read as clean")
+        assertTrue(result.lines.any { it.contains("none", ignoreCase = true) }, "mute status should be none")
     }
 }

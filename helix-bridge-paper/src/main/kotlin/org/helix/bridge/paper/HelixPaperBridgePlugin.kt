@@ -216,6 +216,12 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     /**
      * Renders chat with the addon-published format and display profiles.
      *
+     * Enforces the moderation addon's mute list and chat blocklist first
+     * (there is no per-message round trip to the node, so both are checked
+     * against the bridge-value snapshot synced every [PERIOD_TICKS]):
+     * a muted sender or a message containing a blocked word never reaches
+     * public chat OR a team/clan channel.
+     *
      * Messages starting with a channel prefix (`@team`, `@clan`) never reach
      * public chat: the event is cancelled and the text is forwarded to the
      * matching node player-command (`tc` / `cc`), which delivers it to the
@@ -229,6 +235,9 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     @EventHandler(ignoreCancelled = true)
     fun onChat(event: AsyncChatEvent) {
         val plain = PlainTextComponentSerializer.plainText().serialize(event.message())
+        if (blockMuted(event) || blockFiltered(event, plain)) {
+            return
+        }
         val channel = CHAT_CHANNELS.entries.firstOrNull { (prefix, _) ->
             plain.length >= prefix.length && plain.substring(0, prefix.length).equals(prefix, ignoreCase = true) &&
                 (plain.length == prefix.length || plain[prefix.length] == ' ')
@@ -259,6 +268,64 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
                 )
             },
         )
+    }
+
+    /**
+     * Cancels the event and notifies the sender when [ChatModerationGate]
+     * reports an active network mute (`moderation.mutes` bridge value).
+     *
+     * @param event the chat event.
+     * @return `true` when the message was blocked.
+     */
+    private fun blockMuted(event: AsyncChatEvent): Boolean {
+        val mutes = decodeBridgeMap<Long>("moderation.mutes") ?: return false
+        if (!ChatModerationGate.isMuted(mutes, event.player.name, System.currentTimeMillis())) {
+            return false
+        }
+        event.isCancelled = true
+        event.player.sendMessage(colored(localizedBridgeText("moderation.muteMessage", event.player)))
+        return true
+    }
+
+    /**
+     * Cancels the event and notifies the sender when [ChatModerationGate]
+     * reports the message contains a word from the configured blocklist
+     * (`moderation.blocklist` bridge value).
+     *
+     * @param event the chat event.
+     * @param plain the plain-text message.
+     * @return `true` when the message was blocked.
+     */
+    private fun blockFiltered(event: AsyncChatEvent, plain: String): Boolean {
+        val blocked = bridgeValues["moderation.blocklist"]
+            ?.let { runCatching { json.decodeFromString<List<String>>(it) }.getOrNull() }
+            ?: return false
+        if (!ChatModerationGate.isBlocked(blocked, plain)) {
+            return false
+        }
+        event.isCancelled = true
+        event.player.sendMessage(colored(localizedBridgeText("moderation.blockedMessage", event.player)))
+        return true
+    }
+
+    /**
+     * Decodes a bridge value published as a JSON object with values of type
+     * [V], or `null` when absent/malformed.
+     */
+    private inline fun <reified V> decodeBridgeMap(key: String): Map<String, V>? =
+        bridgeValues[key]?.let { runCatching { json.decodeFromString<Map<String, V>>(it) }.getOrNull() }
+
+    /**
+     * Resolves a bilingual (`en`/`de`) bridge-published text by the player's
+     * own reported client locale via [ChatModerationGate.localize] — there
+     * is no per-message round trip to the node here, so this cannot go
+     * through the node's per-player language preference like every other
+     * moderation message; the client's self-reported locale is the only
+     * language signal available bridge-side.
+     */
+    private fun localizedBridgeText(key: String, player: Player): String {
+        val texts = decodeBridgeMap<String>(key) ?: return ""
+        return ChatModerationGate.localize(texts, player.locale().language)
     }
 
     /**
