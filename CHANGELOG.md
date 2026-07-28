@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.76.0 — 2026-07-28
+
+### Fix: IGui-Textur-Datenbank ohne direkte DB-Verbindung
+- **`/profilemenu` warf beim Start eine `IllegalStateException`**
+  („Configure PostgreSQL in IGui.install with postgres(...)"), weil die
+  IGui-Konfiguration ohne Textur-Datenbank initialisiert wurde.
+- **Neue `NodeGuiTextureDatabase`**: das Paper-Menü spricht jetzt über
+  neue `profile.texture.list/get/put/remove`-Actions mit dem Profile-Addon
+  statt eine eigene (Postgres-)Datenbankverbindung vom Spielserver aus
+  aufzumachen — konsistent mit der Storage-Anbindung jedes anderen
+  Addons in diesem Projekt (z. B. Guard: `storage.mode: helix` →
+  `guard.store.*`-Actions → Node-Storage-Provider).
+
 ## 0.75.0 — 2026-07-28
 
 ### Neuer Release-Workflow
