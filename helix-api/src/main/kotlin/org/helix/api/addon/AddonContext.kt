@@ -89,12 +89,17 @@ interface AddonContext {
     fun onlinePlayers(): List<OnlinePlayer> = emptyList()
 
     /**
-     * Resolves a player name to its current owner's uuid, from the node's
-     * identity registry (populated as players join).
+     * Resolves the UUID a player name is known by on this network, even
+     * while the player is offline, from the node's identity registry
+     * (populated as players join).
      *
      * The primary defence against ban/permission evasion through renaming or
      * Mojang name recycling: identity-sensitive addons should key their
      * persisted data on this uuid instead of the name whenever it is known.
+     * Also used to tell a real, previously-seen account name apart from an
+     * arbitrary or misspelled one — for example to stop a nick from
+     * impersonating a known premium account, or to reject `/pay` to a name
+     * nobody has ever joined with.
      *
      * @param name player name, case-insensitive.
      * @return the uuid, or `null` when this node has never seen that name join.

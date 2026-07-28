@@ -16,6 +16,7 @@ class DiscordAddonTest {
         botToken = "token",
         channelId = "123",
         adminUserIds = listOf("42"),
+        allowedActions = listOf("service.start"),
     )
     private val handler = DiscordCommandHandler(context.actions, { config })
 
@@ -60,6 +61,28 @@ class DiscordAddonTest {
 
         assertTrue(allowed!!.contains("started Lobby-1"))
         assertEquals(listOf("Lobby"), context.invocations.single { it.action == "service.start" }.arguments)
+    }
+
+    @Test
+    fun `run is restricted to the configured allowlist even for admins`() {
+        context.registerAction(ActionDescriptor("eco.give", "give", "eco.give <player> <amount>")) {
+            ActionResult.ok("done")
+        }
+
+        val denied = handler.handle("42", false, "123", "!run eco.give Steve 100")
+
+        assertEquals("That action is not on the allowlist.", denied)
+        assertTrue(context.invocations.none { it.action == "eco.give" })
+    }
+
+    @Test
+    fun `run denies everything when the allowlist is empty by default`() {
+        val defaultConfig = DiscordConfig(botToken = "token", channelId = "123", adminUserIds = listOf("42"))
+        val defaultHandler = DiscordCommandHandler(context.actions, { defaultConfig })
+
+        val denied = defaultHandler.handle("42", false, "123", "!run service.start Lobby")
+
+        assertEquals("That action is not on the allowlist.", denied)
     }
 
     @Test

@@ -232,7 +232,7 @@ class ClanAddon : AddonBase() {
 
     private fun create(executor: String, args: List<String>): ActionResult {
         val tag = args.getOrNull(0) ?: return ActionResult.error(msg.formatFor(executor, "create.usage"))
-        val name = args.drop(1).joinToString(" ").trim()
+        val name = args.drop(1).joinToString(" ")
         if (name.isEmpty()) {
             return ActionResult.error(msg.formatFor(executor, "create.usage"))
         }
@@ -241,6 +241,9 @@ class ClanAddon : AddonBase() {
         }
         if (!TAG_PATTERN.matches(tag)) {
             return ActionResult.error(msg.formatFor(executor, "error.tagformat"))
+        }
+        if (name != name.trim() || !NAME_PATTERN.matches(name)) {
+            return ActionResult.error(msg.formatFor(executor, "error.nameformat"))
         }
         if (store.tagTaken(tag)) {
             return ActionResult.error(msg.formatFor(executor, "error.tagtaken"))
@@ -465,6 +468,14 @@ class ClanAddon : AddonBase() {
         }
     }
 
+    /**
+     * Takes [amount] from the executor's balance and credits the clan bank.
+     *
+     * The player's coins are only taken once the bank credit is confirmed
+     * (via [ClanStore.adjustBank]'s return value); if the credit fails —
+     * for example because the clan was disbanded concurrently — the
+     * player is refunded instead of the coins being silently destroyed.
+     */
     private fun deposit(executor: String, clanId: String, amountArg: String?): ActionResult {
         val amount = amountArg?.toLongOrNull()?.takeIf { it > 0 }
             ?: return ActionResult.error(msg.formatFor(executor, "bank.amount"))
@@ -472,13 +483,27 @@ class ClanAddon : AddonBase() {
         if (!take.success) {
             return ActionResult.error(msg.formatFor(executor, "bank.deposit.fail"))
         }
-        store.adjustBank(clanId, amount)
+        if (!store.adjustBank(clanId, amount)) {
+            eco("eco.give", executor, amount)
+            return ActionResult.error(msg.formatFor(executor, "error.noclan"))
+        }
         val bank = store.clanById(clanId)?.bank ?: amount
         return ActionResult.ok(
             msg.formatFor(executor, "bank.deposit.ok", "amount" to amount.toString(), "bank" to bank.toString()),
         )
     }
 
+    /**
+     * Debits [amount] from the clan bank and pays it out to the executor.
+     *
+     * The bank is debited FIRST through [ClanStore.adjustBank], which
+     * atomically rejects a debit that would take the bank negative; only
+     * once that debit actually succeeds is the player paid out. This
+     * avoids a coin-duplication race where a stale bank snapshot lets two
+     * concurrent withdrawals both pay out before either debit lands. If
+     * the payout itself then fails, the debit is undone so the bank's
+     * coins are never destroyed either.
+     */
     private fun withdraw(executor: String, clanId: String, amountArg: String?): ActionResult {
         val clan = store.clanById(clanId) ?: return ActionResult.error(msg.formatFor(executor, "error.noclan"))
         if (!canManage(clan, executor)) {
@@ -486,14 +511,14 @@ class ClanAddon : AddonBase() {
         }
         val amount = amountArg?.toLongOrNull()?.takeIf { it > 0 }
             ?: return ActionResult.error(msg.formatFor(executor, "bank.amount"))
-        if (clan.bank < amount) {
+        if (!store.adjustBank(clanId, -amount)) {
             return ActionResult.error(msg.formatFor(executor, "bank.withdraw.funds"))
         }
         val give = eco("eco.give", executor, amount)
         if (!give.success) {
+            store.adjustBank(clanId, amount)
             return ActionResult.error(msg.formatFor(executor, "bank.withdraw.fail"))
         }
-        store.adjustBank(clanId, -amount)
         val bank = store.clanById(clanId)?.bank ?: 0
         return ActionResult.ok(
             msg.formatFor(executor, "bank.withdraw.ok", "amount" to amount.toString(), "bank" to bank.toString()),
@@ -637,6 +662,7 @@ class ClanAddon : AddonBase() {
             "error.tagtaken" to "&cThat tag is already taken.",
             "error.nametaken" to "&cThat name is already taken.",
             "error.tagformat" to "&cThe tag must be 2-5 alphanumeric characters.",
+            "error.nameformat" to "&cThe name must be 3-24 characters, without color codes or control characters.",
             "error.notofficer" to "&cYou must be an officer or the owner.",
             "error.notowner" to "&cOnly the owner can do that.",
             "error.notmember" to "&c{target} is not in your clan.",
@@ -700,6 +726,7 @@ class ClanAddon : AddonBase() {
             "error.tagtaken" to "&cDieser Tag ist bereits vergeben.",
             "error.nametaken" to "&cDieser Name ist bereits vergeben.",
             "error.tagformat" to "&cDer Tag muss 2-5 alphanumerische Zeichen haben.",
+            "error.nameformat" to "&cDer Name muss 3-24 Zeichen haben, ohne Farbcodes oder Steuerzeichen.",
             "error.notofficer" to "&cDu musst Offizier oder Besitzer sein.",
             "error.notowner" to "&cNur der Besitzer kann das tun.",
             "error.notmember" to "&c{target} ist nicht in deinem Clan.",
@@ -713,5 +740,13 @@ class ClanAddon : AddonBase() {
     private companion object {
         /** Valid clan tag: 2-5 alphanumeric characters. */
         val TAG_PATTERN = Regex("[A-Za-z0-9]{2,5}")
+
+        /**
+         * Valid clan name: 3-24 characters, no control characters and no `&`
+         * or `§` (both trigger a Minecraft color/formatting code, which
+         * would let a clan name inject markup into chat, tab and the name
+         * tag suffix). Leading/trailing whitespace is rejected separately.
+         */
+        val NAME_PATTERN = Regex("[^\\p{Cntrl}&§]{3,24}")
     }
 }

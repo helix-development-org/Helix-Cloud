@@ -515,6 +515,12 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         scoreboardTask = server.scheduler.runTaskTimer(this, Runnable { refreshScoreboards() }, 1L, interval)
     }
 
+    /**
+     * Resolves the board's global placeholders once for the whole tick, then
+     * applies the (much smaller) per-player substitution for each viewer —
+     * previously every global lookup (tps, clock, online count, ...) was
+     * redone once per line per online player instead of once per refresh.
+     */
     private fun refreshScoreboards() {
         val board = activeBoard()?.takeIf { it.enabled && it.lines.isNotEmpty() }
         if (board == null) {
@@ -522,7 +528,10 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
             return
         }
         val manager = server.scoreboardManager ?: return
-        server.onlinePlayers.forEach { player -> runCatching { applyBoard(player, board, manager) } }
+        val global = globalPlaceholderValues()
+        val title = ScoreboardPlaceholders.global(board.title, global)
+        val lines = board.boundedLines().map { ScoreboardPlaceholders.global(it, global) }
+        server.onlinePlayers.forEach { player -> runCatching { applyBoard(player, title, lines, manager) } }
         playerBoards.keys.toList().forEach { name ->
             if (server.getPlayerExact(name) == null) {
                 playerBoards.remove(name)
@@ -530,19 +539,38 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         }
     }
 
+    /** The board values that are identical for every viewer this tick. */
+    private fun globalPlaceholderValues(): ScoreboardPlaceholders.Global {
+        val now = LocalTime.now()
+        return ScoreboardPlaceholders.Global(
+            online = bridgeValues["network.online"]?.toIntOrNull() ?: server.onlinePlayers.size,
+            max = server.maxPlayers,
+            server = settings?.serviceId ?: "",
+            task = settings?.task ?: "",
+            tps = String.format(java.util.Locale.ROOT, "%.1f", server.tps.firstOrNull() ?: 20.0),
+            date = LocalDate.now().toString(),
+            time = String.format(java.util.Locale.ROOT, "%02d:%02d", now.hour, now.minute),
+            network = bridgeValues["network.name"] ?: "",
+            prefix = bridgeValues["network.prefix"] ?: "",
+        )
+    }
+
     /**
      * Builds (or updates in place, to avoid flicker) the player's private
-     * sidebar scoreboard from [board], substituting placeholders per player.
+     * sidebar scoreboard from the already globally-substituted [title] and
+     * [lines], applying only this viewer's per-player placeholders on top.
      * Each line is stored on a per-index team prefix with a unique invisible
      * score entry, so identical lines still render (a Bukkit quirk).
      *
      * @param player the viewer.
-     * @param board the active board configuration.
+     * @param title the board title, global placeholders already substituted.
+     * @param lines the board lines, global placeholders already substituted.
      * @param manager the server scoreboard manager.
      */
     private fun applyBoard(
         player: Player,
-        board: ScoreboardData,
+        title: String,
+        lines: List<String>,
         manager: org.bukkit.scoreboard.ScoreboardManager,
     ) {
         // A fresh private board must carry the display teams of everyone online, otherwise this
@@ -553,8 +581,8 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
                 it.displaySlot = DisplaySlot.SIDEBAR
                 runCatching { it.numberFormat(io.papermc.paper.scoreboard.numbers.NumberFormat.blank()) }
             }
-        objective.displayName(colored(placeholders(board.title, player)))
-        val lines = board.boundedLines()
+        val perPlayer = perPlayerPlaceholderValues(player)
+        objective.displayName(colored(ScoreboardPlaceholders.player(title, perPlayer)))
         lines.forEachIndexed { index, raw ->
             val entry = invisibleEntry(index)
             val team = scoreboard.getTeam(LINE_TEAM_PREFIX + index)
@@ -563,7 +591,7 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
             if (!team.hasEntry(entry)) {
                 team.addEntry(entry)
             }
-            team.prefix(colored(placeholders(raw, player)))
+            team.prefix(colored(ScoreboardPlaceholders.player(raw, perPlayer)))
             objective.getScore(entry).score = lines.size - index
         }
         for (index in lines.size until ScoreboardData.MAX_LINES) {
@@ -573,6 +601,24 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         if (player.scoreboard !== scoreboard) {
             player.scoreboard = scoreboard
         }
+    }
+
+    /** The board values specific to one viewer. */
+    private fun perPlayerPlaceholderValues(player: Player): ScoreboardPlaceholders.PerPlayer {
+        val location = player.location
+        val profile = displayProfiles[player.name.lowercase()] ?: DisplayProfile()
+        return ScoreboardPlaceholders.PerPlayer(
+            name = player.name,
+            displayName = profile.displayName(player.name),
+            nick = profile.nameOr(player.name),
+            ping = player.ping,
+            world = location.world?.name ?: "",
+            x = location.blockX,
+            y = location.blockY,
+            z = location.blockZ,
+            balance = bridgeValues["economy.balance.${player.name.lowercase()}"] ?: "",
+            clan = bridgeValues["clan.tag.${player.name.lowercase()}"] ?: "",
+        )
     }
 
     private fun clearAllScoreboards() {
@@ -593,35 +639,6 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     private fun invisibleEntry(index: Int): String {
         val hex = "0123456789abcdef"
         return "§${hex[index % 16]}§r"
-    }
-
-    private fun placeholders(text: String, player: Player): String {
-        val location = player.location
-        val now = LocalTime.now()
-        val profile = displayProfiles[player.name.lowercase()] ?: DisplayProfile()
-        /** Resolves a shared network placeholder for this player, defaulting to empty. */
-        fun placeholder(identifier: String, onlineCount: Int = 0) =
-            NetworkPlaceholders.resolve(identifier, player.name, bridgeValues, profile, onlineCount) ?: ""
-        return text
-            .replace("{player}", player.name)
-            .replace("{displayname}", placeholder("displayname"))
-            .replace("{nick}", placeholder("nick"))
-            .replace("{online}", placeholder("online", server.onlinePlayers.size))
-            .replace("{max}", server.maxPlayers.toString())
-            .replace("{server}", settings?.serviceId ?: "")
-            .replace("{task}", settings?.task ?: "")
-            .replace("{ping}", player.ping.toString())
-            .replace("{tps}", String.format(java.util.Locale.ROOT, "%.1f", server.tps.firstOrNull() ?: 20.0))
-            .replace("{world}", location.world?.name ?: "")
-            .replace("{x}", location.blockX.toString())
-            .replace("{y}", location.blockY.toString())
-            .replace("{z}", location.blockZ.toString())
-            .replace("{date}", LocalDate.now().toString())
-            .replace("{time}", String.format(java.util.Locale.ROOT, "%02d:%02d", now.hour, now.minute))
-            .replace("{network}", placeholder("network"))
-            .replace("{prefix}", placeholder("prefix"))
-            .replace("{balance}", placeholder("balance"))
-            .replace("{clan}", placeholder("clan"))
     }
 
     private fun placeholders(text: String): String = text

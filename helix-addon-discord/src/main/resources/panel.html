@@ -11,6 +11,7 @@
       <div class="field"><label>Command prefix</label><input id="prefix" placeholder="!"></div>
       <div class="field"><label>Notification categories <span class="muted">(comma-separated)</span></label><input id="categories" placeholder="moderation"></div>
       <div class="field wide" style="grid-column:1/-1"><label>Admin user IDs <span class="muted">(comma-separated, may use !run)</span></label><input id="admins" placeholder="1111,2222"></div>
+      <div class="field wide" style="grid-column:1/-1"><label>Allowed !run actions <span class="muted">(comma-separated, empty = !run always denied)</span></label><input id="actions" placeholder="platform.overview,player.list"></div>
     </div>
     <div class="row" style="margin-top:14px"><button class="btn" id="save">Save &amp; reconnect</button></div>
   </div>
@@ -29,6 +30,7 @@ async function load() {
   document.getElementById("prefix").value = c.commandPrefix || "!";
   document.getElementById("categories").value = (c.notificationCategories || []).join(",");
   document.getElementById("admins").value = (c.adminUserIds || []).join(",");
+  document.getElementById("actions").value = (c.allowedActions || []).join(",");
   document.getElementById("status").innerHTML =
     (c.connected ? '<span class="badge good">connected</span>' : '<span class="badge neutral">offline</span>')
     + (c.tokenSet ? '<span class="badge good">token set</span>' : '<span class="badge warn">no token</span>')
@@ -41,6 +43,7 @@ document.getElementById("save").onclick = async () => {
   args.push("prefix=" + (document.getElementById("prefix").value.trim() || "!"));
   args.push("categories=" + document.getElementById("categories").value.trim());
   args.push("admins=" + document.getElementById("admins").value.trim());
+  args.push("actions=" + document.getElementById("actions").value.trim());
   const r = await Helix.action("discord.config.set", ...args);
   Helix.toast(r.lines[0] || "saved"); document.getElementById("token").value = ""; setTimeout(load, 800);
 };

@@ -63,6 +63,25 @@ class NickAddonTest {
     }
 
     @Test
+    fun `nicking to an offline premium account is rejected`() {
+        context.recordJoin("ghost", "11111111-1111-1111-1111-111111111111")
+
+        assertFalse(context.run("nick", "Steve", "Ghost").success)
+    }
+
+    @Test
+    fun `nicking to a staff member is rejected`() {
+        context.permissionCheck = { player, permission -> player.equals("Admin", ignoreCase = true) && permission == "helix.admin" }
+
+        assertFalse(context.run("nick", "Steve", "Admin").success)
+    }
+
+    @Test
+    fun `nicking to a genuinely unknown name is allowed`() {
+        assertTrue(context.run("nick", "Steve", "Freshname").success)
+    }
+
+    @Test
     fun `nicks persist across restarts and admin clear removes them`() {
         context.run("nick", "Steve", "Herobrine")
 

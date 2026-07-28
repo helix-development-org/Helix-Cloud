@@ -33,6 +33,7 @@ class EconomyAddon : AddonBase() {
                     "error.self" to "&cYou cannot pay yourself.",
                     "error.funds" to "&cYou do not have enough coins.",
                     "error.usage" to "&cUsage: /pay <player> <amount>",
+                    "error.unknown" to "&cNo such player has ever joined this network.",
                 ),
                 "de" to mapOf(
                     "balance" to "&6Dein Kontostand: &f{balance} Coins",
@@ -41,6 +42,7 @@ class EconomyAddon : AddonBase() {
                     "error.self" to "&cDu kannst dir nicht selbst Coins senden.",
                     "error.funds" to "&cDu hast nicht genug Coins.",
                     "error.usage" to "&cBenutzung: /pay <player> <amount>",
+                    "error.unknown" to "&cDieser Spieler war noch nie auf diesem Netzwerk.",
                 ),
             ),
         )
@@ -121,15 +123,24 @@ class EconomyAddon : AddonBase() {
         context.publishBridgeValue("economy.balance.${player.lowercase()}", store.balance(player).toString())
     }
 
+    /**
+     * Transfers coins to a target that must be a real, previously-seen
+     * player — online now or resolvable through the node's identity
+     * registry — so a misspelled or never-seen name errors out instead of
+     * silently creating a balance record nobody will ever claim.
+     */
     private fun pay(invocation: ActionInvocation): ActionResult {
         val executor = invocation.arguments.getOrNull(0)
             ?: return ActionResult.error("missing executing player")
         val target = invocation.arguments.getOrNull(1)
             ?: return ActionResult.error(msg.formatFor(executor, "error.usage"))
-        val amount = invocation.arguments.getOrNull(2)?.toLongOrNull()
+        val amount = invocation.arguments.getOrNull(2)?.toLongOrNull()?.takeIf { it > 0 }
             ?: return ActionResult.error(msg.formatFor(executor, "error.usage"))
         if (executor.equals(target, ignoreCase = true)) {
             return ActionResult.error(msg.formatFor(executor, "error.self"))
+        }
+        if (!isKnownPlayer(target)) {
+            return ActionResult.error(msg.formatFor(executor, "error.unknown"))
         }
         return try {
             store.transfer(executor, target, amount)
@@ -150,6 +161,11 @@ class EconomyAddon : AddonBase() {
             ActionResult.error(msg.formatFor(executor, "error.funds"))
         }
     }
+
+    /** Whether [name] is online now or has ever joined with a known uuid. */
+    private fun isKnownPlayer(name: String): Boolean =
+        context.onlinePlayers().any { it.name.equals(name, ignoreCase = true) } ||
+            context.resolvePlayerUuid(name) != null
 
     private fun adminChange(
         invocation: ActionInvocation,

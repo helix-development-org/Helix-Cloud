@@ -16,7 +16,9 @@ import org.slf4j.LoggerFactory
  *
  * @property clock epoch millis source, injectable for tests.
  */
-class PlayerRegistry(private val clock: () -> Long = System::currentTimeMillis) {
+class PlayerRegistry(
+    private val clock: () -> Long = System::currentTimeMillis,
+) {
     private val logger = LoggerFactory.getLogger(PlayerRegistry::class.java)
     private val players = ConcurrentHashMap<String, OnlinePlayer>()
     private val listeners = ConcurrentHashMap<String, CopyOnWriteArrayList<PlayerListener>>()

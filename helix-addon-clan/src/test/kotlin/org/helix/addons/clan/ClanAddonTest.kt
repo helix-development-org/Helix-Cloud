@@ -92,6 +92,28 @@ class ClanAddonTest {
     }
 
     @Test
+    fun `clan name format is validated`() {
+        assertFalse(context.run("clan", "Steve", "create", "STV", "Hi").success, "too short")
+        assertFalse(
+            context.run("clan", "Steve", "create", "STV", "A".repeat(25)).success,
+            "too long",
+        )
+        assertFalse(
+            context.run("clan", "Steve", "create", "STV", "&cRed Team").success,
+            "color codes are rejected",
+        )
+        assertFalse(
+            context.run("clan", "Steve", "create", "STV", " Padded").success,
+            "leading whitespace is rejected",
+        )
+        assertFalse(
+            context.run("clan", "Steve", "create", "STV", "Padded ").success,
+            "trailing whitespace is rejected",
+        )
+        assertTrue(context.run("clan", "Steve", "create", "STV", "The Steverians").success)
+    }
+
+    @Test
     fun `invite accept joins the clan and notifies members`() {
         createClan()
         val invited = context.run("clan", "Steve", "invite", "Alex")
@@ -194,7 +216,53 @@ class ClanAddonTest {
     }
 
     @Test
-    fun `display resolver returns the tag only after verification`() {
+    fun `withdraw never pays out when the bank debit fails`() {
+        createClan()
+        stubEco("eco.give", ActionResult.ok())
+
+        val result = context.run("clan", "Steve", "bank", "withdraw", "9000")
+
+        assertFalse(result.success)
+        assertTrue(context.invocations.none { it.action == "eco.give" }, "coins must never reach the player")
+    }
+
+    @Test
+    fun `withdraw refunds the clan bank when the payout fails`() {
+        createClan()
+        stubEco("eco.take", ActionResult.ok())
+        context.run("clan", "Steve", "bank", "deposit", "500")
+        stubEco("eco.give", ActionResult.error("economy unavailable"))
+
+        val result = context.run("clan", "Steve", "bank", "withdraw", "200")
+
+        assertFalse(result.success)
+        assertEquals(500L, ClanStore(context.storage).clanById("stevers")!!.bank, "the debit must be undone")
+    }
+
+    @Test
+    fun `deposit refunds the player when crediting the bank fails`() {
+        createClan()
+        // Simulates the clan being disbanded by another command between the
+        // player's coins being taken and the bank actually being credited —
+        // routed through the addon's own admin action so it mutates the same
+        // live ClanStore instance the bank command uses.
+        context.registerAction(ActionDescriptor("eco.take", "take", "eco.take")) {
+            context.run("clan.disband", "stevers")
+            ActionResult.ok()
+        }
+        context.registerAction(ActionDescriptor("eco.give", "give", "eco.give")) { ActionResult.ok() }
+
+        val result = context.run("clan", "Steve", "bank", "deposit", "500")
+
+        assertFalse(result.success)
+        assertTrue(
+            context.invocations.any { it.action == "eco.give" && it.arguments == listOf("Steve", "500") },
+            "the player must be refunded instead of the coins being destroyed",
+        )
+    }
+
+    @Test
+    fun `display resolver returns the tag for members and null otherwise`() {
         createClan()
         val resolver = context.displayResolvers.single()
 

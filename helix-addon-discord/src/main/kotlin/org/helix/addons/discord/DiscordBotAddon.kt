@@ -82,6 +82,7 @@ class DiscordBotAddon : AddonBase() {
                 commandPrefix = config.commandPrefix,
                 notificationCategories = config.notificationCategories,
                 adminUserIds = config.adminUserIds,
+                allowedActions = config.allowedActions,
                 tokenSet = config.botToken.isNotBlank(),
                 connected = kordRef.get() != null,
             )
@@ -89,7 +90,7 @@ class DiscordBotAddon : AddonBase() {
         }
         action(
             "discord.config.set",
-            "Updates the bot config and reconnects. Keys: token, channel, prefix, categories, admins.",
+            "Updates the bot config and reconnects. Keys: token, channel, prefix, categories, admins, actions.",
             "discord.config.set <key=value>...",
         ) { invocation -> updateConfig(invocation) }
         panel(
@@ -116,6 +117,7 @@ class DiscordBotAddon : AddonBase() {
             commandPrefix = overrides["prefix"] ?: current.commandPrefix,
             notificationCategories = list("categories") ?: current.notificationCategories,
             adminUserIds = list("admins") ?: current.adminUserIds,
+            allowedActions = list("actions") ?: current.allowedActions,
         )
         DiscordConfig.save(context.storage(), updated)
         stopBot()

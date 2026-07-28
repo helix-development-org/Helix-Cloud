@@ -14,8 +14,10 @@ import org.helix.api.message.Messages
  * - `!status` — platform overview,
  * - `!players` — online players,
  * - `!help` — command list,
- * - `!run <action> [args...]` — any platform action, restricted to the
- *   configured admin user ids.
+ * - `!run <action> [args...]` — a platform action, restricted to the
+ *   configured admin user ids AND to the configured action allowlist (opt-in,
+ *   empty by default — a Discord channel must never reach the full action
+ *   registry just because a user id is an admin).
  *
  * @property actions action entry point of the node.
  * @property config supplies the current configuration.
@@ -69,6 +71,9 @@ class DiscordCommandHandler(
             return messages.raw("run.denied")
         }
         val action = tokens.firstOrNull() ?: return "Usage: ${current.commandPrefix}run <action> [args...]"
+        if (action !in current.allowedActions) {
+            return messages.raw("run.notallowed")
+        }
         return reply(
             actions.invoke(
                 ActionInvocation(action, tokens.drop(1), ActionSource.ADDON),
@@ -93,10 +98,12 @@ class DiscordCommandHandler(
         val DEFAULT_MESSAGES = mapOf(
             "en" to mapOf(
                 "run.denied" to "You are not allowed to run actions.",
+                "run.notallowed" to "That action is not on the allowlist.",
                 "unavailable" to "Command is currently unavailable.",
             ),
             "de" to mapOf(
                 "run.denied" to "Du darfst keine Aktionen ausführen.",
+                "run.notallowed" to "Diese Aktion steht nicht auf der Erlaubnisliste.",
                 "unavailable" to "Der Befehl ist gerade nicht verfügbar.",
             ),
         )

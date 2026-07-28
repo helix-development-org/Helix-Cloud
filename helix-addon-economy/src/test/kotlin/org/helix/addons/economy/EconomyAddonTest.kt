@@ -31,6 +31,7 @@ class EconomyAddonTest {
     @Test
     fun `pay transfers coins and notifies the receiver`() {
         context.run("eco.give", "Steve", "100")
+        context.online += org.helix.api.player.OnlinePlayer(name = "Alex")
 
         val result = context.run("pay", "Steve", "Alex", "40")
 
@@ -42,11 +43,33 @@ class EconomyAddonTest {
     }
 
     @Test
+    fun `pay to an offline but known player still works`() {
+        context.run("eco.give", "Steve", "100")
+        context.recordJoin("alex", "11111111-1111-1111-1111-111111111111")
+
+        assertTrue(context.run("pay", "Steve", "Alex", "40").success)
+        assertTrue(context.run("eco.get", "Alex").lines.single().contains("40"))
+    }
+
+    @Test
+    fun `pay to a name nobody has ever joined with is rejected`() {
+        context.run("eco.give", "Steve", "100")
+
+        val result = context.run("pay", "Steve", "Alex", "40")
+
+        assertFalse(result.success)
+        assertTrue(context.run("eco.get", "Steve").lines.single().contains("100"), "the sender must keep the coins")
+        assertTrue(context.run("eco.get", "Alex").lines.single().contains("1000"), "no balance record was created")
+    }
+
+    @Test
     fun `pay validates funds amount and self`() {
         context.run("eco.set", "Steve", "10")
+        context.online += org.helix.api.player.OnlinePlayer(name = "Alex")
 
         assertFalse(context.run("pay", "Steve", "Alex", "50").success)
         assertFalse(context.run("pay", "Steve", "Alex", "-5").success)
+        assertFalse(context.run("pay", "Steve", "Alex", "0").success)
         assertFalse(context.run("pay", "Steve", "Steve", "5").success)
         assertFalse(context.run("pay", "Steve", "Alex", "abc").success)
     }

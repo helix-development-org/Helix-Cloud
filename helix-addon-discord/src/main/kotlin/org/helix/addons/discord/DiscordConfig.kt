@@ -14,6 +14,10 @@ import org.helix.api.storage.AddonStorage
  * @property notificationCategories notification-bus categories forwarded
  *   to the channel.
  * @property adminUserIds Discord user ids allowed to use `!run`.
+ * @property allowedActions action names `!run` may invoke, opt-in and empty
+ *   by default — a Discord channel must never reach the full action
+ *   registry (including administrative actions) just because a user id is
+ *   in [adminUserIds].
  */
 @Serializable
 data class DiscordConfig(
@@ -22,6 +26,7 @@ data class DiscordConfig(
     val commandPrefix: String = "!",
     val notificationCategories: List<String> = listOf("moderation"),
     val adminUserIds: List<String> = emptyList(),
+    val allowedActions: List<String> = emptyList(),
 ) {
     /**
      * Whether token and channel are configured.

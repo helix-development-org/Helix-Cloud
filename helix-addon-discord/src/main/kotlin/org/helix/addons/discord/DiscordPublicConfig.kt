@@ -9,6 +9,7 @@ import kotlinx.serialization.Serializable
  * @property commandPrefix command prefix.
  * @property notificationCategories forwarded notification categories.
  * @property adminUserIds ids allowed to use `!run`.
+ * @property allowedActions action names `!run` may invoke.
  * @property tokenSet whether a bot token is stored.
  * @property connected whether the bot is currently connected.
  */
@@ -18,6 +19,7 @@ data class DiscordPublicConfig(
     val commandPrefix: String,
     val notificationCategories: List<String>,
     val adminUserIds: List<String>,
+    val allowedActions: List<String>,
     val tokenSet: Boolean,
     val connected: Boolean,
 )

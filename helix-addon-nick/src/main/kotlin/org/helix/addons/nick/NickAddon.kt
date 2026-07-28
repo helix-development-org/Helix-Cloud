@@ -125,14 +125,19 @@ class NickAddon : AddonBase() {
 
     /**
      * Whether a nick would impersonate someone: it matches an online
-     * player's account name or another player's active nick. The player's
-     * own account name stays allowed (cosmetic re-casing).
+     * player's account name, another player's active nick, the name of any
+     * known premium account that has ever joined this network (even while
+     * offline, via the node's identity registry), or the name of a staff
+     * member (holding [STAFF_PERMISSION]). The player's own account name
+     * stays allowed (cosmetic re-casing).
      */
     private fun taken(nick: String, executor: String): Boolean {
         val lower = nick.lowercase()
         if (lower == executor.lowercase()) return false
         if (context.onlinePlayers().any { it.name.lowercase() == lower }) return true
-        return nicks.any { (owner, active) -> owner != executor.lowercase() && active.lowercase() == lower }
+        if (nicks.any { (owner, active) -> owner != executor.lowercase() && active.lowercase() == lower }) return true
+        if (context.resolvePlayerUuid(nick) != null) return true
+        return context.hasPermission(nick, STAFF_PERMISSION)
     }
 
     private fun load(): Map<String, String> =
@@ -173,6 +178,9 @@ class NickAddon : AddonBase() {
     private companion object {
         /** Allowed nick shape, mirroring Minecraft account names. */
         val NICK_PATTERN = Regex("^[A-Za-z0-9_]{3,16}$")
+
+        /** Permission node that marks a player as staff, whose name may never be nicked to. */
+        const val STAFF_PERMISSION = "helix.admin"
     }
 }
 
