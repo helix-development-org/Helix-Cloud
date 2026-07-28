@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.66.0 — 2026-07-28
+
+Erste Etappe von Phase 2 (Content & Ökosystem): Korrektheits-Fixes im
+Gameplay-Bereich.
+
+### Clan-Bank: kein Münz-Dupe/-Verlust mehr
+- **`/clan bank withdraw` zahlt jetzt erst aus, nachdem die Bank tatsächlich
+  belastet wurde**, statt umgekehrt. Vorher konnte ein fehlgeschlagener oder
+  durch ein Wettrennen zweier gleichzeitiger Abhebungen ungültig gewordener
+  Bank-Abzug trotzdem echte Münzen an den Spieler auszahlen — ein
+  Dupe-Bug.
+- **`/clan bank deposit` erstattet die Münzen jetzt zurück**, wenn die
+  Gutschrift auf der Bank fehlschlägt (z. B. weil der Clan zwischenzeitlich
+  aufgelöst wurde), statt sie stillschweigend zu vernichten.
+
+### Nick: Impersonation-Schutz erweitert
+- **Ein Nick darf jetzt auch nicht mehr den Namen eines bekannten,
+  aktuell offline Premium-Accounts oder eines Staff-Mitglieds annehmen**
+  (bisher nur online Spieler und bereits aktive Nicks gesperrt).
+
+### Weitere Korrekturen
+- **Clan-Namen werden jetzt validiert** (Länge, keine Formatierungscodes,
+  kein führendes/nachfolgendes Leerzeichen).
+- **`/pay` verlangt jetzt einen echten, bekannten Spieler** als Ziel und
+  lehnt Null-/Negativbeträge korrekt ab, statt stillschweigend Münzen ins
+  Leere zu senden.
+- **Scoreboard-Platzhalter werden nicht mehr pro Zeile und Spieler neu
+  aufgelöst**, sondern einmal pro Tick global plus ein schlanker
+  Pro-Spieler-Durchlauf.
+- **Discord `!run` erzwingt jetzt eine konfigurierbare, standardmäßig
+  leere Aktions-Allowlist**, statt jedem Discord-Admin direkten Zugriff auf
+  alle Actions zu geben.
+
 ## 0.61.0 — 2026-07-28
 
 Nachgezogene sechste Etappe von Phase 1 (Addon-Plattform), die zuvor an
