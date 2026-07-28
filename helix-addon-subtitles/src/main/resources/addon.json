@@ -1,0 +1,7 @@
+{
+  "id": "helix.subtitles",
+  "name": "Helix Subtitles",
+  "version": "1.0.0",
+  "main": "org.helix.addons.subtitles.SubtitleAddon",
+  "description": "A second display line below the player's name tag, chosen from an operator-predefined list (or a custom permission-gated free text) via the profile addon."
+}

@@ -1,0 +1,5 @@
+name: HelixSubtitles
+version: 1.0.0
+main: org.helix.addons.subtitles.paper.SubtitlePlugin
+api-version: '1.21'
+description: Renders a player's chosen subtitle as a Text Display entity below their name tag.

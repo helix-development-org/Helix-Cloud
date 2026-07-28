@@ -46,6 +46,19 @@ class ProfileAddonTest {
     }
 
     @Test
+    fun `get reads back the current value, falling back to the descriptor default`() {
+        context.registerProfileSettingProvider(object : ProfileSettingProvider {
+            override fun settingsFor(player: String) = listOf(wingsDescriptor())
+        })
+
+        assertEquals("none", context.run("profile.setting.get", "steve", "provider-0", "wings").lines.first())
+
+        context.run("profile.setting.set", "steve", "provider-0", "wings", "angel")
+
+        assertEquals("angel", context.run("profile.setting.get", "steve", "provider-0", "wings").lines.first())
+    }
+
+    @Test
     fun `setting an unlocked option persists and notifies the owner`() {
         context.registerProfileSettingProvider(object : ProfileSettingProvider {
             override fun settingsFor(player: String) = listOf(wingsDescriptor())

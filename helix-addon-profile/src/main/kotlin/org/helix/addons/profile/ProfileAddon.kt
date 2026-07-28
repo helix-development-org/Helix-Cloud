@@ -67,6 +67,20 @@ class ProfileAddon : AddonBase() {
         }
 
         action(
+            "profile.setting.get",
+            "Reads a player's current value for one setting (falls back to the descriptor's default).",
+            "profile.setting.get <player> <owner> <key>",
+        ) { invocation ->
+            val (player, owner, key) = invocation.arguments.let {
+                Triple(it.getOrNull(0), it.getOrNull(1), it.getOrNull(2))
+            }
+            if (player == null || owner == null || key == null) {
+                return@action ActionResult.error("usage: profile.setting.get <player> <owner> <key>")
+            }
+            ActionResult.ok(store.get(player, owner, key) ?: defaultFor(player, owner, key))
+        }
+
+        action(
             "profile.setting.set",
             "Sets a player's own chosen value for a setting (enforces per-option gating).",
             "profile.setting.set <player> <owner> <key> <value>",

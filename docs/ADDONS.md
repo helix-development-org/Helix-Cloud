@@ -293,6 +293,17 @@ Referenz-Implementierungen in diesem Repo:
   Proxy-Befehl abfängt, bevor ein Paper-Plugin ihn sehen könnte.
   Dashboard-Panel **Profiles** erlaubt Staff lesenden Zugriff plus
   manuelles Setzen/Zurücksetzen.
+- `helix-addon-subtitles` (+ `helix-addon-subtitles-paper`) — eine zweite
+  Anzeigezeile unter dem Namen, gewählt über das Profile-System: eine
+  Betreiber-vordefinierte Liste (`subtitle.config.add/remove/list`, pro
+  Eintrag optional permission-gated) plus optional ein permission-gated
+  Freitext, der die Listenauswahl überschreibt. Kein eigener Wertespeicher
+  — dieses Addon liest/schreibt ausschließlich über
+  `profile.setting.get`/die Profile-Erweiterungsschnittstelle und
+  publiziert den effektiven Text als `subtitle.text.<spieler>`
+  Bridge-Value. Paper-seitig rendert eine dem Spieler folgende, nicht
+  persistente Text-Display-Entity knapp unter dem Namensschild (kein
+  Passagier-Trick, um echtes Reiten nicht zu stören).
 
 ## Lifecycle
 
