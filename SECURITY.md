@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Helix-Cloud is **pre-1.0, Beta software**. There is no long-term support
+Helix-Cloud is **pre-1.0, Alpha software**. There is no long-term support
 branch and no backporting of fixes to older tags — only the latest released
 version is supported. Expect breaking changes between minor versions until a
 1.0 release ships.

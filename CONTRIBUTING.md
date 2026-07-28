@@ -1,6 +1,6 @@
 # Contributing to Helix-Cloud
 
-Thanks for taking a look at Helix-Cloud. This is pre-1.0, Beta software
+Thanks for taking a look at Helix-Cloud. This is pre-1.0, Alpha software
 maintained by a small team, so please open an issue to discuss non-trivial
 changes before investing a lot of time in a pull request.
 

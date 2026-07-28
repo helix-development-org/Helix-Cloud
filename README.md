@@ -9,7 +9,7 @@ processes or Docker containers. Server type and version are configuration,
 not code. It ships a single `Launcher.jar`, a web dashboard, an addon system
 (`.hxa` packages), and CLI/REST control over the whole network.
 
-**This is pre-1.0, Beta software.** APIs, config formats and addon contracts
+**This is pre-1.0, Alpha software.** APIs, config formats and addon contracts
 may still change between versions. The rest of this documentation (below,
 and everything under [docs/](docs/)) is in German for now — an English
 translation is not yet available.

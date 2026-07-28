@@ -7,7 +7,7 @@ Fünfte und letzte Etappe von Phase 2: Ops & Release-Governance.
 ### CI + Governance-Dokumente
 - **Neue GitHub-Actions-Pipeline** (`./gradlew build` +
   `verifyKDocAvailability` bei jedem Push/PR).
-- **Neue `SECURITY.md`** (Pre-1.0/Beta-Status, Melde-Weg für
+- **Neue `SECURITY.md`** (Pre-1.0/Alpha-Status, Melde-Weg für
   Sicherheitslücken) und **`CONTRIBUTING.md`** (Modul-Übersicht,
   Build/Test-Befehle, KDoc-Gate).
 - **Org-Referenz korrigiert**: Das Projekt liegt jetzt unter der
@@ -177,7 +177,7 @@ einem Session-Limit gescheitert war.
 
 ## 0.60.0 — 2026-07-28
 
-Erste Etappe des Wegs zu v0.90.0-Beta: Sicherheit, Vertrauensstellung
+Erste Etappe der Kernplattform-Härtung: Sicherheit, Vertrauensstellung
 gegenüber PaperMC/Velocity, Storage-Haltbarkeit, spielerbezogene Identität
 und Node-Robustheit. Fünf Bereiche, gemeinsam entwickelt und verifiziert
 (442 Tests, KDoc-Gate grün), daher als ein Release gebündelt.
