@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.73.0 — 2026-07-28
+
+Neues `helix-addon-subtitles`: eine zweite Anzeigezeile unter dem
+Spielernamen, auswählbar über das Profile-System.
+
+### Vordefiniert + eigener Text
+- **`subtitle.config.add/remove/list`**: Betreiber pflegen eine Liste
+  wählbarer Subtitles (Text + optional ein Permission-Node pro Eintrag).
+- **Ein permission-gated Freitext** (`helix.subtitle.custom`) überschreibt
+  die Listenauswahl, wenn gesetzt.
+- Beide Optionen laufen über das neue Profile-System (`/profile` oder
+  `/profilemenu`) — dieses Addon hält keinen eigenen Wertespeicher,
+  sondern liest/schreibt ausschließlich über `profile.setting.get`.
+
+### Rendering ohne Passagier-Trick
+- **Paper-seitig rendert eine dem Spieler folgende Text-Display-Entity**
+  knapp unter dem Namensschild, jeden Tick neu positioniert statt als
+  Passagier angehängt — stört dadurch nicht, wenn der Spieler tatsächlich
+  ein Reittier nutzt.
+
 ## 0.72.0 — 2026-07-28
 
 Neues `helix-addon-profile`: das zentrale Spielerprofil, Grundlage für die
