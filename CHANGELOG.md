@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.72.0 — 2026-07-28
+
+Neues `helix-addon-profile`: das zentrale Spielerprofil, Grundlage für die
+kommenden Cosmetic-/Subtitle-Features.
+
+### Ein Profil, beliebig viele beitragende Addons
+- **Neuer Erweiterungspunkt**: jedes Addon kann über
+  `AddonContext.registerProfileInfoProvider` (read-only, z. B. Statistiken)
+  oder `registerProfileSettingProvider` (interaktiv: Toggle/Choice/Freitext)
+  Einträge im Profil eines Spielers beisteuern — ohne die anderen Addons
+  zu kennen. Der Node aggregiert, das Profile-Addon zeigt/verwaltet.
+- **Das Profile-Addon speichert den tatsächlich gewählten Wert zentral**
+  (`profile.setting.set`, mit Gating pro Option; `profile.setting.clear`
+  setzt zurück). Ein `validate`-Hook lässt beitragende Addons Prüfungen
+  durchsetzen, die das Typsystem allein nicht abbildet (z. B. ein
+  Freitext-Name, der mit einem bekannten Account kollidiert).
+- **`profile.setting.admin-set`**: Staff kann über das Dashboard jede
+  Einstellung überschreiben, auch rang-gated Optionen, die für den
+  Spieler selbst gerade gesperrt sind.
+
+### Zwei Wege zum Profil
+- **`/profile`**: netzwerkweiter Text-Fallback (funktioniert überall,
+  auch von der Konsole) — zeigt Statistiken und Einstellungen als Text,
+  `/profile set <key> <wert>` ändert eine Einstellung.
+- **`/profilemenu`**: grafisches, IGui-basiertes Menü auf Paper-Servern.
+  Bewusst ein eigener Befehlsname — Velocity registriert `/profile` als
+  Proxy-Befehl und würde ein gleichnamiges Paper-Plugin-Kommando nie zum
+  Zug kommen lassen.
+- **Dashboard-Panel „Profiles"**: Staff kann ein Spielerprofil ansehen
+  und Einstellungen manuell setzen oder zurücksetzen.
+
 ## 0.71.0 — 2026-07-28
 
 Vorarbeit für das kommende Cosmetic-/Subtitle-/Profile-Feature.
