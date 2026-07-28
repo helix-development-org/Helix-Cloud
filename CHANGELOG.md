@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.67.0 — 2026-07-28
+
+Zweite Etappe von Phase 2: Moderations- und Anticheat-Baseline.
+
+### Mute + Chat-Filter
+- **Neues `/mute`, `/unmute`, `/mutes`**: zeitlich befristete oder
+  permanente Stummschaltungen, serverseitig direkt im Chat-Pfad der Bridge
+  durchgesetzt (kein Zusatz-Roundtrip pro Nachricht).
+- **Neuer konfigurierbarer Chat-Wortfilter** (`/blocklist add|remove|list`).
+
+### Bans: Verhängender + Historie
+- **Bans tragen jetzt fest, wer sie verhängt hat** (`issuedBy`), threaded
+  durch `/bans set`, `/tempban` und die REST-Ban-Route.
+- **Aufgehobene oder abgelaufene Bans werden nicht mehr gelöscht**,
+  sondern in eine begrenzte Historie verschoben (`/bans history <player>`).
+
+### Guard-Fixes
+- **Offline-Unban-Bug behoben**: Ein Unban für einen gerade nicht
+  erreichbaren Spieler ging bisher verloren, wenn der Fire-and-Forget-Weg
+  fehlschlug — jetzt wird zuerst der garantierte synchrone Weg versucht.
+- **Aufbewahrungsfristen für Verstöße und Replays werden jetzt tatsächlich
+  durchgesetzt** (waren zuvor nur ungenutzte Konfigurationswerte).
+- **Neue Elytra-Flug-Erkennung**, konservativ kalibriert nach demselben
+  False-Positive-Anspruch wie die bestehenden Bewegungs-Checks.
+- **Physik-Profile erweitert von nur 1.21 auf 1.9–1.21.11** (via
+  ViaVersion angebundene ältere Clients werden jetzt korrekt geprüft statt
+  ungeprüft durchgelassen).
+
+### Weitere Härtung
+- **`/modlookup <player>`**: Aggregierte Ban-/Mute-/Warn-/Incident-Ansicht
+  für Staff an einem Ort.
+- **Verwarnungen laufen jetzt nach einer konfigurierbaren Frist ab**
+  (Standard 30 Tage), statt für immer in die Eskalations-Zählung
+  einzufließen.
+- **Freundschaftsanfragen haben jetzt eine Cooldown-Sperre** gegen
+  Spam/Belästigung durch wiederholte Anfragen.
+
 ## 0.66.0 — 2026-07-28
 
 Erste Etappe von Phase 2 (Content & Ökosystem): Korrektheits-Fixes im
