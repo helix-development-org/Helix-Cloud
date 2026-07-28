@@ -34,5 +34,6 @@ include(
     "helix-addon-nick",
     "helix-addon-stats",
     "helix-addon-parties",
-    "helix-addon-maprotation"
+    "helix-addon-maprotation",
+    "helix-addon-profile"
 )

@@ -1,5 +1,8 @@
 package org.helix.api.addon
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
 /**
  * One selectable option of a [ProfileSettingType.Choice] setting (for
  * example one wing cosmetic, or one predefined subtitle).
@@ -12,6 +15,7 @@ package org.helix.api.addon
  *  currently allowed to choose it (for example a rank-gated cosmetic) — the
  *  option is still shown so a locked choice is visible, just not selectable.
  */
+@Serializable
 data class ProfileSettingOption(
     val id: String,
     val label: String,
@@ -22,8 +26,10 @@ data class ProfileSettingOption(
 /**
  * The kind of value a [ProfileSettingDescriptor] accepts.
  */
+@Serializable
 sealed interface ProfileSettingType {
     /** A simple on/off switch, stored as the strings `"true"`/`"false"`. */
+    @Serializable @SerialName("toggle")
     data object Toggle : ProfileSettingType
 
     /**
@@ -32,6 +38,7 @@ sealed interface ProfileSettingType {
      *
      * @property options the choices, per-player gating already applied.
      */
+    @Serializable @SerialName("choice")
     data class Choice(val options: List<ProfileSettingOption>) : ProfileSettingType
 
     /**
@@ -40,6 +47,7 @@ sealed interface ProfileSettingType {
      * @property maxLength longest value the profile addon accepts; longer
      *  input is rejected rather than truncated.
      */
+    @Serializable @SerialName("freetext")
     data class FreeText(val maxLength: Int = 32) : ProfileSettingType
 }
 
@@ -55,6 +63,7 @@ sealed interface ProfileSettingType {
  * @property type the kind of value this setting accepts.
  * @property default the value a player who never chose one effectively has.
  */
+@Serializable
 data class ProfileSettingDescriptor(
     val key: String,
     val label: String,

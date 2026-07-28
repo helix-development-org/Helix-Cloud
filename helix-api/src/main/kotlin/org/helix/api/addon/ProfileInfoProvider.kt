@@ -1,5 +1,7 @@
 package org.helix.api.addon
 
+import kotlinx.serialization.Serializable
+
 /**
  * One read-only label/value line an addon contributes to a player's
  * profile (for example a stat total or a clan membership summary).
@@ -7,6 +9,7 @@ package org.helix.api.addon
  * @property label display name of the line.
  * @property value the line's text, already formatted for display.
  */
+@Serializable
 data class ProfileInfoEntry(
     val label: String,
     val value: String,

@@ -1,0 +1,7 @@
+{
+  "id": "helix.profile",
+  "name": "Helix Profile",
+  "version": "1.0.0",
+  "main": "org.helix.addons.profile.ProfileAddon",
+  "description": "Central player profile: aggregates read-only info and interactive settings (cosmetics, subtitles, language, ...) other addons contribute, without those addons knowing about each other."
+}

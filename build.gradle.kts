@@ -85,6 +85,7 @@ val addonModules = listOf(
     "helix-addon-stats",
     "helix-addon-parties",
     "helix-addon-maprotation",
+    "helix-addon-profile",
 )
 
 tasks.register("releaseBundle") {
