@@ -24,10 +24,10 @@ dependencies {
     // is compile-only here; the movement tests exercise packetevents types, hence the test dependency.
     compileOnly(libs.packetevents.spigot)
     testImplementation(libs.packetevents.spigot)
-    // IGui resolves through the composite build (../IGui). Its PostgreSQL texture database is unused —
-    // IGuard ships a file-backed one — so the driver and pool stay out of the plugin jar.
-    // kotlinx-coroutines-core arrives transitively as an api dependency of IGui.
-    implementation(libs.igui) {
+    // helix-gui's own PostgreSQL texture database is unused — IGuard ships a file-backed one — so
+    // the driver and pool stay out of the plugin jar. kotlinx-coroutines-core arrives transitively
+    // as an api dependency of helix-gui.
+    implementation(project(":helix-gui")) {
         exclude(group = "org.postgresql")
         exclude(group = "com.zaxxer")
     }

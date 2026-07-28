@@ -12,7 +12,6 @@ snakeyaml = "2.3"
 packetevents = "2.13.0"
 paper-api = "1.21.11-R0.1-SNAPSHOT"
 velocity-api = "3.4.0"
-igui = "1.0.0-SNAPSHOT"
 kord = "0.15.0"
 
 [libraries]
@@ -36,7 +35,6 @@ snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
 packetevents-spigot = { module = "com.github.retrooper:packetevents-spigot", version.ref = "packetevents" }
 paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper-api" }
 velocity-api = { module = "com.velocitypowered:velocity-api", version.ref = "velocity-api" }
-igui = { module = "de.tytoss:igui", version.ref = "igui" }
 kord-core = { module = "dev.kord:kord-core", version.ref = "kord" }
 
 [plugins]

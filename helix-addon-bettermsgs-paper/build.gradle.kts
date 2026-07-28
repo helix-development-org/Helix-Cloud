@@ -17,10 +17,9 @@ repositories {
 dependencies {
     implementation(rootProject.project("helix-api"))
     compileOnly(libs.paper.api)
-    // IGui resolves through the composite build (../IGui). The PostgreSQL
-    // texture database is unused — BetterMSGs ships a file-backed one — so
-    // the driver and pool stay out of the plugin jar.
-    implementation(libs.igui) {
+    // helix-gui's own PostgreSQL texture database is unused — BetterMSGs ships a file-backed one —
+    // so the driver and pool stay out of the plugin jar.
+    implementation(project(":helix-gui")) {
         exclude(group = "org.postgresql")
         exclude(group = "com.zaxxer")
     }

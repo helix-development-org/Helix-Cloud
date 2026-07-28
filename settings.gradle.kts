@@ -4,20 +4,13 @@ plugins {
 
 rootProject.name = "Helix-Cloud"
 
-// IGui (resource-pack font GUIs) lives as a sibling checkout and is wired
-// in as a composite build: de.tytoss:igui resolves to ../IGui sources.
-includeBuild("../IGui") {
-    dependencySubstitution {
-        substitute(module("de.tytoss:igui")).using(project(":"))
-    }
-}
-
 include(
     "helix-api",
     "helix-node",
     "helix-wrapper",
     "helix-bridge-paper",
     "helix-bridge-velocity",
+    "helix-gui",
     "helix-addon-sdk",
     "helix-addon-example",
     "helix-addon-bans",

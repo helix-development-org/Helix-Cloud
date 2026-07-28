@@ -14,6 +14,7 @@ Helix-Cloud is a Kotlin/Gradle multi-module project:
 | `helix-node` | The orchestrator core: Task/Service registry, Control API, CLI, addon loader. Produces `Launcher.jar`. |
 | `helix-wrapper` | Runs alongside each managed Paper/Velocity process. |
 | `helix-bridge-paper`, `helix-bridge-velocity` | Platform-side bridges (backend registration, fallback/lobby routing, maintenance mode). |
+| `helix-gui` | Resource-pack font GUI library (custom-textured Paper inventory menus), used by addons like Guard and BetterMSGs. |
 | `helix-addon-sdk` | The `AddonBase`/`AddonContext` contract every `.hxa` addon is built against. |
 | `helix-addon-*` | Individual addons (bans, chat, economy, friends, guard, …), packaged as `.hxa` files loaded by the node at runtime. |
 | `helix-dashboard` | The React/Vite/TypeScript admin panel, bundled into `Launcher.jar` at build time. |

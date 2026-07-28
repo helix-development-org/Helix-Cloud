@@ -9,18 +9,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Helix-Cloud
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          path: Helix-Cloud
-
-      # helix-bridge-paper/helix-addon-bettermsgs-paper depend on IGui as a
-      # composite build (../IGui), the same way local dev checkouts do.
-      - name: Checkout IGui
-        uses: actions/checkout@v4
-        with:
-          repository: Knabber-Studios/IGui
-          path: IGui
 
       - name: Set up JDK 24 (Temurin)
         uses: actions/setup-java@v4
@@ -39,9 +29,7 @@ jobs:
           version: "11"
 
       - name: Build and test
-        working-directory: Helix-Cloud
         run: ./gradlew build
 
       - name: Verify KDoc availability
-        working-directory: Helix-Cloud
         run: ./gradlew verifyKDocAvailability

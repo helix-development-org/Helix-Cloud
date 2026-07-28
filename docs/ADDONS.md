@@ -397,7 +397,7 @@ enthalten:
 
 Referenz-Implementierung: **BetterMSGs** (`helix-addon-bettermsgs` +
 `helix-addon-bettermsgs-paper`) — ein Handy-artiges `/msg`-GUI auf Basis
-der IGui-Library (Composite-Build `../IGui`), dessen Texturen zur Buildzeit
+der IGui-Library (Modul `helix-gui`, vendored im Monorepo), dessen Texturen zur Buildzeit
 mit Java2D gezeichnet werden (`:helix-addon-bettermsgs-paper:generatePack`).
 
 ### Framework: INpc (paketbasierte NPCs)
