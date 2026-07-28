@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.77.4 — 2026-07-28
+
+### Fix: Cosmetics rendern als schlichtes Papier (kein Modell)
+- **Der Carrier definierte sein Modell nur im klassischen
+  `assets/minecraft/models/item/paper.json`-Overrides-Format** — seit dem
+  Item-Components-Rework (1.21.4+) bringen Vanilla-Items ihr eigenes
+  eingebautes Modell über das neue `assets/minecraft/items/paper.json`
+  mit, das das alte Overrides-Array stillschweigend aussticht. Sichtbares
+  Symptom: die Item-Display-Entity spawnt, zeigt aber schlichtes Papier
+  statt Flügel/Kopfbedeckung.
+- **Neues `assets/minecraft/items/paper.json`** (`minecraft:range_dispatch`
+  über `minecraft:custom_model_data`) zusätzlich zum bisherigen Overrides-
+  Array generiert — das alte Format bleibt für ältere/ViaVersion-gebrückte
+  Clients erhalten, die es (noch) nicht kennen.
+
 ## 0.77.3 — 2026-07-28
 
 ### Fix: `/profilemenu`-Titel ohne Resource-Pack-Font (leeres/kaputtes Menü)

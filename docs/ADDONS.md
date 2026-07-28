@@ -324,7 +324,14 @@ Referenz-Implementierungen in diesem Repo:
   also keine Kollision mit echter Ausrüstung. `CustomModelData`-Werte sind
   bewusst als fester Katalog im Code hinterlegt (nicht zur Laufzeit
   konfigurierbar), da die Modelle selbst zur Build-Zeit im Resource-Pack
-  gebacken werden.
+  gebacken werden. Der Carrier definiert sein Modell **zweifach**:
+  `assets/minecraft/models/item/paper.json` (klassisches Overrides-Array,
+  für ältere/ViaVersion-gebrückte Clients) UND
+  `assets/minecraft/items/paper.json` (moderner `range_dispatch` über
+  `minecraft:custom_model_data`, seit dem Item-Components-Rework nötig,
+  da neuere Clients sonst ihr eingebautes Item-Modell statt des
+  Overrides-Arrays verwenden und der Carrier als schlichtes Papier
+  rendert).
 
 ## Lifecycle
 

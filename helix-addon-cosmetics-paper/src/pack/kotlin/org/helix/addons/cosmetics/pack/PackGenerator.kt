@@ -37,6 +37,7 @@ fun main(args: Array<String>) {
     val entries = linkedMapOf<String, ByteArray>()
     entries["pack.mcmeta"] = packMeta()
     entries["assets/minecraft/models/item/$CARRIER_MODEL.json"] = carrierOverrides()
+    entries["assets/minecraft/items/$CARRIER_MODEL.json"] = carrierItemModel()
 
     WingTheme.entries.forEach { theme ->
         entries["assets/$NAMESPACE/models/item/wings_${theme.id}.json"] = wingsModel(theme.id)
@@ -79,11 +80,7 @@ private fun packMeta(): ByteArray =
 
 /** Maps `CustomModelData` values on [CARRIER_MODEL] to each cosmetic's model. */
 private fun carrierOverrides(): ByteArray {
-    val overrides = buildList {
-        WingTheme.entries.forEach { add(it.customModelData to "wings_${it.id}") }
-        CrownTheme.entries.forEach { add(it.customModelData to "crown_${it.id}") }
-        HaloTheme.entries.forEach { add(it.customModelData to "halo_${it.id}") }
-    }.joinToString(",\n    ") { (cmd, model) ->
+    val overrides = allCosmetics().joinToString(",\n    ") { (cmd, model) ->
         """{"predicate": {"custom_model_data": $cmd}, "model": "$NAMESPACE:item/$model"}"""
     }
     return """
@@ -96,6 +93,41 @@ private fun carrierOverrides(): ByteArray {
     }
     """.trimIndent().toByteArray()
 }
+
+/**
+ * The modern (1.21.4+) item-model definition for [CARRIER_MODEL], read
+ * instead of the legacy [carrierOverrides] file by clients new enough to
+ * have it — vanilla items ship their own built-in item-model definitions
+ * on those clients, which otherwise silently win over the legacy overrides
+ * array, leaving the carrier rendering as plain paper. Kept alongside (not
+ * replacing) [carrierOverrides] so older/ViaVersion-bridged clients that
+ * only understand the legacy format still render correctly.
+ */
+private fun carrierItemModel(): ByteArray {
+    val entries = allCosmetics().joinToString(",\n        ") { (cmd, model) ->
+        """{"threshold": $cmd, "model": {"type": "minecraft:model", "model": "$NAMESPACE:item/$model"}}"""
+    }
+    return """
+    {
+      "model": {
+        "type": "minecraft:range_dispatch",
+        "property": "minecraft:custom_model_data",
+        "index": 0,
+        "fallback": {"type": "minecraft:model", "model": "minecraft:item/paper"},
+        "entries": [
+        $entries
+        ]
+      }
+    }
+    """.trimIndent().toByteArray()
+}
+
+/** Every cosmetic's `CustomModelData` value paired with its model name, sorted ascending. */
+private fun allCosmetics(): List<Pair<Int, String>> = buildList {
+    WingTheme.entries.forEach { add(it.customModelData to "wings_${it.id}") }
+    CrownTheme.entries.forEach { add(it.customModelData to "crown_${it.id}") }
+    HaloTheme.entries.forEach { add(it.customModelData to "halo_${it.id}") }
+}.sortedBy { it.first }
 
 /**
  * Two flat panels spread left and right from a central gap — a simple,
