@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.69.0 — 2026-07-28
+
+Vierte Etappe von Phase 2, komplett neuer Scope: eine eigene
+Gameplay-Kernschicht statt server-spezifischer Plugins.
+
+### Neue Addons
+- **`helix-addon-stats`**: generische Stats/Leaderboards-API (beliebiger
+  String-Key als Statistik-Name) plus saisonale Resets, die den bisherigen
+  Stand archivieren statt ihn zu löschen.
+- **`helix-addon-parties`**: schlanke, netzwerkweite, bewusst nicht
+  über einen Node-Neustart hinweg persistierte Gruppen unterhalb des
+  Clan-Systems (Anführer, Einladen/Annehmen/Verlassen/Kick,
+  Führungswechsel beim Verlassen des Anführers).
+- **`helix-addon-maprotation`**: node-koordinierte Karten-Rotation
+  (zeit- oder rundenbasiert über den bestehenden Scheduler), beschränkt
+  auf die Entscheidung/Ankündigung — das eigentliche Laden der Welt bleibt
+  Aufgabe der Server-eigenen Plugins.
+
 ## 0.68.0 — 2026-07-28
 
 Dritte Etappe von Phase 2: Ökosystem & Compliance.
