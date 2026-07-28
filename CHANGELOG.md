@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.75.0 — 2026-07-28
+
+### Neuer Release-Workflow
+- **Bei jedem `vX.Y.Z`-Tag baut, testet und packt eine neue GitHub-Actions
+  Pipeline (`release.yml`) das Release-Bundle** (Launcher.jar + alle
+  `.hxa`-Addon-Dateien + SHA-256SUMS) und veröffentlicht es als GitHub
+  Release mit diesen Dateien als Downloads.
+- **Die Release-Beschreibung ist der passende CHANGELOG.md-Abschnitt**
+  für diese Version, nicht nur eine generische Commit-Liste — fällt auf
+  GitHubs automatisch generierte Notizen zurück, falls ein Tag (z. B. ein
+  sehr alter) keinen passenden Changelog-Eintrag hat.
+
 ## 0.74.0 — 2026-07-28
 
 Neues `helix-addon-cosmetics`: anziehbare Flügel und Kopfbedeckungen,
