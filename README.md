@@ -49,7 +49,7 @@ Dashboard: `http://127.0.0.1:8080/` — Token: `dev-token-change-me`
 ## Server-Installation (Linux)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Tytoss/Helix-Cloud/main/tools/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/helix-development-org/Helix-Cloud/main/tools/install.sh | sudo bash
 ```
 
 Installiert nach `/opt/helix`: Launcher.jar (Release-Asset oder

@@ -9,7 +9,7 @@
 #
 # Usage (as root):
 #   ./tools/install.sh [options]
-#   curl -fsSL https://raw.githubusercontent.com/Tytoss/Helix-Cloud/main/tools/install.sh | bash -s -- [options]
+#   curl -fsSL https://raw.githubusercontent.com/helix-development-org/Helix-Cloud/main/tools/install.sh | bash -s -- [options]
 #
 # Options:
 #   --dir <path>      install directory            (default: /opt/helix)
@@ -22,7 +22,7 @@
 #   --no-start        install everything but do not start the service
 set -euo pipefail
 
-REPO="Tytoss/Helix-Cloud"
+REPO="helix-development-org/Helix-Cloud"
 JAVA_MAJOR=24
 DIR="/opt/helix"
 RUN_USER="helix"

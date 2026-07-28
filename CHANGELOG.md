@@ -10,10 +10,10 @@ Fünfte und letzte Etappe von Phase 2: Ops & Release-Governance.
 - **Neue `SECURITY.md`** (Pre-1.0/Beta-Status, Melde-Weg für
   Sicherheitslücken) und **`CONTRIBUTING.md`** (Modul-Übersicht,
   Build/Test-Befehle, KDoc-Gate).
-- **Stale Org-Referenz korrigiert**: `tools/install.sh` und die
-  README-Installationszeile zeigten noch auf einen falschen
-  Platzhalter-Org-Namen aus einem früheren, fehlerhaften Commit — jetzt
-  konsistent auf `Tytoss/Helix-Cloud`.
+- **Org-Referenz korrigiert**: Das Projekt liegt jetzt unter der
+  Organisation `helix-development-org` statt im privaten Account —
+  `tools/install.sh`, die README-Installationszeile und der lokale
+  `origin`-Remote zeigen konsistent auf `helix-development-org/Helix-Cloud`.
 
 ### Gradle Version Catalog
 - **Alle bisher pro Modul verstreuten Abhängigkeitsversionen** sind jetzt
