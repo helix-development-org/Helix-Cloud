@@ -3,6 +3,7 @@ version: 1.0.0
 main: org.helix.addons.bettermsgs.paper.BetterMsgsPlugin
 api-version: '1.21'
 description: Phone-style private messages with a Discord-like chat GUI.
+depend: [Helix-GUIs]
 commands:
   msg:
     description: Opens the BetterMSGs phone or a chat with a player.

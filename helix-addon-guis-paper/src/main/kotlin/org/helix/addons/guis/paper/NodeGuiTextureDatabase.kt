@@ -1,18 +1,18 @@
-package org.helix.addons.profile.paper
+package org.helix.addons.guis.paper
 
 import de.tytoss.igui.database.GuiTextureDatabase
 import de.tytoss.igui.texture.GuiTextureDefinition
 import kotlinx.serialization.json.Json
 
 /**
- * [GuiTextureDatabase] backed by the profile addon's `profile.texture.*`
- * actions instead of a direct database connection — this plugin runs on a
- * game server and, like every other Paper-side component in this
- * platform, only ever talks to the node over its action HTTP contract.
+ * [GuiTextureDatabase] backed by the guis addon's `guis.texture.*` actions
+ * instead of a direct database connection — this plugin runs on a game
+ * server and, like every other Paper-side component in this platform, only
+ * ever talks to the node over its action HTTP contract.
  *
  * @property client talks to the node on behalf of this database.
  */
-class NodeGuiTextureDatabase(private val client: ProfileNodeClient) : GuiTextureDatabase {
+class NodeGuiTextureDatabase(private val client: GuisNodeClient) : GuiTextureDatabase {
     private val json = Json { ignoreUnknownKeys = true }
 
     override suspend fun textures(): List<GuiTextureDefinition> {

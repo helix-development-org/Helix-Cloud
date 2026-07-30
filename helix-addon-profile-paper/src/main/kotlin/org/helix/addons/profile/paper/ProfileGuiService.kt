@@ -1,7 +1,7 @@
 package org.helix.addons.profile.paper
 
 import de.tytoss.igui.IGui
-import de.tytoss.igui.display.GuiFontConfiguration
+import de.tytoss.igui.awaitSharedIGui
 import de.tytoss.igui.gui.GuiClickContext
 import de.tytoss.igui.gui.GuiDefinition
 import de.tytoss.igui.gui.GuiInputCancelledException
@@ -24,14 +24,14 @@ import org.helix.api.addon.ProfileView
 import org.helix.api.addon.ResolvedSetting
 
 /**
- * The `/profilemenu` GUI, built on the vendored IGui library: one item per
- * setting the profile addon aggregates across every contributing addon.
- * Clicking a toggle flips it, clicking a choice cycles to the next
- * unlocked option, clicking free text opens an anvil prompt — every
- * change round-trips through the node's `profile.setting.set` action, so
- * this plugin holds no settings state of its own.
+ * The `/profilemenu` GUI, built on the shared Helix-GUIs plugin's IGui
+ * instance: one item per setting the profile addon aggregates across every
+ * contributing addon. Clicking a toggle flips it, clicking a choice cycles
+ * to the next unlocked option, clicking free text opens an anvil prompt —
+ * every change round-trips through the node's `profile.setting.set` action,
+ * so this plugin holds no settings state of its own.
  *
- * @property plugin the owning plugin, for IGui installation.
+ * @property plugin the owning plugin, for logging.
  * @property client talks to the node on behalf of the menu.
  * @property scope coroutine scope IGui operations run on.
  */
@@ -44,27 +44,25 @@ class ProfileGuiService(
     @Volatile private var menu: GuiDefinition? = null
     private val views = ConcurrentHashMap<UUID, ProfileView>()
 
-    /** Installs IGui and builds the menu definition; safe to call once on enable. */
+    /** Awaits the shared Helix-GUIs instance and builds the menu definition; safe to call once on enable. */
     fun install() {
         scope.launch {
-            val gui = IGui.install(plugin) {
-                // Our own resource pack lives under the "helix_profile" namespace
-                // (assets/helix_profile/font/*) — needed for the title's centeredText.
-                fonts = GuiFontConfiguration(namespace = "helix_profile")
-                // No direct database connection: texture storage proxies through the node's
-                // profile.texture.* actions, like every other Paper-side component in this platform.
-                database(NodeGuiTextureDatabase(client))
-            }
+            val gui = awaitSharedIGui()
             igui = gui
             menu = buildMenu(gui)
             plugin.logger.info("Profile menu (IGui) ready")
         }
     }
 
-    /** Shuts IGui down asynchronously (closes open menus); called from onDisable. */
+    /**
+     * Drops this plugin's references to the shared IGui instance; called
+     * from onDisable. Does not shut IGui itself down — it is shared with
+     * every other addon's menu, and only the owning Helix-GUIs plugin may
+     * do that (on its own, later, onDisable).
+     */
     fun shutdown() {
-        val gui = igui ?: return
-        scope.launch { runCatching { gui.shutdown() } }
+        igui = null
+        menu = null
     }
 
     /**

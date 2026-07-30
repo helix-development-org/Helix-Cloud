@@ -17,12 +17,11 @@ repositories {
 dependencies {
     implementation(rootProject.project("helix-api"))
     compileOnly(libs.paper.api)
-    // helix-gui's own PostgreSQL texture database is unused — BetterMSGs ships a file-backed one —
-    // so the driver and pool stay out of the plugin jar.
-    implementation(project(":helix-gui")) {
-        exclude(group = "org.postgresql")
-        exclude(group = "com.zaxxer")
-    }
+    // helix-gui is not bundled: the shared Helix-GUIs plugin (helix-addon-guis) installs the one
+    // real IGui instance and provides its classes (and kotlinx-coroutines-core) at runtime via the
+    // plugin.yml `depend` relationship (Bukkit's plugin classloader delegates to declared
+    // dependencies) — this plugin only needs the library's types to compile against.
+    compileOnly(project(":helix-gui"))
 }
 
 tasks.withType<JavaCompile>().configureEach {

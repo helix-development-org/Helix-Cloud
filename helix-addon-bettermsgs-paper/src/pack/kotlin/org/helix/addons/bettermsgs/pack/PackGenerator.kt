@@ -42,7 +42,6 @@ fun main(args: Array<String>) {
     Files.createDirectories(output.parent)
     val entries = linkedMapOf(
         "pack.mcmeta" to packMeta(),
-        "assets/bettermsgs/font/spaces.json" to spacesFont(),
         "assets/bettermsgs/font/gui.json" to guiFont(),
         "assets/bettermsgs/textures/font/home.png" to png(::drawHome),
         "assets/bettermsgs/textures/font/chat.png" to png(::drawChat),
@@ -82,27 +81,6 @@ private fun packMeta(): ByteArray =
       }
     }
     """.trimIndent().toByteArray()
-
-/** IGui's SpacingRenderer glyphs: powers of two, positive and negative. */
-private fun spacesFont(): ByteArray {
-    val advances = StringBuilder()
-    for (power in 0..9) {
-        val positive = if (power == 9) 0x0010 else 0x0001 + power
-        val negative = if (power == 9) 0x1010 else 0x1001 + power
-        advances.append("    \"\\u%04X\": %d,\n".format(positive, 1 shl power))
-        advances.append("    \"\\u%04X\": %d,\n".format(negative, -(1 shl power)))
-    }
-    return """
-    {
-      "providers": [{
-        "type": "space",
-        "advances": {
-    ${advances.toString().trimEnd(',', '\n').prependIndent()}
-        }
-      }]
-    }
-    """.trimIndent().toByteArray()
-}
 
 private fun guiFont(): ByteArray {
     val thumbProviders = (0..7).joinToString(",\n") { index ->

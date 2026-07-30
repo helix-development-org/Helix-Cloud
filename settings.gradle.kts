@@ -40,5 +40,7 @@ include(
     "helix-addon-subtitles",
     "helix-addon-subtitles-paper",
     "helix-addon-cosmetics",
-    "helix-addon-cosmetics-paper"
+    "helix-addon-cosmetics-paper",
+    "helix-addon-guis",
+    "helix-addon-guis-paper"
 )

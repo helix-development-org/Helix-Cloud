@@ -1,4 +1,4 @@
-package org.helix.addons.profile
+package org.helix.addons.guis
 
 import kotlinx.serialization.Serializable
 

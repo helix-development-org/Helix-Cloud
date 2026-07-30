@@ -1,8 +1,9 @@
 package org.helix.addons.bettermsgs.paper
 
 import de.tytoss.igui.IGui
-import de.tytoss.igui.display.GuiFontConfiguration
+import de.tytoss.igui.awaitSharedIGui
 import de.tytoss.igui.gui.GuiDefinition
+import de.tytoss.igui.texture.GuiTextureDefinition
 import de.tytoss.igui.slot.chestSlot
 import de.tytoss.igui.slot.rectTo
 import de.tytoss.igui.pagination.paginate
@@ -17,7 +18,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -135,14 +135,14 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
         scope = CoroutineScope(SupervisorJob() + mainDispatcher)
         server.pluginManager.registerEvents(this, this)
         scope.launch {
-            val installed = IGui.install(this@BetterMsgsPlugin) {
-                database(FileGuiTextureDatabase(dataFolder.toPath().resolve("textures.json")))
-                fonts = GuiFontConfiguration(namespace = "bettermsgs")
-                texture("bettermsgs.home", "", "gui", widthPixels = 176, heightPixels = 222)
-                texture("bettermsgs.chat", "", "gui", widthPixels = 176, heightPixels = 222)
-                for (index in 0..7) {
-                    texture("bettermsgs.thumb$index", "${'' + index}", "gui", widthPixels = 4, heightPixels = 20)
-                }
+            val installed = awaitSharedIGui()
+            val guiFont = Key.key("bettermsgs", "gui")
+            installed.saveTexture(GuiTextureDefinition("bettermsgs.home", "\ue000", guiFont, 176, 222))
+            installed.saveTexture(GuiTextureDefinition("bettermsgs.chat", "\ue001", guiFont, 176, 222))
+            for (index in 0..7) {
+                installed.saveTexture(
+                    GuiTextureDefinition("bettermsgs.thumb$index", "${'\ue010' + index}", guiFont, 4, 20),
+                )
             }
             igui = installed
             phoneGui = buildPhoneGui(installed)
@@ -154,14 +154,17 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
     }
 
     /**
-     * Restores every borrowed inventory and shuts the GUI runtime down.
+     * Restores every borrowed inventory and cancels this plugin's coroutine
+     * scope. Does not shut IGui itself down — it is the shared instance
+     * every addon's menu uses, and only the owning Helix-GUIs plugin may do
+     * that (on its own, later, onDisable).
      */
     override fun onDisable() {
         if (::takeover.isInitialized) {
             takeover.restoreAll(Bukkit::getPlayer)
         }
         if (::scope.isInitialized) {
-            igui?.let { runBlocking { it.shutdown() } }
+            igui = null
             scope.cancel()
         }
     }

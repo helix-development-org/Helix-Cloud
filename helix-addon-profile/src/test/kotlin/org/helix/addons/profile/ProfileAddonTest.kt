@@ -193,21 +193,4 @@ class ProfileAddonTest {
         assertFalse(result.success)
     }
 
-    @Test
-    fun `texture put get list and remove round-trip, backing a Paper IGui menu without a direct database`() {
-        val recordJson = """{"id":"header","character":"","font":"profile:default","widthPixels":176,
-            |"heightPixels":18,"advancePixels":177,"clientAnimated":false}""".trimMargin()
-
-        assertTrue(context.run("profile.texture.put", "header", recordJson).success)
-        assertTrue(context.run("profile.texture.get", "header").lines.first().contains("\"character\""))
-        assertTrue(context.run("profile.texture.list").lines.first().contains("\"header\""))
-        assertTrue(context.run("profile.texture.remove", "header").success)
-        assertFalse(context.run("profile.texture.get", "header").success)
-        assertFalse(context.run("profile.texture.remove", "header").success)
-    }
-
-    @Test
-    fun `texture put rejects invalid json instead of storing garbage`() {
-        assertFalse(context.run("profile.texture.put", "header", "not json").success)
-    }
 }

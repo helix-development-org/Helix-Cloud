@@ -1,4 +1,4 @@
-package org.helix.addons.profile.paper
+package org.helix.addons.guis.paper
 
 import java.net.URI
 import java.net.http.HttpClient
@@ -13,64 +13,65 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
-import org.helix.api.addon.ProfileView
 import org.slf4j.LoggerFactory
 
 /** Result lines of one node action invocation. */
 private data class ActionOutcome(val success: Boolean, val lines: List<String>)
 
 /**
- * Talks to the node's `POST /api/v1/internal/action` endpoint on behalf of the
- * profile menu, the bridge action-invocation contract for components
- * holding a per-service token — this plugin has no direct dependency on
- * the profile addon's own code, only on the shared [ProfileView] wire
- * type. Not `/api/v1/actions`: that route only ever accepts the admin
- * token or a `helix.admin` session, which a per-service token can never
- * satisfy; the node only lets `/api/v1/internal/action` reach actions explicitly
- * marked `bridgeInvocable` (see `ProfileAddon`'s action registrations).
+ * Talks to the node's `POST /api/v1/internal/action` endpoint on behalf of
+ * the shared texture database — the bridge action-invocation contract for
+ * components holding a per-service token. Not `/api/v1/actions`: that route
+ * only ever accepts the admin token or a `helix.admin` session, which a
+ * per-service token can never satisfy; the node only lets
+ * `/api/v1/internal/action` reach actions explicitly marked
+ * `bridgeInvocable` (see `GuisAddon`'s action registrations).
  *
  * @property controlUrl base control API url, for example `http://127.0.0.1:8080`.
  * @property token bearer token for this service, from the `HELIX_CONTROL_TOKEN`
  *  environment variable the wrapper injects.
  */
-class ProfileNodeClient(private val controlUrl: String, private val token: String) {
-    private val logger = LoggerFactory.getLogger(ProfileNodeClient::class.java)
+class GuisNodeClient(private val controlUrl: String, private val token: String) {
+    private val logger = LoggerFactory.getLogger(GuisNodeClient::class.java)
     private val http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()
     private val endpoint = URI.create(controlUrl.trimEnd('/') + "/api/v1/internal/action")
     private val json = Json { ignoreUnknownKeys = true }
 
     /**
-     * Fetches a player's full profile view.
+     * Lists every stored IGui texture definition, as raw per-record JSON.
      *
-     * @param player player name.
-     * @return the parsed view, or `null` if the node is unreachable or the
-     *  action failed.
+     * @return the stored definitions' JSON array text, or `null` if the
+     *  node is unreachable.
      */
-    fun view(player: String): ProfileView? {
-        val outcome = invoke("profile.view", listOf(player)) ?: return null
-        if (!outcome.success) return null
-        return outcome.lines.firstOrNull()?.let {
-            runCatching { json.decodeFromString<ProfileView>(it) }
-                .onFailure { e -> logger.warn("Could not parse profile view: {}", e.message) }
-                .getOrNull()
-        }
-    }
+    fun textureListJson(): String? = invoke("guis.texture.list", emptyList())?.takeIf { it.success }?.lines?.firstOrNull()
 
     /**
-     * Sets the executing player's own value for a setting (self-service,
-     * subject to the owning addon's per-option gating).
+     * Reads one stored IGui texture definition.
      *
-     * @param player player name.
-     * @param owner the addon id that registered the setting.
-     * @param key the setting's key.
-     * @param value the chosen value.
-     * @return `null` on success, or a player-facing rejection reason.
+     * @param id the texture id.
+     * @return the definition's raw JSON, or `null` if it does not exist or
+     *  the node is unreachable.
      */
-    fun set(player: String, owner: String, key: String, value: String): String? {
-        val outcome = invoke("profile.setting.set", listOf(player, owner, key, value))
-            ?: return "the node is unreachable"
-        return if (outcome.success) null else outcome.lines.firstOrNull() ?: "rejected"
-    }
+    fun textureGetJson(id: String): String? =
+        invoke("guis.texture.get", listOf(id))?.takeIf { it.success }?.lines?.firstOrNull()
+
+    /**
+     * Stores (or replaces) one IGui texture definition.
+     *
+     * @param id the texture id.
+     * @param recordJson the definition's raw JSON.
+     * @return `true` on success.
+     */
+    fun texturePut(id: String, recordJson: String): Boolean =
+        invoke("guis.texture.put", listOf(id, recordJson))?.success == true
+
+    /**
+     * Removes one stored IGui texture definition.
+     *
+     * @param id the texture id.
+     * @return `true` if a definition with that id existed and was removed.
+     */
+    fun textureRemove(id: String): Boolean = invoke("guis.texture.remove", listOf(id))?.success == true
 
     /**
      * Invokes a node action over HTTP.

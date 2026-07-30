@@ -292,13 +292,11 @@ Referenz-Implementierungen in diesem Repo:
   beide Namen sind bewusst getrennt, da Velocity `/profile` bereits als
   Proxy-Befehl abfängt, bevor ein Paper-Plugin ihn sehen könnte.
   Dashboard-Panel **Profiles** erlaubt Staff lesenden Zugriff plus
-  manuelles Setzen/Zurücksetzen. Die IGui-Textur-Datenbank des Paper-Menüs
-  (`NodeGuiTextureDatabase`) läuft über neue `profile.texture.*`-Actions
-  statt einer direkten DB-Verbindung vom Spielserver aus — konsistent mit
-  jeder anderen Storage-Anbindung in diesem Projekt. Das Menü selbst bündelt
-  ein eigenes `pack.zip` (`helix_profile`-Namespace, nur Fonts) für den
-  Titel, der IGuis `centeredText`/`SpacingRenderer` nutzt — analog zu
-  Guards/BetterMsgs' eigenen Pack-Generatoren.
+  manuelles Setzen/Zurücksetzen. Das Menü installiert IGui nicht mehr
+  selbst — es holt sich die von `Helix-GUIs` (`helix-addon-guis`)
+  bereitgestellte geteilte Instanz (`awaitSharedIGui()`) und bündelt
+  deshalb auch kein eigenes `pack.zip` mehr; siehe „Framework: Helix-GUIs"
+  weiter unten.
 - `helix-addon-subtitles` (+ `helix-addon-subtitles-paper`) — eine zweite
   Anzeigezeile unter dem Namen, gewählt über das Profile-System: eine
   Betreiber-vordefinierte Liste (`subtitle.config.add/remove/list`, pro
@@ -452,6 +450,45 @@ Referenz-Implementierung: **BetterMSGs** (`helix-addon-bettermsgs` +
 `helix-addon-bettermsgs-paper`) — ein Handy-artiges `/msg`-GUI auf Basis
 der IGui-Library (Modul `helix-gui`, vendored im Monorepo), dessen Texturen zur Buildzeit
 mit Java2D gezeichnet werden (`:helix-addon-bettermsgs-paper:generatePack`).
+
+### Framework: Helix-GUIs (geteilte IGui-Installation)
+
+**Helix-GUIs** (`helix-addon-guis` + `helix-addon-guis-paper`) ist die
+**einzige** Stelle im ganzen Netzwerk, die `IGui.install(...)` tatsächlich
+aufruft. Vorher installierte jedes Addon mit einem IGui-Menü (Guard,
+BetterMSGs, Profile) seine eigene Instanz — mit eigener Font-Namespace-
+Konfiguration, eigener Textur-Datenbank (Guard/BetterMSGs: eine lokale
+Datei; Profile: node-backed) und eigenem `install{}`-Block. Das führte
+genau zu der Inkonsistenz, die dieses Refactoring beheben soll: das
+Profile-Menü vergaß schlicht, seine Fonts zu konfigurieren, und öffnete
+sich monatelang unbemerkt kaputt.
+
+Jetzt gilt:
+- **`helix-addon-guis-paper`** (Plugin-Name `Helix-GUIs`) ruft `IGui.install`
+  einmal auf, mit dem gemeinsamen Font-Namespace `helix_guis` (die generischen
+  Mechanik-Fonts — unsichtbare Cursor-Abstands-Glyphen + die 7 Standard-
+  Textzeilen-Fonts über Vanilla-Ascii — liegen in seinem eigenen `pack.zip`)
+  und einer node-backed `GuiTextureDatabase` (`guis.texture.*`-Actions,
+  `helix-addon-guis` node-seitig — dieselbe Storage-Konvention wie jedes
+  andere Addon: keine direkte DB-Verbindung vom Spielserver).
+- Registriert die fertige Instanz via `IGui.registerShared(plugin)` auf
+  Bukkits `ServicesManager` (`helix-gui`s eigene, generische Erweiterung,
+  nicht Helix-Cloud-spezifisch).
+- Jedes andere Addon mit einem IGui-Menü (Guard, BetterMSGs, Profile) holt
+  sich die geteilte Instanz stattdessen mit `awaitSharedIGui()` (pollt den
+  `ServicesManager`, da `Helix-GUIs`' eigener `install()`-Aufruf asynchron
+  läuft) und ruft `IGui.saveTexture(...)` für seine **eigenen** Texturen auf
+  (z.B. Guards Header-/Background-Bitmaps unter dem `iguard`-Namespace) —
+  Font-/Texturen-Assets bleiben pro Addon selbst generiert
+  (`generatePack`), nur die Laufzeit-Installation und die Textur-Datenbank
+  sind geteilt.
+- **Voraussetzung**: jedes abhängige Addon deklariert
+  `depend: [Helix-GUIs]` in seiner `plugin.yml` und hängt `helix-gui` nur
+  noch `compileOnly` (statt gebündelt) ein — Bukkits Plugin-Classloader
+  reicht `Helix-GUIs`' Klassen (inkl. `kotlinx-coroutines-core`) über die
+  `depend`-Beziehung durch. Operativ heißt das: **`helix-addon-guis` muss
+  installiert und aktiviert sein**, sonst startet kein abhängiges Addon
+  (Bukkit verweigert das Laden bei einer fehlenden `depend`-Abhängigkeit).
 
 ### Framework: INpc (paketbasierte NPCs)
 

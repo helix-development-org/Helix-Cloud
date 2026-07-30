@@ -24,16 +24,14 @@ dependencies {
     // is compile-only here; the movement tests exercise packetevents types, hence the test dependency.
     compileOnly(libs.packetevents.spigot)
     testImplementation(libs.packetevents.spigot)
-    // helix-gui's own PostgreSQL texture database is unused — IGuard ships a file-backed one — so
-    // the driver and pool stay out of the plugin jar. kotlinx-coroutines-core arrives transitively
-    // as an api dependency of helix-gui.
-    implementation(project(":helix-gui")) {
-        exclude(group = "org.postgresql")
-        exclude(group = "com.zaxxer")
-    }
+    // helix-gui is not bundled: the shared Helix-GUIs plugin (helix-addon-guis) installs the one
+    // real IGui instance and provides its classes (and kotlinx-coroutines-core) at runtime via the
+    // plugin.yml `depend` relationship (Bukkit's plugin classloader delegates to declared
+    // dependencies) — this plugin only needs the library's types to compile against.
+    compileOnly(project(":helix-gui"))
     // Rune snapshot/copy model for the world reconstruction used by the incident replay (vendored jar).
     implementation(files("libs/rune-base-0.0.1.jar"))
-    // JSON runtime for the Helix node action bridge + the file-backed GUI texture store.
+    // JSON runtime for the Helix node action bridge.
     implementation(libs.kotlinx.serialization.json)
 }
 

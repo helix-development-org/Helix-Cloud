@@ -1,4 +1,4 @@
-package org.helix.addons.profile.paper
+package org.helix.addons.guis.paper
 
 import de.tytoss.igui.texture.GuiTextureDefinition
 import kotlinx.serialization.Serializable
@@ -6,7 +6,7 @@ import net.kyori.adventure.key.Key
 
 /**
  * Wire form of a [GuiTextureDefinition], with [Key] flattened to its plain
- * string form for JSON transport (matches the profile addon's own
+ * string form for JSON transport (matches the guis addon's own
  * `GuiTextureRecord` shape field-for-field, without either module
  * depending on the other's Kotlin classes).
  */

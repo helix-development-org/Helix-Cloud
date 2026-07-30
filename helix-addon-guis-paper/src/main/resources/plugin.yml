@@ -1,0 +1,5 @@
+name: Helix-GUIs
+version: '${version}'
+main: org.helix.addons.guis.paper.HelixGuisPlugin
+api-version: '1.21'
+description: Shared IGui install for every addon's custom-font GUI, so no addon has to configure its own fonts/database.

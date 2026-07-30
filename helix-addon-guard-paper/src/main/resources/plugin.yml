@@ -4,7 +4,7 @@ main: de.tytoss.iguard.IGuardPlugin
 api-version: '1.21'
 authors: [Tytoss]
 description: Packet-based Paper anti-cheat with conservative setbacks
-depend: [packetevents]
+depend: [packetevents, Helix-GUIs]
 softdepend: [ViaVersion]
 commands:
   iguard:

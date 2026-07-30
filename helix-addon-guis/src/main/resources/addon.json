@@ -1,0 +1,7 @@
+{
+  "id": "helix.guis",
+  "name": "Helix GUIs",
+  "version": "1.0.0",
+  "main": "org.helix.addons.guis.GuisAddon",
+  "description": "Node-side texture storage backing the shared Helix-GUIs Paper plugin, so every addon's IGui-based menu goes through one correctly-configured instance instead of each reinventing its own install/fonts/database."
+}

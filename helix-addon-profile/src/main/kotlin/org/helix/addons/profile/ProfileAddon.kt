@@ -23,7 +23,6 @@ import org.helix.api.message.Messages
 class ProfileAddon : AddonBase() {
     private val json = Json { prettyPrint = true; encodeDefaults = true }
     private lateinit var store: ProfileStore
-    private lateinit var textures: GuiTextureStore
     private lateinit var msg: Messages
 
     /**
@@ -32,7 +31,6 @@ class ProfileAddon : AddonBase() {
      */
     override fun enable() {
         store = ProfileStore(context.storage())
-        textures = GuiTextureStore(context.storage())
         msg = context.localizedMessages(
             mapOf(
                 "en" to mapOf(
@@ -118,54 +116,6 @@ class ProfileAddon : AddonBase() {
             "profile <set <key> <value>>",
             playerCommand = true,
         ) { invocation -> profileCommand(invocation) }
-
-        // Backs a Paper-side IGui menu's GuiTextureDatabase over the action HTTP contract, so a
-        // Paper plugin never opens a direct database connection of its own (see GuiTextureStore).
-        action(
-            "profile.texture.list",
-            "Lists every stored IGui texture definition.",
-            "profile.texture.list",
-            bridgeInvocable = true,
-        ) {
-            ActionResult.ok(json.encodeToString(textures.all()))
-        }
-        action(
-            "profile.texture.get",
-            "Reads one stored IGui texture definition.",
-            "profile.texture.get <id>",
-            bridgeInvocable = true,
-        ) { invocation ->
-            val id = invocation.arguments.firstOrNull()
-                ?: return@action ActionResult.error("usage: profile.texture.get <id>")
-            textures.get(id)?.let { ActionResult.ok(json.encodeToString(it)) }
-                ?: ActionResult.error("no such texture: $id")
-        }
-        action(
-            "profile.texture.put",
-            "Stores (or replaces) one IGui texture definition.",
-            "profile.texture.put <id> <json>",
-            bridgeInvocable = true,
-        ) { invocation ->
-            val id = invocation.arguments.getOrNull(0)
-            val recordJson = invocation.arguments.getOrNull(1)
-            if (id == null || recordJson == null) {
-                return@action ActionResult.error("usage: profile.texture.put <id> <json>")
-            }
-            val record = runCatching { json.decodeFromString<GuiTextureRecord>(recordJson) }
-                .getOrElse { return@action ActionResult.error("invalid texture json: ${it.message}") }
-            textures.put(record)
-            ActionResult.ok("stored")
-        }
-        action(
-            "profile.texture.remove",
-            "Removes one stored IGui texture definition.",
-            "profile.texture.remove <id>",
-            bridgeInvocable = true,
-        ) { invocation ->
-            val id = invocation.arguments.firstOrNull()
-                ?: return@action ActionResult.error("usage: profile.texture.remove <id>")
-            if (textures.remove(id)) ActionResult.ok("removed") else ActionResult.error("no such texture: $id")
-        }
 
         panel(
             "profile",

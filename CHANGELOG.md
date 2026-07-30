@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.78.0 — 2026-07-30
+
+### Neues Addon: Helix-GUIs — eine geteilte IGui-Installation für alle Addons
+- **Bisher installierte jedes Addon mit einem IGui-Menü (Guard, BetterMSGs,
+  Profile) seine eigene IGui-Instanz** — mit eigener Font-Namespace-
+  Konfiguration, eigener Textur-Datenbank (mal lokale Datei, mal
+  node-backed) und eigenem `install{}`-Block. Das führte genau zu der
+  Inkonsistenz, die zuletzt das kaputte Profile-Menü verursacht hat
+  (0.77.3): ein Addon konfiguriert etwas anders oder vergisst es
+  schlicht, und niemand merkt es, bis ein Live-Test es aufdeckt.
+- **Neues `helix-addon-guis` (+ `helix-addon-guis-paper`, Plugin-Name
+  `Helix-GUIs`)**: ruft `IGui.install(...)` jetzt genau einmal für das
+  ganze Netzwerk auf, mit dem gemeinsamen Font-Namespace `helix_guis`
+  (generische Fonts: unsichtbare Cursor-Abstands-Glyphen + die 7
+  Standard-Textzeilen über Vanilla-Ascii) und einer node-backed
+  `GuiTextureDatabase` (neue `guis.texture.*`-Actions, abgelöst von
+  `profile.texture.*`). Registriert sich über Bukkits `ServicesManager`.
+- **`helix-gui` selbst bekommt zwei neue Hilfsfunktionen**
+  (`IGui.registerShared`/`awaitSharedIGui`) für genau dieses
+  Muster — generisch, nicht Helix-Cloud-spezifisch.
+- **Guard, BetterMSGs und Profile holen sich die geteilte Instanz jetzt
+  über `awaitSharedIGui()`** statt selbst zu installieren, registrieren
+  ihre eigenen Texturen (z.B. Guards Header-/Background-Bitmaps) über
+  `IGui.saveTexture(...)` in die geteilte Datenbank und deklarieren
+  `depend: [Helix-GUIs]` in ihrer `plugin.yml`. `helix-gui` wird dadurch
+  nicht mehr in ihre jeweiligen `paper.jar`s gebündelt (spürbar kleinere
+  Jars), sondern nur noch `compileOnly` eingebunden — Bukkits
+  Plugin-Classloader reicht die Klassen über die `depend`-Beziehung durch.
+- Guard und BetterMSGs verlieren ihre eigenen lokalen
+  `FileGuiTextureDatabase`-Implementierungen; ihre generische
+  Font-Erzeugung (Abstands-Glyphen, Standard-Textzeilen) entfällt aus
+  ihren eigenen Pack-Generatoren — addon-eigene Deko-Texturen (Guards
+  Header/Background, BetterMSGs' Phone-/Chat-Icons und seine
+  zusätzlichen, feiner aufgelösten Textzeilen) bleiben unverändert
+  addon-eigen.
+- **Betriebs-Voraussetzung**: `helix-addon-guis` muss installiert und
+  aktiviert sein, sonst starten Guard, BetterMSGs und Profile nicht mehr
+  (Bukkit verweigert das Laden bei fehlender `depend`-Abhängigkeit).
+
 ## 0.77.4 — 2026-07-28
 
 ### Fix: Cosmetics rendern als schlichtes Papier (kein Modell)

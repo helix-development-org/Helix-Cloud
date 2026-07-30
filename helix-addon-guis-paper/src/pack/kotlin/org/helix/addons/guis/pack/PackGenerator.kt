@@ -1,4 +1,4 @@
-package org.helix.addons.profile.pack
+package org.helix.addons.guis.pack
 
 import java.nio.file.Files
 import java.nio.file.Path
@@ -6,13 +6,14 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 /**
- * Assembles the `helix_profile` namespace resource pack: only the font
- * files [de.tytoss.igui.display.DisplayBuilder]'s title renderer needs
- * (the invisible cursor-spacing glyphs and the per-row vanilla-ascii text
- * fonts) — the profile menu's items are plain Bukkit item stacks, so no
- * texture/bitmap assets are required.
+ * Assembles the `helix_guis` namespace resource pack: the generic font
+ * mechanics [de.tytoss.igui.display.DisplayBuilder]'s title renderer needs
+ * (the invisible cursor-spacing glyphs and the standard per-row vanilla-
+ * ascii text fonts) — every dependent addon's menu shares these instead of
+ * each generating its own copy, which is what let one of them (the profile
+ * menu) forget to generate them at all.
  */
-private const val NAMESPACE = "helix_profile"
+private const val NAMESPACE = "helix_guis"
 
 /**
  * Entry point: writes `pack.zip` to the path given as first argument.
@@ -36,11 +37,11 @@ fun main(args: Array<String>) {
             zip.closeEntry()
         }
     }
-    println("Profile pack written to $output (${Files.size(output)} bytes)")
+    println("Helix-GUIs pack written to $output (${Files.size(output)} bytes)")
 }
 
 private fun packMeta(): ByteArray =
-    """{"pack": {"pack_format": 46, "supported_formats": {"min_inclusive": 34, "max_inclusive": 999}, "description": "Helix profile menu fonts"}}""".toByteArray()
+    """{"pack": {"pack_format": 46, "supported_formats": {"min_inclusive": 34, "max_inclusive": 999}, "description": "Helix-GUIs shared fonts"}}""".toByteArray()
 
 /** IGui's SpacingRenderer glyphs: powers of two, positive and negative. */
 private fun spacesFont(): ByteArray {

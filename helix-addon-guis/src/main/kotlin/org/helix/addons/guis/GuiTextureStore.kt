@@ -1,16 +1,17 @@
-package org.helix.addons.profile
+package org.helix.addons.guis
 
 import kotlinx.serialization.json.Json
 import org.helix.api.storage.AddonStorage
 
 /**
- * Node-side persistence for Paper IGui menus' custom texture definitions.
+ * Node-side persistence for the shared Helix-GUIs plugin's custom texture
+ * definitions.
  *
- * Backs a `de.tytoss.igui.database.GuiTextureDatabase` implementation on
- * the Paper side that talks to this store only through the profile
- * addon's actions (`profile.texture.*`) — never a direct database
- * connection from a game server, the same rule every other addon in this
- * platform follows for its own storage.
+ * Every addon's IGui-based Paper menu registers its textures through the one
+ * shared Helix-GUIs instance, which talks to this store only through this
+ * addon's actions (`guis.texture.*`) — never a direct database connection
+ * from a game server, the same rule every other addon in this platform
+ * follows for its own storage.
  *
  * @property storage addon-scoped document store.
  */

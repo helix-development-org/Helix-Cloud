@@ -1,7 +1,9 @@
 package de.tytoss.iguard.gui
 
 import de.tytoss.igui.IGui
+import de.tytoss.igui.awaitSharedIGui
 import de.tytoss.igui.gui.GuiDefinition
+import de.tytoss.igui.texture.GuiTextureDefinition
 import de.tytoss.iguard.check.CheckEngine
 import de.tytoss.iguard.check.Enforcement
 import de.tytoss.iguard.api.ExemptionManager
@@ -60,19 +62,21 @@ class GuiService(
     @Volatile private var panel: GuiDefinition? = null
     private val font = Key.key("minecraft", "default")
 
-    /** Installs IGui asynchronously and builds the panel definition; safe to call once on enable. */
+    /** Awaits the shared Helix-GUIs instance and builds the panel definition; safe to call once on enable. */
     fun install() {
         scope.launch {
-            val gui = IGui.install(plugin) {
-                // Our own resource pack lives under the "iguard" namespace (assets/iguard/font/*).
-                fonts = de.tytoss.igui.display.GuiFontConfiguration(namespace = "iguard")
-                // There is no database in the Helix world: IGui's texture store lives in a JSON file.
-                database(FileGuiTextureDatabase(plugin.dataFolder.toPath().resolve("gui-textures.json")))
-                // Custom UI glyphs from IGuardPack: the slim header bar and the full-window dark
-                // background (header baked in + slot frames), both drawn in the GUI title.
-                texture("header", "\uE001", "ui", widthPixels = 176, heightPixels = 18, advancePixels = 177)
-                texture("background", "\uE003", "ui", widthPixels = 176, heightPixels = 222, advancePixels = 177)
-            }
+            val gui = awaitSharedIGui()
+            // Custom UI glyphs from IGuardPack: the slim header bar and the full-window dark
+            // background (header baked in + slot frames), both drawn in the GUI title. Registered
+            // here (not in an install{} block) since IGui itself is installed once, shared, by the
+            // Helix-GUIs plugin \u2014 every addon contributing its own textures registers them the same
+            // way, into the one database that plugin owns.
+            gui.saveTexture(
+                GuiTextureDefinition("header", "\uE001", Key.key("iguard", "ui"), 176, 18, 177),
+            )
+            gui.saveTexture(
+                GuiTextureDefinition("background", "\uE003", Key.key("iguard", "ui"), 176, 222, 177),
+            )
             igui = gui
             panel = buildPanel(gui)
             plugin.logger.info("IGuard admin panel (IGui) ready")
@@ -82,10 +86,15 @@ class GuiService(
     private fun headerTexture() = runCatching { igui?.cachedTexture("header") }.getOrNull()
     private fun backgroundTexture() = runCatching { igui?.cachedTexture("background") }.getOrNull()
 
-    /** Shuts IGui down asynchronously (closes open panels); called from onDisable. */
+    /**
+     * Drops this plugin's references to the shared IGui instance; called
+     * from onDisable. Does not shut IGui itself down — it is shared with
+     * every other addon's menu, and only the owning Helix-GUIs plugin may
+     * do that (on its own, later, onDisable).
+     */
     fun shutdown() {
-        val gui = igui ?: return
-        scope.launch { runCatching { gui.shutdown() } }
+        igui = null
+        panel = null
     }
 
     /** Open the panel; [focus] optionally jumps straight to a player's detail page. */

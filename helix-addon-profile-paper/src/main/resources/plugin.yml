@@ -3,6 +3,7 @@ version: 1.0.0
 main: org.helix.addons.profile.paper.ProfilePlugin
 api-version: '1.21'
 description: Graphical /profilemenu for the profile addon's settings (cosmetics, subtitles, language, ...).
+depend: [Helix-GUIs]
 commands:
   profilemenu:
     description: Opens your profile menu.

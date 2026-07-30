@@ -9,7 +9,7 @@ plugins {
 
 allprojects {
     group = "org.helix"
-    version = "0.77.4"
+    version = "0.78.0"
 
     repositories {
         mavenCentral()
@@ -66,6 +66,7 @@ tasks.register("verifyKDocAvailability") {
 /** Addon modules packaged into the release bundle. */
 val addonModules = listOf(
     "helix-addon-example",
+    "helix-addon-guis",
     "helix-addon-bans",
     "helix-addon-bettermsgs",
     "helix-addon-permissions",
