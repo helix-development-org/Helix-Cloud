@@ -29,6 +29,7 @@ import org.helix.api.storage.InMemoryAddonStorage
 import org.helix.api.proxy.PermissionCheckRequest
 import org.helix.node.actions.ActionRegistry
 import org.helix.node.dashboard.DashboardPanelRegistry
+import org.helix.node.dashboard.DefaultAddonPanel
 import org.helix.node.display.BridgeValueStore
 import org.helix.node.display.DisplayResolverRegistry
 import org.helix.node.gates.JoinGateRegistry
@@ -130,6 +131,9 @@ class AddonManager(
         var classLoader: URLClassLoader? = null
         var failureReason: String? = null
         val actionNames = mutableSetOf<String>()
+
+        /** Whether this addon registered any dashboard panel of its own, suppressing the generated default page. */
+        var registeredOwnPanel = false
     }
 
     /**
@@ -315,6 +319,7 @@ class AddonManager(
 
     private fun enableRecord(record: LoadedAddon) {
         var classLoader: URLClassLoader? = null
+        record.registeredOwnPanel = false
         runCatching {
             classLoader = URLClassLoader(
                 arrayOf(record.jar.toUri().toURL()),
@@ -326,6 +331,9 @@ class AddonManager(
             record.classLoader = classLoader
             record.instance = instance
             instance.onEnable(ScopedContext(record))
+            if (!record.registeredOwnPanel) {
+                registerDefaultPanel(record)
+            }
             record.state = AddonState.ENABLED
             record.failureReason = null
             logger.info("Enabled addon {} {}", record.manifest.id, record.manifest.version)
@@ -343,6 +351,23 @@ class AddonManager(
             record.instance = null
             logger.error("Enabling addon {} failed", record.manifest.id, failure)
         }
+    }
+
+    /**
+     * Registers the generated default dashboard page for an addon that
+     * did not register any panel of its own during `onEnable`, so every
+     * enabled addon always has one (see [DefaultAddonPanel]).
+     */
+    private fun registerDefaultPanel(record: LoadedAddon) {
+        val components = buildList {
+            record.paperComponents.forEach { (key, _) ->
+                add(if (key == record.manifest.id) "paper.jar" else "paper/${key.removePrefix("${record.manifest.id}-")}.jar")
+            }
+            if (record.velocityComponent != null) add("velocity.jar")
+            if (record.resourcePack != null) add("pack.zip")
+        }
+        val actions = registry.descriptors().filter { it.name in record.actionNames }
+        dashboardPanels.register(record.manifest.id, DefaultAddonPanel.build(record.manifest, actions, components))
     }
 
     private fun readManifest(file: Path): AddonManifest = ZipFile(file.toFile()).use { zip ->
@@ -534,6 +559,7 @@ class AddonManager(
         }
 
         override fun registerDashboardPanel(panel: DashboardPanel) {
+            record.registeredOwnPanel = true
             dashboardPanels.register(record.manifest.id, panel)
         }
 

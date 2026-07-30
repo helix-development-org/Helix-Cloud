@@ -532,6 +532,17 @@ als geteiltes Framework nutzen.
 
 ## Eigene Dashboard-Seite beisteuern
 
+**Jedes aktivierte Addon hat immer eine Panel-Seite.** Registriert ein
+Addon während `onEnable` keine eigene, generiert die Node automatisch eine
+Default-Seite (Panel-Id `addon-<id>`, Punkte werden Bindestriche):
+Manifest-Metadaten (Name, Id, Version, Beschreibung), die mitgelieferten
+HXA-Komponenten (paper.jar/velocity.jar/pack.zip) und alle registrierten
+Actions mit Usage, Beschreibung, Player-Command- und Permission-Kennzeichnung
+(siehe `DefaultAddonPanel` in `helix-node`). Sobald ein Addon irgendein
+eigenes Panel registriert, entfällt die Default-Seite für dieses Addon
+automatisch — kein explizites Opt-out nötig. Wie jedes Panel verschwindet
+auch die Default-Seite, wenn das Addon deaktiviert wird.
+
 Ein Addon kann eine eigene Seite ins Webpanel bringen. Die Seite ist ein
 HTML-Fragment (mit `<style>`/`<script>`), das das Dashboard in einem
 **sandboxed iframe** rendert. Der Control-Token bleibt im Host — Panel-Code

@@ -18,7 +18,8 @@ import org.helix.node.actions.ActionRegistry
 class AddonManagerTest {
     private val directory = createTempDirectory("addons")
     private val registry = ActionRegistry()
-    private val manager = AddonManager(directory, registry)
+    private val panels = org.helix.node.dashboard.DashboardPanelRegistry()
+    private val manager = AddonManager(directory, registry, dashboardPanels = panels)
 
     private fun writeHxa(
         id: String = "helix.test",
@@ -127,6 +128,32 @@ class AddonManagerTest {
         val result = registry.invoke(ActionInvocation("test.ping"))
         assertTrue(result.success)
         assertTrue(result.lines.first().contains("helix.test"))
+    }
+
+    @Test
+    fun `an addon without an own panel gets a generated default page`() {
+        writeHxa(withPaperComponent = true)
+        manager.loadAll()
+
+        val panel = panels.find("addon-helix-test")
+        assertTrue(panel != null, "default panel missing")
+        assertTrue(panel.html.contains("test.ping"))
+        assertTrue(panel.html.contains("paper.jar"))
+
+        manager.disable("helix.test")
+        assertTrue(panels.find("addon-helix-test") == null, "default panel must disappear on disable")
+
+        manager.enable("helix.test")
+        assertTrue(panels.find("addon-helix-test") != null, "default panel must return on re-enable")
+    }
+
+    @Test
+    fun `an addon registering its own panel suppresses the default page`() {
+        writeHxa(main = PanelTestAddon::class.java.name)
+        manager.loadAll()
+
+        assertTrue(panels.find("custom") != null, "own panel missing")
+        assertTrue(panels.find("addon-helix-test") == null, "default page must not exist alongside an own panel")
     }
 
     @Test

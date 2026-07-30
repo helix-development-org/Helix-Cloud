@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.79.0 — 2026-07-30
+
+### Jedes Addon hat jetzt immer eine Dashboard-Seite
+- **Registriert ein Addon während `onEnable` kein eigenes Panel, generiert
+  die Node automatisch eine Default-Seite** (`DefaultAddonPanel`,
+  Panel-Id `addon-<id>`): Manifest-Metadaten (Name, Id, Version,
+  Beschreibung), mitgelieferte HXA-Komponenten
+  (paper.jar/velocity.jar/pack.zip) und alle registrierten Actions mit
+  Usage, Beschreibung, Player-Command-/Permission-Kennzeichnung.
+- **Überschreiben = einfach ein eigenes Panel registrieren**: sobald ein
+  Addon irgendein Panel über `registerDashboardPanel`/`panel(...)`
+  beisteuert, entfällt die generierte Seite für dieses Addon automatisch —
+  kein Opt-out-Mechanismus nötig. Beim Deaktivieren verschwindet die
+  Default-Seite wie jedes andere Panel, beim Re-Enable kommt sie zurück.
+
 ## 0.78.0 — 2026-07-30
 
 ### Neues Addon: Helix-GUIs — eine geteilte IGui-Installation für alle Addons
