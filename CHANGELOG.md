@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.80.0 — 2026-07-31
+
+### Dashboard: Bklit-Charts + anime.js
+- **Recharts → Bklit** (`ui.bklit.com`, via shadcn-Registry installiert;
+  basiert auf visx + motion): die Metrik-Sparklines der Overview
+  (`MetricChart`) rendern jetzt mit Bklits `AreaChart` — animierte
+  Reveals, Crosshair-Tooltip statt statischer Box. `recharts` ist
+  komplett aus den Dependencies entfernt. Verhaltensänderung: Datenlücken
+  (`-1`-Sentinel) werden auf der Zeitachse überbrückt statt als Lücke
+  gezeigt (Bklit kennt keine echten Gaps).
+- **Neu: Task-Verteilungs-Chart** auf der Overview — ein Bklit-Bar-Chart
+  zeigt, wie sich die Spieler über die laufenden Tasks verteilen
+  (Services-Anzahl im Tooltip); blendet sich auf leeren Netzwerken aus.
+- **anime.js (v4) umfassend integriert** (`src/lib/anim.ts`, respektiert
+  durchgängig `prefers-reduced-motion`): gestaffelte Karten-Einblendung
+  bei jedem Seitenwechsel (Page-Transition), animierte Zahlen-Countups
+  (Players/Services/Tasks-Kacheln + alle Trend-Werte), Scale-Pop auf
+  Service-Status-Badges bei Zustandswechseln, Icon-Nudge in der Sidebar
+  beim Navigieren.
+- shadcn/Radix bleibt bewusst das UI-Fundament: Bklit ist kein
+  shadcn-Ersatz, sondern setzt shadcn voraus (Registry-Installation über
+  die neue `components.json`).
+
 ## 0.79.0 — 2026-07-30
 
 ### Jedes Addon hat jetzt immer eine Dashboard-Seite

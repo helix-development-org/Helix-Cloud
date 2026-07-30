@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { api, setToken, setUnauthorizedHandler, type Identity, type Overview, type PanelInfo } from "@/lib/api"
+import { useViewReveal } from "@/lib/anim"
 import { AppShell } from "@/components/app-shell"
 import { Toaster } from "@/components/ui/sonner"
 import { LoginView } from "@/views/login"
@@ -68,6 +69,7 @@ export function App() {
     <>
       <AppShell identity={identity} panels={panels} view={current} title={title} version={version}
         onNavigate={setView} onLogout={logout}>
+        <ViewTransition viewKey={current}>
         {current === "overview" && <OverviewView />}
         {current === "tasks" && <TasksView />}
         {current === "services" && <ServicesView />}
@@ -84,8 +86,15 @@ export function App() {
         {current === "translations" && <TranslationsView />}
         {current === "settings" && <SettingsView identity={identity} version={version} />}
         {current.startsWith("panel:") && <AddonPanelView panelId={current.slice(6)} />}
+        </ViewTransition>
       </AppShell>
       <Toaster />
     </>
   )
+}
+
+/** Staggered fade/rise reveal of the active view, replayed on every navigation. */
+function ViewTransition({ viewKey, children }: { viewKey: string; children: React.ReactNode }) {
+  const ref = useViewReveal(viewKey)
+  return <div ref={ref} key={viewKey}>{children}</div>
 }

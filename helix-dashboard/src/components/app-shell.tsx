@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
+import { animate } from "animejs"
 import {
   Archive, Blocks, Clock, ClipboardList, FolderTree, Languages, LayoutDashboard, ListChecks, LogOut, Moon, Network,
   Puzzle, ScrollText, Server, Settings, ShieldCheck, Sun, Users, Zap,
@@ -111,6 +112,14 @@ export function AppShell(props: {
 }
 
 function NavButton({ active, icon, label, onClick }: { active: boolean; icon: ReactNode; label: string; onClick: () => void }) {
+  const iconRef = useRef<HTMLSpanElement>(null)
+  // Nudge the icon when this entry becomes the active view — a small, quick
+  // acknowledgement of the navigation without any layout shift.
+  useEffect(() => {
+    if (!active || !iconRef.current) return
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
+    animate(iconRef.current, { translateX: [-4, 0], scale: [0.8, 1], duration: 300, ease: "outBack" })
+  }, [active])
   return (
     <button
       onClick={onClick}
@@ -119,7 +128,7 @@ function NavButton({ active, icon, label, onClick }: { active: boolean; icon: Re
         active ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground" : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground",
       )}
     >
-      {icon}
+      <span ref={iconRef} className="inline-flex">{icon}</span>
       <span className="truncate">{label}</span>
     </button>
   )

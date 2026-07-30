@@ -1,15 +1,19 @@
-import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from "recharts"
+import { Area } from "@/components/charts/area"
+import { AreaChart } from "@/components/charts/area-chart"
+import { ChartTooltip } from "@/components/charts/tooltip"
 import type { MetricSample } from "@/lib/api"
 
-/** Normalises a raw metric value: null/undefined and negative sentinels (-1) become gaps. */
-function clean(v: MetricSample[keyof MetricSample]): number | null {
-  return typeof v === "number" && v >= 0 ? v : null
+/** Whether a raw metric value is real data (null/undefined and negative sentinels like -1 are not). */
+function isReal(v: MetricSample[keyof MetricSample]): v is number {
+  return typeof v === "number" && v >= 0
 }
 
 /**
- * Small area chart of one metric over time, shadcn-styled. Missing points
- * (null, or the `-1` "unknown" sentinel on old samples) render as gaps rather
- * than dropping to zero.
+ * Small area chart of one metric over time, rendered with the Bklit chart
+ * components (visx + motion). Missing points (null, or the `-1` "unknown"
+ * sentinel on old samples) are dropped from the series — the time-based
+ * x-scale keeps the remaining points correctly positioned, so a data gap
+ * shows as a straight bridge rather than a false drop to zero.
  */
 export function MetricChart({
   samples,
@@ -26,31 +30,33 @@ export function MetricChart({
   /** Decimal places shown in the tooltip. */
   digits?: number
 }) {
-  const data = samples.map((s) => ({ epochMs: s.epochMs, v: clean(s[dataKey]) }))
-  const gid = `g-${String(dataKey)}`
+  const data = samples
+    .filter((s) => isReal(s[dataKey]))
+    .map((s) => ({ date: s.epochMs, v: s[dataKey] as number }))
+  if (!data.length) {
+    return <div className="flex h-16 items-center justify-center text-xs text-muted-foreground">no data yet</div>
+  }
   return (
-    <ResponsiveContainer width="100%" height={64}>
-      <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-        <defs>
-          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity={0.35} />
-            <stop offset="100%" stopColor={color} stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <YAxis hide domain={[0, "auto"]} />
-        <Tooltip
-          contentStyle={{
-            background: "var(--popover)",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            fontSize: 12,
-          }}
-          labelFormatter={() => ""}
-          formatter={(v: number) => [`${v.toFixed(digits)}${unit ? " " + unit : ""}`, String(dataKey)]}
-        />
-        <Area type="monotone" dataKey="v" stroke={color} strokeWidth={1.6}
-          fill={`url(#${gid})`} isAnimationActive={false} connectNulls={false} />
-      </AreaChart>
-    </ResponsiveContainer>
+    <AreaChart
+      data={data}
+      xDataKey="date"
+      margin={{ top: 4, right: 0, bottom: 0, left: 0 }}
+      style={{ height: 64, aspectRatio: "auto" }}
+      className="w-full"
+      animationDuration={700}
+    >
+      <Area dataKey="v" fill={color} stroke={color} strokeWidth={1.6} fillOpacity={0.35} />
+      <ChartTooltip
+        showDatePill={false}
+        dotSize={3}
+        rows={(point) => [
+          {
+            label: String(dataKey),
+            value: `${(point.v as number).toFixed(digits)}${unit ? " " + unit : ""}`,
+            color,
+          },
+        ]}
+      />
+    </AreaChart>
   )
 }

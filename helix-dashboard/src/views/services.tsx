@@ -4,6 +4,7 @@ import { api, type ServiceInfo } from "@/lib/api"
 import { streamLines } from "@/lib/sse"
 import { usePoll } from "@/lib/use-poll"
 import { stateVariant, uptime } from "@/lib/format"
+import { usePopOnChange } from "@/lib/anim"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -36,7 +37,7 @@ export function ServicesView() {
             {(data ?? []).map((s) => (
               <TableRow key={s.id}>
                 <TableCell><span className="font-medium">{s.id}</span> <span className="text-xs text-muted-foreground">{s.environment}</span></TableCell>
-                <TableCell><Badge variant={stateVariant(s.state)}>{s.state}</Badge></TableCell>
+                <TableCell><StateBadge state={s.state} /></TableCell>
                 <TableCell className="text-sm">{s.onlinePlayers}/{s.maxPlayers}</TableCell>
                 <TableCell className="text-sm">
                   {s.memoryUsedMb >= 0 ? (
@@ -69,6 +70,16 @@ export function ServicesView() {
       </CardContent>
       {console && <ConsoleDialog id={console} onClose={() => setConsole(null)} />}
     </Card>
+  )
+}
+
+/** Service state badge that pops (scale bounce) whenever the state changes, so lifecycle transitions catch the eye. */
+function StateBadge({ state }: { state: string }) {
+  const ref = usePopOnChange(state)
+  return (
+    <span ref={ref as React.RefObject<HTMLSpanElement>} className="inline-block">
+      <Badge variant={stateVariant(state)}>{state}</Badge>
+    </span>
   )
 }
 

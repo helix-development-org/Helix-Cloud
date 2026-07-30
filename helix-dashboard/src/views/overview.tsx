@@ -13,7 +13,9 @@ import { usePoll } from "@/lib/use-poll"
 import { ago, duration } from "@/lib/format"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { CountUp } from "@/components/count-up"
 import { MetricChart } from "@/components/metric-chart"
+import { TaskDistributionChart } from "@/components/task-distribution-chart"
 
 /** Overview: stat tiles, live node health, trend charts grouped by area, and recent activity. */
 export function OverviewView() {
@@ -36,9 +38,9 @@ export function OverviewView() {
   return (
     <div className="flex flex-col gap-5">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Tile label="Players online" value={ov.onlinePlayers} sub={`of ${ov.maxPlayers} slots`} icon={<Users className="size-4" />} accent />
-        <Tile label="Services" value={`${ov.servicesRunning} / ${ov.servicesTotal}`} sub="running / total" icon={<Server className="size-4" />} />
-        <Tile label="Tasks" value={ov.taskCount} sub="blueprints" icon={<ListChecks className="size-4" />} />
+        <Tile label="Players online" value={<CountUp value={ov.onlinePlayers} />} sub={`of ${ov.maxPlayers} slots`} icon={<Users className="size-4" />} accent />
+        <Tile label="Services" value={<><CountUp value={ov.servicesRunning} /> / {ov.servicesTotal}</>} sub="running / total" icon={<Server className="size-4" />} />
+        <Tile label="Tasks" value={<CountUp value={ov.taskCount} />} sub="blueprints" icon={<ListChecks className="size-4" />} />
         <Tile label="Network" value={proxy.maintenance ? "Maintenance" : "Operational"}
           sub={`${proxy.proxies.length} proxies · ${proxy.backends.length} backends`} icon={<Network className="size-4" />} />
       </div>
@@ -67,9 +69,12 @@ export function OverviewView() {
 
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><Users className="size-4" /> Network</CardTitle></CardHeader>
-        <CardContent className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          <TrendChart samples={metrics} dataKey="onlinePlayers" color="var(--chart-1)" label="Players online" />
-          <TrendChart samples={metrics} dataKey="avgTps" color="var(--chart-3)" label="Avg TPS" digits={1} />
+        <CardContent className="flex flex-col gap-6">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <TrendChart samples={metrics} dataKey="onlinePlayers" color="var(--chart-1)" label="Players online" />
+            <TrendChart samples={metrics} dataKey="avgTps" color="var(--chart-3)" label="Avg TPS" digits={1} />
+          </div>
+          <TaskDistributionChart services={data.services} />
         </CardContent>
       </Card>
 
@@ -210,12 +215,11 @@ function TrendChart({ samples, dataKey, color, label, unit, digits = 0 }: {
       </div>
     )
   }
-  const shown = (digits ? latest.toFixed(digits) : Math.round(latest).toString()) + (unit ? ` ${unit}` : "")
   return (
     <div className="rounded-lg border bg-secondary/30 p-3">
       <div className="mb-1 flex items-baseline justify-between">
         <span className="text-sm text-muted-foreground">{label}</span>
-        <span className="text-lg font-semibold">{shown}</span>
+        <span className="text-lg font-semibold"><CountUp value={latest} digits={digits} unit={unit} /></span>
       </div>
       <MetricChart samples={samples} dataKey={dataKey} color={color} unit={unit} digits={digits} />
     </div>
