@@ -163,9 +163,18 @@ export interface AuditEntry {
   outcome: string
 }
 export interface AddonInfo {
-  manifest: { id: string; name: string; version: string }
+  manifest: { id: string; name: string; version: string; description?: string }
   state: string
   failureReason?: string | null
+  actions?: AddonAction[]
+}
+export interface AddonAction {
+  name: string
+  description: string
+  usage: string
+  playerCommand?: boolean
+  permission?: string | null
+  bridgeInvocable?: boolean
 }
 export interface PanelInfo {
   id: string

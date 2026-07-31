@@ -467,7 +467,12 @@ class AddonManager(
         return normalized
     }
 
-    private fun info(record: LoadedAddon): AddonInfo = AddonInfo(record.manifest, record.state, record.failureReason)
+    private fun info(record: LoadedAddon): AddonInfo = AddonInfo(
+        manifest = record.manifest,
+        state = record.state,
+        failureReason = record.failureReason,
+        actions = registry.descriptors().filter { it.name in record.actionNames },
+    )
 
     private inner class ScopedContext(private val record: LoadedAddon) : AddonContext {
         override val dataDirectory: Path =
