@@ -1,0 +1,23 @@
+{
+  "admin.denied": "<red>Dir fehlt helix.npc.admin.",
+  "usage": "<gray>/npc <create|delete|list|tp|skin|hologram|look|interact|reload>",
+  "resync": "<gray>Synchronisiere NPCs neu vom Node…",
+  "create.players-only": "<red>Nur Spieler können NPCs platzieren.",
+  "create.usage": "<gray>/npc create <id> [skin|self]",
+  "created": "<green>NPC <white>{id}</white> erstellt.",
+  "delete.usage": "<gray>/npc delete <id>",
+  "deleted": "<yellow>NPC <white>{id}</white> gelöscht.",
+  "list.empty": "<gray>Auf diesem Task gibt es noch keine NPCs.",
+  "list.header": "<gray>NPCs auf Task <white>{task}</white>:",
+  "list.entry": "<gray>• <white>{id}</white> <dark_gray>({skin}, {look})</dark_gray>",
+  "tp.usage": "<gray>/npc tp <id>",
+  "tp.unknown": "<red>Unbekannter NPC {id} (nicht auf diesem Task?).",
+  "tp.done": "<gray>Zu <white>{id}</white> teleportiert.",
+  "skin.usage": "<gray>/npc skin <id> <name|self>",
+  "look.usage": "<gray>/npc look <id> <none|nearest|player>",
+  "hologram.usage": "<gray>/npc hologram <id> <zeile…|-> (nutze | für weitere Zeilen)",
+  "interact.usage": "<gray>/npc interact <id> <befehl…|->",
+  "edit.unknown": "<red>Unbekannter NPC {id}.",
+  "updated": "<green>NPC <white>{id}</white> aktualisiert.",
+  "rejected": "<red>Der Node hat den NPC abgelehnt (prüfe Limits/Validierung)."
+}

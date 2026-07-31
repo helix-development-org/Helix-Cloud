@@ -24,28 +24,7 @@ class EconomyAddon : AddonBase() {
      */
     override fun enable() {
         store = BalanceStore(context.storage(), startingBalance = STARTING_BALANCE)
-        msg = context.localizedMessages(
-            mapOf(
-                "en" to mapOf(
-                    "balance" to "&6Your balance: &f{balance} coins",
-                    "pay.sent" to "&6You sent &f{amount} coins &6to {target}.",
-                    "pay.received" to "&6{sender} sent you &f{amount} coins&6.",
-                    "error.self" to "&cYou cannot pay yourself.",
-                    "error.funds" to "&cYou do not have enough coins.",
-                    "error.usage" to "&cUsage: /pay <player> <amount>",
-                    "error.unknown" to "&cNo such player has ever joined this network.",
-                ),
-                "de" to mapOf(
-                    "balance" to "&6Dein Kontostand: &f{balance} Coins",
-                    "pay.sent" to "&6Du hast &f{amount} Coins &6an {target} gesendet.",
-                    "pay.received" to "&6{sender} hat dir &f{amount} Coins &6gesendet.",
-                    "error.self" to "&cDu kannst dir nicht selbst Coins senden.",
-                    "error.funds" to "&cDu hast nicht genug Coins.",
-                    "error.usage" to "&cBenutzung: /pay <player> <amount>",
-                    "error.unknown" to "&cDieser Spieler war noch nie auf diesem Netzwerk.",
-                ),
-            ),
-        )
+        msg = loadMessages()
         context.registerAction(
             ActionDescriptor(
                 name = "balance",

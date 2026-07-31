@@ -1,0 +1,9 @@
+{
+  "chat": "<white>{sender}<gray>: <white>{message}",
+  "empty": "<gray>No team members online.",
+  "list": "<aqua>Online team: <white>{members}</white>",
+  "notify": "<white>{text}",
+  "join": "<white>{player} <gray>is now <green>online<gray>.",
+  "leave": "<white>{player} <gray>is now <dark_gray>offline<gray>.",
+  "usage.tc": "<red>Usage: <white>/tc <message...></white> <dark_gray>— <gray>or write <white>@team <message></white> <gray>in chat"
+}

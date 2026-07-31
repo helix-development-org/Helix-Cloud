@@ -35,108 +35,7 @@ class ModerationAddon : AddonBase() {
             expiryMillis = { config.warnExpiryDays.toLong() * 86_400_000 },
         )
         mutes = MuteStore(context.storage())
-        msg = context.localizedMessages(
-            mapOf(
-                "en" to mapOf(
-                    "kick.default" to "Kicked by a moderator.",
-                    // Kick disconnect screen — MiniMessage, multi-line. Placeholders:
-                    // {reason} {moderator} {staff} {player} {network} {date} {time}
-                    "kick.screen" to (
-                        "<red><bold>You were kicked</bold>\n \n" +
-                            "<gray>Reason: <white>{reason}\n" +
-                            "<gray>By: <white>{moderator}"
-                        ),
-                    "kick.confirm" to "&7Kicked &f{target}&7.",
-                    "kick.notify" to "&c[Kick] &f{target} &7by {moderator}: {reason}",
-                    "warn.player" to "&cYou have been warned: &f{reason}",
-                    "warn.confirm" to "&7Warned &f{target}&7: {reason} ({total} total)",
-                    "warn.notify" to "&e[Warn] &f{target} &7by {moderator}: {reason} ({total} total)",
-                    "warns.none" to "&7{target} has no warnings.",
-                    "warns.entry" to "&c{reason} &7— by {by}",
-                    "announce.format" to "&c&l[Announcement] &r&f{text}",
-                    "tempban.default" to "Banned by {moderator}",
-                    "usage.kick" to "Usage: /kick \\<player> [reason...]",
-                    "usage.warn" to "Usage: /warn \\<player> \\<reason...>",
-                    "usage.warns" to "Usage: /warns \\<player>",
-                    "usage.announce" to "Usage: /announce \\<text...>",
-                    "usage.tempban" to "Usage: /tempban \\<player> \\<duration> [reason...]",
-                    "mute.player" to "&cYou have been muted: &f{reason} &7({expiry})",
-                    "mute.confirm" to "&7Muted &f{target}&7: {reason} ({expiry})",
-                    "mute.notify" to "&e[Mute] &f{target} &7by {moderator}: {reason} ({expiry})",
-                    "mute.default" to "Muted by a moderator.",
-                    "unmute.confirm" to "&7Unmuted &f{target}&7.",
-                    "unmute.notify" to "&a[Unmute] &f{target} &7by {moderator}.",
-                    "unmute.none" to "&c{target} is not muted.",
-                    "mutes.none" to "&7No active mutes.",
-                    "mutes.entry" to "&e{player} &7— {reason} ({expiry}) &7— by {by}",
-                    "blocklist.added" to "&7Added &f{word} &7to the chat blocklist.",
-                    "blocklist.removed" to "&7Removed &f{word} &7from the chat blocklist.",
-                    "blocklist.notfound" to "&c{word} is not on the blocklist.",
-                    "blocklist.list" to "&eBlocked words: &f{words}",
-                    "blocklist.empty" to "&7The chat blocklist is empty.",
-                    "usage.mute" to "Usage: /mute \\<player> [duration] [reason...]",
-                    "usage.unmute" to "Usage: /unmute \\<player>",
-                    "usage.blocklist" to "Usage: /blocklist \\<add|remove|list> [word]",
-                    "modlookup.header" to "&e&lModeration status for &f{target}",
-                    "modlookup.ban" to "&7Ban: &f{value}",
-                    "modlookup.mute" to "&7Mute: &f{value}",
-                    "modlookup.warns" to "&7Active warns: &f{value}",
-                    "modlookup.incidents" to "&7Guard incidents (recent): &f{value}",
-                    "modlookup.na" to "n/a (addon not installed)",
-                    "modlookup.none" to "none",
-                    "usage.modlookup" to "Usage: /modlookup \\<player>",
-                ),
-                "de" to mapOf(
-                    "kick.default" to "Von einem Moderator gekickt.",
-                    // Kick-Disconnect-Screen — MiniMessage, mehrzeilig. Platzhalter:
-                    // {reason} {moderator} {staff} {player} {network} {date} {time}
-                    "kick.screen" to (
-                        "<red><bold>Du wurdest gekickt</bold>\n \n" +
-                            "<gray>Grund: <white>{reason}\n" +
-                            "<gray>Von: <white>{moderator}"
-                        ),
-                    "kick.confirm" to "&7Du hast &f{target}&7 gekickt.",
-                    "kick.notify" to "&c[Kick] &f{target} &7von {moderator}: {reason}",
-                    "warn.player" to "&cDu wurdest verwarnt: &f{reason}",
-                    "warn.confirm" to "&7Du hast &f{target}&7 verwarnt: {reason} ({total} insgesamt)",
-                    "warn.notify" to "&e[Warnung] &f{target} &7von {moderator}: {reason} ({total} insgesamt)",
-                    "warns.none" to "&7{target} hat keine Verwarnungen.",
-                    "warns.entry" to "&c{reason} &7— von {by}",
-                    "announce.format" to "&c&l[Ankündigung] &r&f{text}",
-                    "tempban.default" to "Gebannt von {moderator}",
-                    "usage.kick" to "Verwendung: /kick \\<player> [reason...]",
-                    "usage.warn" to "Verwendung: /warn \\<player> \\<reason...>",
-                    "usage.warns" to "Verwendung: /warns \\<player>",
-                    "usage.announce" to "Verwendung: /announce \\<text...>",
-                    "usage.tempban" to "Verwendung: /tempban \\<player> \\<duration> [reason...]",
-                    "mute.player" to "&cDu wurdest stummgeschaltet: &f{reason} &7({expiry})",
-                    "mute.confirm" to "&7Du hast &f{target}&7 stummgeschaltet: {reason} ({expiry})",
-                    "mute.notify" to "&e[Mute] &f{target} &7von {moderator}: {reason} ({expiry})",
-                    "mute.default" to "Von einem Moderator stummgeschaltet.",
-                    "unmute.confirm" to "&7Du hast &f{target}&7 wieder freigeschaltet.",
-                    "unmute.notify" to "&a[Unmute] &f{target} &7von {moderator}.",
-                    "unmute.none" to "&c{target} ist nicht stummgeschaltet.",
-                    "mutes.none" to "&7Keine aktiven Stummschaltungen.",
-                    "mutes.entry" to "&e{player} &7— {reason} ({expiry}) &7— von {by}",
-                    "blocklist.added" to "&7&f{word} &7zur Chat-Blockliste hinzugefügt.",
-                    "blocklist.removed" to "&7&f{word} &7von der Chat-Blockliste entfernt.",
-                    "blocklist.notfound" to "&c{word} steht nicht auf der Blockliste.",
-                    "blocklist.list" to "&eBlockierte Wörter: &f{words}",
-                    "blocklist.empty" to "&7Die Chat-Blockliste ist leer.",
-                    "usage.mute" to "Verwendung: /mute \\<player> [duration] [reason...]",
-                    "usage.unmute" to "Verwendung: /unmute \\<player>",
-                    "usage.blocklist" to "Verwendung: /blocklist \\<add|remove|list> [word]",
-                    "modlookup.header" to "&e&lModerationsstatus für &f{target}",
-                    "modlookup.ban" to "&7Bann: &f{value}",
-                    "modlookup.mute" to "&7Stummschaltung: &f{value}",
-                    "modlookup.warns" to "&7Aktive Verwarnungen: &f{value}",
-                    "modlookup.incidents" to "&7Guard-Vorfälle (kürzlich): &f{value}",
-                    "modlookup.na" to "n/a (Addon nicht installiert)",
-                    "modlookup.none" to "keine",
-                    "usage.modlookup" to "Verwendung: /modlookup \\<player>",
-                ),
-            ),
-        )
+        msg = loadMessages()
         playerCommand(
             "kick",
             "Kicks a player from the network.",
@@ -144,8 +43,8 @@ class ModerationAddon : AddonBase() {
             "helix.mod.kick",
         ) { executor, args ->
             val target = args.firstOrNull() ?: return@playerCommand usage(executor, "usage.kick")
-            val reason = args.drop(1).joinToString(" ").ifBlank { msg.formatFor(target, "kick.default") }
-            val screen = msg.formatFor(
+            val reason = args.drop(1).joinToString(" ").ifBlank { msg.screenFor(target, "kick.default") }
+            val screen = msg.screenFor(
                 target,
                 "kick.screen",
                 "reason" to reason,
@@ -215,7 +114,7 @@ class ModerationAddon : AddonBase() {
             if (target == null || duration == null) {
                 usage(executor, "usage.tempban")
             } else {
-                val reason = args.drop(2).joinToString(" ").ifBlank { msg.formatFor(target, "tempban.default", "moderator" to executor) }
+                val reason = args.drop(2).joinToString(" ").ifBlank { msg.screenFor(target, "tempban.default", "moderator" to executor) }
                 invoke("ban.set", target, executor, duration, reason)
             }
         }
@@ -229,7 +128,7 @@ class ModerationAddon : AddonBase() {
             val durationToken = args.getOrNull(1)?.takeIf(MuteDuration::isDurationToken)
             val durationMs = durationToken?.let(MuteDuration::parseMillis)
             val reason = args.drop(if (durationToken != null) 2 else 1).joinToString(" ")
-                .ifBlank { msg.formatFor(target, "mute.default") }
+                .ifBlank { msg.screenFor(target, "mute.default") }
             val entry = mutes.set(target, reason, durationMs, executor)
             publishMutes()
             val expiry = expiryText(entry.expiresAtEpochMs)
@@ -382,14 +281,14 @@ class ModerationAddon : AddonBase() {
         val result = context.actions.invoke(ActionInvocation("ban.check", listOf(target), ActionSource.ADDON))
         val line = result.lines.firstOrNull()
         if (!result.success || line == null) {
-            return msg.formatFor(executor, "modlookup.na")
+            return msg.screenFor(executor, "modlookup.na")
         }
-        return if (line.contains("not banned", ignoreCase = true)) msg.formatFor(executor, "modlookup.none") else line
+        return if (line.contains("not banned", ignoreCase = true)) msg.screenFor(executor, "modlookup.none") else line
     }
 
     /** Mute status for `/modlookup`, read directly from this addon's own [MuteStore]. */
     private fun lookupMute(executor: String, target: String): String {
-        val entry = mutes.activeMute(target) ?: return msg.formatFor(executor, "modlookup.none")
+        val entry = mutes.activeMute(target) ?: return msg.screenFor(executor, "modlookup.none")
         return "${entry.reason} (${expiryText(entry.expiresAtEpochMs)})"
     }
 
@@ -406,7 +305,7 @@ class ModerationAddon : AddonBase() {
         )
         val payload = result.lines.firstOrNull()
         if (!result.success || payload == null) {
-            return msg.formatFor(executor, "modlookup.na")
+            return msg.screenFor(executor, "modlookup.na")
         }
         val incidents = runCatching {
             json.parseToJsonElement(payload).jsonObject["incidents"]?.jsonArray

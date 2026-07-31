@@ -1,0 +1,22 @@
+{
+  "joined": "<green>Your friend <white>{player}</white> joined the network.",
+  "request.sent": "<yellow>Friend request sent to <white>{target}</white>.",
+  "request.received": "<yellow><white>{sender}</white> wants to be your friend. <gray>/friend accept {sender}",
+  "accepted.self": "<green>You are now friends with <white>{target}</white>.",
+  "accepted.other": "<green><white>{player}</white> accepted your friend request.",
+  "denied": "<gray>Denied the request from <white>{target}</white>.",
+  "removed": "<gray>You are no longer friends with <white>{target}</white>.",
+  "error.self": "<red>You cannot add yourself.",
+  "error.already": "<red>You are already friends with <white>{target}</white>.",
+  "error.duplicate": "<red>You already sent a request to <white>{target}</white>.",
+  "error.cooldown": "<red>You must wait a bit before sending another request to <white>{target}</white>.",
+  "error.norequest": "<red>No pending request from <white>{target}</white>.",
+  "error.notfriends": "<red>You are not friends with <white>{target}</white>.",
+  "requests.none": "<gray>No pending friend requests.",
+  "requests.list": "<yellow>Pending requests: <white>{players}</white>",
+  "list.empty": "<gray>You have no friends yet. <white>/friend add \\<player></white>",
+  "list.online": "<green>online",
+  "list.offline": "<dark_gray>offline",
+  "list.entry": "<white>{friend}</white> <dark_gray>— <gray>{status}",
+  "usage": "<gray>Usage: <white>/friend \\<add|accept|deny|remove|list|requests> [player]</white>"
+}

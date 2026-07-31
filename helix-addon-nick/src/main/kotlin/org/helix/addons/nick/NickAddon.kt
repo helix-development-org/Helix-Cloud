@@ -38,7 +38,7 @@ class NickAddon : AddonBase() {
     override fun enable() {
         nicks = load()
         config = loadConfig()
-        msg = context.localizedMessages(messages())
+        msg = loadMessages()
         context.registerDisplayResolver { name ->
             nicks[name.lowercase()]?.let {
                 DisplayProfile(prefix = config.prefix, name = it, color = config.color, exclusive = true)
@@ -155,25 +155,6 @@ class NickAddon : AddonBase() {
         config = updated
         context.storage().write("config", json.encodeToString(updated))
     }
-
-    private fun messages(): Map<String, Map<String, String>> = mapOf(
-        "en" to mapOf(
-            "usage" to "&cUsage: /nick \\<name> &7or &c/nick off",
-            "set.ok" to "&aYou are now displayed as &f{nick}&a.",
-            "off.ok" to "&7Your real name is shown again.",
-            "off.none" to "&cYou have no nick set.",
-            "error.format" to "&cNicks are 3-16 characters: letters, digits and underscores.",
-            "error.taken" to "&cThat name is already in use.",
-        ),
-        "de" to mapOf(
-            "usage" to "&cBenutzung: /nick \\<name> &7oder &c/nick off",
-            "set.ok" to "&aDu wirst jetzt als &f{nick} &aangezeigt.",
-            "off.ok" to "&7Dein echter Name wird wieder angezeigt.",
-            "off.none" to "&cDu hast keinen Nick gesetzt.",
-            "error.format" to "&cNicks haben 3-16 Zeichen: Buchstaben, Ziffern und Unterstriche.",
-            "error.taken" to "&cDieser Name ist bereits vergeben.",
-        ),
-    )
 
     private companion object {
         /** Allowed nick shape, mirroring Minecraft account names. */

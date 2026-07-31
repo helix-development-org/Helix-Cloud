@@ -71,8 +71,8 @@ class ModerationAddonTest {
         context.run("warn", "Mod", "Steve", "language")
 
         assertEquals(2, context.notifications.size)
-        assertTrue(context.notifications[0].second.contains("[Kick]"))
-        assertTrue(context.notifications[1].second.contains("[Warn]"))
+        assertTrue(context.notifications[0].second.contains("was kicked by"))
+        assertTrue(context.notifications[1].second.contains("was warned by"))
         assertTrue(context.notifications.all { it.first == "moderation" })
     }
 

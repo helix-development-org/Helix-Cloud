@@ -25,7 +25,8 @@ class FriendsAddonTest {
 
         val accepted = context.run("friend", "Alex", "accept", "Steve")
         assertTrue(accepted.success)
-        assertTrue(accepted.lines.first().contains("friends with Steve"))
+        assertTrue(accepted.lines.first().contains("now friends"))
+        assertTrue(accepted.lines.first().contains("Steve"))
         assertTrue(context.run("friend", "Steve", "list").lines.any { it.contains("alex") })
     }
 

@@ -27,28 +27,7 @@ class TeamUtilsAddon : AddonBase() {
      * Registers the team commands and the join/leave notifications.
      */
     override fun enable() {
-        msg = context.localizedMessages(
-            mapOf(
-                "en" to mapOf(
-                    "chat" to "&b[Team] &f{sender}&7: &f{message}",
-                    "empty" to "&7No team members online.",
-                    "list" to "&bOnline team: &f{members}",
-                    "notify" to "&b[Team] &f{text}",
-                    "join" to "&b[Team] &f{player} &7is now &aonline&7.",
-                    "leave" to "&b[Team] &f{player} &7is now &8offline&7.",
-                    "usage.tc" to "Usage: /tc \\<message...> — or write @team \\<message> in chat",
-                ),
-                "de" to mapOf(
-                    "chat" to "&b[Team] &f{sender}&7: &f{message}",
-                    "empty" to "&7Keine Teammitglieder online.",
-                    "list" to "&bTeam online: &f{members}",
-                    "notify" to "&b[Team] &f{text}",
-                    "join" to "&b[Team] &f{player} &7ist jetzt &aonline&7.",
-                    "leave" to "&b[Team] &f{player} &7ist jetzt &8offline&7.",
-                    "usage.tc" to "Verwendung: /tc \\<nachricht...> — oder schreibe @team \\<nachricht> in den Chat",
-                ),
-            ),
-        )
+        msg = loadMessages()
         context.registerAction(
             ActionDescriptor(
                 name = "tc",

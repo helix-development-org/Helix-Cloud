@@ -1,0 +1,14 @@
+{
+  "usage": "<gray>/profile <dark_gray>— <gray>view your profile\n<gray>/profile set <white><key> <value></white> <dark_gray>— <gray>change a setting",
+  "unknown.key": "<red>Unknown setting: <white>{key}</white>",
+  "locked": "<red>That option is locked for you.",
+  "rejected": "<red>Rejected: <white>{reason}</white>",
+  "changed": "<green>{label} <gray>set to <white>{value}</white>.",
+  "header": "<aqua><bold>Your profile</bold></aqua> <gray>(try <white>/profilemenu</white> for a graphical menu)",
+  "info.line": "<gray>{label}: <white>{value}</white>",
+  "setting.line": "<gray>{label} <dark_gray>({key})<gray>: <white>{value}</white>",
+  "menu.title": "Your Profile",
+  "menu.starting": "<red>The profile menu is still starting, try again in a moment.",
+  "menu.no-options": "<red>You have no unlocked options for this setting.",
+  "menu.current": "<gray>Current: <white>{value}</white>"
+}

@@ -1,0 +1,8 @@
+{
+  "usage": "<red>Verwendung: <white>/nick <name></white> <gray>oder <white>/nick off</white>",
+  "set.ok": "<green>Du wirst jetzt als <white>{nick}</white> angezeigt.",
+  "off.ok": "<gray>Dein echter Name wird wieder angezeigt.",
+  "off.none": "<red>Du hast keinen Nick gesetzt.",
+  "error.format": "<red>Nicks haben 3-16 Zeichen: Buchstaben, Ziffern und Unterstriche.",
+  "error.taken": "<red>Dieser Name ist bereits vergeben."
+}

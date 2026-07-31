@@ -1,0 +1,12 @@
+{
+  "banned": "<red><bold>You are banned</bold>\n<gray>from {network}\n \n<gray>Reason: <white>{reason}",
+  "banned.temp": "<red><bold>You are temporarily banned</bold>\n<gray>from {network}\n \n<gray>Reason: <white>{reason}\n<gray>Time left: <yellow>{remaining}\n<gray>Expires: <white>{expiry}",
+  "notify.set": "<white>{player}</white> <gray>was banned: {reason} <dark_gray>({expiry})</dark_gray>",
+  "notify.pardon": "<white>{player}</white> <green>was pardoned.",
+  "help.header": "<aqua><bold>Ban commands:</bold></aqua>",
+  "help.set": "<white>/bans set <player> [duration] [reason...]</white> <dark_gray>—</dark_gray> <gray>30m, 12h, 7d or permanent",
+  "help.pardon": "<white>/bans pardon <player></white>",
+  "help.check": "<white>/bans check <player></white>",
+  "help.list": "<white>/bans list</white>",
+  "help.history": "<white>/bans history <player></white>"
+}

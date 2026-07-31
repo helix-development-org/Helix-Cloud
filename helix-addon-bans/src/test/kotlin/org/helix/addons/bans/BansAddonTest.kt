@@ -46,7 +46,7 @@ class BansAddonTest {
         context.run("ban.pardon", "Alex", "Mod")
 
         assertEquals(listOf("moderation", "moderation"), context.notifications.map { it.first })
-        assertTrue(context.notifications[0].second.contains("[Ban]"))
+        assertTrue(context.notifications[0].second.contains("was banned"))
         assertTrue(context.notifications[0].second.contains("cheating"))
         assertTrue(context.notifications[1].second.contains("pardoned"))
     }

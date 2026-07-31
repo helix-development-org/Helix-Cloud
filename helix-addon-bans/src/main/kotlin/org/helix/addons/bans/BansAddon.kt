@@ -25,56 +25,7 @@ class BansAddon : AddonBase() {
      */
     override fun enable() {
         store = BanStore(context.storage(), resolveUuid = context::resolvePlayerUuid)
-        msg = context.localizedMessages(
-            mapOf(
-                "en" to mapOf(
-                    // Disconnect screens — MiniMessage, multi-line. Placeholders:
-                    // {player} {reason} {remaining} {expiry} {duration} {staff} {network} {date} {time}
-                    "banned" to (
-                        "<red><bold>You are banned</bold>\n" +
-                            "<gray>from {network}\n \n" +
-                            "<gray>Reason: <white>{reason}"
-                        ),
-                    "banned.temp" to (
-                        "<red><bold>You are temporarily banned</bold>\n" +
-                            "<gray>from {network}\n \n" +
-                            "<gray>Reason: <white>{reason}\n" +
-                            "<gray>Time left: <yellow>{remaining}\n" +
-                            "<gray>Expires: <white>{expiry}"
-                        ),
-                    "notify.set" to "&c[Ban] &f{player} &7was banned: {reason} ({expiry})",
-                    "notify.pardon" to "&a[Ban] &f{player} &7was pardoned.",
-                    "help.header" to "&cBan commands:",
-                    "help.set" to "&f/bans set <player> [duration] [reason...] &7— 30m, 12h, 7d or permanent",
-                    "help.pardon" to "&f/bans pardon <player>",
-                    "help.check" to "&f/bans check <player>",
-                    "help.list" to "&f/bans list",
-                    "help.history" to "&f/bans history <player>",
-                ),
-                "de" to mapOf(
-                    "banned" to (
-                        "<red><bold>Du bist gebannt</bold>\n" +
-                            "<gray>von {network}\n \n" +
-                            "<gray>Grund: <white>{reason}"
-                        ),
-                    "banned.temp" to (
-                        "<red><bold>Du bist vorübergehend gebannt</bold>\n" +
-                            "<gray>von {network}\n \n" +
-                            "<gray>Grund: <white>{reason}\n" +
-                            "<gray>Verbleibende Zeit: <yellow>{remaining}\n" +
-                            "<gray>Läuft ab: <white>{expiry}"
-                        ),
-                    "notify.set" to "&c[Ban] &f{player} &7wurde gebannt: {reason} ({expiry})",
-                    "notify.pardon" to "&a[Ban] &f{player} &7wurde entbannt.",
-                    "help.header" to "&cBan-Befehle:",
-                    "help.set" to "&f/bans set <player> [duration] [reason...] &7— 30m, 12h, 7d oder permanent",
-                    "help.pardon" to "&f/bans pardon <player>",
-                    "help.check" to "&f/bans check <player>",
-                    "help.list" to "&f/bans list",
-                    "help.history" to "&f/bans history <player>",
-                ),
-            ),
-        )
+        msg = loadMessages()
         context.registerJoinGate { request ->
             // request.uuid is the bridge-reported uuid of the actual joining account — checking
             // by it (not just the current name) is what stops a rename from evading a ban.
@@ -230,7 +181,7 @@ class BansAddon : AddonBase() {
     private fun banMessage(entry: BanEntry): String {
         val expiresAt = entry.expiresAtEpochMs
         return if (expiresAt != null) {
-            msg.formatFor(
+            msg.screenFor(
                 entry.player,
                 "banned.temp",
                 "player" to entry.player,
@@ -241,7 +192,7 @@ class BansAddon : AddonBase() {
                 "expiry" to formatDate(expiresAt),
             )
         } else {
-            msg.formatFor(
+            msg.screenFor(
                 entry.player,
                 "banned",
                 "player" to entry.player,

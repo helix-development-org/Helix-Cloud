@@ -31,30 +31,7 @@ class ProfileAddon : AddonBase() {
      */
     override fun enable() {
         store = ProfileStore(context.storage())
-        msg = context.localizedMessages(
-            mapOf(
-                "en" to mapOf(
-                    "usage" to "&f/profile &7— view your profile\n&f/profile set <key> <value> &7— change a setting",
-                    "unknown.key" to "&cUnknown setting: {key}",
-                    "locked" to "&cThat option is locked for you.",
-                    "rejected" to "&cRejected: {reason}",
-                    "changed" to "&a{label} set to {value}.",
-                    "header" to "&b&lYour profile &7(try /profilemenu for a graphical menu)",
-                    "info.line" to "&7{label}: &f{value}",
-                    "setting.line" to "&7{label} ({key}): &f{value}",
-                ),
-                "de" to mapOf(
-                    "usage" to "&f/profile &7— zeigt dein Profil\n&f/profile set <key> <wert> &7— ändert eine Einstellung",
-                    "unknown.key" to "&cUnbekannte Einstellung: {key}",
-                    "locked" to "&cDiese Option ist für dich gesperrt.",
-                    "rejected" to "&cAbgelehnt: {reason}",
-                    "changed" to "&a{label} auf {value} gesetzt.",
-                    "header" to "&b&lDein Profil &7(probier /profilemenu für ein grafisches Menü)",
-                    "info.line" to "&7{label}: &f{value}",
-                    "setting.line" to "&7{label} ({key}): &f{value}",
-                ),
-            ),
-        )
+        msg = loadMessages()
 
         action(
             "profile.view",

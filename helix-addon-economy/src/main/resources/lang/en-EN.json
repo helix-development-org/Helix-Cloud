@@ -1,0 +1,9 @@
+{
+  "balance": "<gold>Your balance: <white>{balance} coins</white>",
+  "pay.sent": "<gold>You sent <white>{amount} coins</white> to <white>{target}</white>.",
+  "pay.received": "<gold><white>{sender}</white> sent you <white>{amount} coins</white>.",
+  "error.self": "<red>You cannot pay yourself.",
+  "error.funds": "<red>You do not have enough coins.",
+  "error.usage": "<red>Usage: <white>/pay \\<player> \\<amount></white>",
+  "error.unknown": "<red>No such player has ever joined this network."
+}

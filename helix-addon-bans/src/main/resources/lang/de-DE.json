@@ -1,0 +1,12 @@
+{
+  "banned": "<red><bold>Du bist gebannt</bold>\n<gray>von {network}\n \n<gray>Grund: <white>{reason}",
+  "banned.temp": "<red><bold>Du bist vorübergehend gebannt</bold>\n<gray>von {network}\n \n<gray>Grund: <white>{reason}\n<gray>Verbleibende Zeit: <yellow>{remaining}\n<gray>Läuft ab: <white>{expiry}",
+  "notify.set": "<white>{player}</white> <gray>wurde gebannt: {reason} <dark_gray>({expiry})</dark_gray>",
+  "notify.pardon": "<white>{player}</white> <green>wurde entbannt.",
+  "help.header": "<aqua><bold>Ban-Befehle:</bold></aqua>",
+  "help.set": "<white>/bans set <player> [duration] [reason...]</white> <dark_gray>—</dark_gray> <gray>30m, 12h, 7d oder permanent",
+  "help.pardon": "<white>/bans pardon <player></white>",
+  "help.check": "<white>/bans check <player></white>",
+  "help.list": "<white>/bans list</white>",
+  "help.history": "<white>/bans history <player></white>"
+}

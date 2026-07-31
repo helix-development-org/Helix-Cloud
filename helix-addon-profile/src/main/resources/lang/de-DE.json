@@ -1,0 +1,14 @@
+{
+  "usage": "<gray>/profile <dark_gray>— <gray>zeigt dein Profil\n<gray>/profile set <white><key> <wert></white> <dark_gray>— <gray>ändert eine Einstellung",
+  "unknown.key": "<red>Unbekannte Einstellung: <white>{key}</white>",
+  "locked": "<red>Diese Option ist für dich gesperrt.",
+  "rejected": "<red>Abgelehnt: <white>{reason}</white>",
+  "changed": "<green>{label} <gray>auf <white>{value}</white> gesetzt.",
+  "header": "<aqua><bold>Dein Profil</bold></aqua> <gray>(probier <white>/profilemenu</white> für ein grafisches Menü)",
+  "info.line": "<gray>{label}: <white>{value}</white>",
+  "setting.line": "<gray>{label} <dark_gray>({key})<gray>: <white>{value}</white>",
+  "menu.title": "Dein Profil",
+  "menu.starting": "<red>Das Profilmenü startet noch, versuch es gleich nochmal.",
+  "menu.no-options": "<red>Du hast keine freigeschalteten Optionen für diese Einstellung.",
+  "menu.current": "<gray>Aktuell: <white>{value}</white>"
+}

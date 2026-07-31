@@ -1,0 +1,7 @@
+{
+  "value": "<gold>{stat}: <white>{value}</white>",
+  "value.other": "<gold><white>{player}</white>'s {stat}: <white>{value}</white>",
+  "top.empty": "<gray>No values recorded yet for <white>{stat}</white>.",
+  "top.entry": "<gold>#{rank} <white>{player}</white> <dark_gray>— <white>{value}</white>",
+  "usage": "<gray>Usage: <white>/stats \\<stat> [player]</white> <dark_gray>| <white>/stats top \\<stat> [limit]</white>"
+}

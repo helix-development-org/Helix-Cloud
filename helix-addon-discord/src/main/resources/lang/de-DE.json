@@ -1,0 +1,5 @@
+{
+  "run.denied": "Du darfst keine Aktionen ausführen.",
+  "run.notallowed": "Diese Aktion steht nicht auf der Erlaubnisliste.",
+  "unavailable": "Der Befehl ist gerade nicht verfügbar."
+}

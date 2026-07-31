@@ -3,6 +3,7 @@ package org.helix.addons.discord
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionInvoker
 import org.helix.api.action.ActionSource
+import org.helix.api.message.LangResources
 import org.helix.api.message.MapMessages
 import org.helix.api.message.Messages
 
@@ -21,12 +22,14 @@ import org.helix.api.message.Messages
  *
  * @property actions action entry point of the node.
  * @property config supplies the current configuration.
- * @property messages configurable reply templates.
+ * @property messages configurable reply templates (defaults ship as
+ *  bundled `lang` JSON resources). Replies go to Discord, not into the
+ *  Minecraft chat, so every read here uses the prefix-free [Messages.raw].
  */
 class DiscordCommandHandler(
     private val actions: ActionInvoker,
     private val config: () -> DiscordConfig,
-    private val messages: Messages = MapMessages(DEFAULT_MESSAGES.getValue("en")),
+    private val messages: Messages = MapMessages(LangResources.load(DiscordCommandHandler::class.java).getValue("en")),
 ) {
     /**
      * Handles one Discord message.
@@ -92,20 +95,4 @@ class DiscordCommandHandler(
 
     private fun codeBlock(lines: List<String>): String =
         "```\n${lines.joinToString("\n")}\n```"
-
-    companion object {
-        /** Default configurable reply templates of the Discord bot, by language code. */
-        val DEFAULT_MESSAGES = mapOf(
-            "en" to mapOf(
-                "run.denied" to "You are not allowed to run actions.",
-                "run.notallowed" to "That action is not on the allowlist.",
-                "unavailable" to "Command is currently unavailable.",
-            ),
-            "de" to mapOf(
-                "run.denied" to "Du darfst keine Aktionen ausführen.",
-                "run.notallowed" to "Diese Aktion steht nicht auf der Erlaubnisliste.",
-                "unavailable" to "Der Befehl ist gerade nicht verfügbar.",
-            ),
-        )
-    }
 }

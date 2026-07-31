@@ -30,24 +30,7 @@ class StatsAddon : AddonBase() {
     override fun enable() {
         store = StatsStore(context.storage())
         seasons = SeasonStore(context.storage(), store)
-        msg = context.localizedMessages(
-            mapOf(
-                "en" to mapOf(
-                    "value" to "&6{stat}: &f{value}",
-                    "value.other" to "&6{player}'s {stat}: &f{value}",
-                    "top.empty" to "&7No values recorded yet for {stat}.",
-                    "top.entry" to "&6#{rank} &f{player} &7— {value}",
-                    "usage" to "Usage: /stats <stat> [player] | /stats top <stat> [limit]",
-                ),
-                "de" to mapOf(
-                    "value" to "&6{stat}: &f{value}",
-                    "value.other" to "&6{player}s {stat}: &f{value}",
-                    "top.empty" to "&7Für {stat} sind noch keine Werte erfasst.",
-                    "top.entry" to "&6#{rank} &f{player} &7— {value}",
-                    "usage" to "Verwendung: /stats <stat> [player] | /stats top <stat> [limit]",
-                ),
-            ),
-        )
+        msg = loadMessages()
 
         action("stats.add", "Adds a delta to a player's stat.", "stats.add <stat> <player> <delta>") { inv ->
             val stat = inv.arguments.getOrNull(0)

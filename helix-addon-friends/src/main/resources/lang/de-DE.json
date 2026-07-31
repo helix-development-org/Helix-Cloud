@@ -1,0 +1,22 @@
+{
+  "joined": "<green>Dein Freund <white>{player}</white> ist dem Netzwerk beigetreten.",
+  "request.sent": "<yellow>Freundschaftsanfrage an <white>{target}</white> gesendet.",
+  "request.received": "<yellow><white>{sender}</white> möchte dein Freund sein. <gray>/friend accept {sender}",
+  "accepted.self": "<green>Du bist jetzt mit <white>{target}</white> befreundet.",
+  "accepted.other": "<green><white>{player}</white> hat deine Freundschaftsanfrage angenommen.",
+  "denied": "<gray>Anfrage von <white>{target}</white> abgelehnt.",
+  "removed": "<gray>Du bist nicht mehr mit <white>{target}</white> befreundet.",
+  "error.self": "<red>Du kannst dich nicht selbst hinzufügen.",
+  "error.already": "<red>Du bist bereits mit <white>{target}</white> befreundet.",
+  "error.duplicate": "<red>Du hast <white>{target}</white> bereits eine Anfrage gesendet.",
+  "error.cooldown": "<red>Du musst kurz warten, bevor du <white>{target}</white> erneut anfragen kannst.",
+  "error.norequest": "<red>Keine offene Anfrage von <white>{target}</white>.",
+  "error.notfriends": "<red>Du bist nicht mit <white>{target}</white> befreundet.",
+  "requests.none": "<gray>Keine offenen Freundschaftsanfragen.",
+  "requests.list": "<yellow>Offene Anfragen: <white>{players}</white>",
+  "list.empty": "<gray>Du hast noch keine Freunde. <white>/friend add \\<player></white>",
+  "list.online": "<green>online",
+  "list.offline": "<dark_gray>offline",
+  "list.entry": "<white>{friend}</white> <dark_gray>— <gray>{status}",
+  "usage": "<gray>Verwendung: <white>/friend \\<add|accept|deny|remove|list|requests> [player]</white>"
+}
