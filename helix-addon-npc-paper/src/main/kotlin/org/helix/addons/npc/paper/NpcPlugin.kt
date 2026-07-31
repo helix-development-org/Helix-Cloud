@@ -20,6 +20,7 @@ import org.bukkit.command.Command
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
+import org.helix.api.i18n.NodeTranslations
 
 /**
  * Helix-NPC Paper component.
@@ -46,6 +47,9 @@ class NpcPlugin : JavaPlugin() {
     private var task: String = "*"
     private lateinit var scope: CoroutineScope
 
+    /** Node-backed player-facing texts (`helix.npc` language files). */
+    private lateinit var translations: NodeTranslations
+
     /** Dispatcher running coroutines on the Bukkit main thread. */
     private val mainDispatcher = object : CoroutineDispatcher() {
         override fun isDispatchNeeded(context: CoroutineContext): Boolean = !Bukkit.isPrimaryThread()
@@ -70,6 +74,9 @@ class NpcPlugin : JavaPlugin() {
         client = nodeClient
         task = System.getenv("HELIX_TASK")?.takeIf { it.isNotBlank() } ?: "*"
         scope = CoroutineScope(SupervisorJob() + mainDispatcher)
+        // Same environment NodeClient.fromEnvironment() just validated.
+        translations = NodeTranslations(nodeClient.controlUrl, System.getenv("HELIX_CONTROL_TOKEN").orEmpty(), "helix.npc")
+        server.scheduler.runTaskTimerAsynchronously(this, Runnable { translations.sync() }, 1L, TRANSLATION_SYNC_TICKS)
         npcs = INpc.install(this)
         logger.info("Helix-NPC installed for task '$task'.")
         // First sync shortly after start (worlds must be loaded), then poll.
@@ -86,6 +93,9 @@ class NpcPlugin : JavaPlugin() {
         }
         spawned.clear()
         known.clear()
+        client?.close()
+        client = null
+        if (::translations.isInitialized) translations.close()
     }
 
     /**
@@ -99,7 +109,7 @@ class NpcPlugin : JavaPlugin() {
      */
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
         if (!sender.hasPermission("helix.npc.admin")) {
-            sender.sendMessage(render("<red>You lack helix.npc.admin."))
+            sender.sendMessage(chat(sender, "admin.denied"))
             return true
         }
         val sub = args.getOrNull(0)?.lowercase()
@@ -108,24 +118,22 @@ class NpcPlugin : JavaPlugin() {
             "delete" -> delete(sender, args)
             "list" -> list(sender)
             "tp" -> teleport(sender, args)
-            "skin" -> edit(sender, args, "skin <id> <name|self>") { it.copy(skin = args[2]) }
-            "look" -> edit(sender, args, "look <id> <none|nearest|player>") { it.copy(lookMode = args[2].lowercase()) }
-            "hologram" -> edit(sender, args, "hologram <id> <line…|-> (use | for extra lines)") { def ->
+            "skin" -> edit(sender, args, "skin.usage") { it.copy(skin = args[2]) }
+            "look" -> edit(sender, args, "look.usage") { it.copy(lookMode = args[2].lowercase()) }
+            "hologram" -> edit(sender, args, "hologram.usage") { def ->
                 val raw = args.drop(2).joinToString(" ")
                 val lines = if (raw == "-") emptyList() else raw.split("|").map { it.trim() }
                 def.copy(hologramLines = lines)
             }
-            "interact" -> edit(sender, args, "interact <id> <command…|->") { def ->
+            "interact" -> edit(sender, args, "interact.usage") { def ->
                 val raw = args.drop(2).joinToString(" ").trim()
                 def.copy(interactAction = raw.takeIf { it.isNotEmpty() && it != "-" })
             }
             "reload" -> {
-                sender.sendMessage(render("<gray>Re-syncing NPCs from the node…"))
+                sender.sendMessage(chat(sender, "resync"))
                 server.scheduler.runTaskAsynchronously(this, Runnable { syncTick() })
             }
-            else -> sender.sendMessage(
-                render("<gray>/npc <create|delete|list|tp|skin|hologram|look|interact|reload>"),
-            )
+            else -> sender.sendMessage(chat(sender, "usage"))
         }
         return true
     }
@@ -134,11 +142,11 @@ class NpcPlugin : JavaPlugin() {
 
     private fun create(sender: CommandSender, args: Array<out String>) {
         val player = sender as? Player ?: run {
-            sender.sendMessage(render("<red>Only players can place NPCs."))
+            sender.sendMessage(chat(sender, "create.players-only"))
             return
         }
         val id = args.getOrNull(1) ?: run {
-            sender.sendMessage(render("<gray>/npc create <id> [skin|self]"))
+            sender.sendMessage(chat(sender, "create.usage"))
             return
         }
         val skin = args.getOrNull(2) ?: "self"
@@ -156,12 +164,12 @@ class NpcPlugin : JavaPlugin() {
             hologramLines = listOf(id),
             lookMode = "none",
         )
-        save(sender, def, "<green>Created NPC <white>${def.id}</white>.")
+        save(sender, def, "created")
     }
 
     private fun delete(sender: CommandSender, args: Array<out String>) {
         val id = args.getOrNull(1)?.lowercase() ?: run {
-            sender.sendMessage(render("<gray>/npc delete <id>"))
+            sender.sendMessage(chat(sender, "delete.usage"))
             return
         }
         val nodeClient = client ?: return
@@ -170,20 +178,20 @@ class NpcPlugin : JavaPlugin() {
             withContext(mainDispatcher) {
                 despawn(id)
                 known.remove(id)
-                sender.sendMessage(render("<yellow>Deleted NPC <white>$id</white>."))
+                sender.sendMessage(chat(sender, "deleted", "id" to id))
             }
         }
     }
 
     private fun list(sender: CommandSender) {
         if (known.isEmpty()) {
-            sender.sendMessage(render("<gray>No NPCs on this task yet."))
+            sender.sendMessage(chat(sender, "list.empty"))
             return
         }
-        sender.sendMessage(render("<gray>NPCs on task <white>$task</white>:"))
+        sender.sendMessage(chat(sender, "list.header", "task" to task))
         known.values.sortedBy { it.id }.forEach { def ->
             sender.sendMessage(
-                render("<gray>• <white>${def.id}</white> <dark_gray>(${def.skin}, ${def.lookMode})</dark_gray>"),
+                chat(sender, "list.entry", "id" to def.id, "skin" to def.skin, "look" to def.lookMode),
             )
         }
     }
@@ -191,16 +199,16 @@ class NpcPlugin : JavaPlugin() {
     private fun teleport(sender: CommandSender, args: Array<out String>) {
         val player = sender as? Player ?: return
         val id = args.getOrNull(1)?.lowercase() ?: run {
-            sender.sendMessage(render("<gray>/npc tp <id>"))
+            sender.sendMessage(chat(sender, "tp.usage"))
             return
         }
         val def = known[id] ?: run {
-            sender.sendMessage(render("<red>Unknown NPC $id (not on this task?)."))
+            sender.sendMessage(chat(sender, "tp.unknown", "id" to id))
             return
         }
         val world = Bukkit.getWorld(def.world) ?: return
         player.teleport(org.bukkit.Location(world, def.x, def.y, def.z, def.yaw, def.pitch))
-        sender.sendMessage(render("<gray>Teleported to <white>$id</white>."))
+        sender.sendMessage(chat(sender, "tp.done", "id" to id))
     }
 
     /**
@@ -210,40 +218,40 @@ class NpcPlugin : JavaPlugin() {
     private fun edit(
         sender: CommandSender,
         args: Array<out String>,
-        usage: String,
+        usageKey: String,
         transform: (NpcDef) -> NpcDef,
     ) {
         val id = args.getOrNull(1)?.lowercase()
         if (id == null || args.size < 3) {
-            sender.sendMessage(render("<gray>/npc $usage"))
+            sender.sendMessage(chat(sender, usageKey))
             return
         }
         val nodeClient = client ?: return
         scope.launch(Dispatchers.IO) {
             val current = fetchDef(nodeClient, id)
             if (current == null) {
-                withContext(mainDispatcher) { sender.sendMessage(render("<red>Unknown NPC $id.")) }
+                withContext(mainDispatcher) { sender.sendMessage(chat(sender, "edit.unknown", "id" to id)) }
                 return@launch
             }
             val updated = transform(current)
             nodeClient.action("npc.save", json.encodeToString(updated))
             withContext(mainDispatcher) {
                 apply(updated)
-                sender.sendMessage(render("<green>Updated NPC <white>$id</white>."))
+                sender.sendMessage(chat(sender, "updated", "id" to id))
             }
         }
     }
 
-    private fun save(sender: CommandSender, def: NpcDef, feedback: String) {
+    private fun save(sender: CommandSender, def: NpcDef, feedbackKey: String) {
         val nodeClient = client ?: return
         scope.launch(Dispatchers.IO) {
             val ok = nodeClient.action("npc.save", json.encodeToString(def)) != null
             withContext(mainDispatcher) {
                 if (ok) {
                     apply(def)
-                    sender.sendMessage(render(feedback))
+                    sender.sendMessage(chat(sender, feedbackKey, "id" to def.id))
                 } else {
-                    sender.sendMessage(render("<red>The node rejected the NPC (check limits/validation)."))
+                    sender.sendMessage(chat(sender, "rejected"))
                 }
             }
         }
@@ -320,8 +328,19 @@ class NpcPlugin : JavaPlugin() {
 
     private fun render(markup: String): Component = mini.deserialize(markup)
 
+    /**
+     * A chat message resolved in the sender's language (with the network
+     * prefix, per [NodeTranslations.text]) and rendered as MiniMessage.
+     * Console senders resolve to the network's default language.
+     */
+    private fun chat(sender: CommandSender, key: String, vararg params: Pair<String, String>): Component =
+        render(translations.text(sender.name, (sender as? Player)?.locale()?.language, key, *params))
+
     private companion object {
         /** Sync poll interval in ticks (20 ticks = 1 second). */
         const val SYNC_TICKS = 200L
+
+        /** How often the translation snapshot re-syncs from the node. */
+        const val TRANSLATION_SYNC_TICKS = 100L
     }
 }

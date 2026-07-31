@@ -19,6 +19,9 @@ repositories {
 }
 
 dependencies {
+    // NodeTranslations (org.helix.api.i18n) + LegacyToMini — bundled into the fat jar below.
+    // helix-api classes are not kotlin*, so the jar filter keeps them.
+    implementation(rootProject.project("helix-api"))
     compileOnly(libs.paper.api)
     // packetevents ships as its own Bukkit plugin (bundled into the HXA under paper/), so the API
     // is compile-only here; the movement tests exercise packetevents types, hence the test dependency.

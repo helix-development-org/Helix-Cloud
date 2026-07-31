@@ -8,6 +8,7 @@ import org.bukkit.command.Command
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
+import org.helix.api.i18n.NodeTranslations
 
 /**
  * Graphical `/profilemenu` for the profile addon.
@@ -23,18 +24,24 @@ class ProfilePlugin : JavaPlugin() {
     private val job = SupervisorJob()
     private val scope = CoroutineScope(job + Dispatchers.Default)
     private lateinit var gui: ProfileGuiService
+    private var client: ProfileNodeClient? = null
+    private var translations: NodeTranslations? = null
 
     /** Reads the node connection from the environment and installs the GUI. */
     override fun onEnable() {
         val controlUrl = System.getenv("HELIX_CONTROL_URL").orEmpty()
         val controlToken = System.getenv("HELIX_CONTROL_TOKEN").orEmpty()
-        if (controlUrl.isBlank()) {
-            logger.severe("HelixProfile requires the HELIX_CONTROL_URL environment variable")
+        if (controlUrl.isBlank() || controlToken.isBlank()) {
+            logger.severe("HelixProfile requires HELIX_CONTROL_URL and HELIX_CONTROL_TOKEN")
             server.pluginManager.disablePlugin(this)
             return
         }
         val client = ProfileNodeClient(controlUrl, controlToken)
-        gui = ProfileGuiService(this, client, scope)
+        this.client = client
+        val translations = NodeTranslations(controlUrl, controlToken, "helix.profile")
+        this.translations = translations
+        server.scheduler.runTaskTimerAsynchronously(this, Runnable { translations.sync() }, 1L, TRANSLATION_SYNC_TICKS)
+        gui = ProfileGuiService(this, client, translations, scope)
         gui.install()
         logger.info("HelixProfile enabled (node: $controlUrl)")
     }
@@ -45,6 +52,10 @@ class ProfilePlugin : JavaPlugin() {
             gui.shutdown()
         }
         scope.cancel()
+        client?.close()
+        client = null
+        translations?.close()
+        translations = null
     }
 
     /** Opens the profile menu for the executing player. */
@@ -55,5 +66,10 @@ class ProfilePlugin : JavaPlugin() {
         }
         gui.open(player)
         return true
+    }
+
+    private companion object {
+        /** How often the translation snapshot re-syncs from the node. */
+        const val TRANSLATION_SYNC_TICKS = 100L
     }
 }

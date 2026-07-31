@@ -7,6 +7,7 @@ import java.net.http.HttpResponse
 import java.time.Duration
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.slf4j.LoggerFactory
 
 /**
  * Minimal HTTP client for the node control API, configured from the same
@@ -20,9 +21,10 @@ class NodeClient(
     val controlUrl: String,
     private val token: String,
 ) {
+    private val logger = LoggerFactory.getLogger(NodeClient::class.java)
     private val json = Json { ignoreUnknownKeys = true }
     private val client = HttpClient.newBuilder()
-        .connectTimeout(Duration.ofSeconds(3))
+        .connectTimeout(Duration.ofSeconds(5))
         .build()
 
     /**
@@ -32,16 +34,12 @@ class NodeClient(
      * @param body the JSON payload.
      * @return the response body, or `null` on non-2xx or transport failure.
      */
-    fun postJson(path: String, body: String): String? = runCatching {
-        val response = client.send(
-            request(path)
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body))
-                .build(),
-            HttpResponse.BodyHandlers.ofString(),
-        )
-        response.body().takeIf { response.statusCode() in 200..299 }
-    }.getOrNull()
+    fun postJson(path: String, body: String): String? = exchange(path) {
+        request(path)
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(body))
+            .build()
+    }
 
     /**
      * Invokes a node action and returns its first result line.
@@ -63,9 +61,49 @@ class NodeClient(
         return if (result.success) result.lines.firstOrNull() else null
     }
 
+
+    /**
+     * Sends one request, logging failures instead of swallowing them: a
+     * non-2xx status logs once per status change (so a steady 401 does not
+     * spam), transport failures log their message, and an interrupt restores
+     * the thread's interrupt flag before returning.
+     *
+     * @param path request path, for the log line.
+     * @param build builds the request to send.
+     * @return the body on 2xx, `null` otherwise.
+     */
+    private fun exchange(path: String, build: () -> HttpRequest): String? {
+        try {
+            val response = client.send(build(), HttpResponse.BodyHandlers.ofString())
+            val status = response.statusCode()
+            if (status in 200..299) {
+                lastLoggedStatus = 0
+                return response.body()
+            }
+            if (lastLoggedStatus != status) {
+                lastLoggedStatus = status
+                logger.warn("Node request {} failed: HTTP {}", path, status)
+            }
+            return null
+        } catch (interrupted: InterruptedException) {
+            Thread.currentThread().interrupt()
+            return null
+        } catch (failure: Exception) {
+            if (lastLoggedStatus != -1) {
+                lastLoggedStatus = -1
+                logger.warn("Node request {} failed: {}", path, failure.message)
+            }
+            return null
+        }
+    }
+
+    /** Last logged failure signal (status code, -1 transport, 0 healthy), throttling repeat logs. */
+    @Volatile
+    private var lastLoggedStatus = 0
+
     private fun request(path: String): HttpRequest.Builder = HttpRequest.newBuilder()
-        .uri(URI.create(controlUrl + path))
-        .timeout(Duration.ofSeconds(5))
+        .uri(URI.create(controlUrl.trimEnd('/') + path))
+        .timeout(Duration.ofSeconds(10))
         .header("Authorization", "Bearer $token")
 
     /**
@@ -97,5 +135,15 @@ class NodeClient(
             val token = System.getenv("HELIX_CONTROL_TOKEN") ?: return null
             return NodeClient(url, token)
         }
+    }
+
+    /**
+     * Closes the underlying HTTP client, releasing its executor and
+     * connection resources — call from the owning plugin's onDisable so a
+     * Bukkit `/reload` does not leak the client (and, through it, the old
+     * plugin classloader).
+     */
+    fun close() {
+        client.close()
     }
 }

@@ -5,7 +5,9 @@ import de.tytoss.iguard.storage.ReplayFrameRow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.format.NamedTextColor
+import net.kyori.adventure.text.event.ClickEvent
+import net.kyori.adventure.text.format.TextDecoration
+import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.Bukkit
 import org.bukkit.Color
 import org.bukkit.GameMode
@@ -17,6 +19,8 @@ import org.bukkit.WorldCreator
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
+import org.helix.api.i18n.NodeTranslations
+import org.helix.api.message.LegacyToMini
 import org.fsqrt.rune.Pos3d
 import org.fsqrt.rune.Rune
 import org.fsqrt.rune.RuneBlock
@@ -36,8 +40,11 @@ import kotlin.math.sin
 class ReplayService(
     private val plugin: JavaPlugin,
     private val storage: GuardStore,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val translations: NodeTranslations
 ) {
+    private val miniMessage = MiniMessage.miniMessage()
+
     private class Session(
         val viewerId: UUID,
         val world: World,
@@ -71,13 +78,13 @@ class ReplayService(
             // Resolve the skin off the main thread (may hit Mojang) before touching Bukkit.
             val profile = ReplayNpc.profileFor(who?.first ?: admin.uniqueId, who?.second ?: "replay")
             main {
-                if (frames.size < 2) { admin.sendMessage(msg("No replay data for that case.", NamedTextColor.RED)); return@main }
-                val rw = ensureWorld() ?: run { admin.sendMessage(msg("Replay world unavailable.", NamedTextColor.RED)); return@main }
+                if (frames.size < 2) { admin.sendMessage(chat(admin, "replay.no-data")); return@main }
+                val rw = ensureWorld() ?: run { admin.sendMessage(chat(admin, "replay.world-unavailable")); return@main }
                 stop(admin)
                 val src = worldUid?.let { Bukkit.getWorld(it) }
                 val (minP, maxP) = bounds(frames, src)
                 plugin.logger.info("Replay $incidentId: ${frames.size} frames, srcWorld=${src?.name ?: "MISSING(uid=$worldUid)"}, region $minP..$maxP")
-                admin.sendMessage(msg("Building replay of ${frames.size} frames...", NamedTextColor.GRAY))
+                admin.sendMessage(chat(admin, "replay.building", "frames" to frames.size.toString()))
                 pasteRegionThen(src, rw, minP, maxP) {
                     val f0 = frames.first()
                     val prevMode = admin.gameMode
@@ -89,12 +96,12 @@ class ReplayService(
                     val session = Session(admin.uniqueId, rw, minP to maxP, npc, frames, speed.coerceIn(0.1, 10.0), prevMode, prevLocation)
                     sessions[admin.uniqueId] = session
                     admin.sendMessage(
-                        msg("Replay ready — ", NamedTextColor.GRAY)
-                            .append(control("Pause", "/iguard replay pause")).append(Component.text(" "))
-                            .append(control("Speed+", "/iguard replay speed ${"%.1f".format(session.speed * 2)}")).append(Component.text(" "))
-                            .append(control("Follow", "/iguard replay follow")).append(Component.text(" "))
-                            .append(control("Trail", "/iguard replay trail")).append(Component.text(" "))
-                            .append(control("Stop", "/iguard replay stop"))
+                        chat(admin, "replay.ready")
+                            .append(control(admin, "replay.button.pause", "/iguard replay pause")).append(Component.text(" "))
+                            .append(control(admin, "replay.button.speed", "/iguard replay speed ${"%.1f".format(session.speed * 2)}")).append(Component.text(" "))
+                            .append(control(admin, "replay.button.follow", "/iguard replay follow")).append(Component.text(" "))
+                            .append(control(admin, "replay.button.trail", "/iguard replay trail")).append(Component.text(" "))
+                            .append(control(admin, "replay.button.stop", "/iguard replay stop"))
                     )
                     session.task = Bukkit.getScheduler().runTaskTimer(plugin, Runnable { tick(session) }, 1L, 1L)
                 }
@@ -103,13 +110,13 @@ class ReplayService(
     }
 
     /** Toggles pause for the admin's running replay. */
-    fun pause(admin: Player) { sessions[admin.uniqueId]?.let { it.paused = !it.paused; admin.sendMessage(msg(if (it.paused) "Paused" else "Resumed", NamedTextColor.GRAY)) } }
+    fun pause(admin: Player) { sessions[admin.uniqueId]?.let { it.paused = !it.paused; admin.sendMessage(chat(admin, if (it.paused) "replay.paused" else "replay.resumed")) } }
     /** Sets the playback speed (clamped to 0.1..10x). */
-    fun setSpeed(admin: Player, speed: Double) { sessions[admin.uniqueId]?.let { it.speed = speed.coerceIn(0.1, 10.0); admin.sendMessage(msg("Speed ${it.speed}x", NamedTextColor.GRAY)) } }
+    fun setSpeed(admin: Player, speed: Double) { sessions[admin.uniqueId]?.let { it.speed = speed.coerceIn(0.1, 10.0); admin.sendMessage(chat(admin, "replay.speed", "speed" to it.speed.toString())) } }
     /** Toggles the chase camera that follows the replay NPC. */
-    fun toggleFollow(admin: Player) { sessions[admin.uniqueId]?.let { it.follow = !it.follow; admin.sendMessage(msg(if (it.follow) "Chase camera on" else "Chase camera off", NamedTextColor.GRAY)) } }
+    fun toggleFollow(admin: Player) { sessions[admin.uniqueId]?.let { it.follow = !it.follow; admin.sendMessage(chat(admin, if (it.follow) "replay.follow-on" else "replay.follow-off")) } }
     /** Toggles the particle trail along the replayed path. */
-    fun toggleTrail(admin: Player) { sessions[admin.uniqueId]?.let { it.trail = !it.trail; admin.sendMessage(msg(if (it.trail) "Path trail on" else "Path trail off", NamedTextColor.GRAY)) } }
+    fun toggleTrail(admin: Player) { sessions[admin.uniqueId]?.let { it.trail = !it.trail; admin.sendMessage(chat(admin, if (it.trail) "replay.trail-on" else "replay.trail-off")) } }
 
     /** Ends the admin's replay session and restores their previous state. */
     fun stop(admin: Player) = sessions.remove(admin.uniqueId)?.let { endSession(it, admin) }
@@ -173,10 +180,16 @@ class ReplayService(
         val filled = ((session.elapsed / session.durationMillis) * 20).toInt().coerceIn(0, 20)
         val bar = "█".repeat(filled) + "░".repeat(20 - filled)
         val head = if (session.paused) "⏸" else "▶"
+        val text = screen(
+            admin, "replay.scrubber",
+            "elapsed" to "%.1f".format(elapsedS),
+            "total" to "%.1f".format(totalS),
+            "speed" to "%.1f".format(session.speed)
+        )
         admin.sendActionBar(
-            Component.text("$head ", NamedTextColor.RED)
-                .append(Component.text(bar, NamedTextColor.GRAY))
-                .append(Component.text("  %.1fs / %.1fs  %.1fx".format(elapsedS, totalS, session.speed), NamedTextColor.WHITE))
+            Component.text("$head ").color(net.kyori.adventure.text.format.NamedTextColor.RED)
+                .append(Component.text(bar).color(net.kyori.adventure.text.format.NamedTextColor.GRAY))
+                .append(text)
         )
     }
 
@@ -268,7 +281,24 @@ class ReplayService(
     }
 
     private fun main(action: () -> Unit) = Bukkit.getScheduler().runTask(plugin, Runnable(action))
-    private fun msg(text: String, color: NamedTextColor) = Component.text(text, color)
-    private fun control(label: String, command: String) = Component.text("[$label]", NamedTextColor.AQUA)
-        .clickEvent(net.kyori.adventure.text.event.ClickEvent.runCommand(command))
+
+    private fun locale(player: Player): String = player.locale().language
+
+    /** A chat message (network prefix included) resolved in the admin's language, rendered. */
+    private fun chat(player: Player, key: String, vararg params: Pair<String, String>): Component =
+        render(translations.text(player.name, locale(player), key, *params))
+
+    /** Prefix-free screen/ActionBar text resolved in the admin's language, rendered. */
+    private fun screen(player: Player, key: String, vararg params: Pair<String, String>): Component =
+        render(translations.screen(player.name, locale(player), key, *params))
+
+    /** A clickable `[label]` replay control button; the label is resolved prefix-free. */
+    private fun control(player: Player, labelKey: String, command: String): Component =
+        Component.text("[").color(net.kyori.adventure.text.format.NamedTextColor.AQUA)
+            .append(screen(player, labelKey).color(net.kyori.adventure.text.format.NamedTextColor.AQUA))
+            .append(Component.text("]").color(net.kyori.adventure.text.format.NamedTextColor.AQUA))
+            .clickEvent(ClickEvent.runCommand(command))
+
+    private fun render(text: String): Component =
+        miniMessage.deserialize(LegacyToMini.translate(text)).decoration(TextDecoration.ITALIC, false)
 }

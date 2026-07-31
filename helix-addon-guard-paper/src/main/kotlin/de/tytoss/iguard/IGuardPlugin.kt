@@ -31,6 +31,7 @@ import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.plugin.ServicePriority
 import org.bukkit.plugin.java.JavaPlugin
+import org.helix.api.i18n.NodeTranslations
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -53,6 +54,7 @@ class IGuardPlugin : JavaPlugin(), Listener {
     private var gui: GuiService? = null
     private var replay: ReplayService? = null
     private var banCoordinator: de.tytoss.iguard.ban.BanCoordinator? = null
+    private var translations: NodeTranslations? = null
     private var started = false
 
     /** Bootstraps all services; disables the plugin with a clear message when a requirement is missing. */
@@ -86,6 +88,8 @@ class IGuardPlugin : JavaPlugin(), Listener {
             runBlocking { database.stopAndFlush(3000) }
             database.close()
         }
+        translations?.close()
+        translations = null
         scope.cancel()
         if (started) logger.info("IGuard disabled")
         started = false
@@ -104,10 +108,15 @@ class IGuardPlugin : JavaPlugin(), Listener {
         // The node owns network-wide enforcement, but this store-backed lookup keeps joins that bypass
         // the proxy gated as well.
         val ban = runCatching { storage?.activeBan(event.uniqueId) }.getOrNull() ?: return
-        val until = ban.expiresAt?.let { java.time.Instant.ofEpochMilli(it).toString() } ?: "permanent"
+        val i18n = translations
+        val permanent = i18n?.screen(event.name, null, "ban.expiry.permanent") ?: "permanent"
+        val until = ban.expiresAt?.let { java.time.Instant.ofEpochMilli(it).toString() } ?: permanent
+        // Prefer the node-localized direct-join screen; fall back to plain text if translations are unavailable.
+        val screen = i18n?.screen(event.name, null, "ban.screen.direct", "reason" to ban.reason, "until" to until)
+            ?: "IGuard: ${ban.reason}\nUntil: $until"
         event.disallow(
             org.bukkit.event.player.AsyncPlayerPreLoginEvent.Result.KICK_BANNED,
-            net.kyori.adventure.text.Component.text("IGuard: ${ban.reason}\nUntil: $until")
+            net.kyori.adventure.text.Component.text(screen)
         )
     }
 
@@ -132,7 +141,16 @@ class IGuardPlugin : JavaPlugin(), Listener {
         )
         storage = helixStore
         logger.info("IGuard storage: helix node (${System.getenv("HELIX_CONTROL_URL")})")
-        val alertService = AlertService(this, dynamic)
+        // Node-backed player-facing texts (`helix.guard` language files). Constructing this is always
+        // safe even without a Helix environment — an empty sync just makes it fall back to key returns.
+        val nodeTranslations = NodeTranslations(
+            System.getenv("HELIX_CONTROL_URL").orEmpty(),
+            System.getenv("HELIX_CONTROL_TOKEN").orEmpty(),
+            "helix.guard"
+        )
+        translations = nodeTranslations
+        server.scheduler.runTaskTimerAsynchronously(this, Runnable { nodeTranslations.sync() }, 1L, TRANSLATION_SYNC_TICKS)
+        val alertService = AlertService(this, dynamic, nodeTranslations)
         alerts = alertService
         val notificationService = de.tytoss.iguard.notify.NotificationService(dynamic, logger)
         notifications = notificationService
@@ -174,14 +192,14 @@ class IGuardPlugin : JavaPlugin(), Listener {
         sampler = mainSampler
         val api = IGuardApiImpl(checkEngine, exemptions, banCoordinatorLocal)
         server.servicesManager.register(IGuardApi::class.java, api, this, ServicePriority.Normal)
-        val spectateService = SpectateService(this)
+        val spectateService = SpectateService(this, nodeTranslations)
         spectate = spectateService
         Bukkit.getPluginManager().registerEvents(spectateService, this)
-        val replayService = ReplayService(this, helixStore, scope)
+        val replayService = ReplayService(this, helixStore, scope, nodeTranslations)
         replay = replayService
-        val guiService = GuiService(this, checkEngine, exemptions, spectateService, replayService, banCoordinatorLocal, helixStore, loaded.serverId, scope)
+        val guiService = GuiService(this, checkEngine, exemptions, spectateService, replayService, banCoordinatorLocal, helixStore, loaded.serverId, scope, nodeTranslations)
         gui = guiService
-        val commandHandler = IGuardCommand(this, loaded, dynamic, api, checkEngine, alertService, helixStore, mainSampler, spectateService, guiService, replayService, banCoordinatorLocal, scope)
+        val commandHandler = IGuardCommand(this, loaded, dynamic, api, checkEngine, alertService, helixStore, mainSampler, spectateService, guiService, replayService, banCoordinatorLocal, scope, nodeTranslations)
         getCommand("iguard")?.apply {
             setExecutor(commandHandler)
             tabCompleter = commandHandler
@@ -193,5 +211,10 @@ class IGuardPlugin : JavaPlugin(), Listener {
         helixStore.start()
         guiService.install()
         registeredPacketListener = PacketEvents.getAPI().eventManager.registerListener(packets)
+    }
+
+    private companion object {
+        /** How often the translation snapshot re-syncs from the node (20 ticks = 1 second). */
+        const val TRANSLATION_SYNC_TICKS = 100L
     }
 }
