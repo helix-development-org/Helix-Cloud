@@ -9,7 +9,11 @@ package org.helix.api.message
  * dashboard. Reads always return the current value, so edits take effect
  * without restarting the addon.
  *
- * Templates use `{placeholder}` markers and may contain `&` color codes.
+ * Templates use `{placeholder}` markers and MiniMessage tags (legacy `&`
+ * codes still render, but MiniMessage is the project-wide convention).
+ * Chat-message formatting ([format]/[formatFor]) prepends the network
+ * prefix automatically; use [screenFor] for kick/ban screens and other
+ * full-screen text that must stay prefix-free.
  */
 interface Messages {
     /**
@@ -48,6 +52,19 @@ interface Messages {
      * @return the template, or the key itself if unknown.
      */
     fun rawFor(player: String, key: String): String = raw(key)
+
+    /**
+     * Formats a full-screen message (kick/ban screens, MOTD lines and
+     * similar) in the receiving player's language — like [formatFor], but
+     * WITHOUT the network prefix chat messages carry automatically.
+     *
+     * @param player receiving player name.
+     * @param key message key.
+     * @param params placeholder name to value pairs.
+     * @return the formatted screen text, or the key itself if unknown.
+     */
+    fun screenFor(player: String, key: String, vararg params: Pair<String, String>): String =
+        applyPlaceholders(rawFor(player, key), params)
 
     /**
      * Formats a message from a parameter map — the Java-friendly overload.

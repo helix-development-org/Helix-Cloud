@@ -7,6 +7,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.helix.api.message.Messages
 import org.helix.api.message.applyPlaceholders
+import org.helix.api.message.prefixed
 import org.helix.api.storage.AddonStorage
 
 /**
@@ -76,7 +77,7 @@ class MessageBundle(
      */
     @Synchronized
     override fun format(key: String, vararg params: Pair<String, String>): String =
-        applyPlaceholders(rawIn(defaultLanguage(), key), params)
+        applyPlaceholders(prefixed(rawIn(defaultLanguage(), key)), params)
 
     /**
      * Formats a message in the player's language.
@@ -88,7 +89,7 @@ class MessageBundle(
      */
     @Synchronized
     override fun formatFor(player: String, key: String, vararg params: Pair<String, String>): String =
-        applyPlaceholders(rawIn(languageOf(player), key), params)
+        applyPlaceholders(prefixed(rawIn(languageOf(player), key)), params)
 
     /**
      * The raw template in the network's default language.

@@ -8,7 +8,7 @@ package org.helix.api.message
  */
 class MapMessages(private val values: Map<String, String>) : Messages {
     override fun format(key: String, vararg params: Pair<String, String>): String =
-        applyPlaceholders(values[key] ?: key, params)
+        applyPlaceholders(prefixed(values[key] ?: key), params)
 
     override fun raw(key: String): String = values[key] ?: key
 }

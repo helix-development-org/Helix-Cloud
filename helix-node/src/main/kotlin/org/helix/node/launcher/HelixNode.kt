@@ -130,6 +130,9 @@ class HelixNode(
     /** On-disk mirror of the running services, read back after a restart. */
     private val serviceRegistry = ServiceRegistryFile(paths.root.resolve("services/registry.json"))
 
+    /** Single HTTP fetcher for server-jar downloads, reused across every service start. */
+    private val serverJarFetcher = org.helix.node.versions.JavaHttpFetcher()
+
     /** Service lifecycle owner. */
     val manager: ServiceManager = ServiceManager(
         taskStore = taskStore,
@@ -137,7 +140,9 @@ class HelixNode(
             paths = paths,
             internalResources = ClasspathInternalResources(),
             serverJar = { environment, version ->
-                ServerJarProvider(paths.cache, VersionCatalog.load(dataDirectory))
+                // Re-read the catalog each start (URL overrides may have changed) but reuse the
+                // one fetcher — a fresh JDK HttpClient per start leaked its executor threads.
+                ServerJarProvider(paths.cache, VersionCatalog.load(dataDirectory), fetcher = serverJarFetcher)
                     .ensureJar(environment, version)
             },
             paperComponents = { taskName -> addonManager.paperComponents(taskName) },
@@ -335,6 +340,10 @@ class HelixNode(
     val networkMessages: MessageBundle = bundle(
         "network",
         mapOf(
+            // The restart.* templates keep a literal {prefix}: they are rendered by the
+            // VELOCITY BRIDGE from the raw translation tables (flat key + ctx substitution),
+            // never by MessageBundle.formatFor — the automatic chat prefix does not apply
+            // on that path, the bridge fills {prefix} itself.
             "en" to linkedMapOf(
                 "prefix" to "<gradient:#8b5cf6:#38bdf8><bold>Helix</bold></gradient> <dark_gray>»</dark_gray>",
                 "name" to config.network.name,
@@ -653,6 +662,9 @@ class HelixNode(
             serviceTokens.revoke(service.id)
             if (service.task.environment.proxy) {
                 playerRegistry.dropProxy(service.id)
+                // Drop the proxy's pending-command queue so a later service reusing this
+                // id does not inherit the previous instance's undelivered commands.
+                commandQueue.drop(service.id)
             }
             autoScaler.noteTermination(service)
             if (!stopping.get()) {
@@ -867,7 +879,19 @@ class HelixNode(
      * dropped; the auto-scaler starts replacements.
      */
     private fun adoptSurvivingServices() {
-        val entries = serviceRegistry.read().filter {
+        val persisted = serviceRegistry.read()
+        if (persisted == null) {
+            // Parse failure: the previous process may well have left
+            // survivors behind that we simply cannot identify. Leave
+            // registryServiceIds at null so the orphan sweep is skipped —
+            // wiping every survivor's workspace would be far worse than a
+            // missed cleanup.
+            registryServiceIds = null
+            logger.warn("Service registry is unreadable — skipping adoption and orphan-workspace sweep")
+            return
+        }
+        registryServiceIds = persisted.map { it.id }.toSet()
+        val entries = persisted.filter {
             it.state != ServiceState.STOPPED && it.state != ServiceState.FAILED
         }
         if (entries.isEmpty()) {
@@ -897,6 +921,11 @@ class HelixNode(
                 ).takeIf { it.alive }
             }
             if (handle != null) {
+                // The surviving process still authenticates with the token
+                // from its original environment — accept exactly that token
+                // again, or every /internal/ call would get 403 and the
+                // heartbeat watchdog would kill the survivor.
+                entry.controlToken?.let { serviceTokens.restore(entry.id, it) }
                 manager.adopt(task, entry, handle)
                 adopted++
             } else {
@@ -904,18 +933,35 @@ class HelixNode(
             }
         }
         logger.info("Adopted {}/{} surviving service(s)", adopted, entries.size)
-        serviceRegistry.write(manager.managedServices())
+        manager.flushRegistry()
     }
+
+    /**
+     * Ids listed in the service registry file as read at boot, before the
+     * post-adoption rewrite dropped dead entries; `null` when the registry
+     * existed but could not be parsed. Used to keep the orphan sweep away
+     * from workspaces of services the previous process still knew about.
+     */
+    private var registryServiceIds: Set<String>? = emptySet()
 
     /**
      * Removes `services/temp` workspaces left behind by a service that never
      * made it into [adoptSurvivingServices] (crashed before this boot, and
      * its own [org.helix.node.services.ServiceManager] cleanup never ran).
      * Must run after [adoptSurvivingServices] so genuinely-adopted workspaces
-     * are never mistaken for orphans.
+     * are never mistaken for orphans. Every id named in the boot-time
+     * registry file is spared as well — a survivor that could not be adopted
+     * (unknown task, unmatched pid) may still be running, and deleting the
+     * workspace under a live server would corrupt it. When the registry file
+     * was unreadable the sweep is skipped entirely.
      */
     private fun sweepOrphanedWorkspaces() {
-        val liveIds = manager.managedServices().map { it.id }.toSet()
+        val persistedIds = registryServiceIds
+        if (persistedIds == null) {
+            logger.warn("Skipping orphan-workspace sweep — the service registry could not be parsed")
+            return
+        }
+        val liveIds = manager.managedServices().map { it.id }.toSet() + persistedIds
         val removed = OrphanWorkspaceSweeper.sweep(paths.servicesTemp, liveIds)
         if (removed > 0) {
             logger.info("Removed {} orphaned service workspace(s)", removed)
@@ -985,6 +1031,10 @@ class HelixNode(
     /**
      * Imports edited disconnect screens of the pre-translation `proxy`
      * bundle into `helix.translations.velocity.screen.*`, once.
+     *
+     * The legacy document is only deleted after a fully successful import;
+     * a failed import keeps it so the operator's edits are not lost and
+     * the migration can retry on the next boot.
      */
     private fun migrateLegacyProxyScreens() {
         val legacy = storageProvider.forAddon("proxy", paths.root.resolve("proxy"))
@@ -996,9 +1046,15 @@ class HelixNode(
                     doc[legacyKey]?.takeIf { it != velocityMessages.rawIn("en", key) }
                         ?.let { velocityMessages.set("en", key, it) }
                 }
+        }.onSuccess {
+            legacy.delete("messages")
+            logger.info("Migrated legacy proxy screens into the translation system")
+        }.onFailure { failure ->
+            logger.warn(
+                "Could not migrate legacy proxy screens — keeping the legacy document for the next attempt: {}",
+                failure.message,
+            )
         }
-        legacy.delete("messages")
-        logger.info("Migrated legacy proxy screens into the translation system")
     }
 
     /**
