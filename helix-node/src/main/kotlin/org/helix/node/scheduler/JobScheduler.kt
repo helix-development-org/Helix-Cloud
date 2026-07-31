@@ -44,6 +44,15 @@ class JobScheduler(
     private val logger = LoggerFactory.getLogger(JobScheduler::class.java)
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
     private val lastRun = mutableMapOf<String, Long>()
+
+    /**
+     * Fail-safe flag: set when the persisted job document exists but could
+     * not be parsed. While set, [persist] refuses to write — otherwise the
+     * next save would overwrite the unreadable (but possibly recoverable)
+     * document with whatever partial list is in memory, silently deleting
+     * every job that failed to load.
+     */
+    private var storeUnreadable = false
     private var jobs: List<ScheduledJob> = load()
 
     /**
@@ -153,10 +162,30 @@ class JobScheduler(
     private fun parseTime(value: String): LocalTime? =
         runCatching { LocalTime.parse(value.trim()) }.getOrNull()
 
-    private fun load(): List<ScheduledJob> =
-        storage.read(KEY)?.let { runCatching { json.decodeFromString(SERIALIZER, it) }.getOrNull() } ?: emptyList()
+    private fun load(): List<ScheduledJob> {
+        val document = storage.read(KEY) ?: return emptyList()
+        return runCatching { json.decodeFromString(SERIALIZER, document) }.getOrElse { failure ->
+            storeUnreadable = true
+            logger.error(
+                "Persisted job store '{}' is unreadable — running without jobs and REFUSING to " +
+                    "persist changes so the document is not overwritten; repair or remove it and " +
+                    "restart the node to re-enable job persistence",
+                KEY,
+                failure,
+            )
+            emptyList()
+        }
+    }
 
     private fun persist() {
+        if (storeUnreadable) {
+            logger.error(
+                "NOT persisting job changes: the job store '{}' was unreadable at load and " +
+                    "writing now would overwrite it; this change is lost on restart",
+                KEY,
+            )
+            return
+        }
         storage.write(KEY, json.encodeToString(SERIALIZER, jobs))
     }
 

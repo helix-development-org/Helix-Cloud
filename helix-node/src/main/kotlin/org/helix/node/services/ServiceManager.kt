@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory
  * @property clock epoch millis source, injectable for tests.
  * @property registry on-disk mirror of the services map, rewritten on every
  *   lifecycle change so a restarted node can re-adopt surviving services.
+ * @property portAllocator finds free service ports; injectable for tests.
  */
 class ServiceManager(
     private val taskStore: TaskStore,
@@ -33,10 +34,10 @@ class ServiceManager(
     private val clock: () -> Long = System::currentTimeMillis,
     private val eventSink: (category: String, level: String, message: String) -> Unit = { _, _, _ -> },
     private val registry: ServiceRegistryFile? = null,
+    private val portAllocator: PortAllocator = PortAllocator(),
 ) {
     private val logger = LoggerFactory.getLogger(ServiceManager::class.java)
     private val services = linkedMapOf<String, ManagedService>()
-    private val portAllocator = PortAllocator()
     private val stopListeners = CopyOnWriteArrayList<(ManagedService) -> Unit>()
 
     /**
@@ -93,18 +94,7 @@ class ServiceManager(
      */
     fun startService(taskName: String): ServiceInfo {
         val task = requireNotNull(taskStore.find(taskName)) { "unknown task: $taskName" }
-        val managed = synchronized(this) {
-            require(activeCount(taskName) < task.maxServiceCount) {
-                "task $taskName already runs ${task.maxServiceCount} services"
-            }
-            val id = allocateId(task)
-            val port = portAllocator.allocate(
-                task.startPort,
-                services.values.filter { it.active() }.map { it.port }.toSet(),
-            )
-            ManagedService(id, task, workspacePreparer.workspaceFor(task, id), port)
-                .also { services[it.id] = it }
-        }
+        val managed = reserveService(task)
         return runCatching { launch(managed) }
             .onFailure { failure ->
                 managed.state = ServiceState.FAILED
@@ -114,19 +104,68 @@ class ServiceManager(
     }
 
     /**
+     * Reserves an id, port and map slot for a new service of [task].
+     *
+     * The port probe binds real sockets, so it must not run while holding
+     * the manager lock — otherwise every reader (routing, dashboard,
+     * heartbeats) would stall behind socket syscalls. The probe therefore
+     * runs against a snapshot of the currently used ports, and only the
+     * final reservation re-validates the candidate under the lock; if a
+     * concurrent start claimed the candidate in between, the probe retries
+     * with that port excluded.
+     */
+    private fun reserveService(task: TaskDefinition): ManagedService {
+        val lostCandidates = mutableSetOf<Int>()
+        while (true) {
+            val usedPorts = synchronized(this) {
+                ensureCapacity(task)
+                services.values.filter { it.active() }.map { it.port }.toSet()
+            }
+            val candidate = portAllocator.allocate(task.startPort, usedPorts + lostCandidates)
+            val reserved = synchronized(this) {
+                ensureCapacity(task)
+                if (services.values.any { it.active() && it.port == candidate }) {
+                    lostCandidates += candidate
+                    null
+                } else {
+                    val id = allocateId(task)
+                    ManagedService(id, task, workspacePreparer.workspaceFor(task, id), candidate)
+                        .also { services[it.id] = it }
+                }
+            }
+            if (reserved != null) {
+                return reserved
+            }
+        }
+    }
+
+    private fun ensureCapacity(task: TaskDefinition) {
+        require(activeCount(task.name) < task.maxServiceCount) {
+            "task ${task.name} already runs ${task.maxServiceCount} services"
+        }
+    }
+
+    /**
      * Requests a graceful stop.
      *
      * @param id the service id.
      * @return `true` if the service was running and the stop was issued.
      */
     fun stopService(id: String): Boolean {
-        val managed = find(id) ?: return false
-        val handle = managed.handle
-        if (handle == null || !managed.active()) {
-            return false
+        // Check and STOPPING-transition are atomic under the manager lock:
+        // racing a concurrent exit could otherwise stamp STOPPING onto an
+        // already-terminated service, leaving a zombie that never settles.
+        // The blocking handle.stop() itself runs outside the lock.
+        val handle = synchronized(this) {
+            val managed = services[id] ?: return false
+            val handle = managed.handle
+            if (handle == null || !managed.active()) {
+                return false
+            }
+            managed.stopRequested = true
+            managed.state = ServiceState.STOPPING
+            handle
         }
-        managed.stopRequested = true
-        managed.state = ServiceState.STOPPING
         logger.info("Stopping {}", id)
         handle.stop()
         persistRegistry()
@@ -140,13 +179,16 @@ class ServiceManager(
      * @return `true` if the service was running.
      */
     fun killService(id: String): Boolean {
-        val managed = find(id) ?: return false
-        val handle = managed.handle ?: return false
-        if (!managed.active()) {
-            return false
+        val handle = synchronized(this) {
+            val managed = services[id] ?: return false
+            val handle = managed.handle ?: return false
+            if (!managed.active()) {
+                return false
+            }
+            managed.stopRequested = true
+            managed.state = ServiceState.STOPPING
+            handle
         }
-        managed.stopRequested = true
-        managed.state = ServiceState.STOPPING
         handle.kill()
         return true
     }
@@ -166,15 +208,18 @@ class ServiceManager(
      * @return `true` if the service was active and the kill was issued.
      */
     fun watchdogFail(id: String, reason: String): Boolean {
-        val managed = find(id) ?: return false
-        val handle = managed.handle ?: return false
-        if (!managed.active()) {
-            return false
+        val handle = synchronized(this) {
+            val managed = services[id] ?: return false
+            val handle = managed.handle ?: return false
+            if (!managed.active()) {
+                return false
+            }
+            managed.watchdogKilled = true
+            managed.state = ServiceState.STOPPING
+            handle
         }
-        managed.watchdogKilled = true
-        managed.state = ServiceState.STOPPING
         logger.warn("Watchdog killing {}: {}", id, reason)
-        eventSink("service", "warn", "Watchdog killing ${managed.id}: $reason")
+        eventSink("service", "warn", "Watchdog killing $id: $reason")
         handle.kill()
         return true
     }
@@ -249,12 +294,17 @@ class ServiceManager(
         val executor = requireNotNull(executors[task.executor]) {
             "no executor registered for ${task.executor}"
         }
+        val environment = baseEnvironment(managed) + environmentProvider(managed)
+        // Remember the token exactly as injected into the process: it is
+        // persisted with the registry so a successor node can restore it
+        // when it re-adopts this service after a backend restart.
+        managed.controlToken = environment[CONTROL_TOKEN_ENV]
         val spec = ServiceStartSpec(
             serviceId = managed.id,
             task = task,
             workspace = managed.workspace,
             port = managed.port,
-            environmentVariables = baseEnvironment(managed) + environmentProvider(managed),
+            environmentVariables = environment,
         )
         managed.state = ServiceState.STARTING
         managed.startedAtEpochMs = clock()
@@ -291,6 +341,7 @@ class ServiceManager(
         // service whose last-known start time is arbitrarily old and reap it
         // before the bridge gets a chance to report in again.
         managed.lastHeartbeatEpochMs = clock()
+        managed.controlToken = entry.controlToken
         managed.handle = handle
         services[managed.id] = managed
         handle.onExit { exitCode -> onExit(managed, exitCode) }
@@ -300,8 +351,24 @@ class ServiceManager(
         return managed
     }
 
+    /**
+     * Rewrites the on-disk service registry from the current services map,
+     * for callers outside the normal lifecycle (for example after the
+     * adoption pass dropped dead entries).
+     */
+    fun flushRegistry() {
+        persistRegistry()
+    }
+
     private fun persistRegistry() {
-        registry?.write(synchronized(this) { services.values.toList() })
+        val registry = registry ?: return
+        // Sequence and snapshot are taken atomically under the manager lock,
+        // so the writer can drop a snapshot that was overtaken by a newer
+        // one instead of overwriting it out of order.
+        val (sequence, snapshot) = synchronized(this) {
+            registry.nextSequence() to services.values.toList()
+        }
+        registry.write(sequence, snapshot)
     }
 
     private fun baseEnvironment(managed: ManagedService): Map<String, String> = mapOf(
@@ -335,11 +402,17 @@ class ServiceManager(
             eventSink("service", "info", "${managed.id} stopped")
         }
         if (!managed.task.staticServices) {
-            workspacePreparer.deleteRecursively(managed.workspace)
-            // Failed services stay visible (with their captured logs) for
-            // diagnosis; their record is replaced on the next start.
-            if (managed.state == ServiceState.STOPPED) {
-                synchronized(this) { services.remove(managed.id) }
+            // A delayed exit callback of a stopped service can fire AFTER its id was
+            // reused by a freshly started successor (same id → same temp workspace path).
+            // Only clean up when this exact instance still owns the id's map slot, so a
+            // late predecessor never wipes the successor's workspace or map entry.
+            synchronized(this) {
+                if (services[managed.id] === managed) {
+                    workspacePreparer.deleteRecursively(managed.workspace)
+                    if (managed.state == ServiceState.STOPPED) {
+                        services.remove(managed.id)
+                    }
+                }
             }
         }
         persistRegistry()
@@ -357,5 +430,8 @@ class ServiceManager(
     private companion object {
         /** Log lines captured when a service terminates. */
         const val FINAL_LOG_LINES = 100
+
+        /** Environment variable carrying the per-service bridge token. */
+        const val CONTROL_TOKEN_ENV = "HELIX_CONTROL_TOKEN"
     }
 }

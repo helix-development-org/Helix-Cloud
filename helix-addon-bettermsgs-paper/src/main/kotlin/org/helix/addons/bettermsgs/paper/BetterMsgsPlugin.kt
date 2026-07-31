@@ -167,6 +167,8 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
             igui = null
             scope.cancel()
         }
+        client?.close()
+        client = null
     }
 
     /**

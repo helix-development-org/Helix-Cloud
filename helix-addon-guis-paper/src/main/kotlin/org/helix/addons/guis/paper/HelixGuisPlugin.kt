@@ -22,17 +22,19 @@ class HelixGuisPlugin : JavaPlugin() {
     private val job = SupervisorJob()
     private val scope = CoroutineScope(job + Dispatchers.Default)
     @Volatile private var igui: IGui? = null
+    @Volatile private var client: GuisNodeClient? = null
 
     /** Reads the node connection from the environment and installs the shared IGui instance. */
     override fun onEnable() {
         val controlUrl = System.getenv("HELIX_CONTROL_URL").orEmpty()
         val controlToken = System.getenv("HELIX_CONTROL_TOKEN").orEmpty()
-        if (controlUrl.isBlank()) {
-            logger.severe("Helix-GUIs requires the HELIX_CONTROL_URL environment variable")
+        if (controlUrl.isBlank() || controlToken.isBlank()) {
+            logger.severe("Helix-GUIs requires HELIX_CONTROL_URL and HELIX_CONTROL_TOKEN")
             server.pluginManager.disablePlugin(this)
             return
         }
         val client = GuisNodeClient(controlUrl, controlToken)
+        this.client = client
         scope.launch {
             val installed = IGui.install(this@HelixGuisPlugin) {
                 // The one namespace every dependent addon's DEFAULT font (title text, invisible
@@ -51,5 +53,7 @@ class HelixGuisPlugin : JavaPlugin() {
     override fun onDisable() {
         igui?.let { runBlocking { it.shutdown() } }
         scope.cancel()
+        client?.close()
+        client = null
     }
 }

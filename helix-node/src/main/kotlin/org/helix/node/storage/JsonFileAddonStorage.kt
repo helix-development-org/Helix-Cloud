@@ -18,17 +18,21 @@ import org.slf4j.LoggerFactory
  * [AddonStorage] that keeps one `<key>.json` file per document in the
  * addon's data directory — the default `json` storage mode.
  *
- * Writes are atomic: the new content lands in a sibling `.tmp` file, is
- * fsynced, and only then replaces the real file — with the previous version
- * rotated into a sibling `.bak` file right before that move — so a crash
- * mid-write can never leave a half-written document, and a document found
- * corrupt on read (unreadable as text, e.g. truncated mid-character) falls
- * back to that one prior generation instead of resetting to defaults.
+ * Writes are atomic: the new content lands in a uniquely named sibling
+ * `.tmp` file, is fsynced, and only then replaces the real file — with the
+ * previous version rotated into a sibling `.bak` file right before that move
+ * — so a crash mid-write can never leave a half-written document, and a
+ * document found corrupt on read (unreadable as text, e.g. truncated
+ * mid-character) falls back to that one prior generation instead of
+ * resetting to defaults. Mutations are serialized per storage instance, so
+ * two threads writing the same key cannot interleave the backup rotation or
+ * clobber each other's temp file.
  *
  * @property directory the addon's data directory.
  */
 class JsonFileAddonStorage(private val directory: Path) : AddonStorage {
     private val logger = LoggerFactory.getLogger(JsonFileAddonStorage::class.java)
+    private val writeLock = Any()
 
     override fun read(key: String): String? {
         val safeKey = validateKey(key)
@@ -53,29 +57,36 @@ class JsonFileAddonStorage(private val directory: Path) : AddonStorage {
 
     override fun write(key: String, value: String) {
         val safeKey = validateKey(key)
-        Files.createDirectories(directory)
-        val target = directory.resolve("$safeKey.json")
-        val backup = directory.resolve("$safeKey.json.bak")
-        val temp = directory.resolve("$safeKey.json.tmp")
-        FileChannel.open(
-            temp,
-            StandardOpenOption.CREATE,
-            StandardOpenOption.WRITE,
-            StandardOpenOption.TRUNCATE_EXISTING,
-        ).use { channel ->
-            channel.write(ByteBuffer.wrap(value.toByteArray(StandardCharsets.UTF_8)))
-            channel.force(true)
+        synchronized(writeLock) {
+            Files.createDirectories(directory)
+            val target = directory.resolve("$safeKey.json")
+            val backup = directory.resolve("$safeKey.json.bak")
+            // Unique temp name per write: even a writer outside this lock (a second storage
+            // instance over the same directory) can then never truncate a temp file another
+            // write is about to move into place.
+            val temp = Files.createTempFile(directory, ".$safeKey.", ".tmp")
+            try {
+                FileChannel.open(temp, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING).use { channel ->
+                    channel.write(ByteBuffer.wrap(value.toByteArray(StandardCharsets.UTF_8)))
+                    channel.force(true)
+                }
+                if (Files.exists(target)) {
+                    Files.move(target, backup, StandardCopyOption.REPLACE_EXISTING)
+                }
+                Files.move(temp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            } catch (failure: Throwable) {
+                runCatching { Files.deleteIfExists(temp) }
+                throw failure
+            }
         }
-        if (Files.exists(target)) {
-            Files.move(target, backup, StandardCopyOption.REPLACE_EXISTING)
-        }
-        Files.move(temp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
     }
 
     override fun delete(key: String): Boolean {
         val safeKey = validateKey(key)
-        Files.deleteIfExists(directory.resolve("$safeKey.json.bak"))
-        return Files.deleteIfExists(directory.resolve("$safeKey.json"))
+        synchronized(writeLock) {
+            Files.deleteIfExists(directory.resolve("$safeKey.json.bak"))
+            return Files.deleteIfExists(directory.resolve("$safeKey.json"))
+        }
     }
 
     override fun keys(): List<String> {

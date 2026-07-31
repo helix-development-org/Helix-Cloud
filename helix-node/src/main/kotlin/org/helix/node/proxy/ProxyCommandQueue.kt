@@ -49,26 +49,35 @@ class ProxyCommandQueue {
     /**
      * The commands still queued for one proxy, without removing them — the
      * caller (the long-poll) only removes them once the proxy's NEXT poll
-     * acknowledges having received them via [acknowledge].
+     * acknowledges having received them via [acknowledge]. Each command
+     * carries its sequence number so the caller derives the ack token from
+     * this exact snapshot (see [tokenFor]) instead of re-reading the queue,
+     * which could have grown in the meantime.
      *
      * @param proxyServiceId the polling proxy service.
-     * @return pending commands in enqueue order.
+     * @return pending commands in enqueue order, with their sequence numbers.
      */
-    fun pending(proxyServiceId: String): List<ProxyCommand> =
-        queues[proxyServiceId]?.map { it.command } ?: emptyList()
+    fun pending(proxyServiceId: String): List<QueuedCommand> =
+        queues[proxyServiceId]?.map { QueuedCommand(it.seq, it.command) } ?: emptyList()
 
     /**
      * The sequence number a poll response must echo back as the ack cursor:
-     * the highest sequence number currently queued, or [previous] when
-     * nothing is queued (so the bridge's cursor stays put until there is
-     * something new to acknowledge).
+     * the highest sequence number among the commands ACTUALLY being returned
+     * in this response, or [previous] when the response carries none (so the
+     * bridge's cursor stays put until there is something new to acknowledge).
      *
-     * @param proxyServiceId the polling proxy service.
+     * Deriving the token from the returned snapshot — never from the live
+     * queue — is deliberate: a command enqueued between reading [pending]
+     * and building the response is not in this response, so its sequence
+     * number must not be acknowledged by the bridge's next poll, or it would
+     * be dropped without ever having been delivered.
+     *
+     * @param delivered the exact [pending] snapshot going into this response.
      * @param previous the ack token last known for this proxy.
      * @return the token to send in this poll's response.
      */
-    fun tokenFor(proxyServiceId: String, previous: Long): Long =
-        queues[proxyServiceId]?.lastOrNull()?.seq ?: previous
+    fun tokenFor(delivered: List<QueuedCommand>, previous: Long): Long =
+        delivered.lastOrNull()?.seq ?: previous
 
     /**
      * Removes every command up to and including [upToSeq] — called when a
@@ -87,6 +96,23 @@ class ProxyCommandQueue {
     }
 
     /**
+     * Discards a proxy's queue entirely, including any still-pending commands.
+     *
+     * Call this when the proxy service ends for good (stop/removal), so the
+     * per-proxy queue does not live on unbounded for ids that will never poll
+     * again. Commands queued for a proxy that is gone are meaningless — a
+     * replacement proxy registers under a new service id and receives only
+     * commands enqueued after that.
+     *
+     * Note: not yet wired into the service lifecycle; callers own that wiring.
+     *
+     * @param proxyServiceId the proxy service whose queue to discard.
+     */
+    fun drop(proxyServiceId: String) {
+        queues.remove(proxyServiceId)
+    }
+
+    /**
      * One queued command with the sequence number it was enqueued under.
      *
      * @property seq monotonically increasing enqueue order, used as the ack cursor.
@@ -94,3 +120,13 @@ class ProxyCommandQueue {
      */
     private data class Entry(val seq: Long, val command: ProxyCommand)
 }
+
+/**
+ * One pending command together with the sequence number it was enqueued
+ * under, as returned by [ProxyCommandQueue.pending] — the sequence number is
+ * what a poll response's ack token is derived from ([ProxyCommandQueue.tokenFor]).
+ *
+ * @property seq monotonically increasing enqueue order, used as the ack cursor.
+ * @property command the queued command.
+ */
+data class QueuedCommand(val seq: Long, val command: ProxyCommand)

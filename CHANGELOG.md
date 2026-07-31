@@ -1,5 +1,72 @@
 # Changelog
 
+## 0.81.0 — 2026-07-31
+
+### Nachrichten-System vereinheitlicht
+- **Alle Addon-Nachrichten liegen jetzt als Sprachdateien** (`lang/en-EN.json`
+  + `lang/de-DE.json`) statt als Inline-`mapOf` im Code, geladen über den
+  neuen `AddonBase.loadMessages()`-Helper (`LangResources`). Betrifft alle
+  13 Node-Addons mit Nachrichten.
+- **Durchgängig MiniMessage** mit einheitlichem Farb-Stil (Fließtext
+  `<gray>`, Werte `<white>`, Erfolg `<green>`, Fehler `<red>`, …). Legacy
+  `&`-Codes raus.
+- **Automatischer Netzwerk-Prefix vor jeder Chat-Nachricht**:
+  `Messages.format`/`formatFor` stellen ihn jetzt selbst voran (neuer
+  `prefixed()`-Helper). Hartkodierte Modul-Prefixe (`[Team]`, `[Ban]`,
+  `[Kick]` …) und literale `{prefix}` sind aus den Templates entfernt.
+- **Prefix-freie Screens**: neues `Messages.screenFor(...)` für Kick-/Ban-
+  Screens und andere Vollbild-Texte; Bans, Moderation und Guard nutzen es.
+
+### Paper-Addon-Nachrichten übersetzbar
+- **Neuer `NodeTranslations`-Client** (`helix-api`): Paper-Komponenten holen
+  ihre Texte pro Spieler-Sprache über `GET /internal/translations` statt sie
+  hart einzucodieren — `text(...)` (Chat, mit Prefix) und `screen(...)`
+  (prefix-frei für GUI/Screens). Migriert: **Profile-, NPC- und
+  Guard-Paper** (vorher komplett hartkodiertes Englisch; bei Guard-Spectate
+  war sogar ein EN/DE-Mix drin). Die zugehörigen Keys liegen in den
+  Sprachdateien der jeweiligen Node-Addons und sind damit panel-editierbar.
+  Rein technische `/iguard`-Diagnose-Dumps (VL/Confidence/Queue-Sizes)
+  bleiben bewusst englisch.
+
+### Dashboard: Addon-Actions ausführbar
+- Die **Addons**-Seite hat pro Addon einen aufklappbaren Action-Runner
+  (Argument-Eingabe mit Usage-Hint, Ausführen, Inline-Ergebnis).
+  `playerCommand`-Actions (Ingame-only) sind ausgenommen. Die von einer
+  Action geforderte Permission wird über das Panel geprüft; Actions ohne
+  Permission bleiben Admin-only. `AddonInfo` trägt dafür jetzt die
+  registrierten Actions.
+
+### Audit-Fixes (Härtung)
+- **Nahtloser Backend-Restart repariert**: per-Service-Bridge-Tokens werden
+  jetzt in der Service-Registry persistiert und beim Adopt wieder
+  eingespielt — sonst hätte der Watchdog nach jedem Restart alle
+  überlebenden Services gekillt.
+- **Service-Lifecycle-Races behoben**: ID-Reuse (verspätetes `onExit` löschte
+  den Workspace des Nachfolgers), Orphan-Sweep (löschte laufende
+  Workspaces; korruptes Registry-File löschte alle), Stop/Kill-Zombies,
+  Out-of-order-Registry-Writes, Port-Probe unter dem Manager-Lock.
+- **Kein Datenverlust bei korrupten Stores mehr**: Job-Scheduler,
+  Addon-Storage und Proxy-Screen-Migration überschreiben unlesbare
+  Dokumente nicht länger still.
+- **Proxy-Command-Long-Poll**: Ack-Token wird aus dem tatsächlich
+  ausgelieferten Snapshot abgeleitet (verlor sonst Kommandos); Queue wird
+  beim Proxy-Ende verworfen.
+- **Backup-Restore** extrahiert erst in ein Temp-Verzeichnis und validiert,
+  bevor der Workspace angefasst wird.
+- **HTTP-Client-Vereinheitlichung** über alle Addon-/Bridge-Clients:
+  Fehler-Logging bei non-2xx (gedrosselt), Interrupt-Flag-Restore,
+  einheitliche Timeouts/Trailing-Slash-Behandlung und `close()`-Hooks in
+  jedem `onDisable` (kein Classloader-Leak mehr bei `/reload`).
+- **`GET /api/v1/actions`** ist jetzt admin-only (war Info-Disclosure der
+  Action-Namen für per-Service-Tokens).
+- Diverse unbounded Maps (RateLimiter, PanelAuth-Sessions,
+  Proxy-Command-Queues) werden jetzt geräumt.
+
+### Sicherheit dokumentiert
+- IGuards netzwerkweite Bans vom Spielserver aus (`guard.store.ban`,
+  `bridgeInvocable`) bleiben by design; das akzeptierte Risiko ist jetzt in
+  `SECURITY.md` dokumentiert (auditiert, per Panel reversibel).
+
 ## 0.80.3 — 2026-07-31
 
 ### Fix: Spieler wurden doppelt gezählt (Proxy + Backend)

@@ -1,7 +1,11 @@
 package org.helix.node.backup
 
+import java.io.IOException
 import java.nio.file.Files
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import kotlin.io.path.createTempDirectory
+import kotlin.io.path.name
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
 import kotlin.test.Test
@@ -92,6 +96,58 @@ class BackupServiceTest {
 
         val states = service.workspaces()
         assertTrue(states.any { it.serviceId == "Lobby-4" && it.running })
+    }
+
+    @Test
+    fun `a zip-slip archive fails before the workspace is touched`() {
+        val ws = workspace("Lobby-5")
+        ws.resolve("keep.txt").writeText("precious")
+        val archiveDir = Files.createDirectories(backupsDir.resolve("Lobby-5"))
+        ZipOutputStream(Files.newOutputStream(archiveDir.resolve("evil.zip"))).use { zip ->
+            zip.putNextEntry(ZipEntry("../../escape.txt"))
+            zip.write("boom".toByteArray())
+            zip.closeEntry()
+        }
+
+        assertFailsWith<IllegalArgumentException> { service.restore("Lobby-5", "evil.zip") }
+
+        assertEquals("precious", ws.resolve("keep.txt").readText())
+        Files.walk(root).use { stream ->
+            assertTrue(stream.noneMatch { it.name == "escape.txt" }, "the zip-slip entry escaped")
+        }
+    }
+
+    @Test
+    fun `a corrupt archive fails before the workspace is touched`() {
+        val ws = workspace("Lobby-6")
+        ws.resolve("keep.txt").writeText("precious")
+        Files.createDirectories(backupsDir.resolve("Lobby-6")).resolve("broken.zip").writeText("this is not a zip")
+
+        assertFailsWith<IOException> { service.restore("Lobby-6", "broken.zip") }
+
+        assertEquals("precious", ws.resolve("keep.txt").readText())
+    }
+
+    @Test
+    fun `restore aborts before the swap when the service was started during extraction`() {
+        val ws = workspace("Lobby-7")
+        ws.resolve("keep.txt").writeText("precious")
+        var activityChecks = 0
+        val racing = BackupService(
+            backupsDir = backupsDir,
+            staticServicesDir = staticDir,
+            // inactive on restore's entry check, active again by the pre-swap re-check
+            isActive = { activityChecks++ > 0 },
+            retention = 3,
+            clock = { now },
+        )
+        val info = racing.create("Lobby-7")
+        ws.resolve("keep.txt").writeText("changed while running")
+
+        assertFailsWith<IllegalArgumentException> { racing.restore("Lobby-7", info.fileName) }
+
+        assertEquals(2, activityChecks)
+        assertEquals("changed while running", ws.resolve("keep.txt").readText())
     }
 
     @Test

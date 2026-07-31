@@ -53,6 +53,9 @@ class FileAuditSink(
             .getOrDefault(emptyList())
     }
 
+    // Shares append's monitor: prune rewrites the file via a temp copy, so an unsynchronized
+    // append could land between reading the lines and the replacing move — and be lost.
+    @Synchronized
     override fun prune(olderThanEpochMs: Long) {
         if (Files.notExists(file)) {
             return

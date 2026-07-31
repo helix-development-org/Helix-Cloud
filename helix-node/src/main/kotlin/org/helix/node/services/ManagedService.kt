@@ -72,6 +72,15 @@ class ManagedService(
     @Volatile
     var watchdogKilled: Boolean = false
 
+    /**
+     * The bridge control token actually injected into the service's process
+     * environment (`HELIX_CONTROL_TOKEN`), captured at launch so it can be
+     * persisted with the service registry and restored when the service is
+     * re-adopted after a backend restart. `null` when no token was injected.
+     */
+    @Volatile
+    var controlToken: String? = null
+
     /** Executor handle, present while the service runs. */
     @Volatile
     var handle: ServiceHandle? = null

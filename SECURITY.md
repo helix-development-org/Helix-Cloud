@@ -34,3 +34,17 @@ Velocity bridges, the bundled `helix-addon-*` modules, and the
 Out of scope: vulnerabilities in third-party dependencies (report those
 upstream), and issues that require an attacker to already have Launcher
 admin-token or host-level access to the machine running the node.
+
+## Known accepted risks
+
+- **A compromised game server can issue network bans.** IGuard (the
+  anticheat shipped with `helix-addon-guard`) intentionally bans from the
+  game server through the node's `guard.store.ban`/`unban`/`punishment`
+  actions, which are reachable with that server's per-service token
+  (`bridgeInvocable`). An attacker with code execution on a game server
+  could therefore ban or unban arbitrary players network-wide. This is an
+  accepted trade-off: the anticheat's automatic enforcement requires it,
+  every such action is written to the audit log with its acting service,
+  and bans are reversible from the dashboard. Mitigation if unacceptable
+  for your deployment: disable IGuard's automatic bans and use alerts with
+  manual panel bans instead.

@@ -13,9 +13,13 @@ import java.util.concurrent.ConcurrentHashMap
  * bridge routes for its own service id — a compromised game server can no
  * longer create tasks, read configs or reach any other service.
  *
- * Tokens live in memory only and are re-minted on every service launch,
- * which matches services already getting fresh environment variables on
- * every start; nothing needs to survive a node restart.
+ * Tokens are re-minted on every service launch, which matches services
+ * already getting fresh environment variables on every start. Because a
+ * service that survives a backend restart keeps the token from its
+ * original process environment, the node persists minted tokens in the
+ * service registry file and puts them back via [restore] when it re-adopts
+ * such a survivor — otherwise every `/internal/` call of the survivor
+ * would be rejected and the heartbeat watchdog would kill it.
  */
 class ServiceTokenRegistry {
     private val random = SecureRandom()
@@ -37,6 +41,23 @@ class ServiceTokenRegistry {
         tokenByServiceId[serviceId] = token
         serviceIdByToken[token] = serviceId
         return token
+    }
+
+    /**
+     * Re-registers a previously minted token for a service, replacing any
+     * token currently registered for the same service id.
+     *
+     * Used when re-adopting a service that survived a backend restart: the
+     * surviving process still presents the token from its original
+     * environment, so the new node process must accept exactly that token.
+     *
+     * @param serviceId the service the token is scoped to.
+     * @param token the token the service's process environment carries.
+     */
+    fun restore(serviceId: String, token: String) {
+        revoke(serviceId)
+        tokenByServiceId[serviceId] = token
+        serviceIdByToken[token] = serviceId
     }
 
     /**

@@ -967,6 +967,10 @@ private fun RoutingContext.restActor(): String? =
 
 private fun io.ktor.server.routing.Route.actionRoutes(dependencies: ControlDependencies) {
     get("/actions") {
+        // The full action catalog is admin-only: it enumerates every action name and usage,
+        // which a per-service bridge token has no business reading (the dashboard's per-addon
+        // runner sources its actions from the already-permission-gated /addons route instead).
+        if (!requireAdmin(dependencies)) return@get
         call.respond(dependencies.registry.descriptors())
     }
     post("/actions") {
@@ -1117,13 +1121,16 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
         val hub = dependencies.proxyEvents
         val deadline = System.currentTimeMillis() + POLL_TIMEOUT_MS
         while (true) {
-            val commands = dependencies.commandQueue.pending(proxyServiceId)
+            val pending = dependencies.commandQueue.pending(proxyServiceId)
             val routing = hub.routingVersion.get()
             val catalog = hub.commandCatalogVersion.get()
-            val changed = commands.isNotEmpty() || routing != seenRouting || catalog != seenCatalog
+            val changed = pending.isNotEmpty() || routing != seenRouting || catalog != seenCatalog
             if (changed || System.currentTimeMillis() >= deadline) {
-                val token = dependencies.commandQueue.tokenFor(proxyServiceId, ackUpTo)
-                call.respond(ProxyPoll(commands, routing, catalog, token))
+                // The ack token MUST be derived from the snapshot actually going into this
+                // response — a command enqueued after pending() was read is not in it, so a
+                // token covering it would let the proxy's next poll ack a command it never saw.
+                val token = dependencies.commandQueue.tokenFor(pending, ackUpTo)
+                call.respond(ProxyPoll(pending.map { it.command }, routing, catalog, token))
                 break
             }
             hub.await((deadline - System.currentTimeMillis()).coerceIn(1, POLL_RECHECK_MS))

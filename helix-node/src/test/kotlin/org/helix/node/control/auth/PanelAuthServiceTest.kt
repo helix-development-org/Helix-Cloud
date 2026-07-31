@@ -1,5 +1,9 @@
 package org.helix.node.control.auth
 
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.system.measureTimeMillis
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -166,5 +170,68 @@ class PanelAuthServiceTest {
 
         assertEquals(1, revoked)
         assertNull(auth.authenticate(token))
+    }
+
+    @Test
+    fun `expired login codes are evicted when any new code is requested`() {
+        val players = PlayerRegistry().apply {
+            handle(PlayerEvent("join", "Steve", "u"))
+            handle(PlayerEvent("join", "Alex", "a"))
+        }
+        val cache = NativePermissionCache().apply {
+            update("steve", listOf("helix.panel.login"))
+            update("alex", listOf("helix.panel.login"))
+        }
+        val auth = service(cache, players)
+        auth.requestCode("steve")
+        val steveCode = delivered!!.removePrefix("code:")
+
+        now += 300_001 // steve's code expires (codeTtlMs = 300_000)
+        auth.requestCode("alex") // any new code request sweeps stale pending state
+
+        // steve's record is GONE (evicted), not merely reported as expired
+        val failure = assertFailsWith<IllegalArgumentException> { auth.verify("steve", steveCode) }
+        assertEquals("no login code was requested for this player", failure.message)
+    }
+
+    @Test
+    fun `authenticate does not hold the service monitor during permission checks`() {
+        val players = PlayerRegistry().apply { handle(PlayerEvent("join", "Steve", "u")) }
+        val resolvers = PermissionResolverRegistry()
+        val blocking = AtomicBoolean(false)
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        resolvers.register("test") {
+            if (blocking.get()) {
+                entered.countDown()
+                release.await(3, TimeUnit.SECONDS)
+            }
+            true
+        }
+        val auth = PanelAuthService(
+            adminToken = "admin-token",
+            loginPermission = "helix.panel.login",
+            loginMessage = "code:{code}",
+            codeTtlMs = 300_000,
+            sessionTtlMs = 3_600_000,
+            players = players,
+            permissions = PermissionService(resolvers, NativePermissionProvider(NativePermissionCache())),
+            deliver = { _, text -> delivered = text; true },
+            clock = { now },
+        )
+        val token = login(auth, "steve")
+
+        blocking.set(true)
+        val worker = Thread { auth.authenticate(token) }
+        worker.start()
+        assertTrue(entered.await(1, TimeUnit.SECONDS), "authenticate never reached the permission check")
+
+        // while one request is stuck in a slow permission check, the service's
+        // synchronized session operations must not queue up behind it
+        val elapsedMs = measureTimeMillis { auth.revokeSessions("nobody") }
+
+        release.countDown()
+        worker.join(3_000)
+        assertTrue(elapsedMs < 500, "revokeSessions blocked for ${elapsedMs}ms behind a slow permission check")
     }
 }

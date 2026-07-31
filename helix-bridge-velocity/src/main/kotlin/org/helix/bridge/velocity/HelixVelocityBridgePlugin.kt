@@ -119,7 +119,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
             return
         }
         settings = loaded
-        val httpClient = NodeHttpClient(loaded)
+        val httpClient = NodeHttpClient(loaded) { logger.warn(it) }
         client = httpClient
         val backendRegistry = BackendRegistry(proxy, logger)
         registry = backendRegistry
@@ -160,6 +160,8 @@ class HelixVelocityBridgePlugin @Inject constructor(
         polling = false
         pollThread?.interrupt()
         pollThread = null
+        client?.close()
+        client = null
     }
 
     private fun startPollLoop(settings: BridgeSettings, client: NodeHttpClient, registry: BackendRegistry) {

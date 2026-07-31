@@ -46,5 +46,18 @@ class BridgeValuesClient(
         val response = http.send(request, HttpResponse.BodyHandlers.ofString())
         check(response.statusCode() in 200..299) { "HTTP ${response.statusCode()}" }
         json.parseToJsonElement(response.body()).jsonObject.mapValues { it.value.jsonPrimitive.content }
-    }.onFailure { logger.warn("Could not fetch bridge values: {}", it.message) }.getOrNull()
+    }.onFailure { failure ->
+        if (failure is InterruptedException) Thread.currentThread().interrupt()
+        logger.warn("Could not fetch bridge values: {}", failure.message)
+    }.getOrNull()
+
+    /**
+     * Closes the underlying HTTP client, releasing its executor and
+     * connection resources — call from the owning plugin's onDisable so a
+     * Bukkit `/reload` does not leak the client (and, through it, the old
+     * plugin classloader).
+     */
+    fun close() {
+        http.close()
+    }
 }

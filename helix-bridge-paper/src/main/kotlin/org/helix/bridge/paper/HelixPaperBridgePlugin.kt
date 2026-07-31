@@ -92,7 +92,7 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
             return
         }
         settings = loaded
-        val httpClient = NodeHttpClient(loaded)
+        val httpClient = NodeHttpClient(loaded) { logger.warning(it) }
         client = httpClient
         server.pluginManager.registerEvents(this, this)
         heartbeatTask = server.scheduler.runTaskTimerAsynchronously(
@@ -156,6 +156,8 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         }
         nickPacketListener = null
         nickNames.clear()
+        client?.close()
+        client = null
     }
 
     /**
