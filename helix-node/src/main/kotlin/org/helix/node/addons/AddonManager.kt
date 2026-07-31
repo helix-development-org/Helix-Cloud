@@ -117,6 +117,32 @@ class AddonManager(
     private companion object {
         /** Charset an addon id/version must stick to: they become path segments. */
         val SAFE_SEGMENT = Regex("[a-z0-9._-]+")
+
+        /** Digit runs and non-digit runs of a version-ish string. */
+        val NUMBER_TOKENS = Regex("\\d+|\\D+")
+
+        /**
+         * Compares strings with digit runs as numbers, so `0.82.0` sorts
+         * after `0.9.0` even though it is alphabetically smaller.
+         */
+        val numberAwareOrder = Comparator<String> { a, b ->
+            val left = NUMBER_TOKENS.findAll(a).map { it.value }.toList()
+            val right = NUMBER_TOKENS.findAll(b).map { it.value }.toList()
+            left.zip(right).forEach { (x, y) ->
+                val result = if (x.first().isDigit() && y.first().isDigit()) {
+                    val xNum = x.trimStart('0')
+                    val yNum = y.trimStart('0')
+                    val byLength = xNum.length.compareTo(yNum.length)
+                    if (byLength != 0) byLength else xNum.compareTo(yNum)
+                } else {
+                    x.compareTo(y)
+                }
+                if (result != 0) {
+                    return@Comparator result
+                }
+            }
+            left.size.compareTo(right.size)
+        }
     }
 
     private class LoadedAddon(
@@ -139,18 +165,20 @@ class AddonManager(
     /**
      * Loads and enables every `.hxa` file in the addon directory.
      *
+     * When several files carry the same addon id — typically an old and a
+     * new release bundle side by side — only the newest file is loaded and
+     * the older duplicates are skipped with a warning, instead of the
+     * alphabetically first file winning and pinning the outdated version.
+     *
      * @return snapshots of all installed addons.
      */
     @Synchronized
     fun loadAll(): List<AddonInfo> {
         Files.createDirectories(directory)
-        directory.listDirectoryEntries()
-            .filter { it.extension == "hxa" }
-            .sorted()
-            .forEach { file ->
-                runCatching { install(file) }
-                    .onFailure { logger.error("Failed to load addon {}", file.fileName, it) }
-            }
+        candidateFiles().forEach { file ->
+            runCatching { install(file) }
+                .onFailure { logger.error("Failed to load addon {}", file.fileName, it) }
+        }
         return addons()
     }
 
@@ -160,7 +188,8 @@ class AddonManager(
      *
      * Lets operators drop new HXA files into `Helix/addons/` and pick them
      * up live via the `addon.list.reload` action — no node restart needed.
-     * Malformed packages are logged and skipped.
+     * Malformed packages are logged and skipped; duplicate ids resolve to
+     * the newest file like in [loadAll].
      *
      * @return snapshots of the newly installed addons.
      */
@@ -168,18 +197,52 @@ class AddonManager(
     fun reload(): List<AddonInfo> {
         Files.createDirectories(directory)
         val added = mutableListOf<AddonInfo>()
+        candidateFiles().forEach { file ->
+            runCatching {
+                val manifest = readManifest(file)
+                if (!loaded.containsKey(manifest.id)) {
+                    added += install(file)
+                }
+            }.onFailure { logger.error("Failed to load addon {}", file.fileName, it) }
+        }
+        return added
+    }
+
+    /**
+     * The `.hxa` files to load, one per addon id: files are grouped by
+     * their manifest id and only the newest file of each id survives —
+     * newest by manifest version, then by file name, both compared
+     * number-aware so `0.82.0` beats `0.81.0` and `0.10` beats `0.9`.
+     * Skipped duplicates are logged so operators clean them up.
+     */
+    private fun candidateFiles(): List<Path> {
+        val byId = linkedMapOf<String, MutableList<Pair<Path, AddonManifest>>>()
+        val unreadable = mutableListOf<Path>()
         directory.listDirectoryEntries()
             .filter { it.extension == "hxa" }
             .sorted()
             .forEach { file ->
-                runCatching {
-                    val manifest = readManifest(file)
-                    if (!loaded.containsKey(manifest.id)) {
-                        added += install(file)
-                    }
-                }.onFailure { logger.error("Failed to load addon {}", file.fileName, it) }
+                runCatching { readManifest(file) }
+                    .onSuccess { manifest -> byId.getOrPut(manifest.id) { mutableListOf() } += file to manifest }
+                    // keep unreadable packages in the load list so install() reports them
+                    .onFailure { unreadable.add(file) }
             }
-        return added
+        val chosen = byId.map { (id, files) ->
+            val newest = files.maxWith(
+                compareBy<Pair<Path, AddonManifest>, String>(numberAwareOrder) { it.second.version }
+                    .thenBy(numberAwareOrder) { it.first.fileName.toString() },
+            )
+            files.filter { it !== newest }.forEach { (skipped, _) ->
+                logger.warn(
+                    "Skipping {}: addon {} is also present as newer {} — remove the outdated file",
+                    skipped.fileName,
+                    id,
+                    newest.first.fileName,
+                )
+            }
+            newest.first
+        }
+        return (chosen + unreadable).sorted()
     }
 
     /**

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.82.1 — 2026-07-31
+
+### Fix: Addon-Duplikate beim Laden
+- Liegen mehrere `.hxa`-Dateien mit derselben Addon-ID in `Helix/addons/`
+  (z. B. `helix-discord-0.81.0.hxa` **und** `helix-discord-0.82.0.hxa`
+  nach einem Update ohne Aufräumen), gewann bisher die alphabetisch erste
+  Datei — die alte Version lief weiter und die neue schlug mit
+  `addon already installed` fehl. Jetzt wählt die Node pro Addon-ID die
+  **neueste** Datei (Manifest-Version, dann Dateiname, beides
+  nummernbewusst: `0.82.0` schlägt `0.81.0`, `0.10` schlägt `0.9`) und
+  überspringt ältere Duplikate mit einer Warnung. Gilt für den Start
+  (`loadAll`) und das Laufzeit-Nachladen (`addon.list.reload`).
+
 ## 0.82.0 — 2026-07-31
 
 ### Discord-Bot v2: komplettes Admin-Tooling (helix-addon-discord)
