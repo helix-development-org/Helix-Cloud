@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.80.2 — 2026-07-31
+
+### Fix: LinkageError beim Aktivieren von BetterMSGs/Guard/Profile
+- **`loader constraint violation` auf `kotlin.coroutines.CoroutineContext`**:
+  die drei von Helix-GUIs abhängigen Plugins bündelten weiterhin eine
+  eigene Kopie der Kotlin-Stdlib in ihrem `paper.jar` (via `helix-api`),
+  bekamen Coroutines-Klassen aber über die `depend`-Beziehung aus dem
+  Helix-GUIs-Loader — die JVM sah damit zwei `CoroutineContext`-Kopien
+  aus zwei Classloadern in einer Vererbungskette und verweigerte das
+  Linken beim Enable.
+- Die Fat-Jars von `helix-addon-bettermsgs-paper`, `helix-addon-guard-paper`
+  und `helix-addon-profile-paper` schließen jetzt sämtliche
+  `kotlin*`-Jars (Stdlib, kotlinx-coroutines, kotlinx-serialization) aus —
+  die eine Kotlin-Runtime kommt vollständig vom Helix-GUIs-Plugin, das sie
+  nachweislich bündelt. Nebeneffekt: die drei Plugin-Jars werden spürbar
+  kleiner.
+
 ## 0.80.1 — 2026-07-31
 
 ### Fix: Task-Verteilungs-Chart füllte die halbe Overview

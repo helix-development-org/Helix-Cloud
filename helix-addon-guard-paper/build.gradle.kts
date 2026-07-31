@@ -54,7 +54,11 @@ tasks.withType<Jar>().configureEach {
     dependsOn(configurations.runtimeClasspath)
     from({
         configurations.runtimeClasspath.get()
-            .filter { it.isFile }
+            // No own Kotlin runtime (kotlin-stdlib, kotlinx-*): the Helix-GUIs plugin bundles it
+            // and provides it through the plugin.yml `depend` relationship. Bundling a second
+            // stdlib copy makes the JVM see kotlin.coroutines.CoroutineContext from two loaders
+            // in one inheritance chain and refuse to link (LinkageError on enable).
+            .filter { it.isFile && !it.name.startsWith("kotlin") }
             .map { zipTree(it) }
     })
     exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
