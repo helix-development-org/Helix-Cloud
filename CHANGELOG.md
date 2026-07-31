@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.80.1 — 2026-07-31
+
+### Fix: Task-Verteilungs-Chart füllte die halbe Overview
+- **Das neue Balken-Chart rendrte auf voller Kartenbreite mit `4/1`-
+  Seitenverhältnis** — auf einem breiten Monitor ~550 px hohe, vollflächige
+  Balken; und da bei zwei Tasks mit je einem Spieler beide auf dem Maximum
+  liegen, wirkten sie wie riesige lila Blöcke ohne jede Skala.
+- Jetzt kompakt: Breite auf `max-w-xl` begrenzt, feste Balkenbreite
+  (40 px), horizontale Grid-Linien für die Größenordnung und eine
+  "Players per task"-Überschrift.
+
 ## 0.80.0 — 2026-07-31
 
 ### Dashboard: Bklit-Charts + anime.js
