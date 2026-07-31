@@ -56,7 +56,7 @@ class DiscordBotAddon : AddonBase() {
             config = { config },
             texts = texts,
             descriptorOf = catalog::find,
-            sink = { channelId, text -> runtime.send(channelId, text) },
+            sink = { channelId, text, accent -> runtime.send(channelId, text, accent) },
         )
         val services = BotServices(
             config = { config },

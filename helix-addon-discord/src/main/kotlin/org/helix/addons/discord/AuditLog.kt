@@ -25,13 +25,15 @@ import org.helix.api.action.ActionSource
  *   default language.
  * @property descriptorOf resolves an action name to its descriptor, to
  *   tell player commands apart from machine bridge calls.
- * @property sink receives (channel id, markdown line) pairs.
+ * @property sink receives (channel id, markdown line, accent color) —
+ *   the runtime renders every entry as a Components-V2 container, tinted
+ *   per event type.
  */
 class AuditLog(
     private val config: () -> DiscordConfig,
     private val texts: DiscordMessages,
     private val descriptorOf: (String) -> ActionDescriptor?,
-    private val sink: (channelId: String, text: String) -> Unit,
+    private val sink: (channelId: String, text: String, accent: Int?) -> Unit,
 ) {
     /**
      * Observes a node-side action execution and logs it when a human
@@ -157,7 +159,7 @@ class AuditLog(
     private fun emit(type: String, text: String) {
         val channel = config().channelForAudit(type)
         if (channel.isNotBlank()) {
-            sink(channel, text)
+            sink(channel, text, TONES[type])
         }
     }
 
@@ -192,5 +194,12 @@ class AuditLog(
 
         /** Actions whose arguments carry secrets and are masked. */
         val SECRET_ARGUMENT_ACTIONS = setOf("discord.config.set")
+
+        /** Container accent color per audit event type. */
+        val TONES = mapOf(
+            TYPE_DENIED to 0xED4245,
+            TYPE_CONFIRMATION to 0xFEE75C,
+            TYPE_LINK to 0x5865F2,
+        )
     }
 }

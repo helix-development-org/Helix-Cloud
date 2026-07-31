@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.82.2 — 2026-07-31
+
+### Discord: Components V2 only
+- Der Bot sendet **keine normalen Content-Nachrichten mehr**: Audit-Log,
+  Notification-Forwarding und `discord.send` laufen jetzt ebenfalls als
+  Components-V2-Container (wie Panel, Status-Board und alle
+  Interaktions-Antworten schon zuvor). Audit-Einträge sind dabei je
+  Ereignistyp eingefärbt (Denied rot, Bestätigungs-Lifecycle gelb,
+  Link-Ereignisse blau), Batching pro Kanal+Farbe bleibt erhalten und die
+  Chunk-Grenze nutzt das größere Text-Display-Budget (3800 Zeichen).
+
 ## 0.82.1 — 2026-07-31
 
 ### Fix: Addon-Duplikate beim Laden

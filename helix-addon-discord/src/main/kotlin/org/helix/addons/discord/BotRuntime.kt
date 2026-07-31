@@ -1,5 +1,6 @@
 package org.helix.addons.discord
 
+import dev.kord.common.Color
 import dev.kord.common.entity.MessageFlag
 import dev.kord.common.entity.Snowflake
 import dev.kord.common.entity.TextInputStyle
@@ -20,6 +21,8 @@ import dev.kord.gateway.Intents
 import dev.kord.rest.builder.interaction.string
 import dev.kord.rest.builder.interaction.subCommand
 import dev.kord.rest.builder.message.MessageBuilder
+import dev.kord.rest.builder.message.container
+import dev.kord.rest.builder.message.messageFlags
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CoroutineScope
@@ -78,7 +81,7 @@ class BotRuntime(
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private val kordRef = AtomicReference<Kord?>(null)
     private var scope: CoroutineScope? = null
-    private val outbox = Channel<Pair<String, String>>(capacity = 512)
+    private val outbox = Channel<OutboxLine>(capacity = 512)
     private val statusPoke = Channel<Unit>(Channel.CONFLATED)
     private val setupSelections = ConcurrentHashMap<String, MutableMap<String, String>>()
     private var lastStatus: List<String> = emptyList()
@@ -118,18 +121,21 @@ class BotRuntime(
     fun connected(): Boolean = kordRef.get() != null
 
     /**
-     * Queues a text message for a channel; used by the audit trail, the
-     * notification forwarding and the `discord.send` action.
+     * Queues a feed line for a channel; used by the audit trail, the
+     * notification forwarding and the `discord.send` action. The flusher
+     * batches queued lines per channel and posts them as Components-V2
+     * containers — the bot never sends plain content messages.
      *
      * @param channelId target channel id.
      * @param text markdown text.
+     * @param accent optional container accent color (RGB).
      * @return `false` when the bot is not running.
      */
-    fun send(channelId: String, text: String): Boolean {
+    fun send(channelId: String, text: String, accent: Int? = null): Boolean {
         if (kordRef.get() == null || channelId.isBlank()) {
             return false
         }
-        return outbox.trySend(channelId to text).isSuccess
+        return outbox.trySend(OutboxLine(channelId, text, accent)).isSuccess
     }
 
     /**
@@ -930,23 +936,39 @@ class BotRuntime(
     private suspend fun flushOutbox(kord: Kord) {
         while (scope?.isActive == true && kordRef.get() != null) {
             val first = outbox.receive()
-            val batch = linkedMapOf<String, MutableList<String>>()
-            batch.getOrPut(first.first) { mutableListOf() } += first.second
+            val batch = linkedMapOf<Pair<String, Int?>, MutableList<String>>()
+            batch.getOrPut(first.channelId to first.accent) { mutableListOf() } += first.text
             withTimeoutOrNull(BATCH_WINDOW_MS) {
                 while (true) {
                     val next = outbox.receive()
-                    batch.getOrPut(next.first) { mutableListOf() } += next.second
+                    batch.getOrPut(next.channelId to next.accent) { mutableListOf() } += next.text
                 }
             }
-            batch.forEach { (channelId, lines) ->
+            batch.forEach { (key, lines) ->
+                val (channelId, accent) = key
                 chunk(lines).forEach { text ->
                     runCatching {
-                        kord.rest.channel.createMessage(Snowflake(channelId)) { content = text }
+                        kord.rest.channel.createMessage(Snowflake(channelId)) {
+                            messageFlags { +MessageFlag.IsComponentsV2 }
+                            container {
+                                accent?.let { accentColor = Color(it) }
+                                textDisplay(text)
+                            }
+                        }
                     }
                 }
             }
         }
     }
+
+    /**
+     * One queued feed line awaiting its Components-V2 batch.
+     *
+     * @property channelId target channel id.
+     * @property text markdown text.
+     * @property accent optional container accent color (RGB).
+     */
+    private data class OutboxLine(val channelId: String, val text: String, val accent: Int?)
 
     private fun chunk(lines: List<String>): List<String> {
         val chunks = mutableListOf<StringBuilder>()
@@ -976,8 +998,8 @@ class BotRuntime(
         /** How long queued outbox lines are collected before sending. */
         const val BATCH_WINDOW_MS = 1500L
 
-        /** Discord's plain-message length limit, minus headroom. */
-        const val MESSAGE_LIMIT = 1900
+        /** Discord's per-message text-display budget, minus headroom. */
+        const val MESSAGE_LIMIT = 3800
 
         val WHITESPACE = Regex("\\s+")
 

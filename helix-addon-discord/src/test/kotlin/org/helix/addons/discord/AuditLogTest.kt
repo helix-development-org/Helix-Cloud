@@ -14,7 +14,7 @@ class AuditLogTest {
         auditChannelId = "audit",
         auditChannels = mapOf("link" to "links"),
     )
-    private val sent = mutableListOf<Pair<String, String>>()
+    private val sent = mutableListOf<Triple<String, String, Int?>>()
     private val descriptors = mutableMapOf(
         "kick" to ActionDescriptor("kick", "kicks", "kick <player>", playerCommand = true),
         "service.stop" to ActionDescriptor("service.stop", "stops", "service.stop <service>"),
@@ -34,7 +34,7 @@ class AuditLogTest {
             ),
         ),
         descriptorOf = { descriptors[it] },
-        sink = { channel, text -> sent += channel to text },
+        sink = { channel, text, accent -> sent += Triple(channel, text, accent) },
     )
 
     @Test
@@ -97,6 +97,20 @@ class AuditLogTest {
         config = DiscordConfig()
         audit.denied("steve#dc", "service.stop", "node")
         assertTrue(sent.isEmpty())
+    }
+
+    @Test
+    fun `event types carry their container accent color`() {
+        audit.observe(
+            ActionInvocation("service.stop", emptyList(), ActionSource.CLI),
+            ActionResult.ok(),
+        )
+        audit.denied("steve#dc", "service.stop", "node")
+        audit.link("created", DiscordLink("42", "steve#dc", "uuid-1", "Steve", 0L, "game-code"), "game-code")
+
+        assertEquals(null, sent[0].third)
+        assertEquals(0xED4245, sent[1].third)
+        assertEquals(0x5865F2, sent[2].third)
     }
 
     @Test
