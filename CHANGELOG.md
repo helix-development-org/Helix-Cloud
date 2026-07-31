@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.80.3 — 2026-07-31
+
+### Fix: Spieler wurden doppelt gezählt (Proxy + Backend)
+- **„Players online" summierte Proxy- UND Backend-Zahlen** — jeder Spieler
+  ist aber gleichzeitig auf genau einem Proxy und einem Backend verbunden,
+  also zählte jeder doppelt (1 Spieler auf Lobby + Proxy → „2").
+- `PlatformOverviewService` zählt jetzt: laufen Proxies, gelten allein
+  deren Zahlen als Netzwerk-Total; ohne Proxy-Schicht (Standalone) die
+  Backend-Summe. Betrifft auch die Metrik-Historie (`onlinePlayers`),
+  die aus derselben Overview gespeist wird.
+- **Das „Players per task"-Chart der Overview zeigt nur noch Backends** —
+  der Proxy-Balken war dieselbe Doppelzählung in Diagrammform.
+
 ## 0.80.2 — 2026-07-31
 
 ### Fix: LinkageError beim Aktivieren von BetterMSGs/Guard/Profile

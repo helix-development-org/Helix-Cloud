@@ -25,12 +25,18 @@ class PlatformOverviewService(
     fun overview(): PlatformOverview {
         val services = manager.services()
         val running = services.filter { it.state == ServiceState.RUNNING }
+        // Every network player is connected to exactly one proxy AND one backend —
+        // summing both layers counts each player twice. With a proxy layer running,
+        // its numbers alone are the network total; without one (standalone setup),
+        // the backend sum is.
+        val proxies = running.filter { it.environment.proxy }
+        val countable = proxies.ifEmpty { running }
         return PlatformOverview(
             version = version,
             taskCount = taskStore.all().size,
             servicesRunning = running.size,
             servicesTotal = services.size,
-            onlinePlayers = running.sumOf { it.onlinePlayers },
+            onlinePlayers = countable.sumOf { it.onlinePlayers },
             maxPlayers = running.filter { !it.environment.proxy }.sumOf { it.maxPlayers },
         )
     }

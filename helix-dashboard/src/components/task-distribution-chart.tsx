@@ -17,7 +17,9 @@ import type { ServiceInfo } from "@/lib/api"
 export function TaskDistributionChart({ services }: { services: ServiceInfo[] }) {
   const byTask = new Map<string, { players: number; services: number }>()
   services
-    .filter((s) => s.state === "RUNNING")
+    // Proxies see every network player once more on their way to a backend —
+    // counting them would double every player, so this chart shows backends only.
+    .filter((s) => s.state === "RUNNING" && s.environment !== "VELOCITY")
     .forEach((s) => {
       const entry = byTask.get(s.taskName) ?? { players: 0, services: 0 }
       entry.players += Math.max(0, s.onlinePlayers)

@@ -104,13 +104,15 @@ class ProxyRoutingServiceTest {
     }
 
     @Test
-    fun `overview aggregates running services and players`() {
+    fun `overview counts each player once via the proxy layer`() {
         setup(ExecutorType.PROCESS, ExecutorType.PROCESS)
         val overview = PlatformOverviewService("1.0.0", taskStore, manager).overview()
 
         assertEquals(2, overview.taskCount)
         assertEquals(2, overview.servicesRunning)
-        assertEquals(6, overview.onlinePlayers)
+        // Lobby-1 and Proxy-1 both report 3 players — the SAME 3 players, seen once
+        // on the backend and once on the proxy. The network total is 3, not 6.
+        assertEquals(3, overview.onlinePlayers)
         assertEquals(100, overview.maxPlayers)
     }
 }
