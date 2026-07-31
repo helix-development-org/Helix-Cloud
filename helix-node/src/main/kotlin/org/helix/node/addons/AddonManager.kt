@@ -389,6 +389,7 @@ class AddonManager(
     }
 
     private fun unregisterEverywhere(id: String) {
+        registry.unregisterObserverOwner(id)
         joinGates.unregisterOwner(id)
         permissionResolvers.unregisterOwner(id)
         playerData.unregisterOwner(id)
@@ -493,6 +494,10 @@ class AddonManager(
         override fun registerAction(descriptor: ActionDescriptor, handler: ActionHandler) {
             registry.register(descriptor, handler)
             record.actionNames += descriptor.name
+        }
+
+        override fun registerActionObserver(observer: org.helix.api.action.ActionObserver) {
+            registry.registerObserver(record.manifest.id, observer)
         }
 
         override fun registerJoinGate(gate: JoinGate) {

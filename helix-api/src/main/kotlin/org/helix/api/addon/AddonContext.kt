@@ -4,6 +4,7 @@ import java.nio.file.Path
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionHandler
 import org.helix.api.action.ActionInvoker
+import org.helix.api.action.ActionObserver
 import org.helix.api.message.MapMessages
 import org.helix.api.message.Messages
 import org.helix.api.player.OnlinePlayer
@@ -40,6 +41,20 @@ interface AddonContext {
      * @param handler executed on invocation.
      */
     fun registerAction(descriptor: ActionDescriptor, handler: ActionHandler)
+
+    /**
+     * Registers an action observer owned by this addon.
+     *
+     * The observer sees every action execution on the node — regardless of
+     * which addon owns the action — including source, actor and result,
+     * for example to build an audit trail. Observers cannot veto or change
+     * invocations, and observer exceptions never fail the observed action.
+     * Removed when the addon is disabled.
+     *
+     * @param observer called after every action execution.
+     */
+    fun registerActionObserver(observer: ActionObserver) {
+    }
 
     /**
      * Registers a join gate owned by this addon.

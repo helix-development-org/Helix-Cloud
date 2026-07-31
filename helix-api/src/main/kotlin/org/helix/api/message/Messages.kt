@@ -83,4 +83,16 @@ interface Messages {
      * @return the template, or the key itself if unknown.
      */
     fun raw(key: String): String
+
+    /**
+     * Returns the raw template in a specific language, without
+     * substitution — for output channels whose language is known directly
+     * instead of through a player, for example a Discord user's client
+     * locale. Implementations without language support resolve like [raw].
+     *
+     * @param language language code, for example `de`.
+     * @param key message key.
+     * @return the template, or the key itself if unknown.
+     */
+    fun rawIn(language: String, key: String): String = raw(key)
 }

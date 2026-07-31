@@ -5,6 +5,7 @@ import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionHandler
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionInvoker
+import org.helix.api.action.ActionObserver
 import org.helix.api.action.ActionResult
 import org.helix.api.addon.AddonContext
 import org.helix.api.addon.DisplayResolver
@@ -68,6 +69,9 @@ class RecordingAddonContext(
 
     /** Registered notification listeners. */
     val notificationListeners = mutableListOf<NotificationListener>()
+
+    /** Registered action observers. */
+    val actionObservers = mutableListOf<ActionObserver>()
 
     /** Published notifications as category to message pairs. */
     val notifications = mutableListOf<Pair<String, String>>()
@@ -192,6 +196,10 @@ class RecordingAddonContext(
 
     override fun registerNotificationListener(listener: NotificationListener) {
         notificationListeners += listener
+    }
+
+    override fun registerActionObserver(observer: ActionObserver) {
+        actionObservers += observer
     }
 
     /**

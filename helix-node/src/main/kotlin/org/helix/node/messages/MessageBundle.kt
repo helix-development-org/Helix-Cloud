@@ -122,7 +122,7 @@ class MessageBundle(
      * @return the template, or the key itself if unknown.
      */
     @Synchronized
-    fun rawIn(language: String, key: String): String =
+    override fun rawIn(language: String, key: String): String =
         resolve(language, key)
             ?: resolve(defaultLanguage(), key)
             ?: resolve(MIGRATION_LANGUAGE, key)

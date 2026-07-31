@@ -4,123 +4,128 @@ import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.helix.addon.sdk.testing.RecordingAddonContext
-import org.helix.api.action.ActionDescriptor
-import org.helix.api.action.ActionResult
+import org.helix.api.storage.InMemoryAddonStorage
 
 class DiscordAddonTest {
-    private val context = RecordingAddonContext(createTempDirectory("discord"))
-    private val config = DiscordConfig(
-        botToken = "token",
-        channelId = "123",
-        adminUserIds = listOf("42"),
-        allowedActions = listOf("service.start"),
-    )
-    private val handler = DiscordCommandHandler(context.actions, { config })
-
-    init {
-        context.registerAction(ActionDescriptor("platform.overview", "overview", "platform.overview")) {
-            ActionResult.ok("Helix-Cloud 1.5.0", "&7services: 2/2")
-        }
-        context.registerAction(ActionDescriptor("player.list", "players", "player.list")) {
-            ActionResult.ok("2 online: Steve, Alex")
-        }
-        context.registerAction(ActionDescriptor("service.start", "starts", "service.start <task>")) { invocation ->
-            ActionResult.ok("started ${invocation.arguments.first()}-1")
-        }
+    private fun enabledAddon(): RecordingAddonContext {
+        val context = RecordingAddonContext(createTempDirectory("discord"))
+        DiscordBotAddon().onEnable(context)
+        return context
     }
 
     @Test
-    fun `status and players commands answer with stripped colors in code blocks`() {
-        val status = handler.handle("7", false, "123", "!status")
-
-        assertTrue(status!!.startsWith("```"))
-        assertTrue(status.contains("services: 2/2"))
-        assertFalse(status.contains("&7"))
-        assertTrue(handler.handle("7", false, "123", "!players")!!.contains("Steve"))
-    }
-
-    @Test
-    fun `bots other channels and non-commands are ignored`() {
-        assertNull(handler.handle("7", true, "123", "!status"))
-        assertNull(handler.handle("7", false, "999", "!status"))
-        assertNull(handler.handle("7", false, "123", "hello"))
-        assertNull(handler.handle("7", false, "123", "!unknown"))
-    }
-
-    @Test
-    fun `run is admin gated and forwards to actions`() {
-        assertEquals(
-            "You are not allowed to run actions.",
-            handler.handle("7", false, "123", "!run service.start Lobby"),
-        )
-
-        val allowed = handler.handle("42", false, "123", "!run service.start Lobby")
-
-        assertTrue(allowed!!.contains("started Lobby-1"))
-        assertEquals(listOf("Lobby"), context.invocations.single { it.action == "service.start" }.arguments)
-    }
-
-    @Test
-    fun `run is restricted to the configured allowlist even for admins`() {
-        context.registerAction(ActionDescriptor("eco.give", "give", "eco.give <player> <amount>")) {
-            ActionResult.ok("done")
-        }
-
-        val denied = handler.handle("42", false, "123", "!run eco.give Steve 100")
-
-        assertEquals("That action is not on the allowlist.", denied)
-        assertTrue(context.invocations.none { it.action == "eco.give" })
-    }
-
-    @Test
-    fun `run denies everything when the allowlist is empty by default`() {
-        val defaultConfig = DiscordConfig(botToken = "token", channelId = "123", adminUserIds = listOf("42"))
-        val defaultHandler = DiscordCommandHandler(context.actions, { defaultConfig })
-
-        val denied = defaultHandler.handle("42", false, "123", "!run service.start Lobby")
-
-        assertEquals("That action is not on the allowlist.", denied)
-    }
-
-    @Test
-    fun `help lists the commands with the configured prefix`() {
-        val help = handler.handle("7", false, "123", "!help")
-
-        assertTrue(help!!.contains("!status"))
-        assertTrue(help.contains("!run"))
-    }
-
-    @Test
-    fun `color codes are stripped`() {
-        assertEquals("[Ban] steve — griefing", handler.stripColors("&c[Ban] &fsteve &7— griefing"))
-    }
-
-    @Test
-    fun `config writes defaults on first load and persists edits`() {
-        val storage = org.helix.api.storage.InMemoryAddonStorage()
+    fun `config writes defaults on first load and routes channels`() {
+        val storage = InMemoryAddonStorage()
 
         val defaults = DiscordConfig.load(storage)
 
         assertFalse(defaults.configured())
-        assertEquals("!", defaults.commandPrefix)
         assertEquals(listOf("moderation"), defaults.notificationCategories)
+        assertTrue(DiscordConfig.DEFAULT_CRITICAL.containsAll(listOf("platform.stop", "service.command")))
         assertTrue(storage.read("discord")!!.contains("botToken"))
+
+        val routed = defaults.copy(
+            auditChannelId = "audit",
+            auditChannels = mapOf("link" to "links"),
+            notificationChannelId = "notify",
+            categoryChannels = mapOf("economy" to "eco"),
+        )
+        assertEquals("links", routed.channelForAudit("link"))
+        assertEquals("audit", routed.channelForAudit("action"))
+        assertEquals("eco", routed.channelForCategory("economy"))
+        assertEquals("notify", routed.channelForCategory("moderation"))
+    }
+
+    @Test
+    fun `a legacy channel id migrates to the notification channel`() {
+        val storage = InMemoryAddonStorage()
+        storage.write("discord", """{"botToken":"t","channelId":"123","commandPrefix":"!"}""")
+
+        val migrated = DiscordConfig.load(storage)
+
+        assertEquals("123", migrated.notificationChannelId)
+        assertTrue(storage.read("discord")!!.contains("notificationChannelId"))
     }
 
     @Test
     fun `addon enables idle without token and reports status`() {
-        val addonContext = RecordingAddonContext(createTempDirectory("discord"))
-        DiscordBotAddon().onEnable(addonContext)
+        val context = enabledAddon()
 
-        val status = addonContext.run("discord.status")
+        val status = context.run("discord.status")
 
         assertTrue(status.success)
         assertTrue(status.lines.any { it == "configured: false" })
         assertTrue(status.lines.any { it == "connected: false" })
-        assertEquals(1, addonContext.notificationListeners.size)
-        assertFalse(addonContext.run("discord.send", "hi").success)
+        assertEquals(1, context.notificationListeners.size)
+        assertEquals(1, context.actionObservers.size)
+        assertEquals(1, context.playerListeners.size)
+        assertFalse(context.run("discord.send", "123", "hi").success)
+    }
+
+    @Test
+    fun `link bootstrap actions manage links by player and discord id`() {
+        val context = enabledAddon()
+        context.recordJoin("Steve", "uuid-1")
+
+        assertFalse(context.run("discord.link.set", "Unknown", "42").success)
+        assertTrue(context.run("discord.link.set", "Steve", "42").success)
+        assertFalse(context.run("discord.link.set", "Steve", "43").success)
+
+        val list = context.run("discord.link.list")
+        assertTrue(list.lines.single().contains("uuid-1"))
+        assertTrue(list.lines.single().contains("42"))
+
+        assertTrue(context.run("discord.link.remove", "Steve").success)
+        assertEquals("no links", context.run("discord.link.list").lines.single())
+        assertFalse(context.run("discord.link.remove", "Steve").success)
+    }
+
+    @Test
+    fun `the in game discord command creates codes and unlinks`() {
+        val context = enabledAddon()
+        context.recordJoin("Steve", "uuid-1")
+
+        assertTrue(context.run("discord", "Steve").success)
+        assertFalse(context.run("discord", "Steve", "WRONGCODE").success)
+
+        assertFalse(context.run("discord", "Steve", "unlink").success)
+        context.run("discord.link.set", "Steve", "42")
+        assertTrue(context.run("discord", "Steve", "unlink").success)
+        assertEquals("no links", context.run("discord.link.list").lines.single())
+    }
+
+    @Test
+    fun `the in game discord command is permission gated for bridges`() {
+        val context = enabledAddon()
+        val descriptor = context.handlers.getValue("discord").first
+
+        assertTrue(descriptor.playerCommand)
+        assertEquals(PermissionGate.LINK_NODE, descriptor.permission)
+    }
+
+    @Test
+    fun `config set updates routing maps and tier lists`() {
+        val context = enabledAddon()
+
+        val result = context.run(
+            "discord.config.set",
+            "guild=1",
+            "auditchannel=audit",
+            "category.economy=eco",
+            "audit.link=links",
+            "critical=platform.stop,ban.set",
+            "interval=120",
+        )
+
+        assertTrue(result.success)
+        val config = DiscordConfig.load(context.storage)
+        assertEquals("1", config.guildId)
+        assertEquals("audit", config.auditChannelId)
+        assertEquals(mapOf("economy" to "eco"), config.categoryChannels)
+        assertEquals(mapOf("link" to "links"), config.auditChannels)
+        assertEquals(listOf("platform.stop", "ban.set"), config.criticalActions)
+        assertEquals(120, config.statusIntervalSeconds)
     }
 }

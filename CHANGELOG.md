@@ -1,5 +1,70 @@
 # Changelog
 
+## 0.82.0 — 2026-07-31
+
+### Discord-Bot v2: komplettes Admin-Tooling (helix-addon-discord)
+- **Kord 0.15.0 → 0.18.1** und damit volle **Components-V2**-Unterstützung
+  (Container, Sections, TextDisplays, Separators, Labels in Modals).
+- **Slash-Commands statt Prefix-Commands**: `/helix status|panel|setup|link|
+  unlink|run` als Guild-Commands plus Kontextmenü **„Helix: Profil"**
+  (Rechtsklick auf einen Discord-User). Die alten `!status`/`!players`/
+  `!run`-Prefix-Commands sind entfernt.
+- **Persistentes Control-Panel** im konfigurierten Panel-Channel: Buttons
+  öffnen ephemere Modul-Screens für **Services** (Start/Stop/Kill/Restart/
+  Logs/Konsole je Service), **Tasks** (Start, Rolling-Restart, Löschen),
+  **Spieler** (Kick/Nachricht/Warn/Mute/Ban/Pardon/Historie, Broadcast,
+  Pagination), **Proxy & Plattform** (Wartung, Backend-/Launcher-Restart,
+  Plattform-Stopp), **Permissions** (Info/Zuweisen/Entziehen/Grant/Revoke
+  per Modal) und **Addons**.
+- **Dynamischer Action-Browser**: alle registrierten Actions aller Addons,
+  nach Gruppen durchblätterbar, Argumente per Modal — jedes Addon ist damit
+  automatisch über Discord bedienbar.
+- **Rechte ausschließlich über Account-Verknüpfung**: jede Bot-Funktion
+  prüft das Pro-Action-Node `helix.discord.action.<action>` (Wildcards über
+  das Permissions-Addon, z. B. `helix.discord.action.service.*`) des
+  verknüpften Minecraft-Accounts — kein User-ID-Bypass, keine Allowlist
+  mehr. Hat eine Action zusätzlich eine eigene Permission (z. B.
+  `helix.mod.kick`), gilt UND-Verknüpfung.
+- **Account-Linking in beide Richtungen**: Ingame `/discord` (Node
+  `helix.discord.link`) erzeugt einen Code für `/helix link` auf Discord;
+  `/helix link` ohne Code erzeugt umgekehrt einen Code für `/discord
+  <code>`. Codes sind kurzlebig (Default 5 min), einmalig und
+  konfliktgeprüft. Bootstrap ohne Code über die neuen Actions
+  `discord.link.set/remove/list` (Dashboard/CLI).
+- **Dreistufige Bestätigung**: read-only Actions laufen direkt, destruktive
+  brauchen den roten Bestätigen-Button (30 s, nur der Auslöser), kritische
+  (`platform.stop`, `platform.restart`, `launcher.restart`, `task.delete`,
+  `service.command`, `player.gdpr-delete`; konfigurierbar) ein
+  Type-to-Confirm-Modal mit exakt einzutippendem Ziel.
+- **Discord-Audit-Log**: jede Action-Ausführung mit menschlichem Urheber
+  (Discord, Dashboard/CLI, Ingame-Player-Commands), verweigerte Zugriffe,
+  abgebrochene/abgelaufene/fehlgeschlagene Bestätigungen und
+  Link/Unlink-Ereignisse. Routing pro Ereignistyp und pro
+  Notification-Kategorie frei konfigurierbar (`audit.<typ>=<channel>`,
+  `category.<name>=<channel>`), Batching gegen Rate-Limits,
+  Token-Argumente werden maskiert.
+- **Live-Status-Board**: persistente Components-V2-Nachricht mit Übersicht,
+  Wartungsstatus und Service-Liste; aktualisiert bei Events (Join/Leave,
+  Bot-Aktionen) und per Intervall, editiert nur bei Änderung.
+- **`/helix setup`-Wizard**: Channel-Selects für Panel-, Status-, Audit- und
+  Notification-Channel direkt in Discord (Node `helix.discord.setup`).
+- **Sprache**: ephemere Antworten folgen der Discord-Client-Locale
+  (de/en), gemeinsame Nachrichten der Netzwerk-Default-Sprache; alle Texte
+  liegen als panel-editierbare Sprachdateien vor.
+- Bestehende `channelId`-Konfigurationen werden als Notification-Channel
+  migriert; `commandPrefix`, `adminUserIds` und `allowedActions` entfallen.
+
+### API
+- **Neu: `AddonContext.registerActionObserver`** (`ActionObserver` in
+  `helix-api`): Addons können jede Action-Ausführung samt Quelle, Actor und
+  Ergebnis beobachten (Basis des Discord-Audit-Logs). Observer sind
+  owner-gebunden, werden beim Disable entfernt und können Invocations
+  weder verändern noch durch Exceptions stören.
+- **Neu: `Messages.rawIn(language, key)`**: Roh-Template in einer konkreten
+  Sprache für Ausgabekanäle, deren Sprache nicht über einen Spieler läuft
+  (z. B. Discord-Locale). `MessageBundle` implementiert es mit der
+  bekannten Fallback-Kette.
+
 ## 0.81.0 — 2026-07-31
 
 ### Nachrichten-System vereinheitlicht

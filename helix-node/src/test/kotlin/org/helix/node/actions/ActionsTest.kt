@@ -120,6 +120,26 @@ class ActionsTest {
     }
 
     @Test
+    fun `action observers see every invocation and are removable by owner`() {
+        val seen = mutableListOf<Pair<String, Boolean>>()
+        registry.register(ActionDescriptor("observed", "works", "observed")) { ActionResult.ok("fine") }
+        registry.registerObserver("helix.discord") { invocation, result ->
+            seen += invocation.action to result.success
+        }
+        registry.registerObserver("broken.addon") { _, _ -> error("observer kaputt") }
+
+        val result = registry.invoke(ActionInvocation("observed"))
+        registry.invoke(ActionInvocation("missing"))
+
+        assertTrue(result.success)
+        assertEquals(listOf("observed" to true, "missing" to false), seen)
+
+        registry.unregisterObserverOwner("helix.discord")
+        registry.invoke(ActionInvocation("observed"))
+        assertEquals(2, seen.size)
+    }
+
+    @Test
     fun `platform stop wires shutdown`() {
         assertTrue(invoke("platform.stop").success)
         assertTrue(shutdownCalled)

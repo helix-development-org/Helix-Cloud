@@ -6,6 +6,7 @@ import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionHandler
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionInvoker
+import org.helix.api.action.ActionObserver
 import org.helix.api.action.ActionResult
 import org.slf4j.LoggerFactory
 
@@ -21,6 +22,7 @@ class ActionRegistry : ActionInvoker {
     private val entries = ConcurrentHashMap<String, Entry>()
     private val changeListeners = CopyOnWriteArrayList<() -> Unit>()
     private val invocationListeners = CopyOnWriteArrayList<(ActionInvocation, ActionResult) -> Unit>()
+    private val observers = CopyOnWriteArrayList<Pair<String, ActionObserver>>()
 
     private data class Entry(val descriptor: ActionDescriptor, val handler: ActionHandler)
 
@@ -42,6 +44,31 @@ class ActionRegistry : ActionInvoker {
      */
     fun onInvocation(listener: (ActionInvocation, ActionResult) -> Unit) {
         invocationListeners += listener
+    }
+
+    /**
+     * Registers an addon-owned observer of every action execution.
+     *
+     * Unlike [onInvocation] listeners, observers are keyed by owner so they
+     * can be removed again when the owning addon is disabled, and observer
+     * exceptions are logged and swallowed — a broken observer never fails
+     * the observed invocation.
+     *
+     * @param owner the owning addon id.
+     * @param observer receives every invocation and its result.
+     */
+    fun registerObserver(owner: String, observer: ActionObserver) {
+        observers += owner to observer
+    }
+
+    /**
+     * Removes all observers registered by an owner, used when the owning
+     * addon is disabled.
+     *
+     * @param owner the owning addon id.
+     */
+    fun unregisterObserverOwner(owner: String) {
+        observers.removeAll { it.first == owner }
     }
 
     /**
@@ -91,6 +118,13 @@ class ActionRegistry : ActionInvoker {
             }
         }
         invocationListeners.forEach { it(invocation, result) }
+        observers.forEach { (owner, observer) ->
+            try {
+                observer.onAction(invocation, result)
+            } catch (failure: Exception) {
+                logger.warn("Action observer of {} failed", owner, failure)
+            }
+        }
         return result
     }
 
