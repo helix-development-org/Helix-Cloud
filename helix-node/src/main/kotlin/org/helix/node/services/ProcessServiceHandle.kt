@@ -35,9 +35,15 @@ class ProcessServiceHandle(
     }
 
     /**
-     * Kills the wrapper process immediately.
+     * Kills the wrapper process and its whole process tree immediately.
+     *
+     * A force-killed wrapper never runs its shutdown hook, so the server
+     * child it spawned would survive as an orphan still holding the
+     * service port — the descendants are therefore killed explicitly.
+     * (Graceful [stop] keeps relying on the wrapper's hook.)
      */
     override fun kill() {
+        process.descendants().forEach { it.destroyForcibly() }
         process.destroyForcibly()
     }
 

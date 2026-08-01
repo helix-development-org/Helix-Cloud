@@ -64,6 +64,7 @@ import org.helix.node.proxy.ProxyRoutingService
 import org.helix.node.resources.ClasspathInternalResources
 import org.helix.node.scaling.AutoScaler
 import org.helix.node.services.AdoptedProcessHandle
+import org.helix.node.services.ForwardingSecret
 import org.helix.node.services.ManagedService
 import org.helix.node.services.ProcessIdentity
 import org.helix.node.services.ProcessServiceExecutor
@@ -149,7 +150,10 @@ class HelixNode(
             paperComponents = { taskName -> addonManager.paperComponents(taskName) },
             velocityComponents = { taskName -> addonManager.velocityComponents(taskName) },
             eulaAccepted = config.eula.accept,
-            forwardingSecret = config.proxy.forwardingSecret,
+            forwardingSecret = ForwardingSecret.resolve(
+                config.proxy.forwardingSecret,
+                paths.config.resolve("forwarding.secret"),
+            ),
             legacyForwarding = config.proxy.legacyForwarding,
         ),
         executors = mapOf(

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.83.2 — 2026-08-01
+
+### Fixes aus dem ersten produktionsnahen Deployment
+- **Velocity-Proxy startete auf frischen Installationen nicht**: Der
+  Default `proxy.forwardingSecret = ""` führte zu einer leeren
+  `forwarding.secret` im Proxy-Workspace — Velocity verweigert dann den
+  Start („forwarding-secret file must not be empty"). Ohne konfiguriertes
+  Secret generiert die Node jetzt einmalig ein zufälliges und persistiert
+  es unter `Helix/config/forwarding.secret`; Proxies und Backends bleiben
+  über Restarts hinweg konsistent.
+- **`service.kill` hinterließ verwaiste Serverprozesse**: Der Force-Kill
+  traf nur den Wrapper — dessen Shutdown-Hook lief nie, das Server-Kind
+  überlebte und blockierte den Port. Der Kill räumt jetzt den gesamten
+  Prozessbaum ab (der graceful `service.stop` nutzt weiterhin den Hook).
+
 ## 0.83.1 — 2026-08-01
 
 ### Fix: Wrapper findet das JVM ohne System-Java
