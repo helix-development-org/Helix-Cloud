@@ -97,7 +97,10 @@ class DockerServiceExecutor(
     }
 
     private companion object {
-        /** Extra container memory on top of the JVM heap, in megabytes. */
-        const val MEMORY_OVERHEAD_MB = 256
+        /** Extra container memory on top of the JVM heap, in megabytes.
+         *  Covers metaspace, GC/code cache, netty direct buffers and the
+         *  world-generation native peak — 256 got Paper OOM-killed (137)
+         *  during first world generation. */
+        const val MEMORY_OVERHEAD_MB = 512
     }
 }

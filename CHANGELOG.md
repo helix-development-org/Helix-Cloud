@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.83.4 — 2026-08-01
+
+### Fix: Docker-Memory-Limit zu knapp für Paper
+- Das Container-Limit von Heap+256 MB ließ Paper bei der ersten
+  Weltgenerierung am nativen Speicher-Peak sterben (OOM-Kill, Exit 137).
+  Der Overhead über dem JVM-Heap beträgt jetzt 512 MB.
+
 ## 0.83.3 — 2026-08-01
 
 ### Fix: Docker-Services ohne root-Dateileichen

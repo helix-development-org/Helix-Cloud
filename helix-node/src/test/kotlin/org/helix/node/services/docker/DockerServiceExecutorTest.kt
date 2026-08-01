@@ -53,7 +53,7 @@ class DockerServiceExecutorTest {
         assertTrue(run.any { it.endsWith(":/helix:z") }, "workspace mount must carry the selinux :z label")
         assertTrue(run.containsAll(listOf("--network", "helix")))
         assertTrue(run.containsAll(listOf("-e", "HELIX_SERVICE_ID=Lobby-1")))
-        assertTrue(run.containsAll(listOf("--memory", "1280m")))
+        assertTrue(run.containsAll(listOf("--memory", "1536m")))
         assertEquals(listOf("java", "-jar", "Wrapper.jar"), run.takeLast(3))
     }
 
