@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.83.1 — 2026-08-01
+
+### Fix: Wrapper findet das JVM ohne System-Java
+- Der Service-Wrapper startete den Server mit `java` aus dem PATH und
+  scheiterte auf Installationen ohne System-Java (install.sh legt das JDK
+  privat unter `/opt/helix/jdk` ab). Er nutzt jetzt — wie die Node beim
+  Wrapper-Start — das JVM-Binary, unter dem er selbst läuft.
+
 ## 0.83.0 — 2026-08-01
 
 ### Vault-Economy-Provider & PlaceholderAPI-Expansion (Ökosystem-Restpunkt)
