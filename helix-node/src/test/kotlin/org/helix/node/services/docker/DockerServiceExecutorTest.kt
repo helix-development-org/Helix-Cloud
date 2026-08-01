@@ -58,6 +58,19 @@ class DockerServiceExecutorTest {
     }
 
     @Test
+    fun `configured user is passed and blank user keeps the image default`() {
+        val withUser = FakeRunner()
+        DockerServiceExecutor(NodeConfig.DockerSettings(user = "998:998"), withUser).start(spec())
+        val runWithUser = withUser.commands.first { it.take(2) == listOf("docker", "run") }
+        assertTrue(runWithUser.containsAll(listOf("--user", "998:998")))
+
+        val withoutUser = FakeRunner()
+        DockerServiceExecutor(NodeConfig.DockerSettings(), withoutUser).start(spec())
+        val runWithout = withoutUser.commands.first { it.take(2) == listOf("docker", "run") }
+        assertFalse(runWithout.contains("--user"))
+    }
+
+    @Test
     fun `paper backend port is not published to the host`() {
         val runner = FakeRunner()
         val executor = DockerServiceExecutor(NodeConfig.DockerSettings(), runner)

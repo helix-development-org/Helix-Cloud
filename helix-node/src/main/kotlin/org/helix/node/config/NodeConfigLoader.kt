@@ -47,6 +47,7 @@ class NodeConfigLoader {
             docker = NodeConfig.DockerSettings(
                 network = toml.getString("docker.network") ?: defaults.docker.network,
                 image = toml.getString("docker.image") ?: defaults.docker.image,
+                user = toml.getString("docker.user") ?: defaults.docker.user,
             ),
             storage = NodeConfig.StorageSettings(
                 mode = toml.getString("storage.mode") ?: defaults.storage.mode,

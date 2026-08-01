@@ -37,6 +37,10 @@ tlsKeyAlias = "helix"     # Alias des Schlüssels im Keystore
 [docker]
 network = "helix"              # Docker-Netzwerk aller Helix-Container
 image = "eclipse-temurin:24-jre"  # Basis-Image für Service-Container
+user = ""                      # uid:gid der Container-Prozesse (z. B. "998:998");
+                               # leer = Image-Default (root). Auf die Node-User-ID
+                               # setzen, sonst hinterlassen Container root-eigene
+                               # Dateien im gemounteten Workspace.
 
 [storage]
 mode = "json"          # "json" (Dateien), "postgres" oder "mongodb"

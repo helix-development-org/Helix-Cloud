@@ -75,10 +75,16 @@ data class NodeConfig(
      *
      * @property network docker network all Helix containers join.
      * @property image base image used to run service containers.
+     * @property user `uid:gid` the container processes run as; blank keeps
+     *  the image default (usually root). Match the node's own user so the
+     *  files a service writes into its bind-mounted workspace stay
+     *  manageable by the node — a root-run container otherwise leaves
+     *  root-owned files the next workspace preparation cannot touch.
      */
     data class DockerSettings(
         val network: String = "helix",
         val image: String = "eclipse-temurin:24-jre",
+        val user: String = "",
     )
 
     /**

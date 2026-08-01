@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.83.3 — 2026-08-01
+
+### Fix: Docker-Services ohne root-Dateileichen
+- Neu: `[docker] user = "uid:gid"` — Service-Container laufen damit als
+  Node-User statt als root. Ohne die Option hinterließ ein Container
+  root-eigene Dateien im bind-gemounteten Workspace (Paper legt z. B.
+  `versions/` an), an denen die nächste Workspace-Vorbereitung mit
+  `AccessDeniedException` scheiterte.
+
 ## 0.83.2 — 2026-08-01
 
 ### Fixes aus dem ersten produktionsnahen Deployment
