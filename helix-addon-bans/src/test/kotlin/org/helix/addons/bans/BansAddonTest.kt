@@ -31,6 +31,24 @@ class BansAddonTest {
     }
 
     @Test
+    fun `ban alts lists sharing accounts and marks banned ones`() {
+        context.recordJoin("Steve", "uuid-1")
+        context.recordJoin("Alex", "uuid-2")
+        context.recordJoin("Mallory", "uuid-3")
+        context.sharedAddresses["uuid-1"] = listOf("uuid-2", "uuid-3")
+        context.run("ban.set", "Mallory", "Mod", "griefing")
+
+        val result = context.run("ban.alts", "Steve")
+
+        assertTrue(result.success)
+        assertTrue(result.lines.any { it.startsWith("alex (uuid-2)") && !it.contains("BANNED") })
+        assertTrue(result.lines.any { it.startsWith("mallory (uuid-3)") && it.contains("[BANNED]") })
+
+        assertFalse(context.run("ban.alts", "Nobody").success)
+        assertTrue(context.run("ban.alts", "Alex").lines.single().contains("no accounts share"))
+    }
+
+    @Test
     fun `ban kicks online player through generic action`() {
         context.run("ban.set", "Alex", "Mod", "7d", "cheating")
 

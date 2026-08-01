@@ -219,7 +219,8 @@ class HelixVelocityBridgePlugin @Inject constructor(
     @Subscribe
     fun onPostLogin(event: PostLoginEvent) {
         val granted = permissionNodes().filter { event.player.hasPermission(it) }
-        reportPlayerEvent("join", event.player.username, event.player.uniqueId.toString(), granted)
+        val address = runCatching { event.player.remoteAddress?.address?.hostAddress }.getOrNull()
+        reportPlayerEvent("join", event.player.username, event.player.uniqueId.toString(), granted, address)
         sendNetworkPack(event.player)
     }
 
@@ -294,6 +295,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
         name: String,
         uuid: String,
         permissions: List<String> = emptyList(),
+        address: String? = null,
     ) {
         val activeSettings = settings ?: return
         val httpClient = client ?: return
@@ -304,6 +306,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
                 uuid = uuid,
                 proxyServiceId = activeSettings.serviceId,
                 permissions = permissions,
+                address = address,
             )
             httpClient.postJson("/api/v1/internal/player-event", json.encodeToString(event))
         }.onFailure { logger.warn("Helix player event failed: {}", it.message) }

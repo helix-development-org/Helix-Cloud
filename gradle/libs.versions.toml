@@ -11,6 +11,8 @@ mongodb-driver = "5.2.1"
 snakeyaml = "2.3"
 packetevents = "2.13.0"
 paper-api = "1.21.11-R0.1-SNAPSHOT"
+vault-api = "1.7.1"
+placeholderapi = "2.11.6"
 velocity-api = "3.4.0"
 kord = "0.18.1"
 
@@ -34,6 +36,8 @@ ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negoti
 snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
 packetevents-spigot = { module = "com.github.retrooper:packetevents-spigot", version.ref = "packetevents" }
 paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper-api" }
+vault-api = { module = "com.github.MilkBowl:VaultAPI", version.ref = "vault-api" }
+placeholderapi = { module = "me.clip:placeholderapi", version.ref = "placeholderapi" }
 velocity-api = { module = "com.velocitypowered:velocity-api", version.ref = "velocity-api" }
 kord-core = { module = "dev.kord:kord-core", version.ref = "kord" }
 

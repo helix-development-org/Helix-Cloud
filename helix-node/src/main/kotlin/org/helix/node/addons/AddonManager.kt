@@ -80,6 +80,8 @@ import org.slf4j.LoggerFactory
  * @property defaultLanguage supplier of the network's default language.
  * @property languageOf resolver of a player's language preference.
  * @property identityRegistry node-wide uuid to last-known-name identity registry.
+ * @property sharedAddressPlayers alt-account lookup over the node's salted
+ *  address-hash registry, exposed to addons through the context.
  * @property onChange invoked after an addon was installed, enabled or
  *  disabled, so the node can rebuild derived state such as the merged
  *  network resource pack.
@@ -107,6 +109,7 @@ class AddonManager(
     private val defaultLanguage: () -> String = { "en" },
     private val languageOf: ((String) -> String)? = null,
     private val identityRegistry: IdentityRegistry = IdentityRegistry(InMemoryAddonStorage()),
+    private val sharedAddressPlayers: (String) -> List<String> = { emptyList() },
     private val storageConnection: () -> org.helix.api.addon.StorageConnection? = { null },
     private val onChange: () -> Unit = {},
 ) {
@@ -604,6 +607,9 @@ class AddonManager(
         override fun resolvePlayerUuid(name: String): String? = identityRegistry.resolveUuid(name)
 
         override fun lastKnownName(uuid: String): String? = identityRegistry.lastKnownName(uuid)
+
+        override fun sharedAddressPlayers(uuid: String): List<String> =
+            this@AddonManager.sharedAddressPlayers(uuid)
 
         override fun installedAddons(): List<AddonInfo> = addons()
 

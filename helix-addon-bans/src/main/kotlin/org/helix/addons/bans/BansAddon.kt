@@ -83,6 +83,28 @@ class BansAddon : AddonBase() {
                 ActionResult.ok(*history.map(::describeHistory).toTypedArray())
             }
         }
+        action(
+            "ban.alts",
+            "Lists accounts that recently joined from an address the player also used (salted hashes, no raw IPs).",
+            "ban.alts <player>",
+        ) { invocation ->
+            val player = invocation.arguments.firstOrNull()
+                ?: return@action ActionResult.error("usage: ban.alts <player>")
+            val uuid = context.resolvePlayerUuid(player)
+                ?: return@action ActionResult.error("unknown player: $player (never joined)")
+            val sharing = context.sharedAddressPlayers(uuid)
+            if (sharing.isEmpty()) {
+                ActionResult.ok("no accounts share a recent address with $player")
+            } else {
+                ActionResult.ok(
+                    *sharing.map { altUuid ->
+                        val name = context.lastKnownName(altUuid) ?: altUuid
+                        val banned = store.activeBan(name, altUuid) != null
+                        if (banned) "$name ($altUuid) [BANNED]" else "$name ($altUuid)"
+                    }.toTypedArray(),
+                )
+            }
+        }
         action("ban.export", "Exports all active bans as JSON (used by the dashboard).", "ban.export") {
             ActionResult.ok(kotlinx.serialization.json.Json.encodeToString(store.all()))
         }

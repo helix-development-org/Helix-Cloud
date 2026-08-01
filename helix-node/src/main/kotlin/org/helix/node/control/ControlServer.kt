@@ -1063,6 +1063,11 @@ private fun applyPlayerEvent(dependencies: ControlDependencies, event: PlayerEve
         "join" -> {
             dependencies.nativePermissions.update(event.name, event.permissions)
             dependencies.identityRegistry.recordJoin(event.name, event.uuid)
+            val address = event.address
+            val uuid = event.uuid
+            if (!address.isNullOrBlank() && !uuid.isNullOrBlank()) {
+                dependencies.addressHashes.record(uuid, address)
+            }
         }
         "leave" -> dependencies.nativePermissions.clear(event.name)
     }

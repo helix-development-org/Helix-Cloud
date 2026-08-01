@@ -42,6 +42,7 @@ import org.helix.node.gates.PlayerDataRegistry
 import org.helix.node.gates.ProfileInfoRegistry
 import org.helix.node.gates.ProfileSettingRegistry
 import org.helix.node.identity.IdentityRegistry
+import org.helix.node.privacy.AddressHashRegistry
 import org.helix.node.privacy.PlayerDataActions
 import org.helix.node.whitelist.WhitelistActions
 import org.helix.node.whitelist.WhitelistStore
@@ -234,6 +235,11 @@ class HelixNode(
     /** Node-wide uuid to last-known-name identity registry. */
     val identityRegistry: IdentityRegistry = IdentityRegistry(
         storageProvider.forAddon("identity", paths.root.resolve("identity")),
+    )
+
+    /** Salted join-address hashes backing the staff alt-account lookup. */
+    val addressHashes: AddressHashRegistry = AddressHashRegistry(
+        storageProvider.forAddon("addresses", paths.root.resolve("addresses")),
     )
 
     /**
@@ -449,6 +455,7 @@ class HelixNode(
         defaultLanguage = languages::defaultLanguage,
         languageOf = languages::languageOf,
         identityRegistry = identityRegistry,
+        sharedAddressPlayers = addressHashes::sharing,
         storageConnection = {
             org.helix.api.addon.StorageConnection(
                 mode = config.storage.mode,
@@ -540,6 +547,7 @@ class HelixNode(
         joinGates = joinGates,
         whitelist = whitelist,
         playerData = playerData,
+        addressHashes = addressHashes,
         commandQueue = commandQueue,
         permissionResolvers = permissionResolvers,
         nativePermissions = nativePermissions,
@@ -651,6 +659,17 @@ class HelixNode(
         registerControlActions()
         WhitelistActions(whitelist).registerAll(registry)
         PlayerDataActions(playerData).registerAll(registry)
+        playerData.register(
+            "node.addresses",
+            /** The node's own address-hash store answers GDPR requests like any addon. */
+            object : org.helix.api.addon.PlayerDataProvider {
+                override fun export(player: String): String? =
+                    identityRegistry.resolveUuid(player)?.let(addressHashes::export)
+
+                override fun delete(player: String): Boolean =
+                    identityRegistry.resolveUuid(player)?.let(addressHashes::delete) ?: false
+            },
+        )
         addonManager.loadAll()
         rebuildNetworkPack()
         registerEventSources()

@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.83.0 — 2026-08-01
+
+### Vault-Economy-Provider & PlaceholderAPI-Expansion (Ökosystem-Restpunkt)
+- **Vault**: Liegt das Vault-Plugin auf einem Backend-Server, registriert
+  die Paper-Bridge die Helix-Coins automatisch als Economy-Provider —
+  Shops-/Jobs-Plugins lesen und ändern die netzwerkweiten Balances.
+  Reads laufen über die synchronisierten Bridge-Values (kein Round-Trip
+  für Online-Spieler), Änderungen über die neuen Maschinen-Actions
+  `eco.api.balance|deposit|withdraw` (bridgeInvocable, ganze Coins,
+  gedeckte Abbuchungen, keine Banken).
+- **PlaceholderAPI**: `%helix_balance%`, `%helix_clan%`, `%helix_online%`,
+  `%helix_network%`, `%helix_prefix%`, `%helix_nick%`,
+  `%helix_displayname%` über den bestehenden NetworkPlaceholders-Resolver.
+  Beides ohne Konfiguration (softdepend Vault/PlaceholderAPI); die
+  Hook-Klassen werden nur geladen, wenn das jeweilige Plugin vorhanden ist.
+
+### Gesalzene Adress-Hashes & Alt-Account-Lookup
+- Die Node speichert **keine Roh-IPs**: Der Velocity-Join meldet die
+  Adresse mit, die Node hasht sie sofort (SHA-256 mit zufälligem,
+  persistentem Installations-Salt) und verwirft sie. Pro Spieler bleiben
+  die letzten 5 unterschiedlichen Hashes, Ablauf nach 90 Tagen.
+- **Neue Staff-Action `ban.alts <spieler>`** (Bans-Addon): listet Accounts,
+  die kürzlich von einer gemeinsamen Adresse gejoint sind, gebannte
+  markiert mit `[BANNED]`. Addon-API: `AddonContext.sharedAddressPlayers`.
+- Die Hashes hängen am GDPR-Export/-Delete wie jede andere Spielerdate.
+
+### Dokumentation
+- SECURITY.md beschreibt das Admin-Identitätsmodell (MC-Account +
+  Audit + `session.revoke`; der statische Token ist ausschließlich
+  Break-Glass) und die IP-Datenschutz-Garantien.
+
 ## 0.82.2 — 2026-07-31
 
 ### Discord: Components V2 only

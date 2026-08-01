@@ -12,6 +12,33 @@ class EconomyAddonTest {
     private val addon = EconomyAddon().also { it.onEnable(context) }
 
     @Test
+    fun `machine api actions are bridge invocable and answer plain numbers`() {
+        listOf("eco.api.balance", "eco.api.deposit", "eco.api.withdraw").forEach { name ->
+            assertTrue(context.handlers.getValue(name).first.bridgeInvocable, "$name must be bridgeInvocable")
+        }
+
+        val start = context.run("eco.api.balance", "Steve").lines.single().toLong()
+        assertEquals((start + 40).toString(), context.run("eco.api.deposit", "Steve", "40").lines.single())
+        assertEquals((start + 40).toString(), context.bridgeValues["economy.balance.steve"])
+        assertEquals(start.toString(), context.run("eco.api.withdraw", "Steve", "40").lines.single())
+        assertEquals(start.toString(), context.bridgeValues["economy.balance.steve"])
+    }
+
+    @Test
+    fun `machine api withdraw rejects uncovered and invalid amounts`() {
+        val start = context.run("eco.api.balance", "Steve").lines.single().toLong()
+
+        val uncovered = context.run("eco.api.withdraw", "Steve", (start + 1).toString())
+        assertFalse(uncovered.success)
+        assertTrue(uncovered.lines.single().contains("insufficient"))
+
+        assertFalse(context.run("eco.api.deposit", "Steve", "-5").success)
+        assertFalse(context.run("eco.api.deposit", "Steve", "abc").success)
+        assertFalse(context.run("eco.api.deposit", "Steve").success)
+        assertEquals(start.toString(), context.run("eco.api.balance", "Steve").lines.single())
+    }
+
+    @Test
     fun `admin actions manage balances`() {
         assertTrue(context.run("eco.give", "Steve", "100").success)
         assertTrue(context.run("eco.take", "Steve", "30").success)

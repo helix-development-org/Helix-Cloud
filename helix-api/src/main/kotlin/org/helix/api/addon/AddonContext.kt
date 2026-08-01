@@ -132,6 +132,20 @@ interface AddonContext {
     fun lastKnownName(uuid: String): String? = null
 
     /**
+     * The uuids of other accounts that recently joined from an address the
+     * given account also joined from — the staff alt-account lookup.
+     *
+     * Privacy: the node never stores raw IP addresses. Joins are recorded
+     * as salted hashes (installation-specific random salt), capped per
+     * player and expired after a retention window, so this can only answer
+     * "which known accounts shared an address", never "which address".
+     *
+     * @param uuid the player uuid to look up.
+     * @return uuids of other accounts sharing a recent address hash.
+     */
+    fun sharedAddressPlayers(uuid: String): List<String> = emptyList()
+
+    /**
      * Lists all installed addons with their manifests, including the
      * permission nodes each addon declares in its `addon.json`.
      *

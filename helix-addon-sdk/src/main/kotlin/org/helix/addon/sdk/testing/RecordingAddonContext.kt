@@ -94,6 +94,9 @@ class RecordingAddonContext(
     /** Simulated identity registry: uuid to last-known lowercase name. */
     val namesByUuid = mutableMapOf<String, String>()
 
+    /** Simulated shared-address lookup: uuid to sharing uuids. */
+    val sharedAddresses = mutableMapOf<String, List<String>>()
+
     /** Stable storage returned by [storage]. */
     val storage: AddonStorage get() = storageBackend
 
@@ -102,6 +105,8 @@ class RecordingAddonContext(
     override fun resolvePlayerUuid(name: String): String? = uuidsByName[name.lowercase()]
 
     override fun lastKnownName(uuid: String): String? = namesByUuid[uuid]
+
+    override fun sharedAddressPlayers(uuid: String): List<String> = sharedAddresses[uuid].orEmpty()
 
     /**
      * Simulates a join: records the name/uuid pair like the node's identity

@@ -65,6 +65,38 @@ class EconomyAddon : AddonBase() {
         action("eco.export", "Exports all balances as JSON (used by the dashboard).", "eco.export") {
             ActionResult.ok(Json.encodeToString(store.all()))
         }
+        // Machine API for the Paper bridge's Vault economy provider: plain
+        // numeric results and bridgeInvocable so a per-service token reaches
+        // them via POST /internal/action.
+        action(
+            "eco.api.balance",
+            "Machine API: a player's balance as a plain number.",
+            "eco.api.balance <player>",
+            bridgeInvocable = true,
+        ) { invocation ->
+            val player = invocation.arguments.firstOrNull()
+                ?: return@action ActionResult.error("usage: eco.api.balance <player>")
+            ActionResult.ok(store.balance(player).toString())
+        }
+        action(
+            "eco.api.deposit",
+            "Machine API: adds coins and answers with the new balance.",
+            "eco.api.deposit <player> <amount>",
+            bridgeInvocable = true,
+        ) { invocation -> apiChange(invocation) { player, amount -> store.add(player, amount) } }
+        action(
+            "eco.api.withdraw",
+            "Machine API: removes coins when covered and answers with the new balance.",
+            "eco.api.withdraw <player> <amount>",
+            bridgeInvocable = true,
+        ) { invocation ->
+            apiChange(invocation) { player, amount ->
+                if (store.balance(player) < amount) {
+                    return@apiChange null
+                }
+                store.add(player, -amount)
+            }
+        }
         panel(
             "economy",
             "Economy",
@@ -100,6 +132,26 @@ class EconomyAddon : AddonBase() {
     /** Publishes a player's balance as the `economy.balance.<name>` bridge value. */
     private fun publishBalance(player: String) {
         context.publishBridgeValue("economy.balance.${player.lowercase()}", store.balance(player).toString())
+    }
+
+    /**
+     * Applies one machine-API balance change: validates the amount, runs
+     * [change] (returning the new balance, or `null` for insufficient
+     * funds), refreshes the bridge value and answers with the new balance
+     * as a plain number.
+     */
+    private fun apiChange(
+        invocation: ActionInvocation,
+        change: (player: String, amount: Long) -> Long?,
+    ): ActionResult {
+        val player = invocation.arguments.getOrNull(0)
+            ?: return ActionResult.error("usage: ${invocation.action} <player> <amount>")
+        val amount = invocation.arguments.getOrNull(1)?.toLongOrNull()?.takeIf { it >= 0 }
+            ?: return ActionResult.error("invalid amount: ${invocation.arguments.getOrNull(1)}")
+        val newBalance = change(player, amount)
+            ?: return ActionResult.error("insufficient funds")
+        publishBalance(player)
+        return ActionResult.ok(newBalance.toString())
     }
 
     /**

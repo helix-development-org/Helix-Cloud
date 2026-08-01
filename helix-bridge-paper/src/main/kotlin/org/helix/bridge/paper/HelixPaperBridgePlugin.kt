@@ -108,6 +108,21 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
             ANIMATION_PERIOD_TICKS,
         )
         registerNickPacketListener()
+        // Optional integrations — the hook objects reference Vault/PlaceholderAPI
+        // types and are only touched when the respective plugin is present.
+        if (server.pluginManager.getPlugin("Vault") != null) {
+            VaultEconomyHook.register(this, BridgeActionInvoker(httpClient)) { bridgeValues }
+            logger.info("Helix economy registered as Vault provider")
+        }
+        if (server.pluginManager.getPlugin("PlaceholderAPI") != null) {
+            PlaceholderApiHook.register(
+                plugin = this,
+                bridgeValues = { bridgeValues },
+                profileOf = { name -> displayProfiles[name.lowercase()] },
+                onlineCount = { server.onlinePlayers.size },
+            )
+            logger.info("Helix PlaceholderAPI expansion %helix_*% registered")
+        }
         logger.info("Helix bridge enabled for ${loaded.serviceId} → ${loaded.controlUrl}")
     }
 
