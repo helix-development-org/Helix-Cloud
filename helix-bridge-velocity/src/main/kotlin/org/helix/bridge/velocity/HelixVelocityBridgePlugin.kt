@@ -221,7 +221,34 @@ class HelixVelocityBridgePlugin @Inject constructor(
         val granted = permissionNodes().filter { event.player.hasPermission(it) }
         val address = runCatching { event.player.remoteAddress?.address?.hostAddress }.getOrNull()
         reportPlayerEvent("join", event.player.username, event.player.uniqueId.toString(), granted, address)
-        sendNetworkPack(event.player)
+    }
+
+    /**
+     * Offers the network pack once the player reached their first backend.
+     *
+     * Deliberately not at [onPostLogin]: since the 1.20.2 configuration
+     * phase, an offer sent before the first server connection is silently
+     * dropped by some client versions — the player then never sees the
+     * pack prompt.
+     *
+     * @param event the post-connect event.
+     */
+    @Subscribe
+    fun onServerPostConnect(event: com.velocitypowered.api.event.player.ServerPostConnectEvent) {
+        if (event.previousServer == null) {
+            sendNetworkPack(event.player)
+        }
+    }
+
+    /**
+     * Logs the client's answer to the pack offer, so "player got no pack"
+     * reports are diagnosable from the proxy log.
+     *
+     * @param event the status event.
+     */
+    @Subscribe
+    fun onResourcePackStatus(event: com.velocitypowered.api.event.player.PlayerResourcePackStatusEvent) {
+        logger.info("Network pack status for {}: {}", event.player.username, event.status)
     }
 
     /**
@@ -619,8 +646,13 @@ class HelixVelocityBridgePlugin @Inject constructor(
      * @param player the receiving player.
      */
     private fun sendNetworkPack(player: Player) {
-        val sha1 = networkPackSha1?.takeIf { it.length == SHA1_HEX_LENGTH } ?: return
+        val sha1 = networkPackSha1?.takeIf { it.length == SHA1_HEX_LENGTH }
+        if (sha1 == null) {
+            logger.info("No network pack (yet) — nothing offered to {}", player.username)
+            return
+        }
         val url = packUrl(player) ?: return
+        logger.info("Offering network pack {} to {} from {}", sha1.take(8), player.username, url)
         runCatching {
             player.sendResourcePackOffer(
                 proxy.createResourcePackBuilder(url)

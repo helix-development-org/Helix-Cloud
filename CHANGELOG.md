@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.84.2 — 2026-08-02
+
+### Fix: Resource-Pack kam bei manchen Clients nie an
+- Der Pack-Offer ging beim Proxy-Login raus — seit der
+  1.20.2-Konfigurationsphase verwerfen manche Client-Versionen ein so
+  frühes Angebot stillschweigend. Der Offer kommt jetzt erst mit der
+  ersten Backend-Verbindung.
+- Der Proxy loggt Angebot (Hash + URL) und die Client-Antwort
+  (SUCCESSFUL/DECLINED/FAILED_DOWNLOAD/…), damit „Spieler hat kein Pack"
+  künftig direkt im Log diagnostizierbar ist.
+
 ## 0.84.1 — 2026-08-02
 
 ### LabyMod: eigene Dashboard-Seite
