@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.84.1 — 2026-08-02
+
+### LabyMod: eigene Dashboard-Seite
+- Das LabyMod-Addon hat jetzt eine richtige Panel-Seite statt der
+  generierten Default-Seite: Live-Status (Anteil, Online-Nutzer mit
+  Version), Feature-Schalter, Rich-Presence-Format, Interaction-Menü-Editor
+  (hinzufügen/entfernen) und NPC-Emote-Verwaltung inklusive
+  „Play emote now"-Test.
+
 ## 0.84.0 — 2026-08-02
 
 ### Neu: LabyMod-Integration (helix-addon-labymod)

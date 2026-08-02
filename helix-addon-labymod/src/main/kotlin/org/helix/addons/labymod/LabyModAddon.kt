@@ -54,6 +54,13 @@ class LabyModAddon : AddonBase() {
                 presence.values.removeIf { it.name.equals(player.name, ignoreCase = true) }
             }
         })
+        panel(
+            "labymod",
+            "LabyMod",
+            "/panel.html",
+            "<path d=\"M12 3l7 4v6c0 4-3 7-7 8-4-1-7-4-7-8V7l7-4z\"/>" +
+                "<path d=\"M9 11h.01M15 11h.01M9 15c1 1 5 1 6 0\"/>",
+        )
         val sync = Executors.newSingleThreadScheduledExecutor { runnable ->
             Thread(runnable, "helix-labymod-mutesync").apply { isDaemon = true }
         }
