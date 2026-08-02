@@ -9,7 +9,7 @@ plugins {
 
 allprojects {
     group = "org.helix"
-    version = "0.83.4"
+    version = "0.84.0"
 
     repositories {
         mavenCentral()
@@ -73,6 +73,7 @@ val addonModules = listOf(
     "helix-addon-friends",
     "helix-addon-clan",
     "helix-addon-guard",
+    "helix-addon-labymod",
     "helix-addon-tablist",
     "helix-addon-scoreboard",
     "helix-addon-chat",

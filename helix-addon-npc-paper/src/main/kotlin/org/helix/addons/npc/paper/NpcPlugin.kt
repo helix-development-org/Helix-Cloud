@@ -45,6 +45,7 @@ class NpcPlugin : JavaPlugin() {
     private var npcs: INpc? = null
     private var client: NodeClient? = null
     private var task: String = "*"
+    private var serviceId: String = ""
     private lateinit var scope: CoroutineScope
 
     /** Node-backed player-facing texts (`helix.npc` language files). */
@@ -73,6 +74,7 @@ class NpcPlugin : JavaPlugin() {
         }
         client = nodeClient
         task = System.getenv("HELIX_TASK")?.takeIf { it.isNotBlank() } ?: "*"
+        serviceId = System.getenv("HELIX_SERVICE_ID").orEmpty()
         scope = CoroutineScope(SupervisorJob() + mainDispatcher)
         // Same environment NodeClient.fromEnvironment() just validated.
         translations = NodeTranslations(nodeClient.controlUrl, System.getenv("HELIX_CONTROL_TOKEN").orEmpty(), "helix.npc")
@@ -307,13 +309,49 @@ class NpcPlugin : JavaPlugin() {
                 look { nearestPlayer() }
             }
             val interact = def.interactAction
-            if (interact != null) {
-                onInteract { ctx -> runInteract(ctx.player, interact) }
+            // Always registered: even command-less NPCs report their clicks so
+            // integrations (LabyMod interact emotes) can react network-side.
+            onInteract { ctx ->
+                if (interact != null) {
+                    runInteract(ctx.player, interact)
+                }
+                reportInteraction(def.id, ctx.player.name)
             }
         }
         definition.spawn()
         spawned[def.id] = definition
         known[def.id] = def
+        reportEntity(def.id, definition)
+    }
+
+    /**
+     * Reports the spawned entity uuid to the node (best effort) so the
+     * LabyMod integration can address this NPC in emote packets. The uuid
+     * sits on the framework's internal state and is read reflectively.
+     */
+    private fun reportEntity(id: String, definition: NpcDefinition) {
+        if (serviceId.isBlank()) {
+            return
+        }
+        val nodeClient = client ?: return
+        val uuid = runCatching {
+            val state = definition.javaClass.getMethod("getState\$inpc").invoke(definition)
+            state.javaClass.getMethod("getUuid").invoke(state)?.toString()
+        }.getOrNull() ?: return
+        scope.launch(Dispatchers.IO) {
+            nodeClient.action("labymod.npc.entity", serviceId, id, uuid)
+        }
+    }
+
+    /** Reports an NPC click to the node (best effort), off the main thread. */
+    private fun reportInteraction(id: String, player: String) {
+        if (serviceId.isBlank()) {
+            return
+        }
+        val nodeClient = client ?: return
+        scope.launch(Dispatchers.IO) {
+            nodeClient.action("labymod.npc.clicked", serviceId, id, player)
+        }
     }
 
     private suspend fun despawn(id: String) {

@@ -240,6 +240,13 @@ class ModerationAddon : AddonBase() {
         publishBlocklist()
         publishMuteMessages()
         action(
+            "mute.export",
+            "Exports all active mutes as JSON (used by integrations such as the LabyMod voice-chat sync).",
+            "mute.export",
+        ) {
+            ActionResult.ok(kotlinx.serialization.json.Json.encodeToString(mutes.all()))
+        }
+        action(
             "warn.expiry.get",
             "Shows how many days a warning stays active before it drops out of the warn count.",
             "warn.expiry.get",

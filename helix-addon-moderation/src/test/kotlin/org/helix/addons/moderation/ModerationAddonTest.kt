@@ -14,6 +14,17 @@ class ModerationAddonTest {
     private val addon = ModerationAddon().also { it.onEnable(context) }
 
     @Test
+    fun `mute export lists active mutes as json`() {
+        assertEquals("[]", context.run("mute.export").lines.single())
+
+        context.run("mute", "Mod", "Steve", "12h", "spam")
+
+        val exported = context.run("mute.export").lines.single()
+        assertTrue(exported.contains("\"player\""))
+        assertTrue(exported.lowercase().contains("steve"))
+    }
+
+    @Test
     fun `all commands are permission gated player commands`() {
         val commands = context.handlers.values.map { it.first }.filter { it.playerCommand }
 

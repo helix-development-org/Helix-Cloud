@@ -21,6 +21,8 @@ include(
     "helix-addon-clan",
     "helix-addon-guard",
     "helix-addon-guard-paper",
+    "helix-addon-labymod",
+    "helix-addon-labymod-velocity",
     "helix-addon-tablist",
     "helix-addon-scoreboard",
     "helix-addon-chat",

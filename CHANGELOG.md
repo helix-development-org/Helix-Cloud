@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.84.0 — 2026-08-02
+
+### Neu: LabyMod-Integration (helix-addon-labymod)
+- **Offizielle LabyMod-4-Server-API am Proxy**: Die mitgelieferte
+  Velocity-Komponente ist der einzige LabyMod-Protokoll-Endpunkt des
+  Netzwerks — die offizielle Velocity-Lib konsumiert die
+  `labymod:neo`-Payloads am Proxy (Backends sehen sie nie), hinter einem
+  Proxy ist das der einzig zuverlässige Ort. Erstes Addon mit
+  `velocity.jar`-Komponente im HXA.
+- **Erkennung + Stats**: `labymod.list` (Nutzer + Version),
+  `labymod.stats` (Anteil online, Lifetime-Nutzer).
+- **Economy-HUD**: helix-economy-Coins live in der LabyMod-Cash-Anzeige.
+- **Voice-Mute-Sync**: aktive helix-moderation-Mutes wirken im
+  LabyMod-Voice-Chat (neue Moderation-Action `mute.export`, Sync alle
+  10 s, konfigurierbar).
+- **Discord Rich Presence**: konfigurierbares Format
+  (`labymod.config.set rpcformat=…`, Platzhalter `{network}`, `{task}`,
+  `{service}`), aktualisiert bei jedem Serverwechsel.
+- **Subtitles**: helix-subtitles werden für LabyMod-Clients zusätzlich
+  nativ gerendert.
+- **Interaction-Menü**: Rechtsklick-Einträge auf Spieler (Standard:
+  Nachricht, Freund, Party, Clan; `labymod.menu.add|remove|list`).
+- **NPC-Emotes**: helix-npc-NPCs spielen LabyMod-Emotes — beim Anklicken
+  und/oder als Idle-Loop (`labymod.npc.set <id> <intervall> <idle> <interact>`,
+  `labymod.emote`). npc-paper meldet dafür Entity-UUIDs und Klicks an die
+  Node (`labymod.npc.entity|clicked`, bridgeInvocable).
+- **Gameplay-Actions** für Admins/Addons/Discord-Bot: `labymod.marker`,
+  `labymod.banner`, `labymod.prompt.input` (Antwort als
+  `labymod`-Notification), `labymod.prompt.server`.
+- Alle Features einzeln abschaltbar (`labymod.config.set economy=… voicemute=…
+  rpc=… subtitles=… npcemotes=… menu=…`); Feature-Daten fließen über
+  Bridge-Values (`labymod.config`, `labymod.voicemutes`, `labymod.npcs`)
+  plus eine sequenznummerierte One-Shot-Queue (`labymod.cmd`), die nach
+  Proxy-Restarts nicht nachspielt.
+
 ## 0.83.4 — 2026-08-01
 
 ### Fix: Docker-Memory-Limit zu knapp für Paper
