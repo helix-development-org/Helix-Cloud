@@ -66,6 +66,20 @@ class AutoScalerTest {
     }
 
     @Test
+    fun `paused tasks are left alone entirely`() {
+        task(min = 1, max = 3)
+        taskStore.save(taskStore.find("Game")!!.copy(paused = true))
+
+        scaler.tick()
+
+        assertEquals(0, manager.activeCount("Game"))
+
+        taskStore.save(taskStore.find("Game")!!.copy(paused = false))
+        scaler.tick()
+        assertEquals(1, manager.activeCount("Game"))
+    }
+
+    @Test
     fun `minimum is restored after a normal stop`() {
         task(min = 1, max = 2)
         scaler.tick()

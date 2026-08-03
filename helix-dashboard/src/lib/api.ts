@@ -195,6 +195,7 @@ export interface ActionResult {
 }
 export interface ProxyView {
   maintenance: boolean
+  paused?: boolean
   proxies: { id: string; state: string; port: number; onlinePlayers: number; maxPlayers: number }[]
   backends: { id: string; task: string; state: string; host: string; port: number; onlinePlayers: number }[]
 }

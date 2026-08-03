@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.85.0 — 2026-08-03
+
+### Neu: Tasks pausieren
+- Bisher gewann der Auto-Scaler jedes Wettrennen gegen `service.stop` —
+  ein Task mit `min >= 1` ließ sich weder leerstoppen noch löschen
+  („still has active services"), weil jeder gestoppte Service sofort
+  wieder hochgezogen wurde.
+- Neu: `task.pause <task> [stop]` nimmt den Task aus der
+  Auto-Scaler-Verwaltung (mit `stop` stoppt es zusätzlich alle Services
+  des Tasks), `task.resume <task>` gibt ihn zurück. Pausierte Tasks
+  tragen `PAUSED` in `task.list`/`task.info`, das Dashboard zeigt ein
+  Badge und einen Pause/Resume-Button in der Task-Tabelle
+  (`TaskDefinition.paused`, per REST editierbar). Manuelles
+  `service.start` bleibt auch pausiert möglich.
+
 ## 0.84.2 — 2026-08-02
 
 ### Fix: Resource-Pack kam bei manchen Clients nie an

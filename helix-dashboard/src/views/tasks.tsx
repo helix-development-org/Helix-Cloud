@@ -25,6 +25,13 @@ export function TasksView() {
     try { await api(`/tasks/${name}`, { method: "DELETE" }); toast.success("Deleted " + name); reload() }
     catch (e) { toast.error((e as Error).message) }
   }
+  const setPaused = async (task: TaskDefinition, paused: boolean) => {
+    try {
+      await api(`/tasks/${task.name}`, { method: "PUT", body: JSON.stringify({ ...task, paused }) })
+      toast.success((paused ? "Paused " : "Resumed ") + task.name)
+      reload()
+    } catch (e) { toast.error((e as Error).message) }
+  }
 
   return (
     <Card>
@@ -38,11 +45,12 @@ export function TasksView() {
           <TableBody>
             {(data ?? []).map((t) => (
               <TableRow key={t.name}>
-                <TableCell className="font-medium">{t.name}</TableCell>
+                <TableCell className="font-medium">{t.name}{t.paused && <Badge variant="warning" className="ml-2">paused</Badge>}</TableCell>
                 <TableCell><Badge variant={t.environment?.proxy ? "warning" : "secondary"}>{t.environment?.name}</Badge></TableCell>
                 <TableCell className="text-sm text-muted-foreground">{t.executor}</TableCell>
                 <TableCell>
                   <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setPaused(t, !t.paused)}>{t.paused ? "Resume" : "Pause"}</Button>
                     <Button size="sm" onClick={() => deploy(t.name)}>Deploy</Button>
                     <Button size="sm" variant="destructive" onClick={() => del(t.name)}>Delete</Button>
                   </div>
