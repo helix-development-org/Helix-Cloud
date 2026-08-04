@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.85.2 — 2026-08-04
+
+### Fix: Launcher-Konsole schickte doppelt kodiertes JSON
+- Die neue Konsolen-Eingabe übergab den Request-Body bereits als String,
+  den der API-Helper ein zweites Mal JSON-kodierte — jede Action
+  scheiterte mit „Unexpected token 'F'…". Der Body wird jetzt wie überall
+  sonst als Objekt übergeben.
+
 ## 0.85.1 — 2026-08-04
 
 ### Dashboard: Launcher-Konsole

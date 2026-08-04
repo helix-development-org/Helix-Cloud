@@ -48,7 +48,7 @@ export function LogsView() {
     try {
       const r = await api<ActionResult>("/actions", {
         method: "POST",
-        body: JSON.stringify({ action, arguments: args }),
+        body: { action, arguments: args },
       })
       append((r.lines.length ? r.lines : [r.success ? "done" : "failed"]).map(
         (l) => (r.success ? "  " : "ERROR ") + l,
