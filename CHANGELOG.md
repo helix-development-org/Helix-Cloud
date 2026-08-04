@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.85.1 — 2026-08-04
+
+### Dashboard: Launcher-Konsole
+- Die Launcher-Logs-Ansicht ist jetzt eine echte Konsole: unter dem
+  Live-Log-Stream (SSE) sitzt eine CLI-artige Eingabezeile, die Actions
+  ausführt (`service.list`, `task.pause Lobby stop`, …) und die
+  Ergebniszeilen inline in den Feed schreibt — mit Befehls-History über
+  die Pfeiltasten. Sidebar-Eintrag heißt jetzt „Konsole".
+
 ## 0.85.0 — 2026-08-03
 
 ### Neu: Tasks pausieren

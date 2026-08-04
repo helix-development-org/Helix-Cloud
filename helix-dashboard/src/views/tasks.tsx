@@ -45,7 +45,7 @@ export function TasksView() {
           <TableBody>
             {(data ?? []).map((t) => (
               <TableRow key={t.name}>
-                <TableCell className="font-medium">{t.name}{t.paused && <Badge variant="warning" className="ml-2">paused</Badge>}</TableCell>
+                <TableCell className="font-medium">{t.name}{t.paused ? <Badge variant="warning" className="ml-2">paused</Badge> : null}</TableCell>
                 <TableCell><Badge variant={t.environment?.proxy ? "warning" : "secondary"}>{t.environment?.name}</Badge></TableCell>
                 <TableCell className="text-sm text-muted-foreground">{t.executor}</TableCell>
                 <TableCell>
