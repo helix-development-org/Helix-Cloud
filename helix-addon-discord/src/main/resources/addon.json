@@ -1,7 +1,13 @@
 {
   "id": "helix.discord",
   "name": "Helix Discord Bot",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "main": "org.helix.addons.discord.DiscordBotAddon",
-  "description": "Kord-based Discord bot: moderation notifications to a channel and !status/!players/!run commands."
+  "description": "Kord-based Discord bot: slash commands, Components-V2 control panel, dynamic action browser, live status board, configurable audit trail and account linking. Every bot feature checks the linked account's helix.discord.action.<action> node (wildcards supported).",
+  "permissions": [
+    "helix.discord.link",
+    "helix.discord.setup",
+    "helix.discord.whois",
+    "helix.discord.action.*"
+  ]
 }

@@ -5,6 +5,7 @@ import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionHandler
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionInvoker
+import org.helix.api.action.ActionObserver
 import org.helix.api.action.ActionResult
 import org.helix.api.addon.AddonContext
 import org.helix.api.addon.DisplayResolver
@@ -69,6 +70,9 @@ class RecordingAddonContext(
     /** Registered notification listeners. */
     val notificationListeners = mutableListOf<NotificationListener>()
 
+    /** Registered action observers. */
+    val actionObservers = mutableListOf<ActionObserver>()
+
     /** Published notifications as category to message pairs. */
     val notifications = mutableListOf<Pair<String, String>>()
 
@@ -90,6 +94,9 @@ class RecordingAddonContext(
     /** Simulated identity registry: uuid to last-known lowercase name. */
     val namesByUuid = mutableMapOf<String, String>()
 
+    /** Simulated shared-address lookup: uuid to sharing uuids. */
+    val sharedAddresses = mutableMapOf<String, List<String>>()
+
     /** Stable storage returned by [storage]. */
     val storage: AddonStorage get() = storageBackend
 
@@ -98,6 +105,8 @@ class RecordingAddonContext(
     override fun resolvePlayerUuid(name: String): String? = uuidsByName[name.lowercase()]
 
     override fun lastKnownName(uuid: String): String? = namesByUuid[uuid]
+
+    override fun sharedAddressPlayers(uuid: String): List<String> = sharedAddresses[uuid].orEmpty()
 
     /**
      * Simulates a join: records the name/uuid pair like the node's identity
@@ -192,6 +201,10 @@ class RecordingAddonContext(
 
     override fun registerNotificationListener(listener: NotificationListener) {
         notificationListeners += listener
+    }
+
+    override fun registerActionObserver(observer: ActionObserver) {
+        actionObservers += observer
     }
 
     /**

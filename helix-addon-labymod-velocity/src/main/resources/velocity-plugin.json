@@ -1,0 +1,7 @@
+{
+  "id": "helixlabymod",
+  "name": "HelixLabyMod",
+  "version": "1.0.0",
+  "main": "org.helix.addons.labymod.velocity.LabyModVelocityPlugin",
+  "authors": ["Helix"]
+}

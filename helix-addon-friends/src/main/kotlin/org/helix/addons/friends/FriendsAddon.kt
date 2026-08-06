@@ -24,54 +24,7 @@ class FriendsAddon : AddonBase() {
      */
     override fun enable() {
         store = FriendStore(context.storage(), resolveUuid = context::resolvePlayerUuid)
-        msg = context.localizedMessages(
-            mapOf(
-                "en" to mapOf(
-                    "joined" to "&aYour friend &f{player} &ajoined the network.",
-                    "request.sent" to "&eFriend request sent to {target}.",
-                    "request.received" to "&e{sender} wants to be your friend. &7/friend accept {sender}",
-                    "accepted.self" to "&aYou are now friends with {target}.",
-                    "accepted.other" to "&a{player} accepted your friend request.",
-                    "denied" to "&7Denied the request from {target}.",
-                    "removed" to "&7You are no longer friends with {target}.",
-                    "error.self" to "&cYou cannot add yourself.",
-                    "error.already" to "&cYou are already friends with {target}.",
-                    "error.duplicate" to "&cYou already sent a request to {target}.",
-                    "error.cooldown" to "&cYou must wait a bit before sending another request to {target}.",
-                    "error.norequest" to "&cNo pending request from {target}.",
-                    "error.notfriends" to "&cYou are not friends with {target}.",
-                    "requests.none" to "&7No pending friend requests.",
-                    "requests.list" to "&ePending requests: &f{players}",
-                    "list.empty" to "&7You have no friends yet. &f/friend add <player>",
-                    "list.online" to "&aonline",
-                    "list.offline" to "&8offline",
-                    "list.entry" to "&f{friend} &7— {status}",
-                    "usage" to "Usage: /friend \\<add|accept|deny|remove|list|requests> [player]",
-                ),
-                "de" to mapOf(
-                    "joined" to "&aDein Freund &f{player} &aist dem Netzwerk beigetreten.",
-                    "request.sent" to "&eFreundschaftsanfrage an {target} gesendet.",
-                    "request.received" to "&e{sender} möchte dein Freund sein. &7/friend accept {sender}",
-                    "accepted.self" to "&aDu bist jetzt mit {target} befreundet.",
-                    "accepted.other" to "&a{player} hat deine Freundschaftsanfrage angenommen.",
-                    "denied" to "&7Anfrage von {target} abgelehnt.",
-                    "removed" to "&7Du bist nicht mehr mit {target} befreundet.",
-                    "error.self" to "&cDu kannst dich nicht selbst hinzufügen.",
-                    "error.already" to "&cDu bist bereits mit {target} befreundet.",
-                    "error.duplicate" to "&cDu hast {target} bereits eine Anfrage gesendet.",
-                    "error.cooldown" to "&cDu musst kurz warten, bevor du {target} erneut anfragen kannst.",
-                    "error.norequest" to "&cKeine offene Anfrage von {target}.",
-                    "error.notfriends" to "&cDu bist nicht mit {target} befreundet.",
-                    "requests.none" to "&7Keine offenen Freundschaftsanfragen.",
-                    "requests.list" to "&eOffene Anfragen: &f{players}",
-                    "list.empty" to "&7Du hast noch keine Freunde. &f/friend add <player>",
-                    "list.online" to "&aonline",
-                    "list.offline" to "&8offline",
-                    "list.entry" to "&f{friend} &7— {status}",
-                    "usage" to "Verwendung: /friend \\<add|accept|deny|remove|list|requests> [player]",
-                ),
-            ),
-        )
+        msg = loadMessages()
         context.registerAction(
             ActionDescriptor(
                 name = "friend",

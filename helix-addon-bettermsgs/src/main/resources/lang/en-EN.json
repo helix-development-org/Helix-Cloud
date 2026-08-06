@@ -1,0 +1,15 @@
+{
+  "notify": "<gray>New message from <white>{sender}</white> <dark_gray>—</dark_gray> <click:run_command:'/msg {sender}'><aqua>[open]</aqua></click>",
+  "error.self": "<red>You cannot message yourself.",
+  "item.back": "<gray>Back",
+  "item.close": "<red>Close",
+  "item.write": "<green>Write a message…",
+  "item.scroll.up": "<gray>Older",
+  "item.scroll.down": "<gray>Newer",
+  "item.refresh": "<gray>Refresh",
+  "prompt.message": "<gray>Type your message in chat (or <white>cancel</white>):",
+  "note.empty": "<gray>No messages yet — say hi!",
+  "note.offline": "<dark_gray>offline",
+  "note.online": "<green>online",
+  "sent": "<gray>To <white>{target}</white>: {text}"
+}

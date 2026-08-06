@@ -140,10 +140,16 @@ class BackupService(
     /**
      * Restores a backup into the service workspace, replacing its content.
      *
+     * The archive is fully extracted and validated in a staging directory
+     * first; only then is the workspace cleared and the staged content moved
+     * in. A corrupt or malicious archive (zip-slip entry, truncated zip)
+     * therefore fails BEFORE the existing workspace is touched, instead of
+     * leaving it wiped with nothing restored.
+     *
      * @param serviceId the static service id.
      * @param fileName the archive to restore.
-     * @throws IllegalArgumentException if the archive is unknown or the
-     *  service is still running.
+     * @throws IllegalArgumentException if the archive is unknown, invalid, or
+     *  the service is still running.
      */
     @Synchronized
     fun restore(serviceId: String, fileName: String) {
@@ -151,9 +157,11 @@ class BackupService(
         val archive = resolveArchive(serviceId, fileName)
         require(Files.isRegularFile(archive)) { "unknown backup: $serviceId/$fileName" }
         val workspace = staticServicesDir.resolve(serviceId).normalize()
-        clearDirectory(workspace)
-        Files.createDirectories(workspace)
-        extract(archive, mapOf("" to workspace))
+        stageAndSwap(archive, mapOf("" to workspace)) {
+            // Re-check as close to the destructive swap as possible: the service could have
+            // been started while the archive was being extracted into the staging directory.
+            require(!isActive(serviceId)) { "stop $serviceId before restoring a backup" }
+        }
         logger.info("Restored backup {} into {}", fileName, serviceId)
     }
 
@@ -176,12 +184,51 @@ class BackupService(
         }
         val archive = resolveArchive(DATA_BACKUP_ID, fileName)
         require(Files.isRegularFile(archive)) { "unknown backup: $DATA_BACKUP_ID/$fileName" }
-        dataSources.values.forEach { root ->
-            clearDirectory(root)
-            Files.createDirectories(root)
-        }
-        extract(archive, dataSources)
+        stageAndSwap(archive, dataSources)
         logger.info("Restored addon-data backup {}", fileName)
+    }
+
+    /**
+     * Extracts [archive] into a staging directory (validating every entry
+     * there), then — and only then — clears each target directory and moves
+     * the staged content in. [beforeSwap] runs between successful extraction
+     * and the first destructive step, for a last-moment activity re-check.
+     */
+    private fun stageAndSwap(archive: Path, targets: Map<String, Path>, beforeSwap: () -> Unit = {}) {
+        val staging = Files.createTempDirectory(archive.parent, ".restore-")
+        try {
+            val staged = targets.mapValues { (label, _) ->
+                if (label.isEmpty()) staging else staging.resolve(label)
+            }
+            extract(archive, staged)
+            beforeSwap()
+            targets.forEach { (label, root) ->
+                clearDirectory(root)
+                Files.createDirectories(root)
+                val source = staged.getValue(label)
+                if (Files.isDirectory(source)) {
+                    moveContents(source, root)
+                }
+            }
+        } finally {
+            clearDirectory(staging)
+            Files.deleteIfExists(staging)
+        }
+    }
+
+    /** Moves everything under [from] into [into], preserving the directory structure. */
+    private fun moveContents(from: Path, into: Path) {
+        Files.walk(from).use { stream ->
+            stream.filter { it != from }.forEach { path ->
+                val target = into.resolve(from.relativize(path).toString())
+                if (Files.isDirectory(path)) {
+                    Files.createDirectories(target)
+                } else {
+                    Files.createDirectories(target.parent)
+                    Files.move(path, target, StandardCopyOption.REPLACE_EXISTING)
+                }
+            }
+        }
     }
 
     private fun extract(archive: Path, sources: Map<String, Path>) {

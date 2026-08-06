@@ -4,6 +4,7 @@ import java.nio.file.Path
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionHandler
 import org.helix.api.action.ActionInvoker
+import org.helix.api.action.ActionObserver
 import org.helix.api.message.MapMessages
 import org.helix.api.message.Messages
 import org.helix.api.player.OnlinePlayer
@@ -40,6 +41,20 @@ interface AddonContext {
      * @param handler executed on invocation.
      */
     fun registerAction(descriptor: ActionDescriptor, handler: ActionHandler)
+
+    /**
+     * Registers an action observer owned by this addon.
+     *
+     * The observer sees every action execution on the node — regardless of
+     * which addon owns the action — including source, actor and result,
+     * for example to build an audit trail. Observers cannot veto or change
+     * invocations, and observer exceptions never fail the observed action.
+     * Removed when the addon is disabled.
+     *
+     * @param observer called after every action execution.
+     */
+    fun registerActionObserver(observer: ActionObserver) {
+    }
 
     /**
      * Registers a join gate owned by this addon.
@@ -115,6 +130,20 @@ interface AddonContext {
      *  that uuid join.
      */
     fun lastKnownName(uuid: String): String? = null
+
+    /**
+     * The uuids of other accounts that recently joined from an address the
+     * given account also joined from — the staff alt-account lookup.
+     *
+     * Privacy: the node never stores raw IP addresses. Joins are recorded
+     * as salted hashes (installation-specific random salt), capped per
+     * player and expired after a retention window, so this can only answer
+     * "which known accounts shared an address", never "which address".
+     *
+     * @param uuid the player uuid to look up.
+     * @return uuids of other accounts sharing a recent address hash.
+     */
+    fun sharedAddressPlayers(uuid: String): List<String> = emptyList()
 
     /**
      * Lists all installed addons with their manifests, including the

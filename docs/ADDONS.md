@@ -383,11 +383,26 @@ Netzwerkweite Addons (z.B. Bans) ignorieren die Task-Aktivierung.
 ## Konfigurierbare Nachrichten (mehrsprachig)
 
 Alle player-facing Texte eines Addons sollen einstellbar und übersetzbar
-sein. Dafür deklariert das Addon Default-Templates **pro Sprache**; die
-Node persistiert Custom-Werte im Addon-Storage und macht alles über die
-Dashboard-Seite **Translations** editierbar (flache Keys
+sein. Die Default-Templates liegen als **Sprachdateien im Addon**:
+`src/main/resources/lang/en-EN.json` und `lang/de-DE.json`, je ein flaches
+JSON-Objekt (Key → Template). Das Addon lädt sie mit `loadMessages()`
+(AddonBase); die Node persistiert Custom-Werte im Addon-Storage und macht
+alles über die Dashboard-Seite **Translations** editierbar (flache Keys
 `helix.translations.<addon-id>.<key>`). Änderungen wirken sofort (kein
-Neustart). Templates nutzen `{platzhalter}`, MiniMessage und `&`-Farbcodes.
+Neustart).
+
+**Format-Konventionen** (projektweit einheitlich):
+- Templates sind **MiniMessage** (`<gray>`, `<white>`, …; Legacy-`&`-Codes
+  rendern noch, sind aber nicht mehr Konvention). Stil: Fließtext `<gray>`,
+  Werte/Namen `<white>`, Erfolg `<green>`, Fehler `<red>`, Warnungen
+  `<yellow>`, Trenner `<dark_gray>`, Überschriften `<aqua><bold>`.
+- **Der Netzwerk-Prefix steht automatisch vor jeder Chat-Nachricht**:
+  `format`/`formatFor` stellen ihn voran (konfigurierbar über den
+  `network.prefix`-Translation-Key; ohne konfigurierten Prefix passiert
+  nichts). Templates enthalten deshalb selbst KEIN `{prefix}` mehr.
+- **Screens sind prefix-frei**: Kick-/Ban-Screens und andere
+  Vollbild-Texte laufen über `screenFor(player, key, …)` statt
+  `formatFor`; `raw`/`rawFor` bleiben ebenfalls unangetastet.
 
 Spieler wählen ihre Sprache mit `/helix language <code>`; beim First Join
 wird die Minecraft-Client-Sprache übernommen. Nachrichten an einen
@@ -395,24 +410,33 @@ konkreten Spieler laufen deshalb über `formatFor(player, key, …)` — nur
 Texte ohne Empfänger (z.B. Konsole) über `format(key, …)`.
 
 ```kotlin
+// src/main/resources/lang/en-EN.json:  { "welcome": "<green>Welcome, <white>{player}</white>!" }
+// src/main/resources/lang/de-DE.json:  { "welcome": "<green>Willkommen, <white>{player}</white>!" }
 class MyAddon : AddonBase() {
     private lateinit var msg: org.helix.api.message.Messages
     override fun enable() {
-        msg = context.localizedMessages(mapOf(
-            "en" to mapOf("welcome" to "&aWelcome, &f{player}&a!"),
-            "de" to mapOf("welcome" to "&aWillkommen, &f{player}&a!"),
-        ))
+        msg = loadMessages()
         // ...
-        val text = msg.formatFor(name, "welcome", "player" to name)  // Sprache des Spielers
+        val text = msg.formatFor(name, "welcome", "player" to name)  // Sprache des Spielers, mit Prefix
     }
 }
 ```
 
-`context.messages(defaults)` (einsprachig) bleibt als Kurzform erhalten und
-registriert die Defaults als Englisch. Fehlende Übersetzungen fallen auf
+`context.messages(defaults)` (einsprachig) und
+`context.localizedMessages(map)` bleiben als Low-Level-API erhalten —
+neue Addons nutzen die Sprachdateien. Fehlende Übersetzungen fallen auf
 die Default-Sprache des Netzwerks zurück. Über die REST-API:
 `GET /translations`, `POST /translations {key, language, value}` bzw.
 `{key, language, reset:true}`.
+
+**Paper-Komponenten** (`helix-addon-*-paper`) härten keine Texte mehr ein:
+sie lösen ihre Keys über `org.helix.api.i18n.NodeTranslations` auf — ein
+kleiner Client, der `GET /internal/translations` periodisch synct und pro
+Spieler-Sprache auflöst (`text(...)` mit Auto-Prefix für Chat,
+`screen(...)` prefix-frei für GUI-Titel/Item-Lore). Die Keys liegen in den
+Sprachdateien des zugehörigen Node-Addons und sind damit genauso
+panel-editierbar. Referenz: `helix-addon-profile-paper`
+(`ProfileGuiService`, `menu.*`-Keys).
 
 ## Paper-Komponenten & Resource Packs
 
@@ -577,6 +601,22 @@ class MyAddon : AddonBase() {
 Das Panel erscheint in der Sidebar unter **Extensions** und verschwindet
 wieder, wenn das Addon deaktiviert wird. Mitgelieferte Panels:
 Permissions, Clans, Economy, Bans, Chat, Tablist, Discord, MOTD.
+
+## Actions im Dashboard ausführen
+
+Die **Addons**-Seite listet pro (aktiviertem) Addon seine registrierten
+Actions in einem aufklappbaren Bereich: Argument-Eingabefeld (der
+Usage-Hint steht als Platzhalter), Ausführen-Knopf und Inline-Ergebnis.
+**Ingame-only-Actions sind ausgenommen**: `playerCommand`-Actions
+(`/friend`, `/profile`, …) brauchen einen Spieler-Kontext und tauchen im
+Runner nicht auf; reine Ingame-Features (GUIs, IGuard-Replay/Teleport,
+Cosmetic-Rendering) sind ohnehin Bukkit-Commands im `paper.jar`, keine
+Node-Actions, und existieren hier gar nicht.
+
+Berechtigung: Deklariert eine Action eine `permission`, wird genau die
+über das Panel geprüft (`POST /api/v1/actions` → `authorize`); Actions ohne
+deklarierte Permission bleiben Admin-only (`requireAdmin`). Admins dürfen
+alles. Jede Ausführung landet im Audit-Log.
 
 ## Addons zur Laufzeit nachladen
 

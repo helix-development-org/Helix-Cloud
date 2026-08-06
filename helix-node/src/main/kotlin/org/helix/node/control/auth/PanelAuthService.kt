@@ -67,6 +67,7 @@ class PanelAuthService(
         require(player != null) { LOGIN_CODE_DENIED_MESSAGE }
         require(grantsPermission(player.name, loginPermission)) { LOGIN_CODE_DENIED_MESSAGE }
         val now = clock()
+        evictStaleLoginState(now)
         val previous = lastCodeAt[player.name.lowercase()]
         require(previous == null || now - previous >= CODE_COOLDOWN_MS) {
             "please wait a moment before requesting another code"
@@ -127,26 +128,34 @@ class PanelAuthService(
      * waiting out the session's absolute TTL, and an idle session dies even
      * if it has not yet hit that TTL.
      *
+     * Runs on every authenticated request, so only the session-map lookup
+     * and mutation hold this service's monitor — the permission checks,
+     * which may hit a slow resolver, run outside it. Otherwise one slow
+     * check would serialize the entire control API behind this method.
+     *
      * @param presented the bearer token from the request.
      * @return the caller, or `null` if the token is unknown, expired, idle
      *  too long, or the player no longer holds the login permission.
      */
-    @Synchronized
     fun authenticate(presented: String): PanelPrincipal? {
         if (presented.isNotEmpty() && presented == adminToken) {
             return PanelPrincipal("admin", admin = true, viaStaticToken = true)
         }
-        val session = sessions[presented] ?: return null
-        val now = clock()
-        if (now >= session.expiresAtMs || now >= session.lastSeenAtMs + idleTtlMs) {
-            sessions.remove(presented)
-            return null
+        val session = synchronized(this) {
+            val current = sessions[presented] ?: return null
+            val now = clock()
+            if (now >= current.expiresAtMs || now >= current.lastSeenAtMs + idleTtlMs) {
+                sessions.remove(presented)
+                return null
+            }
+            val refreshed = current.copy(lastSeenAtMs = now)
+            sessions[presented] = refreshed
+            refreshed
         }
         if (!grantsPermission(session.name, loginPermission)) {
-            sessions.remove(presented)
+            synchronized(this) { sessions.remove(presented) }
             return null
         }
-        sessions[presented] = session.copy(lastSeenAtMs = now)
         return PanelPrincipal(session.name, admin = grantsPermission(session.name, ADMIN_PERMISSION))
     }
 
@@ -201,6 +210,17 @@ class PanelAuthService(
      */
     fun identity(principal: PanelPrincipal): PanelIdentity =
         PanelIdentity(principal.name, principal.admin, allowedViews(principal))
+
+    /**
+     * Drops expired login codes and elapsed request cooldowns, called on
+     * every code request — otherwise [pending] and [lastCodeAt] would grow
+     * with every player name ever entered into the login form and never
+     * shrink again.
+     */
+    private fun evictStaleLoginState(now: Long) {
+        pending.entries.removeIf { now >= it.value.expiresAtMs }
+        lastCodeAt.entries.removeIf { now - it.value >= CODE_COOLDOWN_MS }
+    }
 
     private fun grantsPermission(name: String, node: String): Boolean =
         permissions.check(PermissionCheckRequest(name = name, permission = node))

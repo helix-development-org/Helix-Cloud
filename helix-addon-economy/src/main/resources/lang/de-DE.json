@@ -1,0 +1,9 @@
+{
+  "balance": "<gold>Dein Kontostand: <white>{balance} Coins</white>",
+  "pay.sent": "<gold>Du hast <white>{amount} Coins</white> an <white>{target}</white> gesendet.",
+  "pay.received": "<gold><white>{sender}</white> hat dir <white>{amount} Coins</white> gesendet.",
+  "error.self": "<red>Du kannst dir nicht selbst Coins senden.",
+  "error.funds": "<red>Du hast nicht genug Coins.",
+  "error.usage": "<red>Benutzung: <white>/pay \\<player> \\<amount></white>",
+  "error.unknown": "<red>Dieser Spieler war noch nie auf diesem Netzwerk."
+}

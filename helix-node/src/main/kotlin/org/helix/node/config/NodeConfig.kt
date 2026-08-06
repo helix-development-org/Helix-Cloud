@@ -19,6 +19,7 @@ data class NodeConfig(
     val proxy: ProxySettings = ProxySettings(),
     val eula: EulaSettings = EulaSettings(),
     val audit: AuditSettings = AuditSettings(),
+    val wire: WireSettings = WireSettings(),
 ) {
     /**
      * Network-wide display settings.
@@ -75,10 +76,16 @@ data class NodeConfig(
      *
      * @property network docker network all Helix containers join.
      * @property image base image used to run service containers.
+     * @property user `uid:gid` the container processes run as; blank keeps
+     *  the image default (usually root). Match the node's own user so the
+     *  files a service writes into its bind-mounted workspace stay
+     *  manageable by the node — a root-run container otherwise leaves
+     *  root-owned files the next workspace preparation cannot touch.
      */
     data class DockerSettings(
         val network: String = "helix",
         val image: String = "eclipse-temurin:24-jre",
+        val user: String = "",
     )
 
     /**
@@ -156,5 +163,28 @@ data class NodeConfig(
      */
     data class AuditSettings(
         val retentionDays: Int = 180,
+    )
+
+    /**
+     * Helix-Wire transport settings.
+     *
+     * When enabled, every service opens one persistent `helix://` TCP
+     * connection to the node for all its internal communication instead of
+     * the per-call HTTP `internal` endpoints; those stay available and a
+     * service transparently falls back to them while the wire is down.
+     * Disabled by default, so a network keeps using plain HTTP until an
+     * operator opts in.
+     *
+     * @property enabled whether the wire server runs and services are told
+     *  to connect over `helix://`.
+     * @property port the TCP port the wire server listens on, separate from
+     *  the control HTTP port.
+     * @property tls whether the wire uses TLS, reusing the control API's
+     *  PKCS12 keystore ([ControlSettings.tlsKeystore]).
+     */
+    data class WireSettings(
+        val enabled: Boolean = false,
+        val port: Int = 8090,
+        val tls: Boolean = false,
     )
 }

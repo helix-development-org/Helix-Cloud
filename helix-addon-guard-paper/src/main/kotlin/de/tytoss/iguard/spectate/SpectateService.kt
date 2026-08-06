@@ -1,8 +1,8 @@
 package de.tytoss.iguard.spectate
 
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.event.ClickEvent
-import net.kyori.adventure.text.format.NamedTextColor
+import net.kyori.adventure.text.format.TextDecoration
+import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.GameMode
 import org.bukkit.Location
 import org.bukkit.entity.Player
@@ -10,6 +10,8 @@ import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.plugin.java.JavaPlugin
+import org.helix.api.i18n.NodeTranslations
+import org.helix.api.message.LegacyToMini
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -17,7 +19,11 @@ import java.util.concurrent.ConcurrentHashMap
  * Lets a staff member spectate a suspect: stores their state, drops them into spectator mode locked to
  * the target's camera, and restores everything on stop / quit. All operations run on the main thread.
  */
-class SpectateService(private val plugin: JavaPlugin) : Listener {
+class SpectateService(
+    private val plugin: JavaPlugin,
+    private val translations: NodeTranslations
+) : Listener {
+    private val miniMessage = MiniMessage.miniMessage()
     private data class Session(val world: UUID, val location: Location, val gameMode: GameMode, val flying: Boolean, var targetId: UUID)
 
     private val sessions = ConcurrentHashMap<UUID, Session>()
@@ -46,13 +52,8 @@ class SpectateService(private val plugin: JavaPlugin) : Listener {
         )
         vantage.direction = target.location.toVector().add(org.bukkit.util.Vector(0.0, 1.0, 0.0)).subtract(vantage.toVector())
         admin.teleport(vantage)
-        admin.sendMessage(
-            Component.text("Now spectating ", NamedTextColor.GRAY)
-                .append(Component.text(target.name, NamedTextColor.AQUA))
-                .append(Component.text(" — ", NamedTextColor.DARK_GRAY))
-                .append(Component.text("[Stop]", NamedTextColor.RED).clickEvent(ClickEvent.runCommand("/iguard unspectate")))
-                .append(Component.text(" (freie Kamera)", NamedTextColor.DARK_GRAY))
-        )
+        val stop = translations.screen(admin.name, locale(admin), "spectate.stop-button")
+        admin.sendMessage(chat(admin, "spectate.started", "name" to target.name, "stop" to stop))
         return true
     }
 
@@ -63,7 +64,7 @@ class SpectateService(private val plugin: JavaPlugin) : Listener {
         admin.gameMode = session.gameMode
         admin.allowFlight = session.flying
         admin.teleport(session.location)
-        admin.sendMessage(Component.text("Stopped spectating.", NamedTextColor.GRAY))
+        admin.sendMessage(chat(admin, "spectate.stopped"))
     }
 
     /** Restore every active spectator (plugin disable). */
@@ -84,4 +85,12 @@ class SpectateService(private val plugin: JavaPlugin) : Listener {
             }
         }
     }
+
+    private fun locale(player: Player): String = player.locale().language
+
+    private fun chat(player: Player, key: String, vararg params: Pair<String, String>): Component =
+        render(translations.text(player.name, locale(player), key, *params))
+
+    private fun render(text: String): Component =
+        miniMessage.deserialize(LegacyToMini.translate(text)).decoration(TextDecoration.ITALIC, false)
 }

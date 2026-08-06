@@ -56,6 +56,9 @@ class AutoScaler(
      */
     fun tick() {
         taskStore.all().forEach { task ->
+            if (task.paused) {
+                return@forEach
+            }
             ensureMinimum(task)
             if (task.autoScale.enabled) {
                 scaleUp(task)

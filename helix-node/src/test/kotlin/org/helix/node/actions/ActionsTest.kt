@@ -101,6 +101,34 @@ class ActionsTest {
     }
 
     @Test
+    fun `task pause stops the scaler race and enables delete`() {
+        invoke("task.create", "Pausable", "PAPER", "1.21.11", "min=1")
+        invoke("service.start", "Pausable")
+
+        // delete is blocked while a service runs
+        assertFalse(invoke("task.delete", "Pausable").success)
+
+        val paused = invoke("task.pause", "Pausable", "stop")
+        assertTrue(paused.success)
+        assertTrue(taskStore.find("Pausable")!!.paused)
+        assertTrue(invoke("task.list").lines.any { it.startsWith("Pausable") && it.endsWith("PAUSED") })
+
+        // graceful stop completes via the fake executor; then delete works
+        executor.handles.first().exit(0)
+        assertTrue(invoke("task.delete", "Pausable").success)
+    }
+
+    @Test
+    fun `task resume clears the paused flag`() {
+        invoke("task.create", "Resumable", "PAPER", "1.21.11")
+        invoke("task.pause", "Resumable")
+
+        assertTrue(invoke("task.resume", "Resumable").success)
+
+        assertFalse(taskStore.find("Resumable")!!.paused)
+    }
+
+    @Test
     fun `maintenance toggles through action`() {
         assertTrue(invoke("proxy.maintenance", "on").success)
         assertTrue(routing.maintenance)
@@ -117,6 +145,26 @@ class ActionsTest {
 
         assertFalse(result.success)
         assertTrue(result.lines.first().contains("kaputt"))
+    }
+
+    @Test
+    fun `action observers see every invocation and are removable by owner`() {
+        val seen = mutableListOf<Pair<String, Boolean>>()
+        registry.register(ActionDescriptor("observed", "works", "observed")) { ActionResult.ok("fine") }
+        registry.registerObserver("helix.discord") { invocation, result ->
+            seen += invocation.action to result.success
+        }
+        registry.registerObserver("broken.addon") { _, _ -> error("observer kaputt") }
+
+        val result = registry.invoke(ActionInvocation("observed"))
+        registry.invoke(ActionInvocation("missing"))
+
+        assertTrue(result.success)
+        assertEquals(listOf("observed" to true, "missing" to false), seen)
+
+        registry.unregisterObserverOwner("helix.discord")
+        registry.invoke(ActionInvocation("observed"))
+        assertEquals(2, seen.size)
     }
 
     @Test

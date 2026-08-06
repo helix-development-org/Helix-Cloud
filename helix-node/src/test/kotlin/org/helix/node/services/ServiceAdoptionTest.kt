@@ -5,12 +5,15 @@ import java.nio.file.Files
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.helix.api.bridge.HeartbeatReport
 import org.helix.api.environment.Environment
 import org.helix.api.execution.ExecutorType
 import org.helix.api.service.ServiceState
 import org.helix.api.task.TaskDefinition
+import org.helix.node.control.auth.ServiceTokenRegistry
 import org.helix.node.launcher.NodePaths
 import org.helix.node.tasks.TaskStore
 
@@ -21,7 +24,9 @@ class ServiceAdoptionTest {
     private val fakeJar = Files.write(paths.cache.resolve("fake.jar"), byteArrayOf(1))
     private val registryFile = ServiceRegistryFile(paths.root.resolve("services/registry.json"))
 
-    private fun manager() = ServiceManager(
+    private fun manager(
+        environmentProvider: (ManagedService) -> Map<String, String> = { emptyMap() },
+    ) = ServiceManager(
         taskStore = taskStore,
         workspacePreparer = WorkspacePreparer(
             paths = paths,
@@ -30,6 +35,7 @@ class ServiceAdoptionTest {
             eulaAccepted = true,
         ),
         executors = mapOf(ExecutorType.PROCESS to executor),
+        environmentProvider = environmentProvider,
         registry = registryFile,
     )
 
@@ -46,25 +52,25 @@ class ServiceAdoptionTest {
         val manager = manager()
         manager.startService("Lobby")
 
-        val started = registryFile.read().single()
+        val started = registryFile.read()!!.single()
         assertEquals("Lobby-1", started.id)
         assertEquals(ServiceState.STARTING, started.state)
         assertEquals(ExecutorType.PROCESS, started.executor)
         assertEquals(30000, started.port)
 
         manager.handleHeartbeat(HeartbeatReport("Lobby-1", 0, 20))
-        assertEquals(ServiceState.RUNNING, registryFile.read().single().state)
+        assertEquals(ServiceState.RUNNING, registryFile.read()!!.single().state)
 
         manager.stopService("Lobby-1")
         executor.handles.first().exit(0)
         // dynamic stopped services drop out of the map and the file
-        assertTrue(registryFile.read().isEmpty())
+        assertTrue(registryFile.read()!!.isEmpty())
     }
 
     @Test
     fun `a fresh manager adopts a surviving service from the registry entry`() {
         manager().startService("Lobby")
-        val entry = registryFile.read().single()
+        val entry = registryFile.read()!!.single()
 
         // simulate the successor node: fresh manager, re-attached handle
         val successor = manager()
@@ -81,5 +87,30 @@ class ServiceAdoptionTest {
         // exits of adopted services flow through the normal lifecycle
         handle.exit(0)
         assertEquals(1, successor.activeCount("Lobby"))
+    }
+
+    @Test
+    fun `injected bridge token is persisted and restorable after a node restart`() {
+        val tokens = ServiceTokenRegistry()
+        manager(environmentProvider = { service ->
+            mapOf("HELIX_CONTROL_TOKEN" to tokens.mint(service.id))
+        }).startService("Lobby")
+
+        // the registry entry carries exactly the token the process env got
+        val entry = registryFile.read()!!.single()
+        val token = assertNotNull(entry.controlToken, "minted token must be persisted")
+        assertEquals("Lobby-1", tokens.serviceIdFor(token))
+
+        // simulate the successor node: fresh (empty) token registry
+        val successorTokens = ServiceTokenRegistry()
+        assertNull(successorTokens.serviceIdFor(token))
+        successorTokens.restore(entry.id, token)
+        assertEquals("Lobby-1", successorTokens.serviceIdFor(token))
+
+        // adoption keeps the token on the managed service and in the file
+        val successor = manager()
+        successor.adopt(task, entry, FakeHandle())
+        assertEquals(token, successor.find("Lobby-1")?.controlToken)
+        assertEquals(token, registryFile.read()!!.single().controlToken)
     }
 }

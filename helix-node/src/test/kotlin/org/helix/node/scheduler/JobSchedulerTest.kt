@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.io.path.createTempDirectory
 import kotlin.system.measureTimeMillis
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionResult
@@ -69,5 +70,31 @@ class JobSchedulerTest {
             Thread.sleep(20)
         }
         assertTrue(recorded.any { it.contains("job-1") })
+    }
+
+    @Test
+    fun `an unreadable job store is never overwritten by later saves`() {
+        storage.write("jobs", "{ this is not a job list")
+        val scheduler = JobScheduler(storage, ActionRegistry(), clock = { now })
+
+        // fail-safe: run without jobs, but keep the document for manual repair
+        assertTrue(scheduler.all().isEmpty())
+
+        scheduler.save(ScheduledJob(id = "backup", action = "backup.run", everyMinutes = 1))
+
+        assertEquals(listOf("backup"), scheduler.all().map { it.id })
+        assertEquals("{ this is not a job list", storage.read("jobs"))
+    }
+
+    @Test
+    fun `a readable job store still persists changes`() {
+        val scheduler = JobScheduler(storage, ActionRegistry(), clock = { now })
+        scheduler.save(ScheduledJob(id = "backup", action = "backup.run", everyMinutes = 1))
+
+        // a fresh scheduler over the same storage sees the persisted job
+        assertEquals(
+            listOf("backup"),
+            JobScheduler(storage, ActionRegistry(), clock = { now }).all().map { it.id },
+        )
     }
 }

@@ -4,6 +4,7 @@ import kotlinx.serialization.json.Json
 import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
+import org.helix.api.message.Messages
 
 /**
  * Network-wide NPC backend addon ("Helix-NPC").
@@ -16,11 +17,18 @@ import org.helix.api.action.ActionResult
  */
 class NpcAddon : AddonBase() {
     private lateinit var store: NpcStore
+
+    // Player-facing texts of the bundled Paper component. Registering them
+    // here makes them panel-editable and serves them to the Paper plugin
+    // via GET /api/v1/internal/translations (NodeTranslations); the node
+    // side itself sends no chat messages.
+    private lateinit var msg: Messages
     private val json = Json { ignoreUnknownKeys = true }
 
-    /** Registers the `npc.*` control-API actions. */
+    /** Registers the `npc.*` control-API actions and the message bundle. */
     override fun enable() {
         store = NpcStore(context.storage())
+        msg = loadMessages()
         action(
             "npc.save",
             "Inserts or replaces an NPC definition from its JSON payload.",

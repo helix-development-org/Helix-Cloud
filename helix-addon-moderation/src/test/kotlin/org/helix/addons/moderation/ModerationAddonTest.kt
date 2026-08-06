@@ -14,6 +14,17 @@ class ModerationAddonTest {
     private val addon = ModerationAddon().also { it.onEnable(context) }
 
     @Test
+    fun `mute export lists active mutes as json`() {
+        assertEquals("[]", context.run("mute.export").lines.single())
+
+        context.run("mute", "Mod", "Steve", "12h", "spam")
+
+        val exported = context.run("mute.export").lines.single()
+        assertTrue(exported.contains("\"player\""))
+        assertTrue(exported.lowercase().contains("steve"))
+    }
+
+    @Test
     fun `all commands are permission gated player commands`() {
         val commands = context.handlers.values.map { it.first }.filter { it.playerCommand }
 
@@ -71,8 +82,8 @@ class ModerationAddonTest {
         context.run("warn", "Mod", "Steve", "language")
 
         assertEquals(2, context.notifications.size)
-        assertTrue(context.notifications[0].second.contains("[Kick]"))
-        assertTrue(context.notifications[1].second.contains("[Warn]"))
+        assertTrue(context.notifications[0].second.contains("was kicked by"))
+        assertTrue(context.notifications[1].second.contains("was warned by"))
         assertTrue(context.notifications.all { it.first == "moderation" })
     }
 

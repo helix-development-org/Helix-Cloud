@@ -28,6 +28,9 @@ import org.helix.api.execution.ExecutorType
  * @property fallbackEligible whether backend services of this task may serve
  *   as proxy fallback/lobby targets.
  * @property maintenance whether services of this task reject regular joins.
+ * @property paused whether the auto-scaler leaves this task alone: no
+ *   minimum-keeping, no scale-up/-down. Stopped services stay stopped, so
+ *   a paused task can be edited or deleted without racing the scaler.
  * @property autoScale player-based scaling behaviour.
  * @property disabledAddons addon ids turned off for this task; every other
  *   installed addon is active. Empty means all addons are active.
@@ -48,6 +51,7 @@ data class TaskDefinition(
     val templates: List<String> = listOf("default"),
     val fallbackEligible: Boolean = false,
     val maintenance: Boolean = false,
+    val paused: Boolean = false,
     val autoScale: AutoScaleSettings = AutoScaleSettings(),
     val disabledAddons: List<String> = emptyList(),
 ) {

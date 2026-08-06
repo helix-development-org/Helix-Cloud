@@ -1,5 +1,348 @@
 # Changelog
 
+## 0.86.0 — 2026-08-06
+
+### Neu: Helix-Wire — eigenes helix://-Protokoll für die Service-Kommunikation
+- **Neues Modul `helix-wire`**: ein togglebarer, eigener Transport zwischen
+  Node und Services. Ist er aktiv, öffnet jeder Service EINE persistente,
+  authentifizierte `helix://`-TCP-Verbindung zur Node und wickelt darüber
+  seinen gesamten internen Verkehr ab — statt pro Aufruf einen HTTP-Request.
+  Reine JDK-Sockets (kein Netty), längen-präfigierte Frames, **CBOR-Encoding
+  der bestehenden DTOs** (echtes Binärformat ohne Parallel-Schema),
+  Token-Handshake (TLS optional), Keepalive, Reconnect mit Backoff.
+- **Togglebar & abwärtskompatibel**: `[wire] enabled` in der node.toml
+  (Default **aus**). Aus = alles läuft unverändert über HTTP. An = Services
+  bekommen eine `helix://`-URL; die HTTP-`/internal`-Endpoints bleiben als
+  automatischer Fallback bestehen, sodass eine Wire-Störung keinen
+  Funktionsausfall verursacht (Reconnect + HTTP-Fallback).
+- **Node-Seite**: `WireServer` mit Endpoint-Dispatch, der auf **dieselben**
+  Control-Dependencies delegiert wie die HTTP-Routen (eine Logik, zwei
+  Transporte); `WirePush` ersetzt den HTTP-Long-Poll nativ (Command-/
+  Routing-Push mit erhaltenem Ack-Cursor). Auth über die bestehende
+  `ServiceTokenRegistry`; mehrere Verbindungen pro `serviceId` (Kern-Bridge
+  + jede Addon-Komponente im selben JVM).
+- **Client-Seite**: neue `ServiceNodeApi`-Fassade; **beide Kern-Bridges**
+  (Paper/Velocity) und **alle acht Addon-Komponenten** (npc, guis, profile,
+  bettermsgs, guard, subtitles, cosmetics, labymod) laufen darüber. Die
+  Velocity-Bridge konsumiert den Wire-Push und fällt bei Bedarf auf den
+  klassischen Long-Poll zurück.
+- Dashboard (Browser) und `helix-wrapper` (stdout + console.in) bleiben
+  bewusst außen vor. `NetworkPackInfo` ist nach `helix-api` gewandert, damit
+  Node und Services denselben DTO teilen.
+
+## 0.85.2 — 2026-08-04
+
+### Fix: Launcher-Konsole schickte doppelt kodiertes JSON
+- Die neue Konsolen-Eingabe übergab den Request-Body bereits als String,
+  den der API-Helper ein zweites Mal JSON-kodierte — jede Action
+  scheiterte mit „Unexpected token 'F'…". Der Body wird jetzt wie überall
+  sonst als Objekt übergeben.
+
+## 0.85.1 — 2026-08-04
+
+### Dashboard: Launcher-Konsole
+- Die Launcher-Logs-Ansicht ist jetzt eine echte Konsole: unter dem
+  Live-Log-Stream (SSE) sitzt eine CLI-artige Eingabezeile, die Actions
+  ausführt (`service.list`, `task.pause Lobby stop`, …) und die
+  Ergebniszeilen inline in den Feed schreibt — mit Befehls-History über
+  die Pfeiltasten. Sidebar-Eintrag heißt jetzt „Konsole".
+
+## 0.85.0 — 2026-08-03
+
+### Neu: Tasks pausieren
+- Bisher gewann der Auto-Scaler jedes Wettrennen gegen `service.stop` —
+  ein Task mit `min >= 1` ließ sich weder leerstoppen noch löschen
+  („still has active services"), weil jeder gestoppte Service sofort
+  wieder hochgezogen wurde.
+- Neu: `task.pause <task> [stop]` nimmt den Task aus der
+  Auto-Scaler-Verwaltung (mit `stop` stoppt es zusätzlich alle Services
+  des Tasks), `task.resume <task>` gibt ihn zurück. Pausierte Tasks
+  tragen `PAUSED` in `task.list`/`task.info`, das Dashboard zeigt ein
+  Badge und einen Pause/Resume-Button in der Task-Tabelle
+  (`TaskDefinition.paused`, per REST editierbar). Manuelles
+  `service.start` bleibt auch pausiert möglich.
+
+## 0.84.2 — 2026-08-02
+
+### Fix: Resource-Pack kam bei manchen Clients nie an
+- Der Pack-Offer ging beim Proxy-Login raus — seit der
+  1.20.2-Konfigurationsphase verwerfen manche Client-Versionen ein so
+  frühes Angebot stillschweigend. Der Offer kommt jetzt erst mit der
+  ersten Backend-Verbindung.
+- Der Proxy loggt Angebot (Hash + URL) und die Client-Antwort
+  (SUCCESSFUL/DECLINED/FAILED_DOWNLOAD/…), damit „Spieler hat kein Pack"
+  künftig direkt im Log diagnostizierbar ist.
+
+## 0.84.1 — 2026-08-02
+
+### LabyMod: eigene Dashboard-Seite
+- Das LabyMod-Addon hat jetzt eine richtige Panel-Seite statt der
+  generierten Default-Seite: Live-Status (Anteil, Online-Nutzer mit
+  Version), Feature-Schalter, Rich-Presence-Format, Interaction-Menü-Editor
+  (hinzufügen/entfernen) und NPC-Emote-Verwaltung inklusive
+  „Play emote now"-Test.
+
+## 0.84.0 — 2026-08-02
+
+### Neu: LabyMod-Integration (helix-addon-labymod)
+- **Offizielle LabyMod-4-Server-API am Proxy**: Die mitgelieferte
+  Velocity-Komponente ist der einzige LabyMod-Protokoll-Endpunkt des
+  Netzwerks — die offizielle Velocity-Lib konsumiert die
+  `labymod:neo`-Payloads am Proxy (Backends sehen sie nie), hinter einem
+  Proxy ist das der einzig zuverlässige Ort. Erstes Addon mit
+  `velocity.jar`-Komponente im HXA.
+- **Erkennung + Stats**: `labymod.list` (Nutzer + Version),
+  `labymod.stats` (Anteil online, Lifetime-Nutzer).
+- **Economy-HUD**: helix-economy-Coins live in der LabyMod-Cash-Anzeige.
+- **Voice-Mute-Sync**: aktive helix-moderation-Mutes wirken im
+  LabyMod-Voice-Chat (neue Moderation-Action `mute.export`, Sync alle
+  10 s, konfigurierbar).
+- **Discord Rich Presence**: konfigurierbares Format
+  (`labymod.config.set rpcformat=…`, Platzhalter `{network}`, `{task}`,
+  `{service}`), aktualisiert bei jedem Serverwechsel.
+- **Subtitles**: helix-subtitles werden für LabyMod-Clients zusätzlich
+  nativ gerendert.
+- **Interaction-Menü**: Rechtsklick-Einträge auf Spieler (Standard:
+  Nachricht, Freund, Party, Clan; `labymod.menu.add|remove|list`).
+- **NPC-Emotes**: helix-npc-NPCs spielen LabyMod-Emotes — beim Anklicken
+  und/oder als Idle-Loop (`labymod.npc.set <id> <intervall> <idle> <interact>`,
+  `labymod.emote`). npc-paper meldet dafür Entity-UUIDs und Klicks an die
+  Node (`labymod.npc.entity|clicked`, bridgeInvocable).
+- **Gameplay-Actions** für Admins/Addons/Discord-Bot: `labymod.marker`,
+  `labymod.banner`, `labymod.prompt.input` (Antwort als
+  `labymod`-Notification), `labymod.prompt.server`.
+- Alle Features einzeln abschaltbar (`labymod.config.set economy=… voicemute=…
+  rpc=… subtitles=… npcemotes=… menu=…`); Feature-Daten fließen über
+  Bridge-Values (`labymod.config`, `labymod.voicemutes`, `labymod.npcs`)
+  plus eine sequenznummerierte One-Shot-Queue (`labymod.cmd`), die nach
+  Proxy-Restarts nicht nachspielt.
+
+## 0.83.4 — 2026-08-01
+
+### Fix: Docker-Memory-Limit zu knapp für Paper
+- Das Container-Limit von Heap+256 MB ließ Paper bei der ersten
+  Weltgenerierung am nativen Speicher-Peak sterben (OOM-Kill, Exit 137).
+  Der Overhead über dem JVM-Heap beträgt jetzt 512 MB.
+
+## 0.83.3 — 2026-08-01
+
+### Fix: Docker-Services ohne root-Dateileichen
+- Neu: `[docker] user = "uid:gid"` — Service-Container laufen damit als
+  Node-User statt als root. Ohne die Option hinterließ ein Container
+  root-eigene Dateien im bind-gemounteten Workspace (Paper legt z. B.
+  `versions/` an), an denen die nächste Workspace-Vorbereitung mit
+  `AccessDeniedException` scheiterte.
+
+## 0.83.2 — 2026-08-01
+
+### Fixes aus dem ersten produktionsnahen Deployment
+- **Velocity-Proxy startete auf frischen Installationen nicht**: Der
+  Default `proxy.forwardingSecret = ""` führte zu einer leeren
+  `forwarding.secret` im Proxy-Workspace — Velocity verweigert dann den
+  Start („forwarding-secret file must not be empty"). Ohne konfiguriertes
+  Secret generiert die Node jetzt einmalig ein zufälliges und persistiert
+  es unter `Helix/config/forwarding.secret`; Proxies und Backends bleiben
+  über Restarts hinweg konsistent.
+- **`service.kill` hinterließ verwaiste Serverprozesse**: Der Force-Kill
+  traf nur den Wrapper — dessen Shutdown-Hook lief nie, das Server-Kind
+  überlebte und blockierte den Port. Der Kill räumt jetzt den gesamten
+  Prozessbaum ab (der graceful `service.stop` nutzt weiterhin den Hook).
+
+## 0.83.1 — 2026-08-01
+
+### Fix: Wrapper findet das JVM ohne System-Java
+- Der Service-Wrapper startete den Server mit `java` aus dem PATH und
+  scheiterte auf Installationen ohne System-Java (install.sh legt das JDK
+  privat unter `/opt/helix/jdk` ab). Er nutzt jetzt — wie die Node beim
+  Wrapper-Start — das JVM-Binary, unter dem er selbst läuft.
+
+## 0.83.0 — 2026-08-01
+
+### Vault-Economy-Provider & PlaceholderAPI-Expansion (Ökosystem-Restpunkt)
+- **Vault**: Liegt das Vault-Plugin auf einem Backend-Server, registriert
+  die Paper-Bridge die Helix-Coins automatisch als Economy-Provider —
+  Shops-/Jobs-Plugins lesen und ändern die netzwerkweiten Balances.
+  Reads laufen über die synchronisierten Bridge-Values (kein Round-Trip
+  für Online-Spieler), Änderungen über die neuen Maschinen-Actions
+  `eco.api.balance|deposit|withdraw` (bridgeInvocable, ganze Coins,
+  gedeckte Abbuchungen, keine Banken).
+- **PlaceholderAPI**: `%helix_balance%`, `%helix_clan%`, `%helix_online%`,
+  `%helix_network%`, `%helix_prefix%`, `%helix_nick%`,
+  `%helix_displayname%` über den bestehenden NetworkPlaceholders-Resolver.
+  Beides ohne Konfiguration (softdepend Vault/PlaceholderAPI); die
+  Hook-Klassen werden nur geladen, wenn das jeweilige Plugin vorhanden ist.
+
+### Gesalzene Adress-Hashes & Alt-Account-Lookup
+- Die Node speichert **keine Roh-IPs**: Der Velocity-Join meldet die
+  Adresse mit, die Node hasht sie sofort (SHA-256 mit zufälligem,
+  persistentem Installations-Salt) und verwirft sie. Pro Spieler bleiben
+  die letzten 5 unterschiedlichen Hashes, Ablauf nach 90 Tagen.
+- **Neue Staff-Action `ban.alts <spieler>`** (Bans-Addon): listet Accounts,
+  die kürzlich von einer gemeinsamen Adresse gejoint sind, gebannte
+  markiert mit `[BANNED]`. Addon-API: `AddonContext.sharedAddressPlayers`.
+- Die Hashes hängen am GDPR-Export/-Delete wie jede andere Spielerdate.
+
+### Dokumentation
+- SECURITY.md beschreibt das Admin-Identitätsmodell (MC-Account +
+  Audit + `session.revoke`; der statische Token ist ausschließlich
+  Break-Glass) und die IP-Datenschutz-Garantien.
+
+## 0.82.2 — 2026-07-31
+
+### Discord: Components V2 only
+- Der Bot sendet **keine normalen Content-Nachrichten mehr**: Audit-Log,
+  Notification-Forwarding und `discord.send` laufen jetzt ebenfalls als
+  Components-V2-Container (wie Panel, Status-Board und alle
+  Interaktions-Antworten schon zuvor). Audit-Einträge sind dabei je
+  Ereignistyp eingefärbt (Denied rot, Bestätigungs-Lifecycle gelb,
+  Link-Ereignisse blau), Batching pro Kanal+Farbe bleibt erhalten und die
+  Chunk-Grenze nutzt das größere Text-Display-Budget (3800 Zeichen).
+
+## 0.82.1 — 2026-07-31
+
+### Fix: Addon-Duplikate beim Laden
+- Liegen mehrere `.hxa`-Dateien mit derselben Addon-ID in `Helix/addons/`
+  (z. B. `helix-discord-0.81.0.hxa` **und** `helix-discord-0.82.0.hxa`
+  nach einem Update ohne Aufräumen), gewann bisher die alphabetisch erste
+  Datei — die alte Version lief weiter und die neue schlug mit
+  `addon already installed` fehl. Jetzt wählt die Node pro Addon-ID die
+  **neueste** Datei (Manifest-Version, dann Dateiname, beides
+  nummernbewusst: `0.82.0` schlägt `0.81.0`, `0.10` schlägt `0.9`) und
+  überspringt ältere Duplikate mit einer Warnung. Gilt für den Start
+  (`loadAll`) und das Laufzeit-Nachladen (`addon.list.reload`).
+
+## 0.82.0 — 2026-07-31
+
+### Discord-Bot v2: komplettes Admin-Tooling (helix-addon-discord)
+- **Kord 0.15.0 → 0.18.1** und damit volle **Components-V2**-Unterstützung
+  (Container, Sections, TextDisplays, Separators, Labels in Modals).
+- **Slash-Commands statt Prefix-Commands**: `/helix status|panel|setup|link|
+  unlink|run` als Guild-Commands plus Kontextmenü **„Helix: Profil"**
+  (Rechtsklick auf einen Discord-User). Die alten `!status`/`!players`/
+  `!run`-Prefix-Commands sind entfernt.
+- **Persistentes Control-Panel** im konfigurierten Panel-Channel: Buttons
+  öffnen ephemere Modul-Screens für **Services** (Start/Stop/Kill/Restart/
+  Logs/Konsole je Service), **Tasks** (Start, Rolling-Restart, Löschen),
+  **Spieler** (Kick/Nachricht/Warn/Mute/Ban/Pardon/Historie, Broadcast,
+  Pagination), **Proxy & Plattform** (Wartung, Backend-/Launcher-Restart,
+  Plattform-Stopp), **Permissions** (Info/Zuweisen/Entziehen/Grant/Revoke
+  per Modal) und **Addons**.
+- **Dynamischer Action-Browser**: alle registrierten Actions aller Addons,
+  nach Gruppen durchblätterbar, Argumente per Modal — jedes Addon ist damit
+  automatisch über Discord bedienbar.
+- **Rechte ausschließlich über Account-Verknüpfung**: jede Bot-Funktion
+  prüft das Pro-Action-Node `helix.discord.action.<action>` (Wildcards über
+  das Permissions-Addon, z. B. `helix.discord.action.service.*`) des
+  verknüpften Minecraft-Accounts — kein User-ID-Bypass, keine Allowlist
+  mehr. Hat eine Action zusätzlich eine eigene Permission (z. B.
+  `helix.mod.kick`), gilt UND-Verknüpfung.
+- **Account-Linking in beide Richtungen**: Ingame `/discord` (Node
+  `helix.discord.link`) erzeugt einen Code für `/helix link` auf Discord;
+  `/helix link` ohne Code erzeugt umgekehrt einen Code für `/discord
+  <code>`. Codes sind kurzlebig (Default 5 min), einmalig und
+  konfliktgeprüft. Bootstrap ohne Code über die neuen Actions
+  `discord.link.set/remove/list` (Dashboard/CLI).
+- **Dreistufige Bestätigung**: read-only Actions laufen direkt, destruktive
+  brauchen den roten Bestätigen-Button (30 s, nur der Auslöser), kritische
+  (`platform.stop`, `platform.restart`, `launcher.restart`, `task.delete`,
+  `service.command`, `player.gdpr-delete`; konfigurierbar) ein
+  Type-to-Confirm-Modal mit exakt einzutippendem Ziel.
+- **Discord-Audit-Log**: jede Action-Ausführung mit menschlichem Urheber
+  (Discord, Dashboard/CLI, Ingame-Player-Commands), verweigerte Zugriffe,
+  abgebrochene/abgelaufene/fehlgeschlagene Bestätigungen und
+  Link/Unlink-Ereignisse. Routing pro Ereignistyp und pro
+  Notification-Kategorie frei konfigurierbar (`audit.<typ>=<channel>`,
+  `category.<name>=<channel>`), Batching gegen Rate-Limits,
+  Token-Argumente werden maskiert.
+- **Live-Status-Board**: persistente Components-V2-Nachricht mit Übersicht,
+  Wartungsstatus und Service-Liste; aktualisiert bei Events (Join/Leave,
+  Bot-Aktionen) und per Intervall, editiert nur bei Änderung.
+- **`/helix setup`-Wizard**: Channel-Selects für Panel-, Status-, Audit- und
+  Notification-Channel direkt in Discord (Node `helix.discord.setup`).
+- **Sprache**: ephemere Antworten folgen der Discord-Client-Locale
+  (de/en), gemeinsame Nachrichten der Netzwerk-Default-Sprache; alle Texte
+  liegen als panel-editierbare Sprachdateien vor.
+- Bestehende `channelId`-Konfigurationen werden als Notification-Channel
+  migriert; `commandPrefix`, `adminUserIds` und `allowedActions` entfallen.
+
+### API
+- **Neu: `AddonContext.registerActionObserver`** (`ActionObserver` in
+  `helix-api`): Addons können jede Action-Ausführung samt Quelle, Actor und
+  Ergebnis beobachten (Basis des Discord-Audit-Logs). Observer sind
+  owner-gebunden, werden beim Disable entfernt und können Invocations
+  weder verändern noch durch Exceptions stören.
+- **Neu: `Messages.rawIn(language, key)`**: Roh-Template in einer konkreten
+  Sprache für Ausgabekanäle, deren Sprache nicht über einen Spieler läuft
+  (z. B. Discord-Locale). `MessageBundle` implementiert es mit der
+  bekannten Fallback-Kette.
+
+## 0.81.0 — 2026-07-31
+
+### Nachrichten-System vereinheitlicht
+- **Alle Addon-Nachrichten liegen jetzt als Sprachdateien** (`lang/en-EN.json`
+  + `lang/de-DE.json`) statt als Inline-`mapOf` im Code, geladen über den
+  neuen `AddonBase.loadMessages()`-Helper (`LangResources`). Betrifft alle
+  13 Node-Addons mit Nachrichten.
+- **Durchgängig MiniMessage** mit einheitlichem Farb-Stil (Fließtext
+  `<gray>`, Werte `<white>`, Erfolg `<green>`, Fehler `<red>`, …). Legacy
+  `&`-Codes raus.
+- **Automatischer Netzwerk-Prefix vor jeder Chat-Nachricht**:
+  `Messages.format`/`formatFor` stellen ihn jetzt selbst voran (neuer
+  `prefixed()`-Helper). Hartkodierte Modul-Prefixe (`[Team]`, `[Ban]`,
+  `[Kick]` …) und literale `{prefix}` sind aus den Templates entfernt.
+- **Prefix-freie Screens**: neues `Messages.screenFor(...)` für Kick-/Ban-
+  Screens und andere Vollbild-Texte; Bans, Moderation und Guard nutzen es.
+
+### Paper-Addon-Nachrichten übersetzbar
+- **Neuer `NodeTranslations`-Client** (`helix-api`): Paper-Komponenten holen
+  ihre Texte pro Spieler-Sprache über `GET /internal/translations` statt sie
+  hart einzucodieren — `text(...)` (Chat, mit Prefix) und `screen(...)`
+  (prefix-frei für GUI/Screens). Migriert: **Profile-, NPC- und
+  Guard-Paper** (vorher komplett hartkodiertes Englisch; bei Guard-Spectate
+  war sogar ein EN/DE-Mix drin). Die zugehörigen Keys liegen in den
+  Sprachdateien der jeweiligen Node-Addons und sind damit panel-editierbar.
+  Rein technische `/iguard`-Diagnose-Dumps (VL/Confidence/Queue-Sizes)
+  bleiben bewusst englisch.
+
+### Dashboard: Addon-Actions ausführbar
+- Die **Addons**-Seite hat pro Addon einen aufklappbaren Action-Runner
+  (Argument-Eingabe mit Usage-Hint, Ausführen, Inline-Ergebnis).
+  `playerCommand`-Actions (Ingame-only) sind ausgenommen. Die von einer
+  Action geforderte Permission wird über das Panel geprüft; Actions ohne
+  Permission bleiben Admin-only. `AddonInfo` trägt dafür jetzt die
+  registrierten Actions.
+
+### Audit-Fixes (Härtung)
+- **Nahtloser Backend-Restart repariert**: per-Service-Bridge-Tokens werden
+  jetzt in der Service-Registry persistiert und beim Adopt wieder
+  eingespielt — sonst hätte der Watchdog nach jedem Restart alle
+  überlebenden Services gekillt.
+- **Service-Lifecycle-Races behoben**: ID-Reuse (verspätetes `onExit` löschte
+  den Workspace des Nachfolgers), Orphan-Sweep (löschte laufende
+  Workspaces; korruptes Registry-File löschte alle), Stop/Kill-Zombies,
+  Out-of-order-Registry-Writes, Port-Probe unter dem Manager-Lock.
+- **Kein Datenverlust bei korrupten Stores mehr**: Job-Scheduler,
+  Addon-Storage und Proxy-Screen-Migration überschreiben unlesbare
+  Dokumente nicht länger still.
+- **Proxy-Command-Long-Poll**: Ack-Token wird aus dem tatsächlich
+  ausgelieferten Snapshot abgeleitet (verlor sonst Kommandos); Queue wird
+  beim Proxy-Ende verworfen.
+- **Backup-Restore** extrahiert erst in ein Temp-Verzeichnis und validiert,
+  bevor der Workspace angefasst wird.
+- **HTTP-Client-Vereinheitlichung** über alle Addon-/Bridge-Clients:
+  Fehler-Logging bei non-2xx (gedrosselt), Interrupt-Flag-Restore,
+  einheitliche Timeouts/Trailing-Slash-Behandlung und `close()`-Hooks in
+  jedem `onDisable` (kein Classloader-Leak mehr bei `/reload`).
+- **`GET /api/v1/actions`** ist jetzt admin-only (war Info-Disclosure der
+  Action-Namen für per-Service-Tokens).
+- Diverse unbounded Maps (RateLimiter, PanelAuth-Sessions,
+  Proxy-Command-Queues) werden jetzt geräumt.
+
+### Sicherheit dokumentiert
+- IGuards netzwerkweite Bans vom Spielserver aus (`guard.store.ban`,
+  `bridgeInvocable`) bleiben by design; das akzeptierte Risiko ist jetzt in
+  `SECURITY.md` dokumentiert (auditiert, per Panel reversibel).
+
 ## 0.80.3 — 2026-07-31
 
 ### Fix: Spieler wurden doppelt gezählt (Proxy + Backend)

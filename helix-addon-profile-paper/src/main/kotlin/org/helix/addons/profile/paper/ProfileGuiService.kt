@@ -15,6 +15,7 @@ import kotlinx.coroutines.withContext
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.format.TextDecoration
+import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
@@ -22,6 +23,8 @@ import org.bukkit.plugin.java.JavaPlugin
 import org.helix.api.addon.ProfileSettingType
 import org.helix.api.addon.ProfileView
 import org.helix.api.addon.ResolvedSetting
+import org.helix.api.i18n.NodeTranslations
+import org.helix.api.message.LegacyToMini
 
 /**
  * The `/profilemenu` GUI, built on the shared Helix-GUIs plugin's IGui
@@ -29,20 +32,25 @@ import org.helix.api.addon.ResolvedSetting
  * contributing addon. Clicking a toggle flips it, clicking a choice cycles
  * to the next unlocked option, clicking free text opens an anvil prompt —
  * every change round-trips through the node's `profile.setting.set` action,
- * so this plugin holds no settings state of its own.
+ * so this plugin holds no settings state of its own. All player-facing text
+ * resolves through the node's translations (`menu.*` keys of the profile
+ * addon's language files), never hardcoded here.
  *
  * @property plugin the owning plugin, for logging.
  * @property client talks to the node on behalf of the menu.
+ * @property translations node-backed, per-player-language texts.
  * @property scope coroutine scope IGui operations run on.
  */
 class ProfileGuiService(
     private val plugin: JavaPlugin,
     private val client: ProfileNodeClient,
+    private val translations: NodeTranslations,
     private val scope: CoroutineScope,
 ) {
     @Volatile private var igui: IGui? = null
     @Volatile private var menu: GuiDefinition? = null
     private val views = ConcurrentHashMap<UUID, ProfileView>()
+    private val miniMessage = MiniMessage.miniMessage()
 
     /** Awaits the shared Helix-GUIs instance and builds the menu definition; safe to call once on enable. */
     fun install() {
@@ -72,7 +80,7 @@ class ProfileGuiService(
      */
     fun open(player: Player) {
         val definition = menu ?: run {
-            player.sendMessage(plain("Profile menu is still starting, try again in a moment.", NamedTextColor.RED))
+            player.sendMessage(chat(player, "menu.starting"))
             return
         }
         scope.launch { definition.open(player, "main") }
@@ -84,10 +92,12 @@ class ProfileGuiService(
 
         page("main") {
             cancelAllInteractions = true
-            title { _ -> centeredText("Your Profile", 0, color = NamedTextColor.WHITE) }
+            title { ctx -> centeredText(screenText(ctx.player, "menu.title"), 0, color = NamedTextColor.WHITE) }
             prepare { player -> refreshView(player) }
             for (index in 0 until MAX_SETTINGS) {
-                item(index) { ctx -> views[ctx.player.uniqueId]?.settings?.getOrNull(index)?.let(::settingItem) }
+                item(index) { ctx ->
+                    views[ctx.player.uniqueId]?.settings?.getOrNull(index)?.let { settingItem(ctx.player, it) }
+                }
                 onClick(index) { ctx ->
                     val setting = views[ctx.player.uniqueId]?.settings?.getOrNull(index) ?: return@onClick
                     handleClick(ctx, setting)
@@ -100,14 +110,14 @@ class ProfileGuiService(
         val value = when (val type = setting.descriptor.type) {
             is ProfileSettingType.Toggle -> (setting.current != "true").toString()
             is ProfileSettingType.Choice -> ChoiceCycling.next(type.options, setting.current)?.id
-                ?: return sendError(ctx.player, "You have no unlocked options for this setting.")
+                ?: return ctx.player.sendMessage(chat(ctx.player, "menu.no-options"))
             is ProfileSettingType.FreeText -> readFreeText(ctx, setting) ?: return
         }
         val rejection = withContext(Dispatchers.IO) {
             client.set(ctx.player.name, setting.owner, setting.descriptor.key, value)
         }
         if (rejection != null) {
-            sendError(ctx.player, rejection)
+            ctx.player.sendMessage(render("<red>$rejection"))
         }
         refreshView(ctx.player)
         ctx.gui.refresh(ctx.player)
@@ -131,11 +141,7 @@ class ProfileGuiService(
         withContext(Dispatchers.IO) { client.view(player.name) }?.let { views[player.uniqueId] = it }
     }
 
-    private fun sendError(player: Player, message: String) {
-        player.sendMessage(plain(message, NamedTextColor.RED))
-    }
-
-    private fun settingItem(setting: ResolvedSetting): ItemStack {
+    private fun settingItem(player: Player, setting: ResolvedSetting): ItemStack {
         val material = when (val type = setting.descriptor.type) {
             is ProfileSettingType.Toggle -> if (setting.current == "true") Material.LIME_DYE else Material.GRAY_DYE
             is ProfileSettingType.Choice ->
@@ -149,12 +155,25 @@ class ProfileGuiService(
         return ItemStack(material).apply {
             editMeta { meta ->
                 meta.displayName(plain(setting.descriptor.label, NamedTextColor.AQUA))
-                meta.lore(listOf(plain("Current: $currentLabel", NamedTextColor.GRAY)))
+                meta.lore(listOf(render(translations.screen(player.name, locale(player), "menu.current", "value" to currentLabel))))
             }
         }
     }
 
     private fun materialOrNull(name: String): Material? = runCatching { Material.valueOf(name.uppercase()) }.getOrNull()
+
+    /** A chat message (network prefix included) resolved in the player's language, rendered. */
+    private fun chat(player: Player, key: String, vararg params: Pair<String, String>): Component =
+        render(translations.text(player.name, locale(player), key, *params))
+
+    /** Prefix-free screen/GUI text resolved in the player's language, as plain text for the pixel font. */
+    private fun screenText(player: Player, key: String): String =
+        translations.screen(player.name, locale(player), key)
+
+    private fun locale(player: Player): String = player.locale().language
+
+    private fun render(text: String): Component =
+        miniMessage.deserialize(LegacyToMini.translate(text)).decoration(TextDecoration.ITALIC, false)
 
     private fun plain(text: String, color: NamedTextColor): Component =
         Component.text(text, color).decoration(TextDecoration.ITALIC, false)

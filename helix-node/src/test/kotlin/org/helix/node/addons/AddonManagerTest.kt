@@ -29,13 +29,15 @@ class AddonManagerTest {
         withResourcePack: Boolean = false,
         withVelocityComponent: Boolean = false,
         extraPaperJars: List<String> = emptyList(),
+        version: String = "1.0.0",
+        fileName: String = "$id.hxa",
     ): Path {
-        val file = directory.resolve("$id.hxa")
+        val file = directory.resolve(fileName)
         ZipOutputStream(Files.newOutputStream(file)).use { zip ->
             zip.putNextEntry(ZipEntry("addon.json"))
             zip.write(
                 """
-                {"id": "$id", "name": "Test", "version": "1.0.0", "main": "$main"}
+                {"id": "$id", "name": "Test", "version": "$version", "main": "$main"}
                 """.trimIndent().toByteArray(),
             )
             zip.closeEntry()
@@ -128,6 +130,69 @@ class AddonManagerTest {
         val result = registry.invoke(ActionInvocation("test.ping"))
         assertTrue(result.success)
         assertTrue(result.lines.first().contains("helix.test"))
+    }
+
+    @Test
+    fun `loadAll picks only the newest file when an addon id exists in several versions`() {
+        writeHxa(version = "0.81.0", fileName = "helix-test-0.81.0.hxa")
+        writeHxa(
+            version = "0.82.0",
+            fileName = "helix-test-0.82.0.hxa",
+            main = SecondTestAddon::class.java.name,
+        )
+
+        val addons = manager.loadAll()
+
+        val addon = addons.single()
+        assertEquals(AddonState.ENABLED, addon.state)
+        assertEquals("0.82.0", addon.manifest.version)
+        assertTrue(registry.invoke(ActionInvocation("test.pong")).success)
+        assertFalse(registry.invoke(ActionInvocation("test.ping")).success)
+    }
+
+    @Test
+    fun `version comparison is number aware so 0_10 beats 0_9`() {
+        writeHxa(version = "0.9.0", fileName = "helix-test-0.9.0.hxa")
+        writeHxa(
+            version = "0.10.0",
+            fileName = "helix-test-0.10.0.hxa",
+            main = SecondTestAddon::class.java.name,
+        )
+
+        val addons = manager.loadAll()
+
+        assertEquals("0.10.0", addons.single().manifest.version)
+        assertTrue(registry.invoke(ActionInvocation("test.pong")).success)
+    }
+
+    @Test
+    fun `equal manifest versions fall back to the newest file name`() {
+        // real bundles all ship manifest version 1.0.0 — the file name
+        // carries the release version and must decide the winner
+        writeHxa(fileName = "helix-test-0.81.0.hxa")
+        writeHxa(fileName = "helix-test-0.82.0.hxa", main = SecondTestAddon::class.java.name)
+
+        manager.loadAll()
+
+        assertTrue(registry.invoke(ActionInvocation("test.pong")).success)
+        assertFalse(registry.invoke(ActionInvocation("test.ping")).success)
+    }
+
+    @Test
+    fun `reload resolves duplicate ids to the newest file as well`() {
+        writeHxa(id = "helix.first")
+        manager.loadAll()
+
+        writeHxa(id = "helix.second", fileName = "helix-second-0.81.0.hxa")
+        writeHxa(
+            id = "helix.second",
+            fileName = "helix-second-0.82.0.hxa",
+            main = SecondTestAddon::class.java.name,
+        )
+        val added = manager.reload()
+
+        assertEquals(listOf("helix.second"), added.map { it.manifest.id })
+        assertTrue(registry.invoke(ActionInvocation("test.pong")).success)
     }
 
     @Test

@@ -97,6 +97,19 @@ class GuisNodeClient(private val controlUrl: String, private val token: String) 
             val lines = parsed["lines"]?.jsonArray?.mapNotNull { it.jsonPrimitive.content } ?: emptyList()
             val success = parsed["success"]?.jsonPrimitive?.content == "true"
             ActionOutcome(success, lines)
-        }.onFailure { logger.warn("Node action {} failed: {}", action, it.message) }.getOrNull()
+        }.onFailure { failure ->
+            if (failure is InterruptedException) Thread.currentThread().interrupt()
+            logger.warn("Node action {} failed: {}", action, failure.message)
+        }.getOrNull()
+    }
+
+    /**
+     * Closes the underlying HTTP client, releasing its executor and
+     * connection resources — call from the owning plugin's onDisable so a
+     * Bukkit `/reload` does not leak the client (and, through it, the old
+     * plugin classloader).
+     */
+    fun close() {
+        http.close()
     }
 }

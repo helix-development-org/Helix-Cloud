@@ -488,11 +488,11 @@ class GuardStoreActions(
      */
     fun banScreen(player: String, ban: GuardBan): String {
         val expiry = if (ban.expiresAtEpochMs == 0L) {
-            messages.formatFor(player, "ban.expiry.never")
+            messages.screenFor(player, "ban.expiry.never")
         } else {
             formatDate(ban.expiresAtEpochMs)
         }
-        return messages.formatFor(player, "ban.screen", "reason" to ban.reason, "expiry" to expiry)
+        return messages.screenFor(player, "ban.screen", "reason" to ban.reason, "expiry" to expiry)
     }
 
     private fun register(name: String, description: String, usage: String, handler: ActionHandler) {

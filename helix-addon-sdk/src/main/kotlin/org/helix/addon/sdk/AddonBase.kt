@@ -6,6 +6,8 @@ import org.helix.api.action.ActionResult
 import org.helix.api.addon.AddonContext
 import org.helix.api.addon.DashboardPanel
 import org.helix.api.addon.HelixAddon
+import org.helix.api.message.LangResources
+import org.helix.api.message.Messages
 
 /**
  * Convenience base class for addons.
@@ -32,6 +34,17 @@ abstract class AddonBase : HelixAddon {
      * Called once when the addon is enabled.
      */
     protected abstract fun enable()
+
+    /**
+     * Loads this addon's configurable message templates from its bundled
+     * language files (`lang/en-EN.json`, `lang/de-DE.json`) — the
+     * project-wide convention for addon messages: MiniMessage templates,
+     * one flat JSON object per language, panel-editable at runtime like
+     * every declared default.
+     *
+     * @return the addon's live message bundle.
+     */
+    protected fun loadMessages(): Messages = context.localizedMessages(LangResources.load(javaClass))
 
     /**
      * Registers an action owned by this addon.

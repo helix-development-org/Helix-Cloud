@@ -3,22 +3,26 @@
   <div class="card-body"><div id="status" class="row"></div></div>
 </div>
 <div class="card">
-  <div class="card-head"><h2>Configuration</h2><div class="sub">saving reconnects the bot</div></div>
+  <div class="card-head"><h2>Configuration</h2><div class="sub">saving reconnects the bot — channels are usually picked with /helix setup on Discord</div></div>
   <div class="card-body">
     <div class="grid c2">
       <div class="field"><label>Bot token <span class="muted">(leave blank to keep current)</span></label><input id="token" type="password" placeholder="••••••••"></div>
-      <div class="field"><label>Channel ID</label><input id="channel" placeholder="123456789012345678"></div>
-      <div class="field"><label>Command prefix</label><input id="prefix" placeholder="!"></div>
+      <div class="field"><label>Guild ID</label><input id="guild" placeholder="123456789012345678"></div>
+      <div class="field"><label>Control-panel channel</label><input id="panelchannel" placeholder="channel id"></div>
+      <div class="field"><label>Status-board channel</label><input id="statuschannel" placeholder="channel id"></div>
+      <div class="field"><label>Audit-log channel</label><input id="auditchannel" placeholder="channel id"></div>
+      <div class="field"><label>Notification channel</label><input id="notifychannel" placeholder="channel id"></div>
       <div class="field"><label>Notification categories <span class="muted">(comma-separated)</span></label><input id="categories" placeholder="moderation"></div>
-      <div class="field wide" style="grid-column:1/-1"><label>Admin user IDs <span class="muted">(comma-separated, may use !run)</span></label><input id="admins" placeholder="1111,2222"></div>
-      <div class="field wide" style="grid-column:1/-1"><label>Allowed !run actions <span class="muted">(comma-separated, empty = !run always denied)</span></label><input id="actions" placeholder="platform.overview,player.list"></div>
+      <div class="field"><label>Status interval <span class="muted">(seconds)</span></label><input id="interval" placeholder="60"></div>
+      <div class="field wide" style="grid-column:1/-1"><label>Critical actions <span class="muted">(comma-separated, type-to-confirm tier)</span></label><input id="critical" placeholder="platform.stop,launcher.restart"></div>
     </div>
     <div class="row" style="margin-top:14px"><button class="btn" id="save">Save &amp; reconnect</button></div>
+    <p class="muted" style="margin-top:10px">Per-category routing: <code>discord.config.set category.&lt;name&gt;=&lt;channel&gt;</code> and <code>audit.&lt;type&gt;=&lt;channel&gt;</code> (types: action, denied, confirmation, link). Account links: <code>discord.link.set/remove/list</code>.</p>
   </div>
 </div>
 <div class="card">
   <div class="card-head"><h2>Send test message</h2></div>
-  <div class="card-body"><div class="row"><input id="msg" placeholder="Hello from Helix" style="max-width:400px"><button class="btn subtle" id="send">Send</button></div></div>
+  <div class="card-body"><div class="row"><input id="msgchannel" placeholder="channel id" style="max-width:200px"><input id="msg" placeholder="Hello from Helix" style="max-width:400px"><button class="btn subtle" id="send">Send</button></div></div>
 </div>
 <script>
 "use strict";
@@ -26,30 +30,31 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&l
 async function load() {
   const r = await Helix.action("discord.config.get");
   let c = {}; try { c = JSON.parse(r.lines[0] || "{}"); } catch (e) {}
-  document.getElementById("channel").value = c.channelId || "";
-  document.getElementById("prefix").value = c.commandPrefix || "!";
+  for (const id of ["guild","panelchannel","statuschannel","auditchannel","notifychannel"]) {
+    document.getElementById(id).value = c[{guild:"guildId",panelchannel:"panelChannelId",statuschannel:"statusChannelId",auditchannel:"auditChannelId",notifychannel:"notificationChannelId"}[id]] || "";
+  }
   document.getElementById("categories").value = (c.notificationCategories || []).join(",");
-  document.getElementById("admins").value = (c.adminUserIds || []).join(",");
-  document.getElementById("actions").value = (c.allowedActions || []).join(",");
+  document.getElementById("interval").value = c.statusIntervalSeconds || 60;
+  document.getElementById("critical").value = (c.criticalActions || []).join(",");
   document.getElementById("status").innerHTML =
     (c.connected ? '<span class="badge good">connected</span>' : '<span class="badge neutral">offline</span>')
     + (c.tokenSet ? '<span class="badge good">token set</span>' : '<span class="badge warn">no token</span>')
-    + `<span class="tag">channel ${c.channelId ? esc(c.channelId) : "—"}</span>`;
+    + `<span class="tag">guild ${c.guildId ? esc(c.guildId) : "—"}</span>`
+    + `<span class="tag">${Number(c.links || 0)} account links</span>`;
 }
 document.getElementById("save").onclick = async () => {
   const args = [];
   const t = document.getElementById("token").value.trim(); if (t) args.push("token=" + t);
-  args.push("channel=" + document.getElementById("channel").value.trim());
-  args.push("prefix=" + (document.getElementById("prefix").value.trim() || "!"));
-  args.push("categories=" + document.getElementById("categories").value.trim());
-  args.push("admins=" + document.getElementById("admins").value.trim());
-  args.push("actions=" + document.getElementById("actions").value.trim());
+  for (const id of ["guild","panelchannel","statuschannel","auditchannel","notifychannel","categories","interval","critical"]) {
+    args.push(id + "=" + document.getElementById(id).value.trim());
+  }
   const r = await Helix.action("discord.config.set", ...args);
   Helix.toast(r.lines[0] || "saved"); document.getElementById("token").value = ""; setTimeout(load, 800);
 };
 document.getElementById("send").onclick = async () => {
-  const m = document.getElementById("msg").value.trim(); if (!m) return;
-  const r = await Helix.action("discord.send", ...m.split(" ")); Helix.toast(r.success ? "sent" : (r.lines[0] || "failed"));
+  const ch = document.getElementById("msgchannel").value.trim();
+  const m = document.getElementById("msg").value.trim(); if (!m || !ch) return;
+  const r = await Helix.action("discord.send", ch, ...m.split(" ")); Helix.toast(r.success ? "sent" : (r.lines[0] || "failed"));
 };
 document.getElementById("refresh").onclick = load;
 Helix.ready(load);

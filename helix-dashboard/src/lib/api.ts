@@ -163,9 +163,18 @@ export interface AuditEntry {
   outcome: string
 }
 export interface AddonInfo {
-  manifest: { id: string; name: string; version: string }
+  manifest: { id: string; name: string; version: string; description?: string }
   state: string
   failureReason?: string | null
+  actions?: AddonAction[]
+}
+export interface AddonAction {
+  name: string
+  description: string
+  usage: string
+  playerCommand?: boolean
+  permission?: string | null
+  bridgeInvocable?: boolean
 }
 export interface PanelInfo {
   id: string
@@ -186,6 +195,7 @@ export interface ActionResult {
 }
 export interface ProxyView {
   maintenance: boolean
+  paused?: boolean
   proxies: { id: string; state: string; port: number; onlinePlayers: number; maxPlayers: number }[]
   backends: { id: string; task: string; state: string; host: string; port: number; onlinePlayers: number }[]
 }

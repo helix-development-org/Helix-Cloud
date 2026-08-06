@@ -6,6 +6,7 @@ import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
 import org.helix.api.action.ActionSource
+import org.helix.api.message.Messages
 
 /**
  * Private-messaging backend addon ("BetterMSGs").
@@ -19,7 +20,7 @@ import org.helix.api.action.ActionSource
  */
 class BetterMsgsAddon : AddonBase() {
     private lateinit var store: MessageStore
-    private lateinit var msg: org.helix.api.message.Messages
+    private lateinit var msg: Messages
     private val json = Json
 
     /** Player (lowercase) to the peer (lowercase) whose chat is open. */
@@ -30,43 +31,7 @@ class BetterMsgsAddon : AddonBase() {
      */
     override fun enable() {
         store = MessageStore(context.storage())
-        msg = context.localizedMessages(
-            mapOf(
-                "en" to mapOf(
-                    "notify" to "{prefix} <gray>New message from <white>{sender}</white> — " +
-                        "<click:run_command:'/msg {sender}'><aqua>[open]</aqua></click>",
-                    "error.self" to "&cYou cannot message yourself.",
-                    // GUI texts of the Paper component (resolved per player there)
-                    "item.back" to "<gray>Back",
-                    "item.close" to "<red>Close",
-                    "item.write" to "<green>Write a message…",
-                    "item.scroll.up" to "<gray>Older",
-                    "item.scroll.down" to "<gray>Newer",
-                    "item.refresh" to "<gray>Refresh",
-                    "prompt.message" to "<gray>Type your message in chat (or <white>cancel</white>):",
-                    "note.empty" to "<gray>No messages yet — say hi!",
-                    "note.offline" to "<dark_gray>offline",
-                    "note.online" to "<green>online",
-                    "sent" to "<gray>To <white>{target}</white>: {text}",
-                ),
-                "de" to mapOf(
-                    "notify" to "{prefix} <gray>Neue Nachricht von <white>{sender}</white> — " +
-                        "<click:run_command:'/msg {sender}'><aqua>[öffnen]</aqua></click>",
-                    "error.self" to "&cDu kannst dir nicht selbst schreiben.",
-                    "item.back" to "<gray>Zurück",
-                    "item.close" to "<red>Schließen",
-                    "item.write" to "<green>Nachricht schreiben…",
-                    "item.scroll.up" to "<gray>Ältere",
-                    "item.scroll.down" to "<gray>Neuere",
-                    "item.refresh" to "<gray>Aktualisieren",
-                    "prompt.message" to "<gray>Schreib deine Nachricht in den Chat (oder <white>cancel</white>):",
-                    "note.empty" to "<gray>Noch keine Nachrichten — sag hallo!",
-                    "note.offline" to "<dark_gray>offline",
-                    "note.online" to "<green>online",
-                    "sent" to "<gray>An <white>{target}</white>: {text}",
-                ),
-            ),
-        )
+        msg = loadMessages()
         action(
             "bettermsgs.send",
             "Appends a private message and notifies the recipient.",
@@ -89,6 +54,7 @@ class BetterMsgsAddon : AddonBase() {
             "bettermsgs.read",
             "Resets the unread counter of a peer in a player's contact index.",
             "bettermsgs.read <player> <peer>",
+            bridgeInvocable = true,
         ) { invocation -> read(invocation) }
         action(
             "bettermsgs.focus",

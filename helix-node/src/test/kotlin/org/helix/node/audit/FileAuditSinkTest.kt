@@ -73,6 +73,21 @@ class FileAuditSinkTest {
     }
 
     @Test
+    fun `appends racing a concurrent prune are never lost`() {
+        val sink = FileAuditSink(file)
+        val writers = (1..2).map { t ->
+            Thread { repeat(100) { i -> sink.append(entry(epochMs = (t * 1_000 + i).toLong())) } }
+        }
+        writers.forEach { it.start() }
+        // every entry is younger than the cutoff, so prune must not remove anything —
+        // an unsynchronized prune would still drop appends landing mid-rewrite
+        repeat(50) { sink.prune(olderThanEpochMs = 0) }
+        writers.forEach { it.join() }
+
+        assertEquals(200, sink.loadRecent(1_000).size)
+    }
+
+    @Test
     fun `prune on a missing file is a no-op`() {
         val emptyFile = createTempDirectory("audit-empty").resolve("audit.jsonl")
 

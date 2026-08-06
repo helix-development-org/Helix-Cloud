@@ -47,30 +47,7 @@ class GuardAddon : AddonBase() {
             violationRetentionDays = { effectiveInt("history.retention-days", 30) },
             replayRetentionDays = { effectiveInt("detection.replay-retention-days", 7) },
         )
-        msg = context.localizedMessages(
-            mapOf(
-                "en" to mapOf(
-                    // network-wide staff alert on every incident; placeholders:
-                    // {player} {check} {confidence} {server}
-                    "alert" to (
-                        "{prefix} <red>⚠</red> <white>{player}</white> <gray>failed</gray> " +
-                            "<red>{check}</red> <gray>({confidence}% on {server})</gray>"
-                        ),
-                    // disconnect screen — MiniMessage, multi-line; placeholders:
-                    // {reason} {expiry}
-                    "ban.screen" to "<red><bold>Banned</bold></red>\n<gray>{reason}\n<gray>Expires: <white>{expiry}",
-                    "ban.expiry.never" to "never",
-                ),
-                "de" to mapOf(
-                    "alert" to (
-                        "{prefix} <red>⚠</red> <white>{player}</white> <gray>ist aufgefallen:</gray> " +
-                            "<red>{check}</red> <gray>({confidence}% auf {server})</gray>"
-                        ),
-                    "ban.screen" to "<red><bold>Gebannt</bold></red>\n<gray>{reason}\n<gray>Läuft ab: <white>{expiry}",
-                    "ban.expiry.never" to "nie",
-                ),
-            ),
-        )
+        msg = loadMessages()
         storeActions = GuardStoreActions(context, guardStore, msg)
         storeActions.register()
         context.registerJoinGate { request ->

@@ -17,6 +17,7 @@ repositories {
 dependencies {
     compileOnly(libs.paper.api)
     implementation(libs.kotlinx.serialization.json)
+    implementation(rootProject.project("helix-wire"))
 }
 
 tasks.withType<JavaCompile>().configureEach {

@@ -11,11 +11,16 @@ mongodb-driver = "5.2.1"
 snakeyaml = "2.3"
 packetevents = "2.13.0"
 paper-api = "1.21.11-R0.1-SNAPSHOT"
+vault-api = "1.7.1"
+placeholderapi = "2.11.6"
+labymod-serverapi = "1.0.13"
+labymod-voicechat = "1.0.2"
 velocity-api = "3.4.0"
-kord = "0.15.0"
+kord = "0.18.1"
 
 [libraries]
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+kotlinx-serialization-cbor = { module = "org.jetbrains.kotlinx:kotlinx-serialization-cbor", version.ref = "kotlinx-serialization" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
@@ -34,6 +39,10 @@ ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negoti
 snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
 packetevents-spigot = { module = "com.github.retrooper:packetevents-spigot", version.ref = "packetevents" }
 paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper-api" }
+vault-api = { module = "com.github.MilkBowl:VaultAPI", version.ref = "vault-api" }
+placeholderapi = { module = "me.clip:placeholderapi", version.ref = "placeholderapi" }
+labymod-server-velocity = { module = "net.labymod.serverapi:server-velocity", version.ref = "labymod-serverapi" }
+labymod-voicechat = { module = "net.labymod.serverapi.integration:voicechat", version.ref = "labymod-voicechat" }
 velocity-api = { module = "com.velocitypowered:velocity-api", version.ref = "velocity-api" }
 kord-core = { module = "dev.kord:kord-core", version.ref = "kord" }
 

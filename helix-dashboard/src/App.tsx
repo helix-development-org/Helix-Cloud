@@ -20,7 +20,7 @@ import { AddonPanelView } from "@/views/addon-panel"
 
 const TITLES: Record<string, string> = {
   overview: "Overview", tasks: "Tasks", services: "Services", players: "Players", proxy: "Proxy",
-  events: "Events", logs: "Launcher-Logs", audit: "Logs", "audit-log": "Audit", addons: "Addons",
+  events: "Events", logs: "Konsole", audit: "Logs", "audit-log": "Audit", addons: "Addons",
   schedules: "Schedules", backups: "Backups", files: "Files", translations: "Translations", settings: "Settings",
 }
 

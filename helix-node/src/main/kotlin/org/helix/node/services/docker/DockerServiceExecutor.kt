@@ -45,6 +45,10 @@ class DockerServiceExecutor(
             add(settings.network)
             add("--add-host")
             add("host.docker.internal:host-gateway")
+            if (settings.user.isNotBlank()) {
+                add("--user")
+                add(settings.user)
+            }
             // Only the proxy's port is published to the host: backend Paper containers
             // stay reachable solely over the docker network (by the proxy container),
             // never directly from outside the docker host.
@@ -93,7 +97,10 @@ class DockerServiceExecutor(
     }
 
     private companion object {
-        /** Extra container memory on top of the JVM heap, in megabytes. */
-        const val MEMORY_OVERHEAD_MB = 256
+        /** Extra container memory on top of the JVM heap, in megabytes.
+         *  Covers metaspace, GC/code cache, netty direct buffers and the
+         *  world-generation native peak — 256 got Paper OOM-killed (137)
+         *  during first world generation. */
+        const val MEMORY_OVERHEAD_MB = 512
     }
 }

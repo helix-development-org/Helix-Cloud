@@ -8,6 +8,7 @@ plugins {
 
 dependencies {
     api(rootProject.project("helix-api"))
+    api(rootProject.project("helix-wire"))
     api(rootProject.project("helix-addon-sdk"))
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.tomlj)

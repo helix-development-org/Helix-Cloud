@@ -22,6 +22,7 @@ import org.helix.node.gates.NativePermissionProvider
 import org.helix.node.gates.PermissionResolverRegistry
 import org.helix.node.gates.PermissionService
 import org.helix.node.gates.PlayerDataRegistry
+import org.helix.node.privacy.AddressHashRegistry
 import org.helix.node.identity.IdentityRegistry
 import org.helix.node.logging.LogBuffer
 import org.helix.node.audit.AuditLog
@@ -98,6 +99,7 @@ data class ControlDependencies(
     val joinGates: JoinGateRegistry = JoinGateRegistry(),
     val whitelist: WhitelistStore = WhitelistStore(java.nio.file.Path.of("whitelist.json")),
     val playerData: PlayerDataRegistry = PlayerDataRegistry(),
+    val addressHashes: AddressHashRegistry = AddressHashRegistry(org.helix.api.storage.InMemoryAddonStorage()),
     val commandQueue: ProxyCommandQueue = ProxyCommandQueue(),
     val permissionResolvers: PermissionResolverRegistry = PermissionResolverRegistry(),
     val nativePermissions: NativePermissionCache = NativePermissionCache(),

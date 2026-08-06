@@ -39,6 +39,7 @@ import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import kotlinx.serialization.json.Json
 import org.helix.api.action.ActionInvocation
+import org.helix.api.bridge.NetworkPackInfo
 import org.helix.api.action.ActionSource
 import org.helix.api.action.PlayerCommandRequest
 import org.helix.api.display.DisplayBulkRequest
@@ -251,7 +252,7 @@ private suspend fun RoutingContext.requireBridge(dependencies: ControlDependenci
  * @param dependencies control API dependencies.
  * @return the distinct permission nodes to evaluate.
  */
-private fun knownPermissionNodes(dependencies: ControlDependencies): List<String> = buildList {
+internal fun knownPermissionNodes(dependencies: ControlDependencies): List<String> = buildList {
     add(dependencies.loginPermission)
     addAll(PanelAuthService.VIEW_NODES.values)
     dependencies.dashboardPanels.list().forEach { add(PanelAuthService.panelNode(it.id)) }
@@ -967,6 +968,10 @@ private fun RoutingContext.restActor(): String? =
 
 private fun io.ktor.server.routing.Route.actionRoutes(dependencies: ControlDependencies) {
     get("/actions") {
+        // The full action catalog is admin-only: it enumerates every action name and usage,
+        // which a per-service bridge token has no business reading (the dashboard's per-addon
+        // runner sources its actions from the already-permission-gated /addons route instead).
+        if (!requireAdmin(dependencies)) return@get
         call.respond(dependencies.registry.descriptors())
     }
     post("/actions") {
@@ -1051,7 +1056,7 @@ private fun io.ktor.server.routing.Route.addonRoutes(dependencies: ControlDepend
  * @param event the join or leave to apply.
  * @return `true` when the event type was known.
  */
-private fun applyPlayerEvent(dependencies: ControlDependencies, event: PlayerEvent): Boolean {
+internal fun applyPlayerEvent(dependencies: ControlDependencies, event: PlayerEvent): Boolean {
     if (!dependencies.playerRegistry.handle(event)) {
         return false
     }
@@ -1059,6 +1064,11 @@ private fun applyPlayerEvent(dependencies: ControlDependencies, event: PlayerEve
         "join" -> {
             dependencies.nativePermissions.update(event.name, event.permissions)
             dependencies.identityRegistry.recordJoin(event.name, event.uuid)
+            val address = event.address
+            val uuid = event.uuid
+            if (!address.isNullOrBlank() && !uuid.isNullOrBlank()) {
+                dependencies.addressHashes.record(uuid, address)
+            }
         }
         "leave" -> dependencies.nativePermissions.clear(event.name)
     }
@@ -1117,13 +1127,16 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
         val hub = dependencies.proxyEvents
         val deadline = System.currentTimeMillis() + POLL_TIMEOUT_MS
         while (true) {
-            val commands = dependencies.commandQueue.pending(proxyServiceId)
+            val pending = dependencies.commandQueue.pending(proxyServiceId)
             val routing = hub.routingVersion.get()
             val catalog = hub.commandCatalogVersion.get()
-            val changed = commands.isNotEmpty() || routing != seenRouting || catalog != seenCatalog
+            val changed = pending.isNotEmpty() || routing != seenRouting || catalog != seenCatalog
             if (changed || System.currentTimeMillis() >= deadline) {
-                val token = dependencies.commandQueue.tokenFor(proxyServiceId, ackUpTo)
-                call.respond(ProxyPoll(commands, routing, catalog, token))
+                // The ack token MUST be derived from the snapshot actually going into this
+                // response — a command enqueued after pending() was read is not in it, so a
+                // token covering it would let the proxy's next poll ack a command it never saw.
+                val token = dependencies.commandQueue.tokenFor(pending, ackUpTo)
+                call.respond(ProxyPoll(pending.map { it.command }, routing, catalog, token))
                 break
             }
             hub.await((deadline - System.currentTimeMillis()).coerceIn(1, POLL_RECHECK_MS))

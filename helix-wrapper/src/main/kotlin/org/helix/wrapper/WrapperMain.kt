@@ -21,7 +21,12 @@ object WrapperMain {
     fun main(args: Array<String>) {
         val config = WrapperConfig.load(Path.of("wrapper.properties"))
         println("[helix-wrapper] starting service ${config.serviceId} (${config.serverJar})")
-        val exitCode = ServerProcessRunner().run(config.command(), Path.of("console.in"))
+        // Reuse the JVM binary the wrapper itself runs on — like the node does
+        // when it spawns the wrapper. A bare "java" would require a JVM on the
+        // PATH, which an install via install.sh (private JDK under /opt/helix/jdk)
+        // does not have.
+        val javaExecutable = ProcessHandle.current().info().command().orElse("java")
+        val exitCode = ServerProcessRunner().run(config.command(javaExecutable), Path.of("console.in"))
         println("[helix-wrapper] service ${config.serviceId} exited with code $exitCode")
         exitProcess(exitCode)
     }

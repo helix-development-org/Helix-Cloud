@@ -1,0 +1,112 @@
+<div class="card">
+  <div class="card-head"><h2>LabyMod status</h2><div class="right"><button class="btn sm subtle" id="refresh">Refresh</button></div></div>
+  <div class="card-body">
+    <div id="status" class="row"></div>
+    <div id="users" class="muted" style="margin-top:8px"></div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-head"><h2>Features</h2><div class="sub">changes apply within a second (proxy poll)</div></div>
+  <div class="card-body">
+    <div class="grid c2">
+      <label class="field"><input type="checkbox" id="economy"> Economy HUD</label>
+      <label class="field"><input type="checkbox" id="voicemute"> Voice-chat mute sync</label>
+      <label class="field"><input type="checkbox" id="rpc"> Discord Rich Presence</label>
+      <label class="field"><input type="checkbox" id="subtitles"> Native subtitles</label>
+      <label class="field"><input type="checkbox" id="npcemotes"> NPC emotes</label>
+      <label class="field"><input type="checkbox" id="menu"> Interaction menu</label>
+      <div class="field wide" style="grid-column:1/-1"><label>Rich Presence format <span class="muted">({network}, {task}, {service})</span></label><input id="rpcformat" placeholder="{network} — {task}"></div>
+    </div>
+    <div class="row" style="margin-top:14px"><button class="btn" id="save">Save</button></div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-head"><h2>Interaction menu</h2><div class="sub">right-click entries on players; {name} = clicked player</div></div>
+  <div class="card-body">
+    <div id="menuList"></div>
+    <div class="row" style="margin-top:10px">
+      <input id="menuLabel" placeholder="Label" style="max-width:200px">
+      <input id="menuCommand" placeholder="/msg {name}" style="max-width:260px">
+      <button class="btn subtle" id="menuAdd">Add</button>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <div class="card-head"><h2>NPC emotes</h2><div class="sub">emote ids from LabyMod; idle/interact comma-separated, "-" clears</div></div>
+  <div class="card-body">
+    <div id="npcList"></div>
+    <div class="row" style="margin-top:10px">
+      <input id="npcId" placeholder="npc id" style="max-width:140px">
+      <input id="npcInterval" placeholder="30" style="max-width:70px">
+      <input id="npcIdle" placeholder="2,3" style="max-width:110px">
+      <input id="npcInteract" placeholder="1" style="max-width:110px">
+      <button class="btn subtle" id="npcSave">Save NPC</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <input id="playNpc" placeholder="npc id" style="max-width:140px">
+      <input id="playEmote" placeholder="emote id" style="max-width:100px">
+      <button class="btn subtle" id="playBtn">Play emote now</button>
+    </div>
+  </div>
+</div>
+<script>
+"use strict";
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+let cfg = {};
+async function load() {
+  const stats = await Helix.action("labymod.stats");
+  const list = await Helix.action("labymod.list");
+  document.getElementById("status").innerHTML =
+    (stats.lines || []).map(l => `<span class="tag">${esc(l)}</span>`).join("");
+  const users = (list.lines || []).filter(l => !l.startsWith("no LabyMod"));
+  document.getElementById("users").textContent = users.length ? users.join(", ") : "no LabyMod users online";
+  const r = await Helix.action("labymod.config.get");
+  try { cfg = JSON.parse(r.lines[0] || "{}"); } catch (e) { cfg = {}; }
+  const flags = { economy:"economyHud", voicemute:"voiceMuteSync", rpc:"discordRpc", subtitles:"subtitlesSync", npcemotes:"npcEmotes", menu:"interactionMenu" };
+  for (const [id, key] of Object.entries(flags)) document.getElementById(id).checked = !!cfg[key];
+  document.getElementById("rpcformat").value = cfg.rpcFormat || "";
+  document.getElementById("menuList").innerHTML = (cfg.menuEntries || []).map((e, i) =>
+    `<div class="row"><span class="tag">${i + 1}</span> ${esc(e.label)} <code>${esc(e.command)}</code> <button class="btn sm subtle" data-menuremove="${i + 1}">remove</button></div>`).join("") || '<span class="muted">no entries</span>';
+  document.getElementById("npcList").innerHTML = Object.entries(cfg.npcs || {}).map(([id, e]) =>
+    `<div class="row"><code>${esc(id)}</code> idle=${esc((e.idleEmotes || []).join(","))} every ${e.idleIntervalSeconds}s, interact=${esc((e.interactEmotes || []).join(","))}</div>`).join("") || '<span class="muted">no npc emotes configured</span>';
+  document.querySelectorAll("[data-menuremove]").forEach(btn => btn.onclick = async () => {
+    await Helix.action("labymod.menu.remove", btn.dataset.menuremove); load();
+  });
+}
+document.getElementById("save").onclick = async () => {
+  const args = [];
+  for (const id of ["economy","voicemute","rpc","subtitles","npcemotes","menu"]) {
+    args.push(id + "=" + document.getElementById(id).checked);
+  }
+  const format = document.getElementById("rpcformat").value.trim();
+  if (format) args.push("rpcformat=" + format);
+  const r = await Helix.action("labymod.config.set", ...args);
+  Helix.toast(r.lines[0] || "saved"); load();
+};
+document.getElementById("menuAdd").onclick = async () => {
+  const label = document.getElementById("menuLabel").value.trim();
+  const command = document.getElementById("menuCommand").value.trim();
+  if (!label || !command) return;
+  const r = await Helix.action("labymod.menu.add", command, ...label.split(" "));
+  Helix.toast(r.success ? "added" : (r.lines[0] || "failed"));
+  document.getElementById("menuLabel").value = ""; document.getElementById("menuCommand").value = ""; load();
+};
+document.getElementById("npcSave").onclick = async () => {
+  const id = document.getElementById("npcId").value.trim();
+  const interval = document.getElementById("npcInterval").value.trim() || "30";
+  const idle = document.getElementById("npcIdle").value.trim() || "-";
+  const interact = document.getElementById("npcInteract").value.trim() || "-";
+  if (!id) return;
+  const r = await Helix.action("labymod.npc.set", id, interval, idle, interact);
+  Helix.toast(r.lines[0] || "saved"); load();
+};
+document.getElementById("playBtn").onclick = async () => {
+  const id = document.getElementById("playNpc").value.trim();
+  const emote = document.getElementById("playEmote").value.trim();
+  if (!id || !emote) return;
+  const r = await Helix.action("labymod.emote", id, emote);
+  Helix.toast(r.lines[0] || (r.success ? "queued" : "failed"));
+};
+document.getElementById("refresh").onclick = load;
+Helix.ready(load);
+</script>

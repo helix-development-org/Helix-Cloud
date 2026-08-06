@@ -2,6 +2,7 @@ package org.helix.node.storage
 
 import java.nio.file.Files
 import kotlin.io.path.createTempDirectory
+import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.writeBytes
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -65,6 +66,27 @@ class JsonFileAddonStorageTest {
         directory.resolve("fresh.json").writeBytes(byteArrayOf(0xC3.toByte()))
 
         assertFailsWith<IllegalStateException> { storage.read("fresh") }
+    }
+
+    @Test
+    fun `parallel writes to the same key never corrupt the document`() {
+        val failures = java.util.concurrent.CopyOnWriteArrayList<Throwable>()
+        val threads = (1..4).map { t ->
+            Thread {
+                runCatching { repeat(25) { i -> storage.write("shared", "value-$t-$i") } }
+                    .onFailure(failures::add)
+            }
+        }
+        threads.forEach { it.start() }
+        threads.forEach { it.join() }
+
+        assertTrue(failures.isEmpty(), "concurrent writes failed: ${failures.firstOrNull()}")
+        val value = storage.read("shared")
+        assertTrue(value != null && value.startsWith("value-"), "unexpected document content: $value")
+        assertTrue(
+            directory.listDirectoryEntries("*.tmp").isEmpty(),
+            "temp files were left behind: ${directory.listDirectoryEntries()}",
+        )
     }
 
     @Test

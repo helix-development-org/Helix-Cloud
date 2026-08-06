@@ -20,18 +20,20 @@ class SubtitlePlugin : JavaPlugin(), Listener {
     private val displays = SubtitleDisplayService()
     private var fetchTask: BukkitTask? = null
     private var trackTask: BukkitTask? = null
+    private var client: BridgeValuesClient? = null
 
     /** Reads the node connection from the environment and starts both tasks. */
     override fun onEnable() {
         val controlUrl = System.getenv("HELIX_CONTROL_URL").orEmpty()
         val controlToken = System.getenv("HELIX_CONTROL_TOKEN").orEmpty()
         val serviceId = System.getenv("HELIX_SERVICE_ID").orEmpty()
-        if (controlUrl.isBlank() || serviceId.isBlank()) {
-            logger.severe("HelixSubtitles requires HELIX_CONTROL_URL and HELIX_SERVICE_ID")
+        if (controlUrl.isBlank() || controlToken.isBlank() || serviceId.isBlank()) {
+            logger.severe("HelixSubtitles requires HELIX_CONTROL_URL, HELIX_CONTROL_TOKEN and HELIX_SERVICE_ID")
             server.pluginManager.disablePlugin(this)
             return
         }
         val client = BridgeValuesClient(controlUrl, controlToken, serviceId)
+        this.client = client
         server.pluginManager.registerEvents(this, this)
 
         fetchTask = server.scheduler.runTaskTimerAsynchronously(
@@ -54,6 +56,8 @@ class SubtitlePlugin : JavaPlugin(), Listener {
         fetchTask?.cancel()
         trackTask?.cancel()
         displays.shutdown()
+        client?.close()
+        client = null
     }
 
     /** Drops the quitting player's subtitle display; nothing else references it after this. */

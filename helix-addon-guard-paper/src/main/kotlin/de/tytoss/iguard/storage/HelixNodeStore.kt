@@ -27,6 +27,8 @@ import org.bukkit.Bukkit
 import java.io.ByteArrayOutputStream
 import java.net.URI
 import java.net.http.HttpClient
+import org.helix.api.action.ActionInvocation
+import org.helix.wire.ServiceNodeApi
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
@@ -69,8 +71,12 @@ class HelixNodeStore(
     private val history: HistoryConfig,
     private val logger: Logger
 ) : GuardStore {
-    private val endpoint: URI = URI.create(controlUrl.trimEnd('/') + "/api/v1/internal/action")
-    private val http: HttpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()
+    private val api = ServiceNodeApi(
+        controlUrl,
+        System.getenv("HELIX_CONTROL_HTTP_URL")?.ifBlank { null } ?: controlUrl,
+        System.getenv("HELIX_SERVICE_ID").orEmpty(),
+        controlToken,
+    ).also { it.start() }
     private val json = Json { ignoreUnknownKeys = true }
     private val queue = ArrayBlockingQueue<NodeAction>(history.queueCapacity)
     private val available = AtomicBoolean(true)
@@ -106,7 +112,7 @@ class HelixNodeStore(
     }
 
     override fun close() {
-        // The JDK HttpClient releases its resources with the daemon threads; nothing pooled to close.
+        api.close()
     }
 
     // --- Async writes (queued node actions) ---
@@ -321,24 +327,10 @@ class HelixNodeStore(
 
     /** Invokes one node action and returns its output lines; throws when the node rejects or is down. */
     private fun invoke(action: String, arguments: List<String>): List<String> {
-        val body = buildJsonObject {
-            put("action", action)
-            putJsonArray("arguments") { arguments.forEach { add(it) } }
-        }
-        val request = HttpRequest.newBuilder(endpoint)
-            .timeout(Duration.ofSeconds(10))
-            .header("Authorization", "Bearer $controlToken")
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
-            .build()
-        val response = http.send(request, HttpResponse.BodyHandlers.ofString())
-        check(response.statusCode() in 200..299) { "node action $action failed: HTTP ${response.statusCode()}" }
-        val parsed = json.parseToJsonElement(response.body()).jsonObject
-        val lines = parsed["lines"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull } ?: emptyList()
-        check(parsed["success"]?.jsonPrimitive?.booleanOrNull == true) {
-            "node action $action rejected: ${lines.firstOrNull() ?: "no detail"}"
-        }
-        return lines
+        val result = api.action(ActionInvocation(action, arguments))
+            ?: throw IllegalStateException("node action $action failed: node unreachable")
+        check(result.success) { "node action $action rejected: ${result.lines.firstOrNull() ?: "no detail"}" }
+        return result.lines
     }
 
     /** The first response line parsed as a compact-JSON object (the query payload), or null. */

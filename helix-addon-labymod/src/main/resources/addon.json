@@ -1,0 +1,7 @@
+{
+  "id": "helix.labymod",
+  "name": "Helix LabyMod",
+  "version": "1.0.0",
+  "main": "org.helix.addons.labymod.LabyModAddon",
+  "description": "LabyMod 4 integration: detection and stats, economy HUD, voice-chat mute sync, Discord Rich Presence, native subtitles, interaction menu, NPC emotes, markers and prompts. The client protocol runs in the bundled Velocity component."
+}

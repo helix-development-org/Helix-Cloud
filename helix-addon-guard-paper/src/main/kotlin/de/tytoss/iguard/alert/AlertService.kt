@@ -6,9 +6,14 @@ import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.event.ClickEvent
 import net.kyori.adventure.text.event.HoverEvent
 import net.kyori.adventure.text.format.NamedTextColor
+import net.kyori.adventure.text.format.TextDecoration
+import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.Bukkit
+import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
+import org.helix.api.i18n.NodeTranslations
+import org.helix.api.message.LegacyToMini
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
@@ -24,8 +29,10 @@ private data class PendingAlert(val firstAt: Long, val count: Int, val latest: V
  */
 class AlertService(
     private val plugin: JavaPlugin,
-    private val dynamic: AtomicReference<DynamicConfig>
+    private val dynamic: AtomicReference<DynamicConfig>,
+    private val translations: NodeTranslations
 ) {
+    private val miniMessage = MiniMessage.miniMessage()
     private val pending = ConcurrentHashMap<AlertKey, PendingAlert>()
     private val subscribers = ConcurrentHashMap.newKeySet<UUID>()
     private var task: BukkitTask? = null
@@ -69,61 +76,81 @@ class AlertService(
         for ((key, value) in pending) {
             if (now - value.firstAt < config.cooldownMillis || !pending.remove(key, value)) continue
             val record = value.latest
-            val rich = richAlert(record, value.count)
             Bukkit.getOnlinePlayers().asSequence()
                 .filter { it.uniqueId in subscribers && it.hasPermission("iguard.alerts") }
-                .forEach { it.sendMessage(rich) }
+                .forEach { it.sendMessage(richAlert(it, record, value.count)) }
             if (config.console) Bukkit.getConsoleSender().sendMessage(consoleLine(record, value.count))
         }
     }
 
-    /** A modern alert: colour-graded confidence, a hoverable evidence tooltip, and clickable actions. */
-    private fun richAlert(record: ViolationRecord, count: Int): Component {
+    /**
+     * A modern alert resolved in the recipient's language: colour-graded confidence, a hoverable
+     * evidence tooltip, and clickable actions.
+     */
+    private fun richAlert(recipient: Player, record: ViolationRecord, count: Int): Component {
         val confPct = (record.confidence * 100.0).toInt()
-        val confColor = when {
-            confPct >= 80 -> NamedTextColor.RED
-            confPct >= 50 -> NamedTextColor.GOLD
-            else -> NamedTextColor.YELLOW
+        val confTag = when {
+            confPct >= 80 -> "<red>"
+            confPct >= 50 -> "<gold>"
+            else -> "<yellow>"
         }
+        val actionLine = record.shadowAction?.let {
+            screen(recipient, "alert.hover.action", "action" to it)
+        } ?: ""
+        val evidence = record.evidence.entries.joinToString("\n") { "  ${it.key} = ${it.value}" }
         val hover = HoverEvent.showText(
-            Component.text("$CHECK ${record.checkId}\n", NamedTextColor.WHITE)
-                .append(Component.text("Player: ", NamedTextColor.GRAY)).append(Component.text("${record.playerName}\n", NamedTextColor.WHITE))
-                .append(Component.text("VL: ", NamedTextColor.GRAY)).append(Component.text("%.2f".format(record.violationLevel), NamedTextColor.WHITE))
-                .append(Component.text("   Confidence: ", NamedTextColor.GRAY)).append(Component.text("$confPct%\n", confColor))
-                .append(Component.text(if (record.shadowAction != null) "Action: ${record.shadowAction}\n" else "", NamedTextColor.LIGHT_PURPLE))
-                .append(Component.text("Evidence:\n", NamedTextColor.GRAY))
-                .append(Component.text(record.evidence.entries.joinToString("\n") { "  ${it.key} = ${it.value}" }, NamedTextColor.DARK_GRAY))
+            render(
+                screen(
+                    recipient, "alert.hover",
+                    "check" to record.checkId,
+                    "player" to record.playerName,
+                    "vl" to "%.2f".format(record.violationLevel),
+                    "confcolor" to confTag,
+                    "conf" to "$confPct",
+                    "action" to actionLine,
+                    "evidence" to evidence,
+                )
+            )
         )
-        val prefix = Component.text("[", NamedTextColor.DARK_GRAY)
-            .append(Component.text("IGuard", NamedTextColor.RED))
-            .append(Component.text("] ", NamedTextColor.DARK_GRAY))
+        val countTag = if (count > 1) "<dark_gray> x$count</dark_gray>" else ""
+        val prefix = render(screen(recipient, "alert.prefix"))
         val head = Component.text(record.playerName, NamedTextColor.WHITE)
             .hoverEvent(hover)
             .clickEvent(ClickEvent.runCommand("/iguard panel ${record.playerName}"))
-        val body = Component.text(" failed ", NamedTextColor.GRAY)
-            .append(Component.text(record.checkId, NamedTextColor.AQUA))
-            .append(Component.text(" (", NamedTextColor.DARK_GRAY))
-            .append(Component.text("VL %.1f".format(record.violationLevel), NamedTextColor.GRAY))
-            .append(Component.text(" · ", NamedTextColor.DARK_GRAY))
-            .append(Component.text("$confPct%", confColor))
-            .append(if (count > 1) Component.text(" x$count", NamedTextColor.DARK_GRAY) else Component.empty())
-            .append(Component.text(")", NamedTextColor.DARK_GRAY))
-            .hoverEvent(hover)
-        return prefix.append(head).append(body).append(Component.text("  ")).append(actions(record.playerName))
+        val body = render(
+            screen(
+                recipient, "alert.body",
+                "check" to record.checkId,
+                "vl" to "%.1f".format(record.violationLevel),
+                "confcolor" to confTag,
+                "conf" to "$confPct",
+                "count" to countTag,
+            )
+        ).hoverEvent(hover)
+        return prefix.append(head).append(body).append(Component.text("  ")).append(actions(recipient, record.playerName))
     }
 
-    private fun actions(player: String): Component {
-        /** Renders one clickable action button. */
-        fun button(label: String, color: NamedTextColor, command: String, tip: String) =
+    private fun actions(recipient: Player, player: String): Component {
+        /** Renders one clickable action button; the hover tip is resolved prefix-free. */
+        fun button(label: String, color: NamedTextColor, command: String, tipKey: String) =
             Component.text(label, color)
                 .clickEvent(ClickEvent.runCommand(command))
-                .hoverEvent(HoverEvent.showText(Component.text(tip, NamedTextColor.GRAY)))
-        return button("[$EYE]", NamedTextColor.AQUA, "/iguard spectate $player", "Spectate $player")
+                .hoverEvent(HoverEvent.showText(render(screen(recipient, tipKey, "player" to player))))
+        return button("[$EYE]", NamedTextColor.AQUA, "/iguard spectate $player", "alert.button.spectate")
             .append(Component.text(" "))
-            .append(button("[$PANEL]", NamedTextColor.GREEN, "/iguard panel $player", "Open $player in the admin panel"))
+            .append(button("[$PANEL]", NamedTextColor.GREEN, "/iguard panel $player", "alert.button.panel"))
             .append(Component.text(" "))
-            .append(button("[$BAN]", NamedTextColor.RED, "/iguard ban $player", "Ban $player"))
+            .append(button("[$BAN]", NamedTextColor.RED, "/iguard ban $player", "alert.button.ban"))
     }
+
+    private fun locale(player: Player): String = player.locale().language
+
+    /** Prefix-free text resolved in the player's language (raw, for embedding or rendering). */
+    private fun screen(player: Player, key: String, vararg params: Pair<String, String>): String =
+        translations.screen(player.name, locale(player), key, *params)
+
+    private fun render(text: String): Component =
+        miniMessage.deserialize(LegacyToMini.translate(text)).decoration(TextDecoration.ITALIC, false)
 
     private fun consoleLine(record: ViolationRecord, count: Int): Component {
         val details = record.evidence.entries.joinToString(" ") { "${it.key}=${it.value}" } + if (count > 1) " x$count" else ""
@@ -135,7 +162,6 @@ class AlertService(
         const val EYE = "◉"     // spectate glyph
         const val PANEL = "≡"   // panel glyph
         const val BAN = "✘"     // ban glyph
-        const val CHECK = "⚠"   // warning glyph
     }
 
     private fun loadSubscribers() {

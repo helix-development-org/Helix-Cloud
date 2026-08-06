@@ -47,6 +47,7 @@ class NodeConfigLoader {
             docker = NodeConfig.DockerSettings(
                 network = toml.getString("docker.network") ?: defaults.docker.network,
                 image = toml.getString("docker.image") ?: defaults.docker.image,
+                user = toml.getString("docker.user") ?: defaults.docker.user,
             ),
             storage = NodeConfig.StorageSettings(
                 mode = toml.getString("storage.mode") ?: defaults.storage.mode,
@@ -69,6 +70,11 @@ class NodeConfigLoader {
             ),
             audit = NodeConfig.AuditSettings(
                 retentionDays = toml.getLong("audit.retentionDays")?.toInt() ?: defaults.audit.retentionDays,
+            ),
+            wire = NodeConfig.WireSettings(
+                enabled = toml.getBoolean("wire.enabled") ?: defaults.wire.enabled,
+                port = toml.getLong("wire.port")?.toInt() ?: defaults.wire.port,
+                tls = toml.getBoolean("wire.tls") ?: defaults.wire.tls,
             ),
         )
     }

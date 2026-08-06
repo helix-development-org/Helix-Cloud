@@ -2,6 +2,8 @@ package org.helix.node.services
 
 import java.io.ByteArrayInputStream
 import java.nio.file.Files
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -191,5 +193,65 @@ class ServiceManagerTest {
         assertEquals(ServiceState.STOPPED, manager.find(info.id)?.state)
 
         assertFalse(manager.watchdogFail(info.id, "stuck"))
+    }
+
+    @Test
+    fun `stop and kill on a terminated service never re-enter STOPPING`() {
+        task(name = "Static", static = true)
+        val info = manager.startService("Static")
+        executor.handles.first().exit(0)
+
+        assertFalse(manager.stopService(info.id))
+        assertFalse(manager.killService(info.id))
+        assertEquals(ServiceState.STOPPED, manager.find(info.id)?.state)
+    }
+
+    @Test
+    fun `late exit of a superseded service leaves the successor untouched`() {
+        task()
+        val info = manager.startService("Lobby")
+        val old = manager.find(info.id)!!
+
+        // simulate a stop whose exit callback is delayed: the coordinator
+        // already sees the service as inactive and starts a replacement
+        old.stopRequested = true
+        old.state = ServiceState.STOPPED
+        val successorInfo = manager.startService("Lobby")
+        assertEquals(info.id, successorInfo.id) // the id got reused
+        val successor = manager.find(info.id)!!
+
+        // now the predecessor's exit callback finally fires
+        executor.handles.first().exit(0)
+
+        // the successor keeps its map slot and its freshly prepared workspace
+        assertTrue(manager.find(info.id) === successor)
+        assertEquals(ServiceState.STARTING, manager.find(info.id)?.state)
+        assertTrue(Files.exists(paths.servicesTemp.resolve("${info.id}/wrapper.properties")))
+    }
+
+    @Test
+    fun `port probe does not hold the manager lock`() {
+        task()
+        val probing = CountDownLatch(1)
+        val releaseProbe = CountDownLatch(1)
+        val probingManager = ServiceManager(
+            taskStore = taskStore,
+            workspacePreparer = preparer,
+            executors = mapOf(ExecutorType.PROCESS to executor),
+            portAllocator = PortAllocator(canBind = { probing.countDown(); releaseProbe.await(); true }),
+        )
+        val starter = Thread { probingManager.startService("Lobby") }.apply { start() }
+        try {
+            assertTrue(probing.await(5, TimeUnit.SECONDS), "port probe never started")
+
+            // a reader must not stall behind the (potentially slow) bind probe
+            val readerDone = CountDownLatch(1)
+            Thread { probingManager.services(); readerDone.countDown() }.start()
+            assertTrue(readerDone.await(2, TimeUnit.SECONDS), "reader blocked behind the port probe")
+        } finally {
+            releaseProbe.countDown()
+            starter.join(5_000)
+        }
+        assertEquals(30000, probingManager.services().single().port)
     }
 }

@@ -42,6 +42,8 @@ import org.helix.api.proxy.PermissionDecision
 import org.helix.api.proxy.ProxyCommand
 import org.helix.api.proxy.ProxyPoll
 import org.helix.api.proxy.RoutingSnapshot
+import org.helix.wire.ServiceNodeApi
+import org.helix.wire.WireCodec
 import org.slf4j.Logger
 
 /**
@@ -63,7 +65,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
     private val translations = BridgeTranslations()
     private val reportedLocales = ConcurrentHashMap.newKeySet<String>()
     private var settings: BridgeSettings? = null
-    private var client: NodeHttpClient? = null
+    private var api: ServiceNodeApi? = null
     private var registry: BackendRegistry? = null
     private var heartbeatTask: ScheduledTask? = null
 
@@ -119,32 +121,39 @@ class HelixVelocityBridgePlugin @Inject constructor(
             return
         }
         settings = loaded
-        val httpClient = NodeHttpClient(loaded)
-        client = httpClient
+        val nodeApi = ServiceNodeApi(loaded.controlUrl, loaded.httpUrl, loaded.serviceId, loaded.token) { logger.warn(it) }
+        api = nodeApi
+        nodeApi.start()
         val backendRegistry = BackendRegistry(proxy, logger)
         registry = backendRegistry
         ProxyCommands(proxy, backendRegistry, ::translate) { player ->
             hasPermission(player.username, "helix.maintenance.bypass")
         }.register(this)
         // Heartbeat is the only periodic task; everything else (commands,
-        // routing, player-command registration) is delivered instantly via
-        // a long-poll the node answers the moment something changes.
+        // routing, player-command registration) is delivered instantly — over
+        // the wire push when it is up, otherwise via the classic long-poll.
         heartbeatTask = proxy.scheduler
             .buildTask(
                 this,
                 Runnable {
-                    sendHeartbeat(loaded, httpClient)
-                    syncBridgeValues(loaded, httpClient)
-                    syncTranslations(httpClient)
-                    syncNetworkPack(httpClient)
-                    syncBanSnapshot(httpClient)
-                    syncRoster(loaded, httpClient)
+                    sendHeartbeat(nodeApi)
+                    syncBridgeValues(nodeApi)
+                    syncTranslations(nodeApi)
+                    syncNetworkPack(nodeApi)
+                    syncBanSnapshot(nodeApi)
+                    syncRoster(loaded, nodeApi)
                 },
             )
             .delay(Duration.ofSeconds(1))
             .repeat(Duration.ofSeconds(5))
             .schedule()
-        startPollLoop(loaded, httpClient, backendRegistry)
+        // Wire push applies the command/routing feed the instant it arrives.
+        nodeApi.onPush { category, payload ->
+            if (category == "poll") {
+                nodeApi.decodePush<ProxyPoll>(payload)?.let { applyPoll(loaded, nodeApi, backendRegistry, it) }
+            }
+        }
+        startPollLoop(loaded, nodeApi, backendRegistry)
         logger.info("Helix bridge enabled for {} → {}", loaded.serviceId, loaded.controlUrl)
     }
 
@@ -160,40 +169,63 @@ class HelixVelocityBridgePlugin @Inject constructor(
         polling = false
         pollThread?.interrupt()
         pollThread = null
+        api?.close()
+        api = null
     }
 
-    private fun startPollLoop(settings: BridgeSettings, client: NodeHttpClient, registry: BackendRegistry) {
+    // Applied routing/catalog versions, shared between the wire-push handler and the
+    // HTTP long-poll fallback so whichever transport is active continues where the other left off.
+    @Volatile
+    private var appliedRoutingVersion = -1
+
+    @Volatile
+    private var appliedCatalogVersion = -1
+
+    /**
+     * Applies one poll result (from the wire push or the HTTP long-poll):
+     * runs its commands, re-syncs routing and the player-command catalog on
+     * a version change, and acknowledges the commands so the node clears
+     * them — over the wire when it is up.
+     */
+    private fun applyPoll(settings: BridgeSettings, api: ServiceNodeApi, registry: BackendRegistry, poll: ProxyPoll) {
+        poll.commands.forEach(::executeCommand)
+        if (poll.ackToken > 0 && api.isWireActive()) {
+            api.pollAck(poll.ackToken)
+        }
+        if (poll.routingVersion != appliedRoutingVersion) {
+            syncRouting(settings, api, registry)
+            reapplyPermissionNodes()
+            appliedRoutingVersion = poll.routingVersion
+        }
+        if (poll.commandCatalogVersion != appliedCatalogVersion) {
+            syncPlayerCommands(settings, api)
+            reapplyPermissionNodes()
+            appliedCatalogVersion = poll.commandCatalogVersion
+        }
+    }
+
+    private fun startPollLoop(settings: BridgeSettings, api: ServiceNodeApi, registry: BackendRegistry) {
         polling = true
         pollThread = Thread {
-            var routingVersion = -1
-            var catalogVersion = -1
             // Confirms the PREVIOUS response's commands were received; the node only removes them
             // from its queue on this ack, so a response lost in transit (proxy restart, connection
             // reset) never silently drops a command — it simply reappears on the retried poll.
             var ackUpTo = 0L
             while (polling) {
                 try {
-                    val body = client.getJsonLong(
-                        "/api/v1/internal/poll?proxyServiceId=${settings.serviceId}" +
-                            "&routingVersion=$routingVersion&commandCatalogVersion=$catalogVersion&ackUpTo=$ackUpTo",
-                    )
-                    if (body == null) {
+                    // While the wire is up, the push handler delivers the feed; the HTTP long-poll
+                    // stands down to avoid double-applying commands, and simply idles.
+                    if (api.isWireActive()) {
                         Thread.sleep(RECONNECT_DELAY_MS)
                         continue
                     }
-                    val poll = json.decodeFromString<ProxyPoll>(body)
-                    poll.commands.forEach(::executeCommand)
+                    val poll = api.pollHttp(appliedRoutingVersion, appliedCatalogVersion, ackUpTo)
+                    if (poll == null) {
+                        Thread.sleep(RECONNECT_DELAY_MS)
+                        continue
+                    }
                     ackUpTo = poll.ackToken
-                    if (poll.routingVersion != routingVersion) {
-                        syncRouting(settings, client, registry)
-                        reapplyPermissionNodes()
-                        routingVersion = poll.routingVersion
-                    }
-                    if (poll.commandCatalogVersion != catalogVersion) {
-                        syncPlayerCommands(settings, client)
-                        reapplyPermissionNodes()
-                        catalogVersion = poll.commandCatalogVersion
-                    }
+                    applyPoll(settings, api, registry, poll)
                 } catch (interrupt: InterruptedException) {
                     return@Thread
                 } catch (failure: Exception) {
@@ -217,8 +249,36 @@ class HelixVelocityBridgePlugin @Inject constructor(
     @Subscribe
     fun onPostLogin(event: PostLoginEvent) {
         val granted = permissionNodes().filter { event.player.hasPermission(it) }
-        reportPlayerEvent("join", event.player.username, event.player.uniqueId.toString(), granted)
-        sendNetworkPack(event.player)
+        val address = runCatching { event.player.remoteAddress?.address?.hostAddress }.getOrNull()
+        reportPlayerEvent("join", event.player.username, event.player.uniqueId.toString(), granted, address)
+    }
+
+    /**
+     * Offers the network pack once the player reached their first backend.
+     *
+     * Deliberately not at [onPostLogin]: since the 1.20.2 configuration
+     * phase, an offer sent before the first server connection is silently
+     * dropped by some client versions — the player then never sees the
+     * pack prompt.
+     *
+     * @param event the post-connect event.
+     */
+    @Subscribe
+    fun onServerPostConnect(event: com.velocitypowered.api.event.player.ServerPostConnectEvent) {
+        if (event.previousServer == null) {
+            sendNetworkPack(event.player)
+        }
+    }
+
+    /**
+     * Logs the client's answer to the pack offer, so "player got no pack"
+     * reports are diagnosable from the proxy log.
+     *
+     * @param event the status event.
+     */
+    @Subscribe
+    fun onResourcePackStatus(event: com.velocitypowered.api.event.player.PlayerResourcePackStatusEvent) {
+        logger.info("Network pack status for {}: {}", event.player.username, event.status)
     }
 
     /**
@@ -242,12 +302,8 @@ class HelixVelocityBridgePlugin @Inject constructor(
      * @return the fetched nodes, or `null` on failure (nothing cached).
      */
     private fun fetchPermissionNodes(): List<String>? {
-        val httpClient = client ?: return null
-        val nodes = runCatching {
-            httpClient.getJson("/api/v1/internal/permission-nodes")
-                ?.let { json.decodeFromString<List<String>>(it) }
-        }.onFailure { logger.warn("Helix permission-node fetch failed: {}", it.message) }
-            .getOrNull()
+        val nodeApi = api ?: return null
+        val nodes = nodeApi.permissionNodes()
         if (nodes != null) {
             permissionNodes = nodes
         }
@@ -263,16 +319,13 @@ class HelixVelocityBridgePlugin @Inject constructor(
      * effects for players who never left.
      */
     private fun reapplyPermissionNodes() {
-        val httpClient = client ?: return
+        val nodeApi = api ?: return
         val nodes = fetchPermissionNodes() ?: return
         proxy.allPlayers.forEach { player ->
             val granted = nodes.filter { player.hasPermission(it) }
-            runCatching {
-                httpClient.postJson(
-                    "/api/v1/internal/player-permissions",
-                    json.encodeToString(PlayerPermissionsReport(player.username, granted)),
-                )
-            }.onFailure { logger.warn("Helix permission reapply failed for {}: {}", player.username, it.message) }
+            if (!nodeApi.playerPermissionsSet(PlayerPermissionsReport(player.username, granted))) {
+                logger.warn("Helix permission reapply failed for {}", player.username)
+            }
         }
     }
 
@@ -292,19 +345,20 @@ class HelixVelocityBridgePlugin @Inject constructor(
         name: String,
         uuid: String,
         permissions: List<String> = emptyList(),
+        address: String? = null,
     ) {
         val activeSettings = settings ?: return
-        val httpClient = client ?: return
-        runCatching {
-            val event = PlayerEvent(
+        val nodeApi = api ?: return
+        nodeApi.playerEvent(
+            PlayerEvent(
                 type = type,
                 name = name,
                 uuid = uuid,
                 proxyServiceId = activeSettings.serviceId,
                 permissions = permissions,
-            )
-            httpClient.postJson("/api/v1/internal/player-event", json.encodeToString(event))
-        }.onFailure { logger.warn("Helix player event failed: {}", it.message) }
+                address = address,
+            ),
+        )
     }
 
     /**
@@ -319,7 +373,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
     @Subscribe
     fun onLogin(event: LoginEvent) {
         val activeSettings = settings ?: return
-        val httpClient = client ?: return
+        val nodeApi = api ?: return
         val name = event.player.username
         if (proxy.playerCount >= proxy.configuration.showMaxPlayers &&
             !hasPermission(name, "helix.maintenance.bypass")
@@ -333,15 +387,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
             )
             return
         }
-        val decision = runCatching {
-            val request = JoinRequest(name = name, uuid = event.player.uniqueId.toString())
-            httpClient.postJsonForBody(
-                "/api/v1/internal/join-check",
-                json.encodeToString(request),
-            )?.let { json.decodeFromString<JoinDecision>(it) }
-        }.onFailure {
-            logger.warn("Helix join gate failed for {} ({}): fail-open", name, it.message)
-        }.getOrNull() ?: run {
+        val decision = nodeApi.joinCheck(JoinRequest(name = name, uuid = event.player.uniqueId.toString())) ?: run {
             // The live check failed (node unreachable) — consult the cached ban snapshot so a
             // player already known to be banned still cannot slip through the restart window;
             // anyone not on that (fresh enough) cached list still joins as before (fail-open).
@@ -396,15 +442,8 @@ class HelixVelocityBridgePlugin @Inject constructor(
     }
 
     private fun hasPermission(player: String, permission: String): Boolean {
-        val httpClient = client ?: return false
-        return runCatching {
-            httpClient.postJsonForBody(
-                "/api/v1/internal/permission-check",
-                json.encodeToString(PermissionCheckRequest(name = player, permission = permission)),
-            )?.let { json.decodeFromString<PermissionDecision>(it).allowed } ?: false
-        }.onFailure {
-            logger.warn("Helix permission check failed for {}: {}", player, it.message)
-        }.getOrDefault(false)
+        val nodeApi = api ?: return false
+        return nodeApi.permissionCheck(PermissionCheckRequest(name = player, permission = permission))?.allowed ?: false
     }
 
     /**
@@ -435,17 +474,12 @@ class HelixVelocityBridgePlugin @Inject constructor(
      */
     @Subscribe
     fun onPlayerSettingsChanged(event: PlayerSettingsChangedEvent) {
-        val httpClient = client ?: return
+        val nodeApi = api ?: return
         val locale = event.playerSettings.locale ?: return
         if (!reportedLocales.add(event.player.username.lowercase())) {
             return
         }
-        runCatching {
-            httpClient.postJson(
-                "/api/v1/internal/player-language",
-                json.encodeToString(PlayerLocaleReport(event.player.username, locale.toString())),
-            )
-        }.onFailure { logger.warn("Helix locale report failed: {}", it.message) }
+        nodeApi.playerLanguage(PlayerLocaleReport(event.player.username, locale.toString()))
     }
 
     /**
@@ -523,11 +557,9 @@ class HelixVelocityBridgePlugin @Inject constructor(
         return builder.toString()
     }
 
-    private fun syncBridgeValues(settings: BridgeSettings, client: NodeHttpClient) {
+    private fun syncBridgeValues(api: ServiceNodeApi) {
         runCatching {
-            val body = client.getJson("/api/v1/internal/bridge-values?serviceId=${settings.serviceId}")
-                ?: return@runCatching
-            val values = json.decodeFromString<Map<String, String>>(body)
+            val values = api.bridgeValues() ?: return@runCatching
             motd = values["motd.config"]?.let { raw ->
                 runCatching { json.decodeFromString<MotdData>(raw) }.getOrNull()
             }
@@ -544,9 +576,9 @@ class HelixVelocityBridgePlugin @Inject constructor(
      * bans addon's own export verbatim (an empty array without it), so this bridge never needs to
      * know the ban entry's shape beyond `player`/`expiresAtEpochMs`.
      */
-    private fun syncBanSnapshot(client: NodeHttpClient) {
+    private fun syncBanSnapshot(api: ServiceNodeApi) {
         runCatching {
-            val body = client.getJson("/api/v1/internal/ban-snapshot") ?: return@runCatching
+            val body = api.banSnapshot() ?: return@runCatching
             banSnapshot = json.decodeFromString<List<CachedBan>>(body)
             banSnapshotAt = System.currentTimeMillis()
         }.onFailure { logger.warn("Helix ban snapshot sync failed: {}", it.message) }
@@ -576,14 +608,9 @@ class HelixVelocityBridgePlugin @Inject constructor(
      * @param settings bridge settings (carries this proxy's service id).
      * @param client the node HTTP client.
      */
-    private fun syncRoster(settings: BridgeSettings, client: NodeHttpClient) {
-        runCatching {
-            val players = proxy.allPlayers.map { RosterPlayer(it.username, it.uniqueId.toString()) }
-            client.postJson(
-                "/api/v1/internal/player-roster",
-                json.encodeToString(PlayerRosterReport(settings.serviceId, players)),
-            )
-        }.onFailure { logger.warn("Helix roster reconciliation failed: {}", it.message) }
+    private fun syncRoster(settings: BridgeSettings, api: ServiceNodeApi) {
+        val players = proxy.allPlayers.map { RosterPlayer(it.username, it.uniqueId.toString()) }
+        api.playerRoster(PlayerRosterReport(settings.serviceId, players))
     }
 
     /**
@@ -592,19 +619,16 @@ class HelixVelocityBridgePlugin @Inject constructor(
      *
      * @param client the node HTTP client.
      */
-    private fun syncNetworkPack(client: NodeHttpClient) {
-        runCatching {
-            val body = client.getJson("/api/v1/internal/pack") ?: return@runCatching
-            val info = json.decodeFromString<NetworkPackData>(body)
-            if (info.sha1 == networkPackSha1) {
-                return@runCatching
-            }
-            networkPackSha1 = info.sha1
-            if (info.sha1 != null) {
-                logger.info("Network pack changed (sha1 {}), re-sending to {} player(s)", info.sha1, proxy.playerCount)
-                proxy.allPlayers.forEach(::sendNetworkPack)
-            }
-        }.onFailure { logger.warn("Helix network pack sync failed: {}", it.message) }
+    private fun syncNetworkPack(api: ServiceNodeApi) {
+        val info = api.pack() ?: return
+        if (info.sha1 == networkPackSha1) {
+            return
+        }
+        networkPackSha1 = info.sha1
+        if (info.sha1 != null) {
+            logger.info("Network pack changed (sha1 {}), re-sending to {} player(s)", info.sha1, proxy.playerCount)
+            proxy.allPlayers.forEach(::sendNetworkPack)
+        }
     }
 
     /**
@@ -614,8 +638,13 @@ class HelixVelocityBridgePlugin @Inject constructor(
      * @param player the receiving player.
      */
     private fun sendNetworkPack(player: Player) {
-        val sha1 = networkPackSha1?.takeIf { it.length == SHA1_HEX_LENGTH } ?: return
+        val sha1 = networkPackSha1?.takeIf { it.length == SHA1_HEX_LENGTH }
+        if (sha1 == null) {
+            logger.info("No network pack (yet) — nothing offered to {}", player.username)
+            return
+        }
         val url = packUrl(player) ?: return
+        logger.info("Offering network pack {} to {} from {}", sha1.take(8), player.username, url)
         runCatching {
             player.sendResourcePackOffer(
                 proxy.createResourcePackBuilder(url)
@@ -638,7 +667,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
      */
     private fun packUrl(player: Player): String? {
         val activeSettings = settings ?: return null
-        val controlPort = runCatching { java.net.URI(activeSettings.controlUrl).port }
+        val controlPort = runCatching { java.net.URI(activeSettings.httpUrl).port }
             .getOrDefault(-1).takeIf { it > 0 } ?: DEFAULT_CONTROL_PORT
         configuredPackUrl?.let { return expandPackUrl(it, controlPort) }
         System.getenv("HELIX_PACK_URL")?.let { return expandPackUrl(it, controlPort) }
@@ -647,7 +676,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
         if (clientHost != null) {
             return expandPackUrl(clientHost, controlPort)
         }
-        return activeSettings.controlUrl + PACK_PATH
+        return activeSettings.httpUrl + PACK_PATH
     }
 
     /**
@@ -669,45 +698,37 @@ class HelixVelocityBridgePlugin @Inject constructor(
         return if (base.contains("/api/")) base else base.trimEnd('/') + PACK_PATH
     }
 
-    private fun sendHeartbeat(settings: BridgeSettings, client: NodeHttpClient) {
-        runCatching {
-            val report = HeartbeatReport(
-                serviceId = settings.serviceId,
+    private fun sendHeartbeat(api: ServiceNodeApi) {
+        val activeSettings = settings ?: return
+        api.heartbeat(
+            HeartbeatReport(
+                serviceId = activeSettings.serviceId,
                 onlinePlayers = proxy.playerCount,
                 maxPlayers = proxy.configuration.showMaxPlayers,
                 memoryUsedMb = ResourceProbe.memoryUsedMb(),
                 memoryMaxMb = ResourceProbe.memoryMaxMb(),
                 cpuPercent = ResourceProbe.cpuPercent(),
-            )
-            client.postJson("/api/v1/internal/heartbeat", json.encodeToString(report))
-        }.onFailure { logger.warn("Helix heartbeat failed: {}", it.message) }
+            ),
+        )
     }
 
-    private fun syncRouting(settings: BridgeSettings, client: NodeHttpClient, registry: BackendRegistry) {
-        runCatching {
-            val body = client.getJson("/api/v1/internal/routing?proxyServiceId=${settings.serviceId}")
-                ?: return@runCatching
-            val snapshot = json.decodeFromString<RoutingSnapshot>(body)
-            registry.sync(snapshot)
-            maintenance.set(snapshot.maintenance)
-            networkName = snapshot.networkName
-            maintenanceScreen = snapshot.maintenanceScreen
-            serverFullScreen = snapshot.serverFullScreen
-        }.onFailure { logger.warn("Helix routing sync failed: {}", it.message) }
+    private fun syncRouting(settings: BridgeSettings, api: ServiceNodeApi, registry: BackendRegistry) {
+        val snapshot = api.routing() ?: return
+        registry.sync(snapshot)
+        maintenance.set(snapshot.maintenance)
+        networkName = snapshot.networkName
+        maintenanceScreen = snapshot.maintenanceScreen
+        serverFullScreen = snapshot.serverFullScreen
     }
 
-    private fun syncPlayerCommands(settings: BridgeSettings, client: NodeHttpClient) {
-        runCatching {
-            val body = client.getJson("/api/v1/internal/player-commands") ?: return@runCatching
-            json.decodeFromString<List<ActionDescriptor>>(body)
-                .filter { it.playerCommand }
-                .forEach { descriptor -> registerPlayerCommand(settings, client, descriptor) }
-        }.onFailure { logger.warn("Helix player command sync failed: {}", it.message) }
+    private fun syncPlayerCommands(settings: BridgeSettings, api: ServiceNodeApi) {
+        val commands = api.playerCommands() ?: return
+        commands.filter { it.playerCommand }.forEach { descriptor -> registerPlayerCommand(settings, api, descriptor) }
     }
 
     private fun registerPlayerCommand(
         settings: BridgeSettings,
-        client: NodeHttpClient,
+        api: ServiceNodeApi,
         descriptor: ActionDescriptor,
     ) {
         if (!registeredPlayerCommands.add(descriptor.name)) {
@@ -721,7 +742,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
                     ?: return@SimpleCommand
                 proxy.scheduler.buildTask(
                     this,
-                    Runnable { executePlayerCommand(client, descriptor, player, invocation.arguments().toList()) },
+                    Runnable { executePlayerCommand(api, descriptor, player, invocation.arguments().toList()) },
                 ).schedule()
             },
         )
@@ -729,31 +750,24 @@ class HelixVelocityBridgePlugin @Inject constructor(
     }
 
     private fun executePlayerCommand(
-        client: NodeHttpClient,
+        api: ServiceNodeApi,
         descriptor: ActionDescriptor,
         player: com.velocitypowered.api.proxy.Player,
         arguments: List<String>,
     ) {
-        val response = runCatching {
-            client.postJsonForBody(
-                "/api/v1/internal/player-command",
-                json.encodeToString(
-                    org.helix.api.action.PlayerCommandRequest(
-                        player = player.username,
-                        command = descriptor.name,
-                        arguments = arguments,
-                    ),
-                ),
-            )
-        }.onFailure { logger.warn("Player command /{} failed: {}", descriptor.name, it.message) }
-            .getOrNull()
-        if (response == null) {
+        val result = api.playerCommand(
+            org.helix.api.action.PlayerCommandRequest(
+                player = player.username,
+                command = descriptor.name,
+                arguments = arguments,
+            ),
+        )
+        if (result == null) {
             player.sendMessage(
                 translate(player, "helix.translations.velocity.command.unavailable", "Command is currently unavailable."),
             )
             return
         }
-        val result = json.decodeFromString<org.helix.api.action.ActionResult>(response)
         if (result.lines.isEmpty()) {
             val key = if (result.success) "command.result.done" else "command.result.failed"
             val fallback = if (result.success) "Done." else "Failed."
@@ -821,11 +835,8 @@ class HelixVelocityBridgePlugin @Inject constructor(
         return screen(template, ctxFor(player?.username ?: "") + extra)
     }
 
-    private fun syncTranslations(client: NodeHttpClient) {
-        runCatching {
-            val body = client.getJson("/api/v1/internal/translations") ?: return@runCatching
-            translations.update(json.decodeFromString<TranslationsSnapshot>(body))
-        }.onFailure { logger.warn("Helix translation sync failed: {}", it.message) }
+    private fun syncTranslations(api: ServiceNodeApi) {
+        api.translations()?.let(translations::update)
     }
 
     /**

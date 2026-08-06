@@ -37,6 +37,10 @@ tlsKeyAlias = "helix"     # Alias des Schlüssels im Keystore
 [docker]
 network = "helix"              # Docker-Netzwerk aller Helix-Container
 image = "eclipse-temurin:24-jre"  # Basis-Image für Service-Container
+user = ""                      # uid:gid der Container-Prozesse (z. B. "998:998");
+                               # leer = Image-Default (root). Auf die Node-User-ID
+                               # setzen, sonst hinterlassen Container root-eigene
+                               # Dateien im gemounteten Workspace.
 
 [storage]
 mode = "json"          # "json" (Dateien), "postgres" oder "mongodb"
@@ -51,6 +55,15 @@ name = "our network"   # Startwert des Anzeigenamens ({network}); danach im Pane
 
 [audit]
 retentionDays = 180    # harte Aufbewahrungsgrenze des Audit-Logs; 0 = unbegrenzt
+
+[wire]
+enabled = false        # Helix-Wire an/aus. Aus = jede Service-Kommunikation läuft
+                       #   unverändert über HTTP. An = jeder Service öffnet EINE
+                       #   persistente helix://-TCP-Verbindung zur Node für den
+                       #   gesamten internen Verkehr; die HTTP-/internal-Endpoints
+                       #   bleiben als automatischer Fallback bestehen.
+port = 8090            # TCP-Port des Wire-Servers (getrennt vom Control-Port 8080)
+tls = false            # true = TLS über den Control-Keystore ([control] tlsKeystore)
 ```
 
 Im `postgres`-Modus speichern **alle** Addons ihre Daten in der

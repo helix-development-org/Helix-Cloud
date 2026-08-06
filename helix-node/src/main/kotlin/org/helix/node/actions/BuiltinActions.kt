@@ -137,7 +137,8 @@ class BuiltinActions(
                     *tasks.map { task ->
                         val services = "${manager.activeCount(task.name)}/${task.maxServiceCount}"
                         "${task.name} [${task.environment} ${task.version}] " +
-                            "executor=${task.executor} services=$services static=${task.staticServices}"
+                            "executor=${task.executor} services=$services static=${task.staticServices}" +
+                            if (task.paused) " PAUSED" else ""
                     }.toTypedArray(),
                 )
             }
@@ -153,7 +154,7 @@ class BuiltinActions(
                 "services: min=${task.minServiceCount} max=${task.maxServiceCount} active=${manager.activeCount(task.name)}",
                 "memory: ${task.memoryMb} MB, maxPlayers: ${task.maxPlayers}, startPort: ${task.startPort}",
                 "templates: ${task.templates.joinToString()}",
-                "fallbackEligible: ${task.fallbackEligible}, maintenance: ${task.maintenance}",
+                "fallbackEligible: ${task.fallbackEligible}, maintenance: ${task.maintenance}, paused: ${task.paused}",
                 "autoScale: enabled=${task.autoScale.enabled} threshold=${task.autoScale.playerRatioThreshold} " +
                     "idleStopSeconds=${task.autoScale.idleStopSeconds}",
             )
@@ -166,6 +167,40 @@ class BuiltinActions(
             "task.create <name> <PAPER|VELOCITY> <version> [key=value...]",
         ) { invocation ->
             createTask(invocation)
+        }
+        register(
+            registry,
+            "task.pause",
+            "Pauses a task: the auto-scaler stops managing it; with 'stop' all its services stop too.",
+            "task.pause <task> [stop]",
+        ) { invocation ->
+            val name = argument(invocation, 0, "task")
+            val task = taskStore.find(name)
+                ?: return@register ActionResult.error("unknown task: $name")
+            taskStore.save(task.copy(paused = true))
+            val lines = mutableListOf("paused task $name — the auto-scaler leaves it alone")
+            if (invocation.arguments.getOrNull(1)?.equals("stop", ignoreCase = true) == true) {
+                val stopped = manager.services()
+                    .filter { it.taskName == name && manager.stopService(it.id) }
+                lines += "stopping ${stopped.size} service(s): ${stopped.joinToString { it.id }}"
+            } else if (manager.activeCount(name) > 0) {
+                lines += "services keep running — stop them with service.stop or task.pause $name stop"
+            }
+            eventSink("task", "info", "Paused task $name")
+            ActionResult.ok(*lines.toTypedArray())
+        }
+        register(
+            registry,
+            "task.resume",
+            "Resumes a paused task; the auto-scaler takes over again.",
+            "task.resume <task>",
+        ) { invocation ->
+            val name = argument(invocation, 0, "task")
+            val task = taskStore.find(name)
+                ?: return@register ActionResult.error("unknown task: $name")
+            taskStore.save(task.copy(paused = false))
+            eventSink("task", "info", "Resumed task $name")
+            ActionResult.ok("resumed task $name")
         }
         register(registry, "task.delete", "Deletes a task without active services.", "task.delete <task>") { invocation ->
             val name = argument(invocation, 0, "task")
