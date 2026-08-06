@@ -190,7 +190,7 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                 client?.action("bettermsgs.send", player.name, args[0], text)
                 withContext(mainDispatcher) {
                     player.sendMessage(
-                        translations.component(player, "sent", "<gray>To <white>{target}</white>: {text}",
+                        translations.chatComponent(player, "sent", "<gray>To <white>{target}</white>: {text}",
                             "target" to args[0], "text" to text),
                     )
                 }
@@ -292,7 +292,7 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
         scope.launch {
             chatGui?.close(player)
             player.sendMessage(
-                translations.component(
+                translations.chatComponent(
                     player,
                     "prompt.message",
                     "<gray>Type your message in chat (or <white>cancel</white>):",

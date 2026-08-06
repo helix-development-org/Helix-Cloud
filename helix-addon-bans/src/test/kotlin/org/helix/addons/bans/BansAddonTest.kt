@@ -31,6 +31,18 @@ class BansAddonTest {
     }
 
     @Test
+    fun `the in-game bans command prefixes its delegated output`() {
+        context.run("ban.set", "Steve", "Mod", "griefing")
+
+        // /bans pardon Steve — the wrapper prepends {prefix} so the proxy fills it
+        val result = context.run("bans", "Mod", "pardon", "Steve")
+
+        assertTrue(result.success)
+        assertTrue(result.lines.all { it.startsWith("{prefix} ") }, result.lines.toString())
+        assertTrue(result.lines.any { it.contains("pardoned") })
+    }
+
+    @Test
     fun `ban alts lists sharing accounts and marks banned ones`() {
         context.recordJoin("Steve", "uuid-1")
         context.recordJoin("Alex", "uuid-2")

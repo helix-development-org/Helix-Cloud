@@ -88,6 +88,16 @@ class PermissionsAddonTest {
     }
 
     @Test
+    fun `the in-game permissions command prefixes its delegated output`() {
+        context.run("perm.group.create", "admin", "weight=100")
+
+        val result = context.run("permissions", "Steve", "group", "list")
+
+        assertTrue(result.success)
+        assertTrue(result.lines.all { it.startsWith("{prefix} ") }, result.lines.toString())
+    }
+
+    @Test
     fun `group grant flows to members through actions and resolver`() {
         context.run("perm.group.create", "admin", "weight=100")
         context.run("perm.group.grant", "admin", "helix.maintenance.bypass")

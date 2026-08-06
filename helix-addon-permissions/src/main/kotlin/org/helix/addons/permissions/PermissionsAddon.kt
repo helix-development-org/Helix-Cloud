@@ -209,21 +209,27 @@ class PermissionsAddon : AddonBase() {
     private fun permissionsCommand(args: List<String>): ActionResult = when (args.firstOrNull()?.lowercase()) {
         "group" -> args.getOrNull(1)?.let { sub -> delegate("perm.group.${sub.lowercase()}", args.drop(2)) }
             ?: ActionResult.error(
-                "usage: /permissions group <create|delete|list|info|grant|revoke|addparent|removeparent> ...",
+                "{prefix} usage: /permissions group <create|delete|list|info|grant|revoke|addparent|removeparent> ...",
             )
         "user" -> args.getOrNull(1)?.let { sub -> delegate("perm.user.${sub.lowercase()}", args.drop(2)) }
-            ?: ActionResult.error("usage: /permissions user <info|addgroup|removegroup|grant|revoke> ...")
+            ?: ActionResult.error("{prefix} usage: /permissions user <info|addgroup|removegroup|grant|revoke> ...")
         "check" -> delegate("perm.check", args.drop(1))
         else -> ActionResult.ok(
-            "&bPermission commands:",
-            "&f/permissions group <create|delete|list|info|grant|revoke|addparent|removeparent> ...",
-            "&f/permissions user <info|addgroup|removegroup|grant|revoke> ...",
-            "&f/permissions check <player> <permission>",
+            "{prefix} &bPermission commands:",
+            "{prefix} &f/permissions group <create|delete|list|info|grant|revoke|addparent|removeparent> ...",
+            "{prefix} &f/permissions user <info|addgroup|removegroup|grant|revoke> ...",
+            "{prefix} &f/permissions check <player> <permission>",
         )
     }
 
-    private fun delegate(action: String, arguments: List<String>): ActionResult =
-        context.actions.invoke(ActionInvocation(action = action, arguments = arguments, source = ActionSource.ADDON))
+    // The perm.* actions answer in plain lines (also used by CLI/panel/Discord).
+    // On the in-game /permissions path each line is prefixed with the literal
+    // {prefix}, which the proxy bridge fills, so staff see the network prefix
+    // like every other player message — without prefixing the admin channels.
+    private fun delegate(action: String, arguments: List<String>): ActionResult {
+        val result = context.actions.invoke(ActionInvocation(action = action, arguments = arguments, source = ActionSource.ADDON))
+        return result.copy(lines = result.lines.map { "{prefix} $it" })
+    }
 
     private fun createGroup(invocation: ActionInvocation): ActionResult {
         val name = invocation.arguments.firstOrNull()
