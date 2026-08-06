@@ -8,7 +8,6 @@ plugins {
 dependencies {
     api(rootProject.project("helix-api"))
     api(libs.kotlinx.serialization.cbor)
-    implementation(libs.kotlinx.coroutines.core)
 }
 
 // Consumed by the node and by the platform bridges (Paper/Velocity on

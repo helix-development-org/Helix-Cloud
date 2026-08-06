@@ -16,6 +16,7 @@ repositories {
 
 dependencies {
     implementation(rootProject.project("helix-api"))
+    implementation(rootProject.project("helix-wire"))
     compileOnly(libs.velocity.api)
 }
 

@@ -4,12 +4,15 @@ package org.helix.bridge.velocity
  * Connection settings the wrapper exports to the bridge.
  *
  * @property serviceId id of the proxy service.
- * @property controlUrl base URL of the node control API.
+ * @property controlUrl base URL of the node control API — `helix://` when
+ *   the wire is enabled, otherwise plain `http://`.
+ * @property httpUrl plain HTTP base URL used for the fallback path.
  * @property token bearer token for the control API.
  */
 data class BridgeSettings(
     val serviceId: String,
     val controlUrl: String,
+    val httpUrl: String,
     val token: String,
 ) {
     companion object {
@@ -24,7 +27,8 @@ data class BridgeSettings(
             val serviceId = env["HELIX_SERVICE_ID"] ?: return null
             val controlUrl = env["HELIX_CONTROL_URL"] ?: return null
             val token = env["HELIX_CONTROL_TOKEN"] ?: return null
-            return BridgeSettings(serviceId, controlUrl.trimEnd('/'), token)
+            val httpUrl = env["HELIX_CONTROL_HTTP_URL"]?.trimEnd('/') ?: controlUrl.trimEnd('/')
+            return BridgeSettings(serviceId, controlUrl.trimEnd('/'), httpUrl, token)
         }
     }
 }

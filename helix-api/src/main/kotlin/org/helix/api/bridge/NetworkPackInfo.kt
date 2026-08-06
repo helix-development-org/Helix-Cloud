@@ -1,4 +1,4 @@
-package org.helix.node.control
+package org.helix.api.bridge
 
 import kotlinx.serialization.Serializable
 

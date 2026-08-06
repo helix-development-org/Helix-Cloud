@@ -27,7 +27,7 @@ class NodeHttpClientTest {
     }
     private val warnings = java.util.concurrent.CopyOnWriteArrayList<String>()
     private val client = NodeHttpClient(
-        BridgeSettings("Proxy-1", "http://127.0.0.1:${server.address.port}", "token"),
+        BridgeSettings("Proxy-1", "http://127.0.0.1:${server.address.port}", "http://127.0.0.1:${server.address.port}", "token"),
         warn = warnings::add,
     )
 
