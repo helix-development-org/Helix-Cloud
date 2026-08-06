@@ -1,11 +1,5 @@
 package org.helix.wire
 
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import java.time.Duration
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
@@ -31,6 +25,12 @@ import org.helix.api.proxy.PermissionDecision
 import org.helix.api.proxy.PlayerPermissionsSnapshot
 import org.helix.api.proxy.ProxyPoll
 import org.helix.api.proxy.RoutingSnapshot
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.time.Duration
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * The typed node API a service (bridge or addon component) talks through —

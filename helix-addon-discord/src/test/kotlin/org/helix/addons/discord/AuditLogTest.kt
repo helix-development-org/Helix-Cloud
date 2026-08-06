@@ -1,13 +1,13 @@
 package org.helix.addons.discord
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
 import org.helix.api.action.ActionSource
 import org.helix.api.message.MapMessages
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class AuditLogTest {
     private var config = DiscordConfig(

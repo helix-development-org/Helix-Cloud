@@ -1,11 +1,11 @@
 package org.helix.addons.bettermsgs.paper
 
+import org.bukkit.entity.Player
+import org.bukkit.inventory.ItemStack
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
-import org.bukkit.entity.Player
-import org.bukkit.inventory.ItemStack
 
 /**
  * Borrows the player inventory while a chat GUI is open.

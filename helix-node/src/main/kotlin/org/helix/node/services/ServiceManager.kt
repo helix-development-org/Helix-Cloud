@@ -1,6 +1,5 @@
 package org.helix.node.services
 
-import java.util.concurrent.CopyOnWriteArrayList
 import org.helix.api.bridge.HeartbeatReport
 import org.helix.api.execution.ExecutorType
 import org.helix.api.service.ServiceInfo
@@ -8,6 +7,7 @@ import org.helix.api.service.ServiceState
 import org.helix.api.task.TaskDefinition
 import org.helix.node.tasks.TaskStore
 import org.slf4j.LoggerFactory
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Owns the full lifecycle of all services on this node.

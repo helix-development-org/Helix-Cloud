@@ -4,7 +4,6 @@ import kotlinx.serialization.json.Json
 import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
-import org.helix.api.addon.ProfileSettingDescriptor
 import org.helix.api.addon.ProfileSettingType
 import org.helix.api.addon.ProfileView
 import org.helix.api.addon.ResolvedSetting

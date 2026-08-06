@@ -1,11 +1,11 @@
 package org.helix.api
 
-import kotlin.test.AfterTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
 import org.helix.api.message.GlobalPlaceholders
 import org.helix.api.message.LegacyToMini
 import org.helix.api.message.MapMessages
+import kotlin.test.AfterTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class GlobalPlaceholdersTest {
     @AfterTest

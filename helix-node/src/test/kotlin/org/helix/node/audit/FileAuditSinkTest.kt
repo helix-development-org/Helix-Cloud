@@ -1,5 +1,6 @@
 package org.helix.node.audit
 
+import org.helix.api.audit.AuditEntry
 import java.nio.file.Files
 import kotlin.io.path.appendText
 import kotlin.io.path.createTempDirectory
@@ -7,7 +8,6 @@ import kotlin.io.path.listDirectoryEntries
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.helix.api.audit.AuditEntry
 
 class FileAuditSinkTest {
     private val file = createTempDirectory("audit").resolve("audit.jsonl")

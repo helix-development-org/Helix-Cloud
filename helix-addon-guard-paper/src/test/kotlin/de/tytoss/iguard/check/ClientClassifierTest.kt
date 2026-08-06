@@ -1,7 +1,6 @@
 package de.tytoss.iguard.check
 
 import java.util.UUID
-
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -73,5 +72,4 @@ class ClientClassifierTest {
         assertFalse(ClientClassifier.isBedrock(UUID(0L, 0L)))
         assertFalse(ClientClassifier.isBedrock(UUID(0x1234_5678_9abc_def0L, 0x1L)))
     }
-
 }

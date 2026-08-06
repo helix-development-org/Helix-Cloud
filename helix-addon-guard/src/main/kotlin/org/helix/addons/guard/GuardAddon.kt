@@ -1,7 +1,5 @@
 package org.helix.addons.guard
 
-import java.nio.file.Files
-import java.nio.file.Path
 import kotlinx.serialization.json.Json
 import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionInvocation
@@ -9,6 +7,8 @@ import org.helix.api.action.ActionResult
 import org.helix.api.action.ActionSource
 import org.helix.api.message.Messages
 import org.helix.api.proxy.JoinDecision
+import java.nio.file.Files
+import java.nio.file.Path
 
 /**
  * Node-side management addon for the IGuard anticheat Paper plugin

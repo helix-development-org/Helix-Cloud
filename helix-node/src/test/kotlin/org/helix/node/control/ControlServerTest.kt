@@ -1,7 +1,5 @@
 package org.helix.node.control
 
-import org.helix.api.bridge.NetworkPackInfo
-
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -18,16 +16,11 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
-import java.io.ByteArrayInputStream
-import java.nio.file.Files
-import kotlin.io.path.createTempDirectory
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
 import org.helix.api.bridge.HeartbeatReport
+import org.helix.api.bridge.NetworkPackInfo
 import org.helix.api.environment.Environment
 import org.helix.api.execution.ExecutorType
 import org.helix.api.platform.PlatformOverview
@@ -45,6 +38,12 @@ import org.helix.node.services.ServiceManager
 import org.helix.node.services.WorkspacePreparer
 import org.helix.node.tasks.TaskStore
 import org.helix.node.versions.VersionCatalog
+import java.io.ByteArrayInputStream
+import java.nio.file.Files
+import kotlin.io.path.createTempDirectory
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class ControlServerTest {
     private val paths = NodePaths(createTempDirectory("helix")).createAll()
@@ -696,6 +695,7 @@ class ControlServerTest {
             "bans",
             object : org.helix.api.addon.PlayerDataProvider {
                 override fun export(player: String) = """{"reason":"griefing"}"""
+
                 override fun delete(player: String) = true
             },
         )

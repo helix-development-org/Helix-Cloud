@@ -1,12 +1,12 @@
 package org.helix.node.audit
 
+import org.helix.api.audit.AuditEntry
+import org.slf4j.LoggerFactory
 import java.nio.file.Path
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
-import org.helix.api.audit.AuditEntry
-import org.slf4j.LoggerFactory
 
 /**
  * Complete, durable audit trail.
@@ -182,7 +182,9 @@ class AuditLog(
     }
 
     private sealed interface WorkItem
+
     private data class Entry(val value: AuditEntry) : WorkItem
+
     private data class Barrier(val latch: CountDownLatch) : WorkItem
 
     private companion object {

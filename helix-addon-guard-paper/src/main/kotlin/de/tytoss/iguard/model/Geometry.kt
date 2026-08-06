@@ -10,12 +10,17 @@ import kotlin.math.sqrt
 /** Immutable 3D vector with the handful of operations the checks need. */
 data class Vec3(val x: Double, val y: Double, val z: Double) {
     operator fun plus(other: Vec3) = Vec3(x + other.x, y + other.y, z + other.z)
+
     operator fun minus(other: Vec3) = Vec3(x - other.x, y - other.y, z - other.z)
+
     operator fun times(scale: Double) = Vec3(x * scale, y * scale, z * scale)
+
     /** Squared length of the XZ projection. */
     fun horizontalLengthSquared() = x * x + z * z
+
     /** Squared 3D length. */
     fun lengthSquared() = horizontalLengthSquared() + y * y
+
     /** Unit-length copy (the zero vector stays zero). */
     fun normalized(): Vec3 {
         val length = sqrt(lengthSquared())
@@ -40,7 +45,7 @@ data class Box(
     val minZ: Double,
     val maxX: Double,
     val maxY: Double,
-    val maxZ: Double
+    val maxZ: Double,
 ) {
     /** A copy grown by [value] on every side. */
     fun expand(value: Double) = Box(minX - value, minY - value, minZ - value, maxX + value, maxY + value, maxZ + value)

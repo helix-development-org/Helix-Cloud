@@ -1,9 +1,9 @@
 package org.helix.node.proxy
 
-import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Wakes long-polling proxy bridges the instant something changes, so

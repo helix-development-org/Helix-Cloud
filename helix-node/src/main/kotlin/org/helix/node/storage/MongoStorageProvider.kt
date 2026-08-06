@@ -1,9 +1,9 @@
 package org.helix.node.storage
 
 import com.mongodb.client.MongoDatabase
-import java.nio.file.Path
 import org.helix.api.storage.AddonStorage
 import org.slf4j.LoggerFactory
+import java.nio.file.Path
 
 /**
  * [StorageProvider] for the `mongodb` mode: all addons share one MongoDB

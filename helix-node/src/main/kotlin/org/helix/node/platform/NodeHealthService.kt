@@ -1,6 +1,5 @@
 package org.helix.node.platform
 
-import java.lang.management.ManagementFactory
 import org.helix.api.bridge.ResourceProbe
 import org.helix.api.platform.NodeHealth
 import org.helix.api.service.ServiceState
@@ -9,6 +8,7 @@ import org.helix.node.players.PlayerRegistry
 import org.helix.node.scheduler.JobScheduler
 import org.helix.node.services.ManagedService
 import org.helix.node.services.ServiceManager
+import java.lang.management.ManagementFactory
 
 /**
  * Collects the node's own runtime health: process CPU/heap, host load, JVM

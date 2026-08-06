@@ -1,8 +1,8 @@
 package org.helix.bridge.velocity
 
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlinx.serialization.json.Json
 
 class MotdDataTest {
     private val json = Json { ignoreUnknownKeys = true }

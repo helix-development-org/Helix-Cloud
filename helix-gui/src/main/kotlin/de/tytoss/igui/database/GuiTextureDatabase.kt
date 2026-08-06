@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.emptyFlow
  * pool).
  */
 interface GuiTextureDatabase {
-
     /**
      * Loads every stored texture definition, used once on [de.tytoss.igui.IGui.install]
      * and again by [de.tytoss.igui.IGui.refreshAllTextures].

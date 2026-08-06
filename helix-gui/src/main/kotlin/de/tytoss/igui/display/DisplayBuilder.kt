@@ -1,14 +1,13 @@
 package de.tytoss.igui.display
 
-import net.kyori.adventure.key.Key
-import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.format.NamedTextColor
-import net.kyori.adventure.text.format.TextColor
 import de.tytoss.igui.internal.SpacingRenderer
 import de.tytoss.igui.internal.TextWidthTable
 import de.tytoss.igui.texture.GuiTexture
 import de.tytoss.igui.texture.IGuiObject
-
+import net.kyori.adventure.key.Key
+import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.NamedTextColor
+import net.kyori.adventure.text.format.TextColor
 
 /**
  * Builds a pixel-precise GUI title [Component] using the resource-pack font
@@ -246,7 +245,6 @@ class DisplayBuilder internal constructor(
      * @return the built title.
      */
     fun build(): GuiTitle = GuiTitle(component.build(), cursor)
-
 
     companion object {
         const val DEFAULT_ORIGIN_PIXELS: Int = 8

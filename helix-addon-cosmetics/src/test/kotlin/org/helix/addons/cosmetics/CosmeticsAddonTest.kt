@@ -1,16 +1,16 @@
 package org.helix.addons.cosmetics
 
+import org.helix.addon.sdk.testing.RecordingAddonContext
+import org.helix.api.action.ActionDescriptor
+import org.helix.api.action.ActionResult
+import org.helix.api.addon.ProfileSettingType
+import org.helix.api.player.OnlinePlayer
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.helix.addon.sdk.testing.RecordingAddonContext
-import org.helix.api.action.ActionDescriptor
-import org.helix.api.action.ActionResult
-import org.helix.api.addon.ProfileSettingType
-import org.helix.api.player.OnlinePlayer
 
 class CosmeticsAddonTest {
     private val context = RecordingAddonContext(createTempDirectory("cosmetics"))

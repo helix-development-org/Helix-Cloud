@@ -1,13 +1,5 @@
 package org.helix.addons.permissions
 
-import java.nio.file.Files
-import java.nio.file.Path
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
-import kotlin.io.path.createTempDirectory
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionHandler
 import org.helix.api.action.ActionInvocation
@@ -19,6 +11,14 @@ import org.helix.api.addon.AddonManifest
 import org.helix.api.addon.AddonState
 import org.helix.api.addon.JoinGate
 import org.helix.api.addon.PermissionResolver
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+import kotlin.io.path.createTempDirectory
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Fake context feeding the catalog with addons, core nodes and a workspace.

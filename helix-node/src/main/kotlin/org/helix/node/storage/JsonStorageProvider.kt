@@ -1,7 +1,7 @@
 package org.helix.node.storage
 
-import java.nio.file.Path
 import org.helix.api.storage.AddonStorage
+import java.nio.file.Path
 
 /**
  * [StorageProvider] for the `json` mode: each addon stores documents as

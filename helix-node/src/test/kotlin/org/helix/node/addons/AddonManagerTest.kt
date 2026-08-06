@@ -1,5 +1,8 @@
 package org.helix.node.addons
 
+import org.helix.api.action.ActionInvocation
+import org.helix.api.addon.AddonState
+import org.helix.node.actions.ActionRegistry
 import java.io.ByteArrayOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
@@ -11,9 +14,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.helix.api.action.ActionInvocation
-import org.helix.api.addon.AddonState
-import org.helix.node.actions.ActionRegistry
 
 class AddonManagerTest {
     private val directory = createTempDirectory("addons")

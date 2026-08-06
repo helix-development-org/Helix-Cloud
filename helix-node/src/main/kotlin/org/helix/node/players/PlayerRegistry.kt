@@ -1,11 +1,11 @@
 package org.helix.node.players
 
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CopyOnWriteArrayList
 import org.helix.api.addon.PlayerListener
 import org.helix.api.player.OnlinePlayer
 import org.helix.api.player.PlayerEvent
 import org.slf4j.LoggerFactory
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Tracks all players connected to the network.

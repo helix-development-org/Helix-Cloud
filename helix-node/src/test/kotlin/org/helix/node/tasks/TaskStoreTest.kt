@@ -1,16 +1,15 @@
 package org.helix.node.tasks
 
-import kotlin.io.path.createTempDirectory
-import kotlin.io.path.writeText
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 import org.helix.api.environment.Environment
 import org.helix.api.execution.ExecutorType
 import org.helix.api.task.AutoScaleSettings
 import org.helix.api.task.TaskDefinition
+import kotlin.io.path.createTempDirectory
+import kotlin.io.path.writeText
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class TaskStoreTest {
     private val lobby = TaskDefinition(

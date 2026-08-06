@@ -2,7 +2,6 @@ package de.tytoss.igui.gui
 
 import net.kyori.adventure.text.Component
 
-
 internal sealed interface GuiInputRequest {
     /** A [de.tytoss.igui.gui.GuiClickContext.chatInput] request. */
     data class Chat(val prompt: Component?) : GuiInputRequest

@@ -1,13 +1,13 @@
 package org.helix.node.services
 
+import org.helix.api.environment.Environment
+import org.helix.api.task.TaskDefinition
 import java.nio.file.Files
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.helix.api.environment.Environment
-import org.helix.api.task.TaskDefinition
 
 class ServiceRegistryFileTest {
     private val directory = createTempDirectory("helix-registry")

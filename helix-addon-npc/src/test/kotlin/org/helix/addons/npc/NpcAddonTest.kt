@@ -1,13 +1,13 @@
 package org.helix.addons.npc
 
+import kotlinx.serialization.json.Json
+import org.helix.addon.sdk.testing.RecordingAddonContext
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import kotlinx.serialization.json.Json
-import org.helix.addon.sdk.testing.RecordingAddonContext
 
 class NpcAddonTest {
     private val context = RecordingAddonContext(createTempDirectory("npc"))

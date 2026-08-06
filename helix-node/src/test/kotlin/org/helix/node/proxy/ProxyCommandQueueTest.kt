@@ -1,12 +1,11 @@
 package org.helix.node.proxy
 
+import org.helix.api.proxy.ProxyCommand
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.helix.api.proxy.ProxyCommand
 
 class ProxyCommandQueueTest {
-
     @Test
     fun `pending and acknowledge deliver and then remove commands`() {
         val queue = ProxyCommandQueue()

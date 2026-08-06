@@ -14,13 +14,14 @@ import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
 import org.helix.api.i18n.NodeTranslations
 import org.helix.api.message.LegacyToMini
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 
 private data class AlertKey(val playerId: UUID, val checkId: String)
+
 private data class PendingAlert(val firstAt: Long, val count: Int, val latest: ViolationRecord)
 
 /**
@@ -30,7 +31,7 @@ private data class PendingAlert(val firstAt: Long, val count: Int, val latest: V
 class AlertService(
     private val plugin: JavaPlugin,
     private val dynamic: AtomicReference<DynamicConfig>,
-    private val translations: NodeTranslations
+    private val translations: NodeTranslations,
 ) {
     private val miniMessage = MiniMessage.miniMessage()
     private val pending = ConcurrentHashMap<AlertKey, PendingAlert>()
@@ -109,8 +110,8 @@ class AlertService(
                     "conf" to "$confPct",
                     "action" to actionLine,
                     "evidence" to evidence,
-                )
-            )
+                ),
+            ),
         )
         val countTag = if (count > 1) "<dark_gray> x$count</dark_gray>" else ""
         val prefix = render(screen(recipient, "alert.prefix"))
@@ -125,7 +126,7 @@ class AlertService(
                 "confcolor" to confTag,
                 "conf" to "$confPct",
                 "count" to countTag,
-            )
+            ),
         ).hoverEvent(hover)
         return prefix.append(head).append(body).append(Component.text("  ")).append(actions(recipient, record.playerName))
     }
@@ -159,9 +160,9 @@ class AlertService(
     }
 
     private companion object {
-        const val EYE = "◉"     // spectate glyph
-        const val PANEL = "≡"   // panel glyph
-        const val BAN = "✘"     // ban glyph
+        const val EYE = "◉" // spectate glyph
+        const val PANEL = "≡" // panel glyph
+        const val BAN = "✘" // ban glyph
     }
 
     private fun loadSubscribers() {

@@ -1,12 +1,5 @@
 package org.helix.node.addons
 
-import java.net.URLClassLoader
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.StandardCopyOption
-import java.util.zip.ZipFile
-import kotlin.io.path.extension
-import kotlin.io.path.listDirectoryEntries
 import kotlinx.serialization.json.Json
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionHandler
@@ -24,9 +17,9 @@ import org.helix.api.addon.PermissionResolver
 import org.helix.api.addon.PlayerListener
 import org.helix.api.message.Messages
 import org.helix.api.player.OnlinePlayer
+import org.helix.api.proxy.PermissionCheckRequest
 import org.helix.api.storage.AddonStorage
 import org.helix.api.storage.InMemoryAddonStorage
-import org.helix.api.proxy.PermissionCheckRequest
 import org.helix.node.actions.ActionRegistry
 import org.helix.node.dashboard.DashboardPanelRegistry
 import org.helix.node.dashboard.DefaultAddonPanel
@@ -48,6 +41,13 @@ import org.helix.node.players.PlayerRegistry
 import org.helix.node.storage.JsonStorageProvider
 import org.helix.node.storage.StorageProvider
 import org.slf4j.LoggerFactory
+import java.net.URLClassLoader
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption
+import java.util.zip.ZipFile
+import kotlin.io.path.extension
+import kotlin.io.path.listDirectoryEntries
 
 /**
  * Loads and manages HXA addons from `Helix/addons/`.

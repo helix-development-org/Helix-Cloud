@@ -1,7 +1,5 @@
 package org.helix.addons.cosmetics.paper
 
-import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import org.bukkit.Location
 import org.bukkit.Material
 import org.bukkit.entity.Display
@@ -11,6 +9,8 @@ import org.bukkit.inventory.ItemStack
 import org.bukkit.util.Transformation
 import org.joml.Quaternionf
 import org.joml.Vector3f
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * One player's two cosmetic slots, tracked independently.

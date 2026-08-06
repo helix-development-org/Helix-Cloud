@@ -1,11 +1,11 @@
 package org.helix.addons.profile
 
+import org.helix.api.storage.InMemoryAddonStorage
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.helix.api.storage.InMemoryAddonStorage
 
 class ProfileStoreTest {
     @Test

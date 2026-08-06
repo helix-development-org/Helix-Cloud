@@ -21,7 +21,9 @@ import org.bukkit.plugin.java.JavaPlugin
 class HelixGuisPlugin : JavaPlugin() {
     private val job = SupervisorJob()
     private val scope = CoroutineScope(job + Dispatchers.Default)
+
     @Volatile private var igui: IGui? = null
+
     @Volatile private var client: GuisNodeClient? = null
 
     /** Reads the node connection from the environment and installs the shared IGui instance. */

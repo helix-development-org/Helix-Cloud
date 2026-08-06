@@ -1,6 +1,5 @@
 package org.helix.node.storage
 
-import java.nio.file.Path
 import org.bson.Document
 import org.helix.node.audit.AuditSink
 import org.helix.node.audit.FileAuditSink
@@ -8,6 +7,7 @@ import org.helix.node.audit.MongoAuditSink
 import org.helix.node.audit.PostgresAuditSink
 import org.helix.node.config.NodeConfig
 import org.slf4j.LoggerFactory
+import java.nio.file.Path
 
 /**
  * The node's chosen storage backend: it owns the shared database resource (a

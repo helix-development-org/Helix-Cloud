@@ -1,15 +1,14 @@
 package de.tytoss.igui.gui
 
-import org.bukkit.entity.Player
-import org.bukkit.inventory.ItemStack
-import net.kyori.adventure.text.Component
 import de.tytoss.igui.display.DisplayBuilder
 import de.tytoss.igui.display.GuiFontConfiguration
 import de.tytoss.igui.internal.GuiRuntime
 import de.tytoss.igui.slot.SlotSelection
 import de.tytoss.igui.slot.slot
+import net.kyori.adventure.text.Component
+import org.bukkit.entity.Player
+import org.bukkit.inventory.ItemStack
 import java.util.UUID
-
 
 /** Restricts the GUI DSL's builder receivers so nested blocks cannot accidentally call an outer builder. */
 @DslMarker
@@ -24,7 +23,6 @@ annotation class IGuiDsl
 class GuiDefinitionBuilder internal constructor(
     private val fonts: GuiFontConfiguration,
 ) {
-
     /** Number of chest rows (1..6); the inventory has `rows * 9` slots. */
     var rows: Int = 3
 
@@ -66,7 +64,6 @@ class GuiDefinitionBuilder internal constructor(
         return GuiDefinition(runtime, id, rows, landingPage, compiled, closeHandler)
     }
 }
-
 
 /**
  * DSL for declaring a single page of a GUI: its title, static and dynamic

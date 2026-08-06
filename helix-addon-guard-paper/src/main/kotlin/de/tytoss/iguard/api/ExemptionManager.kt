@@ -47,7 +47,7 @@ class ExemptionManager {
 
     private inner class Handle(
         override val playerId: UUID,
-        private val entry: Entry
+        private val entry: Entry,
     ) : IGuardExemption {
         private val active = AtomicBoolean(true)
         override val reason = entry.reason

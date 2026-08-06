@@ -1,10 +1,10 @@
 package org.helix.node.launcher
 
+import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.isDirectory
 import kotlin.io.path.name
-import org.slf4j.LoggerFactory
 
 /**
  * Deletes leftover dynamic-service workspaces under `services/temp` that

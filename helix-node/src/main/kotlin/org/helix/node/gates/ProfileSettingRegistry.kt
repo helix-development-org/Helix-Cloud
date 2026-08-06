@@ -1,10 +1,10 @@
 package org.helix.node.gates
 
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CopyOnWriteArrayList
 import org.helix.api.addon.ProfileSettingDescriptor
 import org.helix.api.addon.ProfileSettingProvider
 import org.slf4j.LoggerFactory
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Aggregates all [ProfileSettingProvider]s registered by addons, backing

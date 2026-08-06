@@ -19,7 +19,7 @@ class BanCoordinator(
     private val command: BanProvider,
     private val storage: GuardStore,
     private val notifications: NotificationService,
-    private val logger: Logger
+    private val logger: Logger,
 ) {
     /** Records the audit entry + notification, then bans through the configured provider. */
     fun ban(playerId: UUID, playerName: String, hours: Int, reason: String, actor: String) {

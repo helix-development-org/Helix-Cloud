@@ -9,7 +9,7 @@ internal data class ClientFingerprint(
     val suspicious: Boolean,
     val signals: List<String>,
     val brandSpoofed: Boolean = false,
-    val brandSpoofSignals: List<String> = emptyList()
+    val brandSpoofSignals: List<String> = emptyList(),
 ) {
     companion object {
         val UNKNOWN = ClientFingerprint("Unknown", "none", false, emptyList())
@@ -23,7 +23,7 @@ internal object ClientClassifier {
         "meteor" to "Meteor",
         "aristois" to "Aristois",
         "impact" to "Impact",
-        "sigma" to "Sigma"
+        "sigma" to "Sigma",
     )
     private val declaredFamilies = linkedMapOf(
         "lunarclient" to "Lunar Client",
@@ -33,7 +33,7 @@ internal object ClientClassifier {
         "badlion" to "Badlion Client",
         "quilt" to "Quilt",
         "forge" to "Forge",
-        "fabric" to "Fabric / modded"
+        "fabric" to "Fabric / modded",
     )
 
     /**
@@ -72,7 +72,7 @@ internal object ClientClassifier {
                 true,
                 haystack.filter { needle in it }.take(4),
                 brandSpoofSignals.isNotEmpty(),
-                brandSpoofSignals
+                brandSpoofSignals,
             )
         }
         declaredFamilies.entries.firstOrNull { (needle, _) -> haystack.any { needle in it } }?.let { (needle, family) ->
@@ -82,7 +82,7 @@ internal object ClientClassifier {
                 false,
                 haystack.filter { needle in it }.take(4),
                 brandSpoofSignals.isNotEmpty(),
-                brandSpoofSignals
+                brandSpoofSignals,
             )
         }
         if (normalizedBrand == "vanilla") {
@@ -92,7 +92,7 @@ internal object ClientClassifier {
                 false,
                 listOf("brand:vanilla"),
                 brandSpoofSignals.isNotEmpty(),
-                brandSpoofSignals
+                brandSpoofSignals,
             )
         }
         if (normalizedBrand.isNotEmpty()) {

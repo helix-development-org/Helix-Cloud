@@ -1,9 +1,9 @@
 package org.helix.node.proxy
 
+import org.helix.api.proxy.ProxyCommand
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicLong
-import org.helix.api.proxy.ProxyCommand
 
 /**
  * Per-proxy queues of pending commands, delivered to proxy bridges via the

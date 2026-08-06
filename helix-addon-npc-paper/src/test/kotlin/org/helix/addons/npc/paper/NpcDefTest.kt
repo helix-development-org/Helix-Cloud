@@ -1,9 +1,9 @@
 package org.helix.addons.npc.paper
 
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import kotlinx.serialization.json.Json
 
 class NpcDefTest {
     private val json = Json { ignoreUnknownKeys = true }

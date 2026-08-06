@@ -1,9 +1,9 @@
 package org.helix.addons.profile.paper
 
+import org.helix.api.addon.ProfileSettingOption
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import org.helix.api.addon.ProfileSettingOption
 
 class ChoiceCyclingTest {
     private val none = ProfileSettingOption("none", "None")

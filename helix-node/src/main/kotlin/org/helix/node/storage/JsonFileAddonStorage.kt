@@ -1,5 +1,7 @@
 package org.helix.node.storage
 
+import org.helix.api.storage.AddonStorage
+import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
@@ -11,8 +13,6 @@ import java.nio.file.StandardOpenOption
 import kotlin.io.path.extension
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.nameWithoutExtension
-import org.helix.api.storage.AddonStorage
-import org.slf4j.LoggerFactory
 
 /**
  * [AddonStorage] that keeps one `<key>.json` file per document in the

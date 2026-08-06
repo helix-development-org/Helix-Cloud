@@ -1,10 +1,10 @@
 package org.helix.bridge.paper
 
-import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import org.bukkit.entity.Player
 import org.bukkit.permissions.PermissionAttachment
 import org.bukkit.plugin.Plugin
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Mirrors the node's permission decisions onto Bukkit's native permission

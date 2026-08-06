@@ -1,5 +1,9 @@
 package org.helix.addons.bans
 
+import org.helix.addon.sdk.testing.RecordingAddonContext
+import org.helix.api.action.ActionResult
+import org.helix.api.proxy.JoinRequest
+import org.helix.api.storage.InMemoryAddonStorage
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -7,10 +11,6 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.helix.addon.sdk.testing.RecordingAddonContext
-import org.helix.api.storage.InMemoryAddonStorage
-import org.helix.api.action.ActionResult
-import org.helix.api.proxy.JoinRequest
 
 class BansAddonTest {
     private val context = RecordingAddonContext(createTempDirectory("bans")).apply {

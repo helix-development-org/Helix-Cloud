@@ -15,7 +15,7 @@ import java.util.logging.Logger
  */
 class NotificationService(
     private val dynamic: AtomicReference<DynamicConfig>,
-    private val logger: Logger
+    private val logger: Logger,
 ) {
     private val io = Executors.newSingleThreadExecutor { r -> Thread(r, "iguard-discord").apply { isDaemon = true } }
     private val lastSent = ConcurrentHashMap<UUID, Long>()
@@ -23,7 +23,7 @@ class NotificationService(
     /** Posts a flagged-incident embed when Discord notifications are enabled and thresholds pass. */
     fun incident(
         playerId: UUID, playerName: String, confidence: Double,
-        families: Set<EvidenceFamily>, evidenceCount: Int, action: String?, recipe: String
+        families: Set<EvidenceFamily>, evidenceCount: Int, action: String?, recipe: String,
     ) {
         val cfg = dynamic.get().notifications
         if (!cfg.discordEnabled || cfg.webhookUrl.isBlank()) return
@@ -38,8 +38,8 @@ class NotificationService(
             fields = listOf(
                 Triple("Families", families.joinToString().ifEmpty { "—" }, true),
                 Triple("Evidence", evidenceCount.toString(), true),
-                Triple("Recipe", recipe, true)
-            )
+                Triple("Recipe", recipe, true),
+            ),
         )
         post(cfg.webhookUrl, embed)
     }
@@ -54,8 +54,8 @@ class NotificationService(
             color = 0x8B0000,
             fields = listOf(
                 Triple("Reason", reason, false),
-                Triple("By", actor, true)
-            )
+                Triple("By", actor, true),
+            ),
         )
         post(cfg.webhookUrl, embed)
     }

@@ -1,7 +1,7 @@
 package org.helix.node.storage
 
-import javax.sql.DataSource
 import org.helix.api.storage.AddonStorage
+import javax.sql.DataSource
 
 /**
  * [AddonStorage] backed by a shared PostgreSQL table

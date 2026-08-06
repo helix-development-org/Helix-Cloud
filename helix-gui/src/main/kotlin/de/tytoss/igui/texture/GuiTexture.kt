@@ -5,7 +5,6 @@ import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.format.TextColor
 
-
 /**
  * A texture ready to be rendered by [de.tytoss.igui.display.DisplayBuilder]:
  * the compiled, cached counterpart of a [GuiTextureDefinition], produced by

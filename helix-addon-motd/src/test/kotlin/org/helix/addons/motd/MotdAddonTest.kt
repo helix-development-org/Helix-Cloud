@@ -1,11 +1,5 @@
 package org.helix.addons.motd
 
-import java.nio.file.Path
-import kotlin.io.path.createTempDirectory
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 import kotlinx.serialization.json.Json
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionHandler
@@ -15,6 +9,12 @@ import org.helix.api.action.ActionResult
 import org.helix.api.addon.AddonContext
 import org.helix.api.addon.JoinGate
 import org.helix.api.addon.PermissionResolver
+import java.nio.file.Path
+import kotlin.io.path.createTempDirectory
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /**
  * Fake context capturing actions and published bridge values.

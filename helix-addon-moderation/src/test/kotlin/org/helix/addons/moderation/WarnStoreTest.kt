@@ -1,9 +1,9 @@
 package org.helix.addons.moderation
 
+import org.helix.api.storage.InMemoryAddonStorage
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.helix.api.storage.InMemoryAddonStorage
 
 class WarnStoreTest {
     @Test

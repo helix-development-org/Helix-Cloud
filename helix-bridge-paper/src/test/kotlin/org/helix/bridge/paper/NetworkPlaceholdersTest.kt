@@ -1,9 +1,9 @@
 package org.helix.bridge.paper
 
+import org.helix.api.display.DisplayProfile
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import org.helix.api.display.DisplayProfile
 
 class NetworkPlaceholdersTest {
     @Test

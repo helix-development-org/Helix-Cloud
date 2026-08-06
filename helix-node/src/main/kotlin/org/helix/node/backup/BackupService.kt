@@ -1,5 +1,6 @@
 package org.helix.node.backup
 
+import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -12,7 +13,6 @@ import java.util.zip.ZipOutputStream
 import kotlin.io.path.isDirectory
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.name
-import org.slf4j.LoggerFactory
 
 /**
  * Creates, lists, restores and deletes zip backups of static service

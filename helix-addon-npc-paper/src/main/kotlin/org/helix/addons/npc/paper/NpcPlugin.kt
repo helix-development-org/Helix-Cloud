@@ -2,8 +2,6 @@ package org.helix.addons.npc.paper
 
 import de.tytoss.inpc.INpc
 import de.tytoss.inpc.npc.NpcDefinition
-import java.util.concurrent.ConcurrentHashMap
-import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,6 +19,8 @@ import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
 import org.helix.api.i18n.NodeTranslations
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.coroutines.CoroutineContext
 
 /**
  * Helix-NPC Paper component.

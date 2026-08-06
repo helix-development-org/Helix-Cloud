@@ -30,7 +30,7 @@ data class EnvironmentFrame(
     val velocity: Vec3,
     val exemptEnvironment: Boolean,
     val environmentTags: Set<String>,
-    val chunkLoaded: Boolean
+    val chunkLoaded: Boolean,
 )
 
 sealed interface PacketFrame {
@@ -51,7 +51,7 @@ data class MovementFrame(
     val position: Vec3,
     val yaw: Float,
     val pitch: Float,
-    val onGround: Boolean
+    val onGround: Boolean,
 ) : PacketFrame
 
 /** Client attack (interact-entity) packet against a target entity. */
@@ -60,7 +60,7 @@ data class AttackFrame(
     override val sequence: Long,
     override val receivedAt: Long,
     override val clientVersion: String,
-    val targetEntityId: Int
+    val targetEntityId: Int,
 ) : PacketFrame
 
 /** Arm-swing / animation packet — its absence around an attack is a killaura tell (combat.noswing). */
@@ -68,7 +68,7 @@ data class SwingFrame(
     override val playerId: UUID,
     override val sequence: Long,
     override val receivedAt: Long,
-    override val clientVersion: String
+    override val clientVersion: String,
 ) : PacketFrame
 
 /** Client entity-action kinds IGuard tracks (sprint/sneak/elytra state changes). */
@@ -78,7 +78,7 @@ enum class ClientAction {
     START_SNEAKING,
     STOP_SNEAKING,
     START_ELYTRA,
-    OTHER
+    OTHER,
 }
 
 /** Client entity-action packet (see [ClientAction]). */
@@ -87,7 +87,7 @@ data class ClientActionFrame(
     override val sequence: Long,
     override val receivedAt: Long,
     override val clientVersion: String,
-    val action: ClientAction
+    val action: ClientAction,
 ) : PacketFrame
 
 /** Client abilities packet (the client toggling its fly state). */
@@ -96,7 +96,7 @@ data class ClientAbilitiesFrame(
     override val sequence: Long,
     override val receivedAt: Long,
     override val clientVersion: String,
-    val flying: Boolean
+    val flying: Boolean,
 ) : PacketFrame
 
 /** Client tick-end marker packet, used by the timer check to measure the client's tick rate. */
@@ -104,7 +104,7 @@ data class ClientTickFrame(
     override val playerId: UUID,
     override val sequence: Long,
     override val receivedAt: Long,
-    override val clientVersion: String
+    override val clientVersion: String,
 ) : PacketFrame
 
 /** Plugin-message payload (brand / channel registrations) used for client fingerprinting. */
@@ -114,7 +114,7 @@ data class ClientIdentityFrame(
     override val receivedAt: Long,
     override val clientVersion: String,
     val channel: String,
-    val payload: ByteArray
+    val payload: ByteArray,
 ) : PacketFrame
 
 /** Ping/keep-alive traffic directions used to reconstruct the latency timeline. */
@@ -127,7 +127,7 @@ data class TimelineFrame(
     override val receivedAt: Long,
     override val clientVersion: String,
     val kind: TimelineKind,
-    val id: Long
+    val id: Long,
 ) : PacketFrame
 
 /** Block interaction kinds observed from digging/placement packets. */
@@ -147,7 +147,7 @@ data class BlockActionFrame(
     val interactionSequence: Int,
     val cursorX: Float = 0.5f,
     val cursorY: Float = 0.5f,
-    val cursorZ: Float = 0.5f
+    val cursorZ: Float = 0.5f,
 ) : PacketFrame
 
 /** Client inventory click packet (window/slot/button), feeding the inventory checks. */
@@ -160,7 +160,7 @@ data class InventoryClickFrame(
     val stateId: Int?,
     val slot: Int,
     val button: Int,
-    val clickType: String
+    val clickType: String,
 ) : PacketFrame
 
 /** Server-sent knockback/velocity, opening a grace window for the velocity checks. */
@@ -170,7 +170,7 @@ data class ServerVelocityFrame(
     override val receivedAt: Long,
     override val clientVersion: String,
     val velocity: Vec3,
-    val source: String
+    val source: String,
 ) : PacketFrame
 
 /** Server-sent teleport (position sync) with its relative flags and confirm id. */
@@ -188,7 +188,7 @@ data class ServerTeleportFrame(
     val relativeY: Boolean,
     val relativeZ: Boolean,
     val relativeYaw: Boolean,
-    val relativePitch: Boolean
+    val relativePitch: Boolean,
 ) : PacketFrame
 
 /** Client confirmation of a server teleport, closing the pending-teleport window. */
@@ -197,7 +197,7 @@ data class TeleportConfirmFrame(
     override val sequence: Long,
     override val receivedAt: Long,
     override val clientVersion: String,
-    val teleportId: Int
+    val teleportId: Int,
 ) : PacketFrame
 
 /** Server-sent abilities update (flight allowed, creative, movement scale). */
@@ -209,7 +209,7 @@ data class ServerAbilitiesFrame(
     val flying: Boolean,
     val flightAllowed: Boolean,
     val creative: Boolean,
-    val movementScale: Float
+    val movementScale: Float,
 ) : PacketFrame
 
 /** Synthetic frame that resets a player's per-check state (respawn, world change, ...). */
@@ -218,7 +218,7 @@ data class ResetFrame(
     override val sequence: Long,
     override val receivedAt: Long,
     override val clientVersion: String,
-    val reason: String
+    val reason: String,
 ) : PacketFrame
 
 /** A player's identity plus the current and recent [EnvironmentFrame]s the workers read from. */
@@ -227,7 +227,7 @@ data class PlayerView(
     val playerName: String,
     val entityId: Int,
     val current: EnvironmentFrame,
-    val history: List<EnvironmentFrame>
+    val history: List<EnvironmentFrame>,
 )
 
 /** Last known legitimate position, used as the setback target. */
@@ -248,5 +248,5 @@ data class ViolationRecord(
     val evidence: Map<String, Any>,
     val incidentId: UUID? = null,
     val confidence: Double = 0.0,
-    val shadowAction: String? = null
+    val shadowAction: String? = null,
 )

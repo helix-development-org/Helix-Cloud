@@ -1,13 +1,13 @@
 package org.helix.node.gates
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 import org.helix.api.proxy.JoinDecision
 import org.helix.api.proxy.JoinRequest
 import org.helix.api.proxy.ProxyCommand
 import org.helix.node.proxy.ProxyCommandQueue
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class JoinGateRegistryTest {
     private val registry = JoinGateRegistry()

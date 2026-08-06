@@ -1,9 +1,9 @@
 package org.helix.node.events
 
+import org.helix.node.logging.LogBuffer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.helix.node.logging.LogBuffer
 
 class ObservabilityTest {
     @Test

@@ -34,7 +34,7 @@ private data class HorizontalProjection(
     val acceleration: Double,
     val friction: Double,
     val jumpImpulse: Double,
-    val takeoffAllowance: Double
+    val takeoffAllowance: Double,
 )
 
 internal class MovementEvaluator {
@@ -45,7 +45,7 @@ internal class MovementEvaluator {
         environment: EnvironmentFrame,
         profile: VersionProfile,
         state: PlayerState,
-        laggy: Boolean = false
+        laggy: Boolean = false,
     ): MovementEvaluation {
         val ticks = state.positionGapTicks.coerceIn(1, 2)
         val supporting = supports(frame.position, environment)
@@ -66,16 +66,18 @@ internal class MovementEvaluator {
 
     /** Deterministic protocol check: non-finite or out-of-range position/rotation values. */
     fun badPacketFailure(frame: MovementFrame): CheckFailure? {
-        val invalidPosition = frame.positionChanged && (!frame.position.x.isFinite() || !frame.position.y.isFinite() ||
+        val invalidPosition = frame.positionChanged && (
+            !frame.position.x.isFinite() || !frame.position.y.isFinite() ||
             !frame.position.z.isFinite() || abs(frame.position.x) > 30_000_000 || abs(frame.position.z) > 30_000_000 ||
-            abs(frame.position.y) > 30_000_000)
+            abs(frame.position.y) > 30_000_000
+        )
         val invalidRotation = frame.rotationChanged && (!frame.yaw.isFinite() || !frame.pitch.isFinite() || abs(frame.pitch) > 90.0001f)
         if (!invalidPosition && !invalidRotation) return null
         return CheckFailure(
             "protocol.badpackets.a",
             3.0,
             mapOf("reason" to if (invalidPosition) "invalid-position" else "invalid-rotation", "pitch" to frame.pitch),
-            deterministic = true
+            deterministic = true,
         )
     }
 
@@ -98,8 +100,8 @@ internal class MovementEvaluator {
                 "horizontalRatio" to horizontalRatio.rounded(),
                 "expectedY" to expected.y.rounded(),
                 "observedY" to state.velocityObservedVertical.rounded(),
-                "verticalRatio" to verticalRatio.rounded()
-            )
+                "verticalRatio" to verticalRatio.rounded(),
+            ),
         )
     }
 
@@ -145,7 +147,7 @@ internal class MovementEvaluator {
         position: Vec3,
         environment: EnvironmentFrame,
         state: PlayerState,
-        laggy: Boolean = false
+        laggy: Boolean = false,
     ): CheckFailure? {
         val minAirTicks = if (laggy) LAG_NOFALL_AIRTICKS else 3
         if (!onGround || supports(position, environment) || state.airTicks < minAirTicks) return null
@@ -157,8 +159,8 @@ internal class MovementEvaluator {
                 "airTicks" to state.airTicks,
                 "clientGround" to true,
                 "support" to false,
-                "packet" to "ground-only"
-            )
+                "packet" to "ground-only",
+            ),
         )
     }
 
@@ -233,7 +235,7 @@ internal class MovementEvaluator {
         state: PlayerState,
         ticks: Int,
         supporting: Boolean,
-        laggy: Boolean
+        laggy: Boolean,
     ): CheckFailure? {
         if (supporting) return null
         val jumpBoost = if (environment.jumpAmplifier >= 0) 0.1 * (environment.jumpAmplifier + 1) else 0.0
@@ -276,8 +278,8 @@ internal class MovementEvaluator {
                 "knockback" to state.verticalUncertainty.rounded(),
                 "previousVelocity" to state.lastVerticalDelta.rounded(),
                 "airTicks" to state.airTicks,
-                "packetTicks" to ticks
-            )
+                "packetTicks" to ticks,
+            ),
         )
     }
 
@@ -287,7 +289,7 @@ internal class MovementEvaluator {
         state: PlayerState,
         ticks: Int,
         supporting: Boolean,
-        laggy: Boolean
+        laggy: Boolean,
     ): CheckFailure? {
         val projection = horizontalProjection(environment, state, ticks, supporting)
         // The possible-horizontal interval: the projected budget (already carries physics tolerance),
@@ -316,8 +318,8 @@ internal class MovementEvaluator {
                 "takeoffAllowance" to projection.takeoffAllowance.rounded(),
                 "sprinting" to state.sprinting,
                 "surface" to environment.surface,
-                "packetTicks" to ticks
-            )
+                "packetTicks" to ticks,
+            ),
         )
     }
 
@@ -325,7 +327,7 @@ internal class MovementEvaluator {
         environment: EnvironmentFrame,
         state: PlayerState,
         ticks: Int,
-        supporting: Boolean
+        supporting: Boolean,
     ): HorizontalProjection {
         val grounded = supporting
         val friction = if (grounded) groundFriction(environment) else 0.91
@@ -363,7 +365,7 @@ internal class MovementEvaluator {
             acceleration,
             friction,
             jumpImpulse,
-            takeoffAllowance
+            takeoffAllowance,
         )
     }
 
@@ -373,7 +375,7 @@ internal class MovementEvaluator {
         environment: EnvironmentFrame,
         state: PlayerState,
         supporting: Boolean,
-        laggy: Boolean
+        laggy: Boolean,
     ): CheckFailure? {
         // Under lag the sampled support state is unreliable, so require sustained airborne evidence
         // before flagging ground-spoof (prevents nofall FP cascades on legit grounded players).
@@ -386,8 +388,8 @@ internal class MovementEvaluator {
                 "dy" to delta.y.rounded(),
                 "airTicks" to state.airTicks,
                 "clientGround" to true,
-                "support" to false
-            )
+                "support" to false,
+            ),
         )
     }
 
@@ -395,16 +397,17 @@ internal class MovementEvaluator {
         frame: MovementFrame,
         delta: Vec3,
         environment: EnvironmentFrame,
-        state: PlayerState
+        state: PlayerState,
     ): CheckFailure? {
         if (sqrt(delta.horizontalLengthSquared()) < 0.18 || environment.environmentTags.isNotEmpty()) return null
         val previous = state.lastMovement ?: return null
         val height = environment.entityBox.maxY - environment.entityBox.minY
         val width = environment.entityBox.maxX - environment.entityBox.minX
+
         /** Shrunken body box at [position] for the collision-entry test. */
         fun body(position: Vec3) = Box(
             position.x - width / 2 + 0.03, position.y + 0.05, position.z - width / 2 + 0.03,
-            position.x + width / 2 - 0.03, position.y + height - 0.05, position.z + width / 2 - 0.03
+            position.x + width / 2 - 0.03, position.y + height - 0.05, position.z + width / 2 - 0.03,
         )
         val entered = environment.collisionBoxes.any(body(frame.position)::intersects)
         val wasInside = environment.collisionBoxes.any(body(previous.position)::intersects)
@@ -444,7 +447,7 @@ internal class MovementEvaluator {
             position.z - half,
             position.x + half,
             position.y + 0.03,
-            position.z + half
+            position.z + half,
         )
         return environment.collisionBoxes.any(feet::intersects)
     }

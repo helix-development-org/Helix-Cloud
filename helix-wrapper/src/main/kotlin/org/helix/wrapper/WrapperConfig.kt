@@ -51,6 +51,7 @@ data class WrapperConfig(
         fun load(file: Path): WrapperConfig {
             val properties = Properties()
             Files.newBufferedReader(file).use(properties::load)
+
             /** Reads a mandatory property or fails with a clear message. */
             fun required(key: String): String =
                 requireNotNull(properties.getProperty(key)) { "wrapper.properties misses key: $key" }
