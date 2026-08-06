@@ -238,8 +238,10 @@ class WireServer(
         private val socket: Socket,
         private val output: DataOutputStream,
     ) {
+        /** Writes a frame to this connection, swallowing write failures. */
         fun send(frame: WireFrame): Boolean = runCatching { WireProtocol.write(output, frame) }.isSuccess
 
+        /** Closes the underlying socket. */
         fun close() {
             runCatching { socket.close() }
         }

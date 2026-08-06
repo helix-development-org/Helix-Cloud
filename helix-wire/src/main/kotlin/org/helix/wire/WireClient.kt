@@ -191,8 +191,10 @@ class WireClient(
         val input: DataInputStream,
         private val output: DataOutputStream,
     ) {
+        /** Writes a frame over this link, swallowing write failures. */
         fun send(frame: WireFrame): Boolean = runCatching { WireProtocol.write(output, frame) }.isSuccess
 
+        /** Closes the underlying socket. */
         fun close() {
             runCatching { socket.close() }
         }
