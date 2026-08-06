@@ -35,6 +35,11 @@ class NodeConfigLoaderTest {
             [eula]
             accept = true
             acceptedBy = "operator"
+
+            [wire]
+            enabled = true
+            port = 8095
+            tls = true
             """.trimIndent(),
         )
 
@@ -49,5 +54,18 @@ class NodeConfigLoaderTest {
         assertEquals(true, config.proxy.legacyForwarding)
         assertEquals(true, config.eula.accept)
         assertEquals("operator", config.eula.acceptedBy)
+        assertEquals(true, config.wire.enabled)
+        assertEquals(8095, config.wire.port)
+        assertEquals(true, config.wire.tls)
+    }
+
+    @Test
+    fun `wire defaults to disabled on port 8090`() {
+        val root = createTempDirectory("helix-config")
+        val defaults = NodeConfigLoader().load(root)
+
+        assertEquals(false, defaults.wire.enabled)
+        assertEquals(8090, defaults.wire.port)
+        assertEquals(false, defaults.wire.tls)
     }
 }

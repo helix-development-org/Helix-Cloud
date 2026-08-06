@@ -251,7 +251,7 @@ private suspend fun RoutingContext.requireBridge(dependencies: ControlDependenci
  * @param dependencies control API dependencies.
  * @return the distinct permission nodes to evaluate.
  */
-private fun knownPermissionNodes(dependencies: ControlDependencies): List<String> = buildList {
+internal fun knownPermissionNodes(dependencies: ControlDependencies): List<String> = buildList {
     add(dependencies.loginPermission)
     addAll(PanelAuthService.VIEW_NODES.values)
     dependencies.dashboardPanels.list().forEach { add(PanelAuthService.panelNode(it.id)) }
@@ -1055,7 +1055,7 @@ private fun io.ktor.server.routing.Route.addonRoutes(dependencies: ControlDepend
  * @param event the join or leave to apply.
  * @return `true` when the event type was known.
  */
-private fun applyPlayerEvent(dependencies: ControlDependencies, event: PlayerEvent): Boolean {
+internal fun applyPlayerEvent(dependencies: ControlDependencies, event: PlayerEvent): Boolean {
     if (!dependencies.playerRegistry.handle(event)) {
         return false
     }

@@ -594,6 +594,14 @@ class HelixNode(
 
     private val controlServer = ControlServer(settings = config.control, dependencies = controlDependencies)
 
+    /** Helix-Wire endpoint, present only when `[wire] enabled` is set. */
+    private val wireService: org.helix.node.wire.WireService? =
+        if (config.wire.enabled) {
+            org.helix.node.wire.WireService(config.wire, config.control, controlDependencies, serviceTokens)
+        } else {
+            null
+        }
+
     /**
      * Boots the node: loads tasks and addons, registers actions, starts the
      * control API and the auto-scaler.
@@ -679,6 +687,7 @@ class HelixNode(
         registerEventSources()
         refreshNetworkPlaceholders()
         controlServer.start()
+        wireService?.start()
         manager.onServiceTerminated { service: ManagedService ->
             // A stopped service's token must not keep working once its id is
             // reused by a later service instance.
@@ -799,6 +808,7 @@ class HelixNode(
             jobSchedulerExecutor.shutdownNow()
             stopServicesQuietly()
             addonManager.disableAll()
+            wireService?.stop()
             controlServer.stop()
             runCatching { audit.close() }
             runCatching { storageProvider.close() }
@@ -867,6 +877,7 @@ class HelixNode(
                 stopServicesQuietly()
             }
             addonManager.disableAll()
+            wireService?.stop()
             controlServer.stop()
             runCatching { audit.close() }
             runCatching { storageProvider.close() }
@@ -1200,10 +1211,20 @@ class HelixNode(
         // handing out the admin token here would let it act as full
         // node-admin (create tasks, read configs, stop the network). The
         // scoped token only unlocks this exact service's /internal/ routes.
-        return mapOf(
+        val token = serviceTokens.mint(service.id)
+        val env = mutableMapOf(
             "HELIX_CONTROL_URL" to "http://$host:${config.control.port}",
-            "HELIX_CONTROL_TOKEN" to serviceTokens.mint(service.id),
+            "HELIX_CONTROL_TOKEN" to token,
         )
+        if (config.wire.enabled) {
+            // Wire on: the primary URL becomes helix://; the plain HTTP URL
+            // stays reachable and is handed over separately as the fallback a
+            // service uses while its wire connection is (re)establishing.
+            val scheme = if (config.wire.tls) "helixs" else "helix"
+            env["HELIX_CONTROL_URL"] = "$scheme://$host:${config.wire.port}"
+            env["HELIX_CONTROL_HTTP_URL"] = "http://$host:${config.control.port}"
+        }
+        return env
     }
 
     private fun version(): String =
