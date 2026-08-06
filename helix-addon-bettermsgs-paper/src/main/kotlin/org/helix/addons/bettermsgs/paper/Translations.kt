@@ -25,9 +25,7 @@ class Translations(private val client: NodeClient) {
      * Fetches the latest snapshot from the node; failures keep the old one.
      */
     fun sync() {
-        val body = client.getJson("/api/v1/internal/translations") ?: return
-        runCatching { json.decodeFromString<TranslationsSnapshot>(body) }
-            .onSuccess { snapshot = it }
+        client.translations()?.let { snapshot = it }
     }
 
     /**

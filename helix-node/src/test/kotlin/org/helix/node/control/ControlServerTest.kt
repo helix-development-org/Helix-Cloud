@@ -1,5 +1,7 @@
 package org.helix.node.control
 
+import org.helix.api.bridge.NetworkPackInfo
+
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation

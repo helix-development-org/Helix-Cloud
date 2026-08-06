@@ -16,6 +16,7 @@ repositories {
 
 dependencies {
     implementation(rootProject.project("helix-api"))
+    implementation(rootProject.project("helix-wire"))
     compileOnly(libs.paper.api)
     // helix-gui is not bundled: the shared Helix-GUIs plugin (helix-addon-guis) installs the one
     // real IGui instance and provides its classes (and kotlinx-coroutines-core) at runtime via the

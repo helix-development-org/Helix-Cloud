@@ -1,43 +1,28 @@
 package org.helix.addons.profile.paper
 
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import java.time.Duration
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.add
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
+import org.helix.api.action.ActionInvocation
 import org.helix.api.addon.ProfileView
+import org.helix.wire.ServiceNodeApi
 import org.slf4j.LoggerFactory
 
-/** Result lines of one node action invocation. */
-private data class ActionOutcome(val success: Boolean, val lines: List<String>)
-
 /**
- * Talks to the node's `POST /api/v1/internal/action` endpoint on behalf of the
- * profile menu, the bridge action-invocation contract for components
- * holding a per-service token — this plugin has no direct dependency on
- * the profile addon's own code, only on the shared [ProfileView] wire
- * type. Not `/api/v1/actions`: that route only ever accepts the admin
- * token or a `helix.admin` session, which a per-service token can never
- * satisfy; the node only lets `/api/v1/internal/action` reach actions explicitly
- * marked `bridgeInvocable` (see `ProfileAddon`'s action registrations).
+ * Node-action client for the profile paper component, over the shared
+ * [ServiceNodeApi] transport — calls travel over Helix-Wire when it is up
+ * and HTTP otherwise. The public shape is unchanged.
  *
- * @property controlUrl base control API url, for example `http://127.0.0.1:8080`.
- * @property token bearer token for this service, from the `HELIX_CONTROL_TOKEN`
- *  environment variable the wrapper injects.
+ * @property controlUrl the primary control url (`helix://` or `http://`).
+ * @property token per-service bearer token.
  */
-class ProfileNodeClient(private val controlUrl: String, private val token: String) {
+class ProfileNodeClient(controlUrl: String, token: String) {
     private val logger = LoggerFactory.getLogger(ProfileNodeClient::class.java)
-    private val http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()
-    private val endpoint = URI.create(controlUrl.trimEnd('/') + "/api/v1/internal/action")
     private val json = Json { ignoreUnknownKeys = true }
+    private val api = ServiceNodeApi(
+        controlUrl,
+        System.getenv("HELIX_CONTROL_HTTP_URL")?.ifBlank { null } ?: controlUrl,
+        System.getenv("HELIX_SERVICE_ID").orEmpty(),
+        token,
+    ).also { it.start() }
 
     /**
      * Fetches a player's full profile view.
@@ -47,9 +32,9 @@ class ProfileNodeClient(private val controlUrl: String, private val token: Strin
      *  action failed.
      */
     fun view(player: String): ProfileView? {
-        val outcome = invoke("profile.view", listOf(player)) ?: return null
-        if (!outcome.success) return null
-        return outcome.lines.firstOrNull()?.let {
+        val result = api.action(ActionInvocation("profile.view", listOf(player))) ?: return null
+        if (!result.success) return null
+        return result.lines.firstOrNull()?.let {
             runCatching { json.decodeFromString<ProfileView>(it) }
                 .onFailure { e -> logger.warn("Could not parse profile view: {}", e.message) }
                 .getOrNull()
@@ -57,8 +42,7 @@ class ProfileNodeClient(private val controlUrl: String, private val token: Strin
     }
 
     /**
-     * Sets the executing player's own value for a setting (self-service,
-     * subject to the owning addon's per-option gating).
+     * Sets the executing player's own value for a setting.
      *
      * @param player player name.
      * @param owner the addon id that registered the setting.
@@ -67,48 +51,15 @@ class ProfileNodeClient(private val controlUrl: String, private val token: Strin
      * @return `null` on success, or a player-facing rejection reason.
      */
     fun set(player: String, owner: String, key: String, value: String): String? {
-        val outcome = invoke("profile.setting.set", listOf(player, owner, key, value))
+        val result = api.action(ActionInvocation("profile.setting.set", listOf(player, owner, key, value)))
             ?: return "the node is unreachable"
-        return if (outcome.success) null else outcome.lines.firstOrNull() ?: "rejected"
+        return if (result.success) null else result.lines.firstOrNull() ?: "rejected"
     }
 
     /**
-     * Invokes a node action over HTTP.
-     *
-     * @return the raw success flag and result lines, or `null` when the
-     *  node could not be reached at all.
-     */
-    private fun invoke(action: String, arguments: List<String>): ActionOutcome? {
-        val body = buildJsonObject {
-            put("action", action)
-            putJsonArray("arguments") { arguments.forEach { add(it) } }
-        }
-        return runCatching {
-            val request = HttpRequest.newBuilder(endpoint)
-                .timeout(Duration.ofSeconds(10))
-                .header("Authorization", "Bearer $token")
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
-                .build()
-            val response = http.send(request, HttpResponse.BodyHandlers.ofString())
-            check(response.statusCode() in 200..299) { "HTTP ${response.statusCode()}" }
-            val parsed = json.parseToJsonElement(response.body()).jsonObject
-            val lines = parsed["lines"]?.jsonArray?.mapNotNull { it.jsonPrimitive.content } ?: emptyList()
-            val success = parsed["success"]?.jsonPrimitive?.content == "true"
-            ActionOutcome(success, lines)
-        }.onFailure { failure ->
-            if (failure is InterruptedException) Thread.currentThread().interrupt()
-            logger.warn("Node action {} failed: {}", action, failure.message)
-        }.getOrNull()
-    }
-
-    /**
-     * Closes the underlying HTTP client, releasing its executor and
-     * connection resources — call from the owning plugin's onDisable so a
-     * Bukkit `/reload` does not leak the client (and, through it, the old
-     * plugin classloader).
+     * Closes the underlying transport.
      */
     fun close() {
-        http.close()
+        api.close()
     }
 }

@@ -9,6 +9,8 @@ import com.velocitypowered.api.proxy.Player
 import com.velocitypowered.api.proxy.ProxyServer
 import java.net.URI
 import java.net.http.HttpClient
+import org.helix.api.action.ActionInvocation
+import org.helix.wire.ServiceNodeApi
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
@@ -53,6 +55,7 @@ class LabyModVelocityPlugin @Inject constructor(
     private val http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build()
     private var controlUrl: String = ""
     private var token: String = ""
+    private var api: ServiceNodeApi? = null
 
     @Volatile
     private var config = LabyConfigValue()
@@ -79,10 +82,13 @@ class LabyModVelocityPlugin @Inject constructor(
     fun onProxyInitialize(event: ProxyInitializeEvent) {
         controlUrl = System.getenv("HELIX_CONTROL_URL").orEmpty().trimEnd('/')
         token = System.getenv("HELIX_CONTROL_TOKEN").orEmpty()
+        val httpUrl = System.getenv("HELIX_CONTROL_HTTP_URL")?.ifBlank { null } ?: controlUrl
+        val serviceId = System.getenv("HELIX_SERVICE_ID").orEmpty()
         if (controlUrl.isBlank() || token.isBlank()) {
             logger.warn("No Helix environment found — LabyMod integration disabled.")
             return
         }
+        api = ServiceNodeApi(controlUrl, httpUrl, serviceId, token) { logger.warn(it) }.also { it.start() }
         LabyModProtocolService.initialize(this, server, logger)
         server.scheduler.buildTask(this, Runnable { poll() })
             .repeat(1, TimeUnit.SECONDS)
@@ -340,42 +346,13 @@ class LabyModVelocityPlugin @Inject constructor(
     private fun stripFormatting(text: String): String =
         text.replace(Regex("&[0-9a-fk-orA-FK-OR]|<[^<>]{1,32}>"), "")
 
-    private fun fetchBridgeValues(): Map<String, String>? = runCatching {
-        val request = HttpRequest.newBuilder(URI.create("$controlUrl/api/v1/internal/bridge-values"))
-            .timeout(Duration.ofSeconds(3))
-            .header("Authorization", "Bearer $token")
-            .GET()
-            .build()
-        val response = http.send(request, HttpResponse.BodyHandlers.ofString())
-        check(response.statusCode() in 200..299) { "HTTP ${response.statusCode()}" }
-        json.parseToJsonElement(response.body()).jsonObject
-            .mapValues { (_, value) -> value.jsonPrimitive.content }
-    }.getOrNull()
+    private fun fetchBridgeValues(): Map<String, String>? = api?.bridgeValues()
 
     private fun invokeAction(action: String, arguments: List<String>) {
+        val nodeApi = api ?: return
         server.scheduler.buildTask(
             this,
-            Runnable {
-                runCatching {
-                    val body = json.encodeToString(ActionCall(action, arguments))
-                    val request = HttpRequest.newBuilder(URI.create("$controlUrl/api/v1/internal/action"))
-                        .timeout(Duration.ofSeconds(5))
-                        .header("Authorization", "Bearer $token")
-                        .header("Content-Type", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString(body))
-                        .build()
-                    http.send(request, HttpResponse.BodyHandlers.ofString())
-                }.onFailure { logger.warn("LabyMod action {} failed: {}", action, it.message) }
-            },
+            Runnable { nodeApi.action(ActionInvocation(action, arguments)) },
         ).schedule()
     }
-
-    /**
-     * Request body of `POST /api/v1/internal/action`.
-     *
-     * @property action the action name.
-     * @property arguments positional arguments.
-     */
-    @kotlinx.serialization.Serializable
-    data class ActionCall(val action: String, val arguments: List<String>)
 }

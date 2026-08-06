@@ -21,6 +21,7 @@ repositories {
 dependencies {
     compileOnly(libs.velocity.api)
     implementation(libs.kotlinx.serialization.json)
+    implementation(rootProject.project("helix-wire"))
     // Official LabyMod 4 server API (+ voice-chat integration), bundled into
     // the component jar together with the kotlin runtime — the proxy only
     // provides the Velocity API.
