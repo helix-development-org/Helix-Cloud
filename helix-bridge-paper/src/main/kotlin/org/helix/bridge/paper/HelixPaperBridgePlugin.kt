@@ -22,6 +22,7 @@ import org.bukkit.scoreboard.Criteria
 import org.bukkit.scoreboard.DisplaySlot
 import org.bukkit.scoreboard.Objective
 import org.bukkit.scoreboard.Scoreboard
+import org.helix.wire.ServiceNodeApi
 import org.helix.api.bridge.HeartbeatReport
 import org.helix.api.bridge.ResourceProbe
 import org.helix.api.display.DisplayBulkRequest
@@ -75,7 +76,7 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     private var animationTask: BukkitTask? = null
     private var scoreboardTask: BukkitTask? = null
     private var scoreboardInterval: Long = -1
-    private var client: NodeHttpClient? = null
+    private var api: ServiceNodeApi? = null
     private var settings: BridgeSettings? = null
     private var pollCounter = 0
 
@@ -92,12 +93,13 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
             return
         }
         settings = loaded
-        val httpClient = NodeHttpClient(loaded) { logger.warning(it) }
-        client = httpClient
+        val nodeApi = ServiceNodeApi(loaded.controlUrl, loaded.httpUrl, loaded.serviceId, loaded.token) { logger.warning(it) }
+        api = nodeApi
+        nodeApi.start()
         server.pluginManager.registerEvents(this, this)
         heartbeatTask = server.scheduler.runTaskTimerAsynchronously(
             this,
-            Runnable { pulse(loaded, httpClient) },
+            Runnable { pulse(loaded, nodeApi) },
             INITIAL_DELAY_TICKS,
             PERIOD_TICKS,
         )
@@ -111,7 +113,7 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         // Optional integrations — the hook objects reference Vault/PlaceholderAPI
         // types and are only touched when the respective plugin is present.
         if (server.pluginManager.getPlugin("Vault") != null) {
-            VaultEconomyHook.register(this, BridgeActionInvoker(httpClient)) { bridgeValues }
+            VaultEconomyHook.register(this, BridgeActionInvoker(nodeApi)) { bridgeValues }
             logger.info("Helix economy registered as Vault provider")
         }
         if (server.pluginManager.getPlugin("PlaceholderAPI") != null) {
@@ -171,8 +173,8 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         }
         nickPacketListener = null
         nickNames.clear()
-        client?.close()
-        client = null
+        api?.close()
+        api = null
     }
 
     /**
@@ -199,12 +201,12 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
      */
     @EventHandler
     fun onJoin(event: PlayerJoinEvent) {
-        val httpClient = client ?: return
+        val nodeApi = api ?: return
         server.scheduler.runTaskAsynchronously(
             this,
             Runnable {
-                refreshDisplay(httpClient, event.player.name)
-                refreshPermissions(httpClient, event.player.name)
+                refreshDisplay(nodeApi, event.player.name)
+                refreshPermissions(nodeApi, event.player.name)
             },
         )
     }
@@ -363,35 +365,29 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
      *   its usage line).
      */
     private fun forwardChannelChat(playerName: String, command: String, text: String) {
-        val httpClient = client ?: return
-        val response = runCatching {
-            httpClient.postJsonForBody(
-                "/api/v1/internal/player-command",
-                json.encodeToString(
-                    org.helix.api.action.PlayerCommandRequest(
-                        player = playerName,
-                        command = command,
-                        arguments = if (text.isEmpty()) emptyList() else text.split(" "),
-                    ),
-                ),
-            )
-        }.onFailure { logger.warning("Channel chat @$command failed: ${it.message}") }.getOrNull()
+        val nodeApi = api ?: return
+        val result = nodeApi.playerCommand(
+            org.helix.api.action.PlayerCommandRequest(
+                player = playerName,
+                command = command,
+                arguments = if (text.isEmpty()) emptyList() else text.split(" "),
+            ),
+        )
         val player = server.getPlayerExact(playerName) ?: return
-        if (response == null) {
+        if (result == null) {
             player.sendMessage(colored("&cThis chat channel is currently unavailable."))
             return
         }
-        val result = json.decodeFromString<org.helix.api.action.ActionResult>(response)
         result.lines.forEach { line -> player.sendMessage(colored(line)) }
         if (!result.success && result.lines.isEmpty()) {
             player.sendMessage(colored("&cThis chat channel is not available to you."))
         }
     }
 
-    private fun pulse(settings: BridgeSettings, client: NodeHttpClient) {
+    private fun pulse(settings: BridgeSettings, api: ServiceNodeApi) {
         if (reachability.shouldAttempt()) {
-            val heartbeatOk = sendHeartbeat(settings, client)
-            val valuesOk = syncBridgeValues(settings, client)
+            val heartbeatOk = sendHeartbeat(settings, api)
+            val valuesOk = syncBridgeValues(settings, api)
             if (heartbeatOk && valuesOk) {
                 if (reachability.isDown()) {
                     logger.info("Helix node reachable again for ${settings.serviceId}")
@@ -413,8 +409,8 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
             return
         }
         if (pollCounter++ % DISPLAY_REFRESH_CYCLES == 0) {
-            refreshAllDisplays(client, server.onlinePlayers.map { it.name })
-            server.onlinePlayers.forEach { player -> refreshPermissions(client, player.name) }
+            refreshAllDisplays(api, server.onlinePlayers.map { it.name })
+            server.onlinePlayers.forEach { player -> refreshPermissions(api, player.name) }
         } else {
             // Nick changes must not wait for the slow display cycle: the nick addon publishes
             // nick.name.<player> bridge values, so a mismatch against the cached profile
@@ -423,13 +419,13 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
                 val expected = bridgeValues["nick.name.${player.name.lowercase()}"].orEmpty()
                 val current = displayProfiles[player.name.lowercase()]?.name.orEmpty()
                 if (expected != current) {
-                    refreshDisplay(client, player.name)
+                    refreshDisplay(api, player.name)
                 }
             }
         }
     }
 
-    private fun sendHeartbeat(settings: BridgeSettings, client: NodeHttpClient): Boolean {
+    private fun sendHeartbeat(settings: BridgeSettings, api: ServiceNodeApi): Boolean {
         val report = HeartbeatReport(
             serviceId = settings.serviceId,
             onlinePlayers = server.onlinePlayers.size,
@@ -439,15 +435,12 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
             memoryMaxMb = ResourceProbe.memoryMaxMb(),
             cpuPercent = ResourceProbe.cpuPercent(),
         )
-        return runCatching { client.postJson("/api/v1/internal/heartbeat", json.encodeToString(report)) }
-            .getOrDefault(false)
+        return api.heartbeat(report)
     }
 
-    private fun syncBridgeValues(settings: BridgeSettings, client: NodeHttpClient): Boolean =
+    private fun syncBridgeValues(settings: BridgeSettings, api: ServiceNodeApi): Boolean =
         runCatching {
-            val body = client.getJson("/api/v1/internal/bridge-values?serviceId=${settings.serviceId}")
-                ?: return@runCatching false
-            bridgeValues = json.decodeFromString<Map<String, String>>(body)
+            bridgeValues = api.bridgeValues() ?: return@runCatching false
             tablist = bridgeValues["tablist.config"]?.let { raw ->
                 runCatching { json.decodeFromString<TablistData>(raw) }.getOrNull()
             }
@@ -664,19 +657,12 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         .replace("{prefix}", bridgeValues["network.prefix"] ?: "")
         .replace("{network}", bridgeValues["network.name"] ?: "")
 
-    private fun refreshDisplay(client: NodeHttpClient, playerName: String) {
-        runCatching {
-            client.postJsonForBody(
-                "/api/v1/internal/display",
-                json.encodeToString(JoinRequest(name = playerName)),
-            )?.let { body ->
-                val profile = json.decodeFromString<DisplayProfile>(body)
-                displayProfiles[playerName.lowercase()] = profile
-                server.getPlayerExact(playerName)?.let { player ->
-                    server.scheduler.runTask(this, Runnable { applyDisplay(player, profile) })
-                }
-            }
-        }.onFailure { logger.warning("Helix display fetch failed: ${it.message}") }
+    private fun refreshDisplay(api: ServiceNodeApi, playerName: String) {
+        val profile = api.display(playerName) ?: return
+        displayProfiles[playerName.lowercase()] = profile
+        server.getPlayerExact(playerName)?.let { player ->
+            server.scheduler.runTask(this, Runnable { applyDisplay(player, profile) })
+        }
     }
 
     /**
@@ -686,29 +672,22 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
      * profile actually changed since the last cycle (avoids redundant
      * packet spam on the default interval).
      *
-     * @param client the node HTTP client.
+     * @param api the node transport.
      * @param names online player names to refresh.
      */
-    private fun refreshAllDisplays(client: NodeHttpClient, names: List<String>) {
+    private fun refreshAllDisplays(api: ServiceNodeApi, names: List<String>) {
         if (names.isEmpty()) return
-        runCatching {
-            client.postJsonForBody(
-                "/api/v1/internal/display-bulk",
-                json.encodeToString(DisplayBulkRequest(names)),
-            )?.let { body ->
-                val profiles = json.decodeFromString<Map<String, DisplayProfile>>(body)
-                profiles.forEach { (name, profile) ->
-                    val key = name.lowercase()
-                    val changed = displayProfiles[key] != profile
-                    displayProfiles[key] = profile
-                    if (changed) {
-                        server.getPlayerExact(name)?.let { player ->
-                            server.scheduler.runTask(this, Runnable { applyDisplay(player, profile) })
-                        }
-                    }
+        val profiles = api.displayBulk(names) ?: return
+        profiles.forEach { (name, profile) ->
+            val key = name.lowercase()
+            val changed = displayProfiles[key] != profile
+            displayProfiles[key] = profile
+            if (changed) {
+                server.getPlayerExact(name)?.let { player ->
+                    server.scheduler.runTask(this, Runnable { applyDisplay(player, profile) })
                 }
             }
-        }.onFailure { logger.warning("Helix bulk display fetch failed: ${it.message}") }
+        }
     }
 
     /**
@@ -716,20 +695,15 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
      * Bukkit permission attachment, so third-party plugins calling
      * `Player#hasPermission` transparently see the node's decisions.
      *
-     * @param client the node HTTP client.
+     * @param api the node transport.
      * @param playerName the player to refresh.
      */
-    private fun refreshPermissions(client: NodeHttpClient, playerName: String) {
-        runCatching {
-            client.getJson("/api/v1/internal/player-permissions?name=${java.net.URLEncoder.encode(playerName, "UTF-8")}")
-                ?.let { body ->
-                    val snapshot = json.decodeFromString<org.helix.api.proxy.PlayerPermissionsSnapshot>(body)
-                    server.getPlayerExact(playerName)?.let { player ->
-                        val granted = snapshot.granted.toSet()
-                        server.scheduler.runTask(this, Runnable { permissionProvider.sync(player, granted) })
-                    }
-                }
-        }.onFailure { logger.warning("Helix permission fetch failed: ${it.message}") }
+    private fun refreshPermissions(api: ServiceNodeApi, playerName: String) {
+        val snapshot = api.playerPermissionsGet(playerName) ?: return
+        server.getPlayerExact(playerName)?.let { player ->
+            val granted = snapshot.granted.toSet()
+            server.scheduler.runTask(this, Runnable { permissionProvider.sync(player, granted) })
+        }
     }
 
     /**
