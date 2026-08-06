@@ -11,6 +11,7 @@ include(
     "helix-bridge-paper",
     "helix-bridge-velocity",
     "helix-gui",
+    "helix-wire",
     "helix-addon-sdk",
     "helix-addon-example",
     "helix-addon-bans",
