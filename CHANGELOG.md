@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.86.0 — 2026-08-06
+
+### Neu: Helix-Wire — eigenes helix://-Protokoll für die Service-Kommunikation
+- **Neues Modul `helix-wire`**: ein togglebarer, eigener Transport zwischen
+  Node und Services. Ist er aktiv, öffnet jeder Service EINE persistente,
+  authentifizierte `helix://`-TCP-Verbindung zur Node und wickelt darüber
+  seinen gesamten internen Verkehr ab — statt pro Aufruf einen HTTP-Request.
+  Reine JDK-Sockets (kein Netty), längen-präfigierte Frames, **CBOR-Encoding
+  der bestehenden DTOs** (echtes Binärformat ohne Parallel-Schema),
+  Token-Handshake (TLS optional), Keepalive, Reconnect mit Backoff.
+- **Togglebar & abwärtskompatibel**: `[wire] enabled` in der node.toml
+  (Default **aus**). Aus = alles läuft unverändert über HTTP. An = Services
+  bekommen eine `helix://`-URL; die HTTP-`/internal`-Endpoints bleiben als
+  automatischer Fallback bestehen, sodass eine Wire-Störung keinen
+  Funktionsausfall verursacht (Reconnect + HTTP-Fallback).
+- **Node-Seite**: `WireServer` mit Endpoint-Dispatch, der auf **dieselben**
+  Control-Dependencies delegiert wie die HTTP-Routen (eine Logik, zwei
+  Transporte); `WirePush` ersetzt den HTTP-Long-Poll nativ (Command-/
+  Routing-Push mit erhaltenem Ack-Cursor). Auth über die bestehende
+  `ServiceTokenRegistry`; mehrere Verbindungen pro `serviceId` (Kern-Bridge
+  + jede Addon-Komponente im selben JVM).
+- **Client-Seite**: neue `ServiceNodeApi`-Fassade; **beide Kern-Bridges**
+  (Paper/Velocity) und **alle acht Addon-Komponenten** (npc, guis, profile,
+  bettermsgs, guard, subtitles, cosmetics, labymod) laufen darüber. Die
+  Velocity-Bridge konsumiert den Wire-Push und fällt bei Bedarf auf den
+  klassischen Long-Poll zurück.
+- Dashboard (Browser) und `helix-wrapper` (stdout + console.in) bleiben
+  bewusst außen vor. `NetworkPackInfo` ist nach `helix-api` gewandert, damit
+  Node und Services denselben DTO teilen.
+
 ## 0.85.2 — 2026-08-04
 
 ### Fix: Launcher-Konsole schickte doppelt kodiertes JSON

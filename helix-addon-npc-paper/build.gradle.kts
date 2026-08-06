@@ -17,6 +17,7 @@ repositories {
 dependencies {
     // NodeTranslations (org.helix.api.i18n) — bundled into the fat jar below.
     implementation(rootProject.project("helix-api"))
+    implementation(rootProject.project("helix-wire"))
     compileOnly(libs.paper.api)
     // INpc is vendored as its prebuilt, Mojang-mapped library jar. It carries
     // no server classes; modern Paper (1.21.11) resolves its Mojang-named NMS

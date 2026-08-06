@@ -16,6 +16,7 @@ repositories {
 
 dependencies {
     implementation(rootProject.project("helix-api"))
+    implementation(rootProject.project("helix-wire"))
     compileOnly(libs.paper.api)
     // Only compileOnly at runtime (Paper provides it), but the texture-mapping test constructs a
     // real Adventure Key, so the test task needs the actual classes on its runtime classpath.
