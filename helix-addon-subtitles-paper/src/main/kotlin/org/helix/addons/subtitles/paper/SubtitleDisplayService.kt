@@ -1,13 +1,13 @@
 package org.helix.addons.subtitles.paper
 
-import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.Location
 import org.bukkit.entity.Display
 import org.bukkit.entity.Player
 import org.bukkit.entity.TextDisplay
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Owns the Text Display entities rendering players' chosen subtitles.

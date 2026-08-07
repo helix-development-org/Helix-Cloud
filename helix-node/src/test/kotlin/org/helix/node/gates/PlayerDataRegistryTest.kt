@@ -1,9 +1,9 @@
 package org.helix.node.gates
 
+import org.helix.api.addon.PlayerDataProvider
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.helix.api.addon.PlayerDataProvider
 
 class PlayerDataRegistryTest {
     private val registry = PlayerDataRegistry()
@@ -35,10 +35,14 @@ class PlayerDataRegistryTest {
 
     @Test
     fun `a throwing provider is skipped instead of failing the whole export`() {
-        registry.register("broken", object : PlayerDataProvider {
+        registry.register(
+            "broken",
+            object : PlayerDataProvider {
             override fun export(player: String): String? = error("boom")
+
             override fun delete(player: String): Boolean = error("boom")
-        })
+        },
+        )
         registry.register("economy", exporter { "{\"balance\":10}" })
 
         assertEquals(mapOf("economy" to "{\"balance\":10}"), registry.export("steve"))
@@ -47,11 +51,13 @@ class PlayerDataRegistryTest {
 
     private fun provider(deletes: Boolean) = object : PlayerDataProvider {
         override fun export(player: String): String? = null
+
         override fun delete(player: String): Boolean = deletes
     }
 
     private fun exporter(export: (String) -> String?) = object : PlayerDataProvider {
         override fun export(player: String): String? = export(player)
+
         override fun delete(player: String): Boolean = false
     }
 }

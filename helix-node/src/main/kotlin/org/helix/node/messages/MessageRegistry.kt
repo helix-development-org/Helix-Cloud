@@ -1,7 +1,7 @@
 package org.helix.node.messages
 
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.Serializable
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Central registry of every owner's [MessageBundle], exposed to the

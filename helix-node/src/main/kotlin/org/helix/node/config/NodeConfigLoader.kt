@@ -1,8 +1,8 @@
 package org.helix.node.config
 
+import org.tomlj.Toml
 import java.nio.file.Files
 import java.nio.file.Path
-import org.tomlj.Toml
 
 /**
  * Loads [NodeConfig] from `config/node.toml` below the data directory.

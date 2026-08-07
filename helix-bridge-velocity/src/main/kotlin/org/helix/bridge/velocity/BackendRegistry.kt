@@ -3,10 +3,10 @@ package org.helix.bridge.velocity
 import com.velocitypowered.api.proxy.ProxyServer
 import com.velocitypowered.api.proxy.server.RegisteredServer
 import com.velocitypowered.api.proxy.server.ServerInfo
-import java.net.InetSocketAddress
-import java.util.concurrent.ConcurrentHashMap
 import org.helix.api.proxy.RoutingSnapshot
 import org.slf4j.Logger
+import java.net.InetSocketAddress
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Mirrors the node routing snapshot into Velocity's server registry.

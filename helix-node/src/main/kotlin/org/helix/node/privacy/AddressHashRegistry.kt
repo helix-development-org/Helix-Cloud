@@ -1,10 +1,10 @@
 package org.helix.node.privacy
 
-import java.security.MessageDigest
-import java.security.SecureRandom
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.helix.api.storage.AddonStorage
+import java.security.MessageDigest
+import java.security.SecureRandom
 
 /**
  * One recorded address hash of a player.

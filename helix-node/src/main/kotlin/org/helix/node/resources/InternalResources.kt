@@ -16,4 +16,3 @@ fun interface InternalResources {
      */
     fun open(name: String): InputStream
 }
-

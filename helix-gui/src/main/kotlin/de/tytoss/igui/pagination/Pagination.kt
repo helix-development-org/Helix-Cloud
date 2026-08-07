@@ -1,10 +1,9 @@
 package de.tytoss.igui.pagination
 
-import net.kyori.adventure.text.format.NamedTextColor
-import net.kyori.adventure.text.format.TextColor
 import de.tytoss.igui.display.DisplayBuilder
 import de.tytoss.igui.texture.GuiTexture
-
+import net.kyori.adventure.text.format.NamedTextColor
+import net.kyori.adventure.text.format.TextColor
 
 /** Which page-navigation arrows are usable, used to pick the matching texture from [PaginationTextures]. */
 enum class PaginationState {
@@ -36,7 +35,6 @@ data class PaginationTextures(
     val nextOnly: GuiTexture,
     val disabled: GuiTexture,
 ) {
-
     /**
      * Picks the texture matching a navigation state.
      *
@@ -85,7 +83,6 @@ fun DisplayBuilder.pagination(
         centeredText(label(page, pageCount), labelLine, color = labelColor)
     }
 }
-
 
 /**
  * Slices out one page's worth of elements.

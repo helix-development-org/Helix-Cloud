@@ -15,7 +15,7 @@ import java.util.logging.Logger
 class CommandBanProvider(
     private val plugin: JavaPlugin,
     private val config: BansConfig,
-    private val logger: Logger
+    private val logger: Logger,
 ) : BanProvider {
     override val id = "command"
     override val ownsEnforcementGate = false
@@ -40,9 +40,12 @@ class CommandBanProvider(
             .replace("%actor%", actor)
             .removePrefix("/")
         // Console dispatch must run on the main thread.
-        Bukkit.getScheduler().runTask(plugin, Runnable {
+        Bukkit.getScheduler().runTask(
+            plugin,
+            Runnable {
             runCatching { Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command) }
                 .onFailure { logger.warning("Ban command failed: ${it.message}") }
-        })
+        },
+        )
     }
 }

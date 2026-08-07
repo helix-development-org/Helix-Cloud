@@ -1,15 +1,5 @@
 package org.helix.node.actions
 
-import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
-import java.io.PrintStream
-import java.nio.file.Files
-import kotlin.io.path.createTempDirectory
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
@@ -23,6 +13,16 @@ import org.helix.node.services.ServiceManager
 import org.helix.node.services.WorkspacePreparer
 import org.helix.node.tasks.TaskStore
 import org.helix.node.versions.VersionCatalog
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.PrintStream
+import java.nio.file.Files
+import kotlin.io.path.createTempDirectory
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class ActionsTest {
     private val paths = NodePaths(createTempDirectory("helix")).createAll()

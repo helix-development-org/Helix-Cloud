@@ -23,8 +23,6 @@ import dev.kord.rest.builder.interaction.subCommand
 import dev.kord.rest.builder.message.MessageBuilder
 import dev.kord.rest.builder.message.container
 import dev.kord.rest.builder.message.messageFlags
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -37,6 +35,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.helix.api.storage.AddonStorage
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Persisted references to the bot's own messages (control panel and status

@@ -1,13 +1,13 @@
 package org.helix.node.wire
 
-import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.runBlocking
 import org.helix.api.proxy.ProxyPoll
 import org.helix.node.control.ControlDependencies
 import org.helix.wire.WireCodec
 import org.helix.wire.WireServer
 import org.slf4j.LoggerFactory
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Pushes proxy command and routing changes to connected proxies over the

@@ -1,10 +1,5 @@
 package org.helix.addons.profile
 
-import kotlin.io.path.createTempDirectory
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 import org.helix.addon.sdk.testing.RecordingAddonContext
 import org.helix.api.addon.ProfileInfoEntry
 import org.helix.api.addon.ProfileInfoProvider
@@ -12,6 +7,11 @@ import org.helix.api.addon.ProfileSettingDescriptor
 import org.helix.api.addon.ProfileSettingOption
 import org.helix.api.addon.ProfileSettingProvider
 import org.helix.api.addon.ProfileSettingType
+import kotlin.io.path.createTempDirectory
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class ProfileAddonTest {
     private val context = RecordingAddonContext(createTempDirectory("profile"))
@@ -137,6 +137,7 @@ class ProfileAddonTest {
             override fun settingsFor(player: String) = listOf(
                 ProfileSettingDescriptor("nick", "Nickname", ProfileSettingType.FreeText()),
             )
+
             override fun validate(player: String, key: String, value: String): String? =
                 if (value.equals("Admin", ignoreCase = true)) "that name is reserved" else null
         })
@@ -192,5 +193,4 @@ class ProfileAddonTest {
 
         assertFalse(result.success)
     }
-
 }

@@ -19,7 +19,6 @@ data class GuiFontConfiguration(
     val spacingFont: Key = Key.key(namespace, "spaces"),
     val textRowPrefix: String = "$namespace:text_row_",
 ) {
-
     /**
      * Resolves the font key for a given text row.
      *

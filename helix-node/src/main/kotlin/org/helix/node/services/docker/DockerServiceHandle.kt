@@ -1,8 +1,8 @@
 package org.helix.node.services.docker
 
-import java.nio.file.Path
 import org.helix.node.services.ConsoleInput
 import org.helix.node.services.ServiceHandle
+import java.nio.file.Path
 
 /**
  * [ServiceHandle] over a service container.

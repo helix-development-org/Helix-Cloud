@@ -1,12 +1,12 @@
 package de.tytoss.iguard.command
 
-import de.tytoss.iguard.api.IGuardApi
 import de.tytoss.iguard.alert.AlertService
+import de.tytoss.iguard.api.IGuardApi
 import de.tytoss.iguard.check.CheckEngine
 import de.tytoss.iguard.config.DynamicConfig
 import de.tytoss.iguard.config.IGuardConfig
-import de.tytoss.iguard.storage.GuardStore
 import de.tytoss.iguard.snapshot.MainThreadSampler
+import de.tytoss.iguard.storage.GuardStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import net.kyori.adventure.text.Component
@@ -40,7 +40,7 @@ class IGuardCommand(
     private val replayService: de.tytoss.iguard.replay.ReplayService,
     private val bans: de.tytoss.iguard.ban.BanCoordinator,
     private val scope: CoroutineScope,
-    private val translations: NodeTranslations
+    private val translations: NodeTranslations,
 ) : CommandExecutor, TabCompleter {
     private val miniMessage = MiniMessage.miniMessage()
 
@@ -94,20 +94,40 @@ class IGuardCommand(
         val player = Bukkit.getPlayerExact(name) ?: return sender.sendMessage(chat(sender, "cmd.not-online"))
         val snapshot = api.snapshot(player.uniqueId) ?: return sender.sendMessage(chat(sender, "cmd.info.no-state"))
         sender.sendMessage(chat(sender, "cmd.info.header", "player" to snapshot.playerName))
-        sender.sendMessage(chat(sender, "cmd.info.client",
-            "version" to "${snapshot.clientVersion}", "supported" to "${snapshot.supported}", "exempt" to "${api.isExempt(player.uniqueId)}"))
-        sender.sendMessage(chat(sender, "cmd.info.identity",
-            "family" to snapshot.clientFamily, "confidence" to "${snapshot.clientConfidence}", "brand" to (snapshot.clientBrand ?: value(sender, "value.unknown"))))
-        sender.sendMessage(chat(sender, "cmd.info.channels",
-            "channels" to snapshot.clientChannels.sorted().joinToString().ifEmpty { value(sender, "value.none-observed") }))
-        sender.sendMessage(chat(sender, "cmd.info.drops",
-            "drops" to "${snapshot.droppedPackets}", "last" to (snapshot.lastPacketAt?.toString() ?: value(sender, "value.never"))))
+        sender.sendMessage(
+            chat(
+                sender, "cmd.info.client",
+            "version" to "${snapshot.clientVersion}", "supported" to "${snapshot.supported}", "exempt" to "${api.isExempt(player.uniqueId)}",
+            ),
+        )
+        sender.sendMessage(
+            chat(
+                sender, "cmd.info.identity",
+            "family" to snapshot.clientFamily, "confidence" to "${snapshot.clientConfidence}", "brand" to (snapshot.clientBrand ?: value(sender, "value.unknown")),
+            ),
+        )
+        sender.sendMessage(
+            chat(
+                sender, "cmd.info.channels",
+            "channels" to snapshot.clientChannels.sorted().joinToString().ifEmpty { value(sender, "value.none-observed") },
+            ),
+        )
+        sender.sendMessage(
+            chat(
+                sender, "cmd.info.drops",
+            "drops" to "${snapshot.droppedPackets}", "last" to (snapshot.lastPacketAt?.toString() ?: value(sender, "value.never")),
+            ),
+        )
         val levels = snapshot.violationLevels.filterValues { it > 0.0 }.entries.joinToString { "${it.key}=%.2f".format(it.value) }
         sender.sendMessage(chat(sender, "cmd.info.vl", "levels" to levels.ifEmpty { value(sender, "value.none") }))
         api.latestIncident(player.uniqueId)?.let { incident ->
-            sender.sendMessage(chat(sender, "cmd.info.case",
+            sender.sendMessage(
+                chat(
+                    sender, "cmd.info.case",
                 "id" to incident.incidentId.toString().take(8), "confidence" to percent(incident.confidence),
-                "families" to incident.families.joinToString(), "shadow" to (incident.shadowAction ?: value(sender, "value.none"))))
+                "families" to incident.families.joinToString(), "shadow" to (incident.shadowAction ?: value(sender, "value.none")),
+                ),
+            )
         }
     }
 
@@ -131,17 +151,24 @@ class IGuardCommand(
         val server = if (selected.equals("all", true)) null else selected ?: config.serverId
         scope.launch {
             val result = runCatching { storage.history(name, page, server) }
-            Bukkit.getScheduler().runTask(plugin, Runnable {
+            Bukkit.getScheduler().runTask(
+                plugin,
+                Runnable {
                 result.onSuccess { entries ->
                     sender.sendMessage(chat(sender, "cmd.history.header", "player" to name, "page" to "$page"))
                     if (entries.isEmpty()) sender.sendMessage(chat(sender, "cmd.history.empty"))
                     entries.forEach { entry ->
-                        sender.sendMessage(chat(sender, "cmd.history.entry",
+                        sender.sendMessage(
+                            chat(
+                                sender, "cmd.history.entry",
                             "time" to formatter.format(entry.createdAt), "server" to entry.serverId,
-                            "check" to entry.checkId, "vl" to "%.2f".format(entry.violationLevel)))
+                            "check" to entry.checkId, "vl" to "%.2f".format(entry.violationLevel),
+                            ),
+                        )
                     }
                 }.onFailure { sender.sendMessage(chat(sender, "cmd.history.failed", "error" to "${it.message}")) }
-            })
+            },
+            )
         }
     }
 
@@ -153,18 +180,25 @@ class IGuardCommand(
         val server = if (selected.equals("all", true)) null else selected ?: config.serverId
         scope.launch {
             val result = runCatching { storage.incidents(name, page, server) }
-            Bukkit.getScheduler().runTask(plugin, Runnable {
+            Bukkit.getScheduler().runTask(
+                plugin,
+                Runnable {
                 result.onSuccess { entries ->
                     sender.sendMessage(chat(sender, "cmd.cases.header", "player" to name, "page" to "$page"))
                     if (entries.isEmpty()) sender.sendMessage(chat(sender, "cmd.cases.empty"))
                     entries.forEach { incident ->
-                        sender.sendMessage(chat(sender, "cmd.cases.entry",
+                        sender.sendMessage(
+                            chat(
+                                sender, "cmd.cases.entry",
                             "id" to "${incident.incidentId}", "time" to formatter.format(incident.updatedAt),
                             "confidence" to percent(incident.confidence), "families" to incident.families.joinToString(),
-                            "shadow" to (incident.shadowAction ?: value(sender, "value.none"))))
+                            "shadow" to (incident.shadowAction ?: value(sender, "value.none")),
+                            ),
+                        )
                     }
                 }.onFailure { sender.sendMessage(chat(sender, "cmd.cases.failed", "error" to "${it.message}")) }
-            })
+            },
+            )
         }
     }
 
@@ -174,19 +208,34 @@ class IGuardCommand(
             ?: return sender.sendMessage(chat(sender, "cmd.case.usage"))
         scope.launch {
             val result = runCatching { storage.incident(id) }
-            Bukkit.getScheduler().runTask(plugin, Runnable {
+            Bukkit.getScheduler().runTask(
+                plugin,
+                Runnable {
                 result.onSuccess { incident ->
                     if (incident == null) return@onSuccess sender.sendMessage(chat(sender, "cmd.case.not-found"))
                     sender.sendMessage(chat(sender, "cmd.case.header", "id" to "${incident.incidentId}"))
-                    sender.sendMessage(chat(sender, "cmd.case.line1",
+                    sender.sendMessage(
+                        chat(
+                            sender, "cmd.case.line1",
                         "player" to incident.playerName, "server" to incident.serverId,
-                        "opened" to formatter.format(incident.openedAt), "updated" to formatter.format(incident.updatedAt)))
-                    sender.sendMessage(chat(sender, "cmd.case.line2",
-                        "confidence" to percent(incident.confidence), "calibrated" to "${incident.calibrated}", "evidence" to "${incident.evidenceCount}"))
-                    sender.sendMessage(chat(sender, "cmd.case.line3",
-                        "families" to incident.families.joinToString(), "shadow" to (incident.shadowAction ?: value(sender, "value.none")), "recipe" to "${incident.recipeVersion}"))
+                        "opened" to formatter.format(incident.openedAt), "updated" to formatter.format(incident.updatedAt),
+                        ),
+                    )
+                    sender.sendMessage(
+                        chat(
+                            sender, "cmd.case.line2",
+                        "confidence" to percent(incident.confidence), "calibrated" to "${incident.calibrated}", "evidence" to "${incident.evidenceCount}",
+                        ),
+                    )
+                    sender.sendMessage(
+                        chat(
+                            sender, "cmd.case.line3",
+                        "families" to incident.families.joinToString(), "shadow" to (incident.shadowAction ?: value(sender, "value.none")), "recipe" to "${incident.recipeVersion}",
+                        ),
+                    )
                 }.onFailure { sender.sendMessage(chat(sender, "cmd.cases.failed", "error" to "${it.message}")) }
-            })
+            },
+            )
         }
     }
 
@@ -211,27 +260,47 @@ class IGuardCommand(
         val name = args.getOrNull(1) ?: return sender.sendMessage(chat(sender, "cmd.confidence.usage"))
         val player = Bukkit.getPlayerExact(name) ?: return sender.sendMessage(chat(sender, "cmd.not-online"))
         val incident = api.latestIncident(player.uniqueId) ?: return sender.sendMessage(chat(sender, "cmd.confidence.none", "player" to player.name))
-        sender.sendMessage(chat(sender, "cmd.confidence.line",
+        sender.sendMessage(
+            chat(
+                sender, "cmd.confidence.line",
             "player" to player.name, "confidence" to percent(incident.confidence), "calibrated" to "${incident.calibrated}",
-            "families" to incident.families.joinToString(), "shadow" to (incident.shadowAction ?: value(sender, "value.none"))))
+            "families" to incident.families.joinToString(), "shadow" to (incident.shadowAction ?: value(sender, "value.none")),
+            ),
+        )
     }
 
     private fun status(sender: CommandSender) {
         if (!permission(sender, "iguard.status")) return
         sender.sendMessage(chat(sender, "cmd.status.header"))
-        sender.sendMessage(chat(sender, "cmd.status.players",
-            "players" to "${engine.trackedPlayers()}", "drops" to "${engine.totalDroppedPackets()}", "unevaluated" to "${engine.unevaluatedFrameCount()}"))
+        sender.sendMessage(
+            chat(
+                sender, "cmd.status.players",
+            "players" to "${engine.trackedPlayers()}", "drops" to "${engine.totalDroppedPackets()}", "unevaluated" to "${engine.unevaluatedFrameCount()}",
+            ),
+        )
         sender.sendMessage(chat(sender, "cmd.status.queues", "queues" to engine.queueSizes().joinToString(prefix = "[", postfix = "]")))
-        sender.sendMessage(chat(sender, "cmd.status.storage",
+        sender.sendMessage(
+            chat(
+                sender, "cmd.status.storage",
             "state" to value(sender, if (storage.isAvailable()) "value.available" else "value.unavailable"),
-            "queue" to "${storage.queueSize()}", "written" to "${storage.writtenRecords()}", "dropped" to "${storage.droppedRecords()}"))
+            "queue" to "${storage.queueSize()}", "written" to "${storage.writtenRecords()}", "dropped" to "${storage.droppedRecords()}",
+            ),
+        )
         sender.sendMessage(chat(sender, "cmd.status.tps", "tps" to "%.2f".format(Bukkit.getTPS().firstOrNull() ?: 20.0)))
         val processing = engine.processingMetrics()
         val sampling = sampler.timingMicros()
-        sender.sendMessage(chat(sender, "cmd.status.frames",
-            "frames" to "${processing.first}", "avg" to "%.1f".format(processing.second), "max" to "%.1f".format(processing.third)))
-        sender.sendMessage(chat(sender, "cmd.status.sampler",
-            "last" to "%.1f".format(sampling.first), "max" to "%.1f".format(sampling.second), "players" to "${sampler.sampledPlayers()}"))
+        sender.sendMessage(
+            chat(
+                sender, "cmd.status.frames",
+            "frames" to "${processing.first}", "avg" to "%.1f".format(processing.second), "max" to "%.1f".format(processing.third),
+            ),
+        )
+        sender.sendMessage(
+            chat(
+                sender, "cmd.status.sampler",
+            "last" to "%.1f".format(sampling.first), "max" to "%.1f".format(sampling.second), "players" to "${sampler.sampledPlayers()}",
+            ),
+        )
     }
 
     private fun reload(sender: CommandSender) {
@@ -292,7 +361,9 @@ class IGuardCommand(
         if (!permission(sender, "iguard.ban")) return
         scope.launch {
             val result = runCatching { storage.activeBans() }
-            Bukkit.getScheduler().runTask(plugin, Runnable {
+            Bukkit.getScheduler().runTask(
+                plugin,
+                Runnable {
                 result.onSuccess { list ->
                     sender.sendMessage(chat(sender, "cmd.bans.header", "count" to "${list.size}"))
                     if (list.isEmpty()) sender.sendMessage(chat(sender, "cmd.bans.empty"))
@@ -301,7 +372,8 @@ class IGuardCommand(
                         sender.sendMessage(chat(sender, "cmd.bans.entry", "player" to b.playerName, "until" to until, "reason" to b.reason))
                     }
                 }.onFailure { sender.sendMessage(chat(sender, "cmd.bans.failed", "error" to "${it.message}")) }
-            })
+            },
+            )
         }
     }
 
@@ -310,19 +382,26 @@ class IGuardCommand(
         val name = args.getOrNull(1) ?: return sender.sendMessage(chat(sender, "cmd.banhistory.usage"))
         scope.launch {
             val result = runCatching { storage.banHistory(name) }
-            Bukkit.getScheduler().runTask(plugin, Runnable {
+            Bukkit.getScheduler().runTask(
+                plugin,
+                Runnable {
                 result.onSuccess { list ->
                     sender.sendMessage(chat(sender, "cmd.banhistory.header", "player" to name, "count" to "${list.size}"))
                     if (list.isEmpty()) sender.sendMessage(chat(sender, "cmd.banhistory.empty"))
                     list.forEach { p ->
                         val dur = p.hours?.let { " ${it}h" } ?: ""
                         val colorTag = if (p.type == "UNBAN") "<green>" else "<red>"
-                        sender.sendMessage(chat(sender, "cmd.banhistory.entry",
+                        sender.sendMessage(
+                            chat(
+                                sender, "cmd.banhistory.entry",
                             "color" to colorTag, "time" to formatter.format(java.time.Instant.ofEpochMilli(p.createdAt)),
-                            "type" to p.type, "dur" to dur, "actor" to p.actor, "reason" to p.reason))
+                            "type" to p.type, "dur" to dur, "actor" to p.actor, "reason" to p.reason,
+                            ),
+                        )
                     }
                 }.onFailure { sender.sendMessage(chat(sender, "cmd.history.failed", "error" to "${it.message}")) }
-            })
+            },
+            )
         }
     }
 

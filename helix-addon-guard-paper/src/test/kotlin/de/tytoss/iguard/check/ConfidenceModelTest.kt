@@ -11,7 +11,7 @@ class ConfidenceModelTest {
         defaultSignal = 0.50,
         singleFamilyCap = 0.79,
         multiFamilyCap = 0.95,
-        deterministic = 0.85
+        deterministic = 0.85,
     )
 
     @Test

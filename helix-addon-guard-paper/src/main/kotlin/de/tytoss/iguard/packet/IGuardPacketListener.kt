@@ -5,28 +5,28 @@ import com.github.retrooper.packetevents.event.PacketListenerPriority
 import com.github.retrooper.packetevents.event.PacketReceiveEvent
 import com.github.retrooper.packetevents.event.PacketSendEvent
 import com.github.retrooper.packetevents.protocol.packettype.PacketType
-import com.github.retrooper.packetevents.protocol.teleport.RelativeFlag
 import com.github.retrooper.packetevents.protocol.player.DiggingAction
+import com.github.retrooper.packetevents.protocol.teleport.RelativeFlag
 import com.github.retrooper.packetevents.util.Vector3d
+import com.github.retrooper.packetevents.wrapper.configuration.client.WrapperConfigClientPluginMessage
+import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientClickWindow
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientEntityAction
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientInteractEntity
-import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPluginMessage
+import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientKeepAlive
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPlayerAbilities
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPlayerBlockPlacement
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPlayerDigging
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPlayerFlying
+import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPluginMessage
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPong
-import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientKeepAlive
-import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientClickWindow
-import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientUseItem
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientTeleportConfirm
+import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientUseItem
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityVelocity
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerExplosion
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerKeepAlive
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPing
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerAbilities
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerPositionAndLook
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPing
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerKeepAlive
-import com.github.retrooper.packetevents.wrapper.configuration.client.WrapperConfigClientPluginMessage
 import de.tytoss.iguard.check.CheckEngine
 import de.tytoss.iguard.model.AttackFrame
 import de.tytoss.iguard.model.BlockAction
@@ -34,16 +34,16 @@ import de.tytoss.iguard.model.BlockActionFrame
 import de.tytoss.iguard.model.ClientAbilitiesFrame
 import de.tytoss.iguard.model.ClientAction
 import de.tytoss.iguard.model.ClientActionFrame
-import de.tytoss.iguard.model.ClientTickFrame
 import de.tytoss.iguard.model.ClientIdentityFrame
-import de.tytoss.iguard.model.MovementFrame
+import de.tytoss.iguard.model.ClientTickFrame
 import de.tytoss.iguard.model.InventoryClickFrame
+import de.tytoss.iguard.model.MovementFrame
 import de.tytoss.iguard.model.PacketFrame
 import de.tytoss.iguard.model.ResetFrame
 import de.tytoss.iguard.model.ServerAbilitiesFrame
-import de.tytoss.iguard.model.SwingFrame
 import de.tytoss.iguard.model.ServerTeleportFrame
 import de.tytoss.iguard.model.ServerVelocityFrame
+import de.tytoss.iguard.model.SwingFrame
 import de.tytoss.iguard.model.TeleportConfirmFrame
 import de.tytoss.iguard.model.TimelineFrame
 import de.tytoss.iguard.model.TimelineKind
@@ -64,12 +64,12 @@ class IGuardPacketListener(private val engine: CheckEngine) : PacketListenerAbst
             event.packetType == PacketType.Configuration.Client.PLUGIN_MESSAGE -> identity(
                 playerId, now, version,
                 WrapperConfigClientPluginMessage(event).channelName,
-                WrapperConfigClientPluginMessage(event).data
+                WrapperConfigClientPluginMessage(event).data,
             )
             event.packetType == PacketType.Play.Client.PLUGIN_MESSAGE -> identity(
                 playerId, now, version,
                 WrapperPlayClientPluginMessage(event).channelName,
-                WrapperPlayClientPluginMessage(event).data
+                WrapperPlayClientPluginMessage(event).data,
             )
             event.packetType == PacketType.Play.Client.CLIENT_TICK_END -> ClientTickFrame(playerId, nextSequence(playerId), now, version)
             WrapperPlayClientPlayerFlying.isFlying(event.packetType) -> movement(event, playerId, now, version)
@@ -96,7 +96,7 @@ class IGuardPacketListener(private val engine: CheckEngine) : PacketListenerAbst
             now,
             version,
             channel.take(128),
-            payload.copyOfRange(0, minOf(payload.size, 4096))
+            payload.copyOfRange(0, minOf(payload.size, 4096)),
         )
     }
 
@@ -137,7 +137,7 @@ class IGuardPacketListener(private val engine: CheckEngine) : PacketListenerAbst
             Vec3(location.x, location.y, location.z),
             location.yaw,
             location.pitch,
-            wrapper.isOnGround
+            wrapper.isOnGround,
         )
     }
 
@@ -185,7 +185,7 @@ class IGuardPacketListener(private val engine: CheckEngine) : PacketListenerAbst
         val cursor = wrapper.cursorPosition
         return BlockActionFrame(
             playerId, nextSequence(playerId), now, version, BlockAction.PLACE,
-            pos.x, pos.y, pos.z, wrapper.face.name, wrapper.sequence, cursor.x, cursor.y, cursor.z
+            pos.x, pos.y, pos.z, wrapper.face.name, wrapper.sequence, cursor.x, cursor.y, cursor.z,
         )
     }
 
@@ -198,7 +198,7 @@ class IGuardPacketListener(private val engine: CheckEngine) : PacketListenerAbst
         val wrapper = WrapperPlayClientClickWindow(event)
         return InventoryClickFrame(
             playerId, nextSequence(playerId), now, version, wrapper.windowId, wrapper.stateId.orElse(null),
-            wrapper.slot, wrapper.button, wrapper.windowClickType.name
+            wrapper.slot, wrapper.button, wrapper.windowClickType.name,
         )
     }
 
@@ -229,7 +229,7 @@ class IGuardPacketListener(private val engine: CheckEngine) : PacketListenerAbst
             wrapper.isRelativeFlag(RelativeFlag.Y),
             wrapper.isRelativeFlag(RelativeFlag.Z),
             wrapper.isRelativeFlag(RelativeFlag.YAW),
-            wrapper.isRelativeFlag(RelativeFlag.PITCH)
+            wrapper.isRelativeFlag(RelativeFlag.PITCH),
         )
     }
 
@@ -243,7 +243,7 @@ class IGuardPacketListener(private val engine: CheckEngine) : PacketListenerAbst
             wrapper.isFlying,
             wrapper.isFlightAllowed,
             wrapper.isInCreativeMode,
-            wrapper.fovModifier
+            wrapper.fovModifier,
         )
     }
 

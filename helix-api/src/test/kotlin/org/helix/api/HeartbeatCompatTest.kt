@@ -1,11 +1,11 @@
 package org.helix.api
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import kotlinx.serialization.json.Json
 import org.helix.api.bridge.HeartbeatReport
 import org.helix.api.bridge.ResourceProbe
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class HeartbeatCompatTest {
     @Test

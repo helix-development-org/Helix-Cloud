@@ -1,9 +1,9 @@
 package org.helix.addons.bans
 
+import org.helix.api.storage.InMemoryAddonStorage
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import org.helix.api.storage.InMemoryAddonStorage
 
 class BanStoreTest {
     @Test

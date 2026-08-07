@@ -11,7 +11,7 @@ class VersionProfilesTest {
         val versions = listOf(
             ClientVersion.V_1_21, ClientVersion.V_1_21_2, ClientVersion.V_1_21_4,
             ClientVersion.V_1_21_5, ClientVersion.V_1_21_6, ClientVersion.V_1_21_7,
-            ClientVersion.V_1_21_9, ClientVersion.V_1_21_11
+            ClientVersion.V_1_21_9, ClientVersion.V_1_21_11,
         )
 
         versions.forEach { assertNotNull(VersionProfiles.forClient(it), "$it should be supported") }
@@ -21,7 +21,7 @@ class VersionProfilesTest {
     fun `older post-combat-update clients back to 1_9 are supported via ViaVersion`() {
         val versions = listOf(
             ClientVersion.V_1_9, ClientVersion.V_1_12_2, ClientVersion.V_1_16_4,
-            ClientVersion.V_1_18_2, ClientVersion.V_1_20_5
+            ClientVersion.V_1_18_2, ClientVersion.V_1_20_5,
         )
 
         versions.forEach { assertNotNull(VersionProfiles.forClient(it), "$it should be supported") }

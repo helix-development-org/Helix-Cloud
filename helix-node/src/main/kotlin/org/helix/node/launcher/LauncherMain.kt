@@ -1,7 +1,7 @@
 package org.helix.node.launcher
 
-import java.nio.file.Path
 import org.helix.node.logging.LogCapture
+import java.nio.file.Path
 
 /**
  * Entry point of the single `Launcher.jar` artifact.

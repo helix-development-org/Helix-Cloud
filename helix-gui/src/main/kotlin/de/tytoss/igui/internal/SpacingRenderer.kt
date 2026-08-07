@@ -43,7 +43,6 @@ internal class SpacingRenderer(font: Key) {
         glyph(0x1010, font),
     )
 
-
     /**
      * Appends the fewest spacing glyphs needed to move the cursor by
      * [amount] pixels (positive or negative) onto [target].

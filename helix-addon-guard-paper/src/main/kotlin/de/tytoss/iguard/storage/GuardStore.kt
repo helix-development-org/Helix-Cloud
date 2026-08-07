@@ -11,7 +11,7 @@ import java.util.UUID
 
 /** One movement sample from a decompressed incident replay. */
 data class ReplayFrameRow(
-    val at: Long, val x: Double, val y: Double, val z: Double, val yaw: Float, val pitch: Float, val onGround: Boolean
+    val at: Long, val x: Double, val y: Double, val z: Double, val yaw: Float, val pitch: Float, val onGround: Boolean,
 )
 
 /** One row of a player's violation history. */
@@ -22,7 +22,7 @@ data class HistoryEntry(
     val playerName: String,
     val checkId: String,
     val violationLevel: Double,
-    val evidence: String
+    val evidence: String,
 )
 
 /** A currently-active network ban. */
@@ -131,7 +131,7 @@ internal fun parseReplayFrames(text: String): List<ReplayFrameRow> {
         val m = move.find(line) ?: return@mapNotNull null
         ReplayFrameRow(
             at, m.groupValues[1].toDouble(), m.groupValues[2].toDouble(), m.groupValues[3].toDouble(),
-            m.groupValues[4].toFloat(), m.groupValues[5].toFloat(), m.groupValues[6].toBoolean()
+            m.groupValues[4].toFloat(), m.groupValues[5].toFloat(), m.groupValues[6].toBoolean(),
         )
     }.toList()
 }

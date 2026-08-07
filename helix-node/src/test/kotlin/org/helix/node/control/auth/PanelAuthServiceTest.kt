@@ -1,5 +1,11 @@
 package org.helix.node.control.auth
 
+import org.helix.api.player.PlayerEvent
+import org.helix.node.gates.NativePermissionCache
+import org.helix.node.gates.NativePermissionProvider
+import org.helix.node.gates.PermissionResolverRegistry
+import org.helix.node.gates.PermissionService
+import org.helix.node.players.PlayerRegistry
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -10,12 +16,6 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.helix.api.player.PlayerEvent
-import org.helix.node.gates.NativePermissionCache
-import org.helix.node.gates.NativePermissionProvider
-import org.helix.node.gates.PermissionResolverRegistry
-import org.helix.node.gates.PermissionService
-import org.helix.node.players.PlayerRegistry
 
 class PanelAuthServiceTest {
     private var now = 1_000L

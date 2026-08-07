@@ -1,9 +1,9 @@
 package org.helix.node.identity
 
+import org.helix.api.storage.InMemoryAddonStorage
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import org.helix.api.storage.InMemoryAddonStorage
 
 class IdentityRegistryTest {
     @Test

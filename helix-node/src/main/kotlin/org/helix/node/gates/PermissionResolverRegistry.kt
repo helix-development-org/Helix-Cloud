@@ -1,10 +1,10 @@
 package org.helix.node.gates
 
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CopyOnWriteArrayList
 import org.helix.api.addon.PermissionResolver
 import org.helix.api.proxy.PermissionCheckRequest
 import org.slf4j.LoggerFactory
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Aggregates all permission resolvers registered by addons.

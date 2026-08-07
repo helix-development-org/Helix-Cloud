@@ -1,9 +1,9 @@
 package org.helix.node.dashboard
 
-import java.util.concurrent.ConcurrentHashMap
 import org.helix.api.addon.DashboardPanel
 import org.helix.api.addon.DashboardPanelInfo
 import org.slf4j.LoggerFactory
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Registry of dashboard pages contributed by addons.

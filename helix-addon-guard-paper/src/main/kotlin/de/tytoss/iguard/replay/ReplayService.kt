@@ -19,11 +19,11 @@ import org.bukkit.WorldCreator
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
-import org.helix.api.i18n.NodeTranslations
-import org.helix.api.message.LegacyToMini
 import org.fsqrt.rune.Pos3d
 import org.fsqrt.rune.Rune
 import org.fsqrt.rune.RuneBlock
+import org.helix.api.i18n.NodeTranslations
+import org.helix.api.message.LegacyToMini
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.cos
@@ -41,7 +41,7 @@ class ReplayService(
     private val plugin: JavaPlugin,
     private val storage: GuardStore,
     private val scope: CoroutineScope,
-    private val translations: NodeTranslations
+    private val translations: NodeTranslations,
 ) {
     private val miniMessage = MiniMessage.miniMessage()
 
@@ -53,13 +53,14 @@ class ReplayService(
         val frames: List<ReplayFrameRow>,
         var speed: Double,
         val prevMode: GameMode,
-        val prevLocation: Location
+        val prevLocation: Location,
     ) {
         val startMillis = frames.first().at
         val durationMillis = (frames.last().at - frames.first().at).coerceAtLeast(1)
         var task: BukkitTask? = null
         var elapsed = 0.0
         var paused = false
+
         // free camera by default — the chase cam stays available via the Follow control
         var follow = false
         var trail = true
@@ -101,7 +102,7 @@ class ReplayService(
                             .append(control(admin, "replay.button.speed", "/iguard replay speed ${"%.1f".format(session.speed * 2)}")).append(Component.text(" "))
                             .append(control(admin, "replay.button.follow", "/iguard replay follow")).append(Component.text(" "))
                             .append(control(admin, "replay.button.trail", "/iguard replay trail")).append(Component.text(" "))
-                            .append(control(admin, "replay.button.stop", "/iguard replay stop"))
+                            .append(control(admin, "replay.button.stop", "/iguard replay stop")),
                     )
                     session.task = Bukkit.getScheduler().runTaskTimer(plugin, Runnable { tick(session) }, 1L, 1L)
                 }
@@ -111,10 +112,13 @@ class ReplayService(
 
     /** Toggles pause for the admin's running replay. */
     fun pause(admin: Player) { sessions[admin.uniqueId]?.let { it.paused = !it.paused; admin.sendMessage(chat(admin, if (it.paused) "replay.paused" else "replay.resumed")) } }
+
     /** Sets the playback speed (clamped to 0.1..10x). */
     fun setSpeed(admin: Player, speed: Double) { sessions[admin.uniqueId]?.let { it.speed = speed.coerceIn(0.1, 10.0); admin.sendMessage(chat(admin, "replay.speed", "speed" to it.speed.toString())) } }
+
     /** Toggles the chase camera that follows the replay NPC. */
     fun toggleFollow(admin: Player) { sessions[admin.uniqueId]?.let { it.follow = !it.follow; admin.sendMessage(chat(admin, if (it.follow) "replay.follow-on" else "replay.follow-off")) } }
+
     /** Toggles the particle trail along the replayed path. */
     fun toggleTrail(admin: Player) { sessions[admin.uniqueId]?.let { it.trail = !it.trail; admin.sendMessage(chat(admin, if (it.trail) "replay.trail-on" else "replay.trail-off")) } }
 
@@ -184,12 +188,12 @@ class ReplayService(
             admin, "replay.scrubber",
             "elapsed" to "%.1f".format(elapsedS),
             "total" to "%.1f".format(totalS),
-            "speed" to "%.1f".format(session.speed)
+            "speed" to "%.1f".format(session.speed),
         )
         admin.sendActionBar(
             Component.text("$head ").color(net.kyori.adventure.text.format.NamedTextColor.RED)
                 .append(Component.text(bar).color(net.kyori.adventure.text.format.NamedTextColor.GRAY))
-                .append(text)
+                .append(text),
         )
     }
 

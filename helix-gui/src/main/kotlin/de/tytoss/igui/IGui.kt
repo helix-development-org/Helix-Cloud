@@ -313,7 +313,6 @@ class IGui private constructor(
     }
 }
 
-
 /**
  * DSL receiver passed to [IGui.install] to declare fonts, sounds, the
  * texture database backend and any statically-known textures.

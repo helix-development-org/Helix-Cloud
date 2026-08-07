@@ -1,7 +1,7 @@
 package org.helix.node.storage
 
-import java.nio.file.Path
 import org.helix.api.storage.AddonStorage
+import java.nio.file.Path
 
 /**
  * Creates addon-scoped [AddonStorage] instances according to the node's

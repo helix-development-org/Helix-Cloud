@@ -1,8 +1,8 @@
 package org.helix.node.launcher
 
+import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
-import org.slf4j.LoggerFactory
 
 /**
  * Spawns a fresh `Launcher.jar` process, used by the backend and launcher

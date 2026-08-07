@@ -1,6 +1,5 @@
 package org.helix.api.addon
 
-import java.nio.file.Path
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionHandler
 import org.helix.api.action.ActionInvoker
@@ -10,6 +9,7 @@ import org.helix.api.message.Messages
 import org.helix.api.player.OnlinePlayer
 import org.helix.api.storage.AddonStorage
 import org.helix.api.storage.InMemoryAddonStorage
+import java.nio.file.Path
 
 /**
  * Node facilities handed to an addon on enable.

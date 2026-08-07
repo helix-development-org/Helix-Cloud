@@ -1,5 +1,6 @@
 package org.helix.wire
 
+import kotlinx.serialization.Serializable
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
@@ -9,7 +10,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import kotlinx.serialization.Serializable
 
 class WireProtocolTest {
     private fun roundtrip(frame: WireFrame): WireFrame {

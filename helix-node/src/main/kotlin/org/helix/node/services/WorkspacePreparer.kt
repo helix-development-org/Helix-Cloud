@@ -1,17 +1,17 @@
 package org.helix.node.services
 
-import java.nio.file.FileVisitResult
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.SimpleFileVisitor
-import java.nio.file.StandardCopyOption
-import java.nio.file.attribute.BasicFileAttributes
 import org.helix.api.environment.Environment
 import org.helix.api.execution.ExecutorType
 import org.helix.api.task.TaskDefinition
 import org.helix.node.launcher.NodePaths
 import org.helix.node.resources.InternalResources
 import org.slf4j.LoggerFactory
+import java.nio.file.FileVisitResult
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
+import java.nio.file.StandardCopyOption
+import java.nio.file.attribute.BasicFileAttributes
 
 /**
  * Builds service workspaces.

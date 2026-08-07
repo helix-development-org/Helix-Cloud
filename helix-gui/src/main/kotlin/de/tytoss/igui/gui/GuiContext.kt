@@ -1,8 +1,8 @@
 package de.tytoss.igui.gui
 
+import net.kyori.adventure.text.Component
 import org.bukkit.entity.Player
 import org.bukkit.event.inventory.InventoryClickEvent
-import net.kyori.adventure.text.Component
 
 /** Handler invoked when a player clicks a bound slot, see [de.tytoss.igui.gui.GuiPageBuilder.onClick]. */
 typealias GuiClickHandler = suspend (GuiClickContext) -> Unit
@@ -21,18 +21,13 @@ typealias GuiCloseHandler = suspend (GuiCloseContext) -> Unit
  * @property pageId the id of the page the click happened on.
  */
 class GuiClickContext internal constructor(
-
     val event: InventoryClickEvent,
-
     val player: Player,
-
     val gui: GuiDefinition,
-
     val pageId: String,
     private val pageOpener: suspend (String) -> Unit,
     private val inputRequester: suspend (GuiInputRequest) -> Any,
 ) {
-
     /** The raw inventory slot that was clicked. */
     val slot: Int get() = event.rawSlot
 

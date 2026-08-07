@@ -1,11 +1,11 @@
 package org.helix.node.gates
 
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CopyOnWriteArrayList
 import org.helix.api.addon.JoinGate
 import org.helix.api.proxy.JoinDecision
 import org.helix.api.proxy.JoinRequest
 import org.slf4j.LoggerFactory
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Aggregates all join gates registered by addons.

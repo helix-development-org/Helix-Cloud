@@ -1,6 +1,5 @@
 package org.helix.node.versions
 
-import java.net.URI
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
@@ -9,6 +8,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.helix.api.environment.Environment
 import org.slf4j.LoggerFactory
+import java.net.URI
 
 /**
  * Resolves stable server jar downloads from the PaperMC Fill v3 API.

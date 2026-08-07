@@ -1,9 +1,9 @@
 package org.helix.addon.example
 
+import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
 import org.helix.api.action.ActionSource
-import org.helix.addon.sdk.AddonBase
 
 /**
  * Reference addon proving the addon/action contract.

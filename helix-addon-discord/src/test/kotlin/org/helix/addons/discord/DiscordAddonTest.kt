@@ -1,12 +1,12 @@
 package org.helix.addons.discord
 
+import org.helix.addon.sdk.testing.RecordingAddonContext
+import org.helix.api.storage.InMemoryAddonStorage
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.helix.addon.sdk.testing.RecordingAddonContext
-import org.helix.api.storage.InMemoryAddonStorage
 
 class DiscordAddonTest {
     private fun enabledAddon(): RecordingAddonContext {

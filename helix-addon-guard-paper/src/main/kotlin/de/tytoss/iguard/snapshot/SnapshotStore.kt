@@ -1,7 +1,7 @@
 package de.tytoss.iguard.snapshot
 
-import de.tytoss.iguard.model.EnvironmentFrame
 import de.tytoss.iguard.model.Box
+import de.tytoss.iguard.model.EnvironmentFrame
 import de.tytoss.iguard.model.PlayerView
 import de.tytoss.iguard.model.Vec3
 import java.util.UUID
@@ -59,7 +59,7 @@ class SnapshotStore {
             position = before.position.interpolate(after.position, factor),
             yaw = (before.yaw + (after.yaw - before.yaw) * factor).toFloat(),
             pitch = (before.pitch + (after.pitch - before.pitch) * factor).toFloat(),
-            entityBox = before.entityBox.interpolate(after.entityBox, factor)
+            entityBox = before.entityBox.interpolate(after.entityBox, factor),
         )
     }
 
@@ -70,7 +70,7 @@ class SnapshotStore {
 private fun Vec3.interpolate(other: Vec3, factor: Double) = Vec3(
     x + (other.x - x) * factor,
     y + (other.y - y) * factor,
-    z + (other.z - z) * factor
+    z + (other.z - z) * factor,
 )
 
 private fun Box.interpolate(other: Box, factor: Double) = Box(
@@ -79,5 +79,5 @@ private fun Box.interpolate(other: Box, factor: Double) = Box(
     minZ + (other.minZ - minZ) * factor,
     maxX + (other.maxX - maxX) * factor,
     maxY + (other.maxY - maxY) * factor,
-    maxZ + (other.maxZ - maxZ) * factor
+    maxZ + (other.maxZ - maxZ) * factor,
 )

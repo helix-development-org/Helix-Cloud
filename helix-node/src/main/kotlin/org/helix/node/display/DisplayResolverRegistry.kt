@@ -1,10 +1,10 @@
 package org.helix.node.display
 
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CopyOnWriteArrayList
 import org.helix.api.addon.DisplayResolver
 import org.helix.api.display.DisplayProfile
 import org.slf4j.LoggerFactory
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Aggregates all display resolvers registered by addons.

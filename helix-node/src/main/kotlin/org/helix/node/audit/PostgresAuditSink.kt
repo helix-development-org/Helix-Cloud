@@ -1,8 +1,8 @@
 package org.helix.node.audit
 
-import javax.sql.DataSource
 import org.helix.api.audit.AuditEntry
 import org.slf4j.LoggerFactory
+import javax.sql.DataSource
 
 /**
  * [AuditSink] persisting to the shared PostgreSQL `audit_log` table.

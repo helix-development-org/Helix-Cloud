@@ -1,9 +1,9 @@
 package org.helix.node.gates
 
+import org.helix.api.proxy.PermissionCheckRequest
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.helix.api.proxy.PermissionCheckRequest
 
 class PermissionServiceTest {
     private fun request(name: String, node: String) = PermissionCheckRequest(name, node)

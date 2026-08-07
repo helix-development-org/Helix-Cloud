@@ -1,10 +1,5 @@
 package org.helix.node.players
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionResult
 import org.helix.api.action.PlayerCommandRequest
@@ -20,6 +15,11 @@ import org.helix.node.gates.NativePermissionCache
 import org.helix.node.gates.NativePermissionProvider
 import org.helix.node.gates.PermissionResolverRegistry
 import org.helix.node.gates.PermissionService
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class PlayerPlatformTest {
     private val registry = PlayerRegistry(clock = { 42L })

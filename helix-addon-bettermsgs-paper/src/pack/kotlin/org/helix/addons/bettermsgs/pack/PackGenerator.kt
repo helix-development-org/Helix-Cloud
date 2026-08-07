@@ -251,9 +251,11 @@ private fun textRowFonts(): Map<String, ByteArray> = TEXT_ROW_Y.withIndex().asso
     // vanilla ascii renders at y≈6 with ascent 7 — shift down by (y - 6)
     val ascent = 7 - (y - 6)
     "assets/bettermsgs/font/text_row_$index.json" to
-        ("""{"providers": [{"type": "space", "advances": {" ": 4}}, """ +
+        (
+            """{"providers": [{"type": "space", "advances": {" ": 4}}, """ +
             """{"type": "bitmap", "file": "minecraft:font/ascii.png", """ +
-            """"ascent": $ascent, "height": 8, "chars": [$ASCII_GRID]}]}""").toByteArray()
+            """"ascent": $ascent, "height": 8, "chars": [$ASCII_GRID]}]}"""
+        ).toByteArray()
 }
 
 /** The 16x16 character grid of Minecraft's `font/ascii.png`. */
@@ -279,7 +281,6 @@ private val ASCII_GRID: String = buildString {
     append(rows.joinToString(",\n") { "\"$it\"" })
 }
 
-
 /**
  * Head anchor y positions: the header head plus the eight message rows.
  * A drawn head is 16x16 px = 8x8 skin pixels at 2 px each; every pixel
@@ -295,7 +296,7 @@ private fun pixelFont(): ByteArray {
                 val char = "\\u%04X".format(0xE100 + row * 8 + sub)
                 add(
                     """{"type": "bitmap", "file": "bettermsgs:font/pixel.png", """ +
-                        """"ascent": $ascent, "height": 16, "chars": ["$char"]}"""
+                        """"ascent": $ascent, "height": 16, "chars": ["$char"]}""",
                 )
             }
         }

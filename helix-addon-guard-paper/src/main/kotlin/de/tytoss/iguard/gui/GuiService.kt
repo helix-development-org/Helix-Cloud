@@ -1,17 +1,15 @@
 package de.tytoss.iguard.gui
 
+import de.tytoss.iguard.api.ExemptionManager
+import de.tytoss.iguard.check.CheckEngine
+import de.tytoss.iguard.model.IncidentSnapshot
+import de.tytoss.iguard.spectate.SpectateService
 import de.tytoss.igui.IGui
 import de.tytoss.igui.awaitSharedIGui
 import de.tytoss.igui.gui.GuiDefinition
 import de.tytoss.igui.texture.GuiTextureDefinition
-import de.tytoss.iguard.check.CheckEngine
-import de.tytoss.iguard.check.Enforcement
-import de.tytoss.iguard.api.ExemptionManager
-import de.tytoss.iguard.model.IncidentSnapshot
-import de.tytoss.iguard.spectate.SpectateService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
@@ -44,7 +42,7 @@ class GuiService(
     private val storage: de.tytoss.iguard.storage.GuardStore,
     private val serverId: String,
     private val scope: CoroutineScope,
-    private val translations: NodeTranslations
+    private val translations: NodeTranslations,
 ) {
     private val miniMessage = MiniMessage.miniMessage()
 
@@ -52,7 +50,7 @@ class GuiService(
         var flagged: List<IncidentSnapshot>,
         var selected: String?,
         var selectedIncident: UUID? = null,
-        var bans: List<de.tytoss.iguard.storage.BanRow> = emptyList()
+        var bans: List<de.tytoss.iguard.storage.BanRow> = emptyList(),
     )
 
     // Ban reason/duration templates shown in the panel's ban submenu (label key; hours; 8760 = 1y ≈
@@ -61,11 +59,13 @@ class GuiService(
         Triple("panel.template.day", 24, "Cheating"),
         Triple("panel.template.week", 168, "Cheating"),
         Triple("panel.template.month", 720, "Cheating"),
-        Triple("panel.template.permanent", 8760, "Cheating (permanent)")
+        Triple("panel.template.permanent", 8760, "Cheating (permanent)"),
     )
 
     private val state = ConcurrentHashMap<UUID, PanelData>()
+
     @Volatile private var igui: IGui? = null
+
     @Volatile private var panel: GuiDefinition? = null
     private val font = Key.key("minecraft", "default")
 
@@ -91,6 +91,7 @@ class GuiService(
     }
 
     private fun headerTexture() = runCatching { igui?.cachedTexture("header") }.getOrNull()
+
     private fun backgroundTexture() = runCatching { igui?.cachedTexture("background") }.getOrNull()
 
     /**
@@ -249,11 +250,13 @@ class GuiService(
         return head(ban.playerName).apply {
             editMeta { meta ->
                 meta.displayName(plain(ban.playerName, NamedTextColor.RED))
-                meta.lore(listOf(
+                meta.lore(
+                    listOf(
                     screen(player, "panel.ban.until", "until" to until),
                     screen(player, "panel.ban.reason", "reason" to ban.reason),
-                    screen(player, "panel.ban.click-unban")
-                ))
+                    screen(player, "panel.ban.click-unban"),
+                ),
+                )
             }
         }
     }
@@ -268,13 +271,15 @@ class GuiService(
         return head(snap.playerName).apply {
             editMeta { meta ->
                 meta.displayName(plain(snap.playerName, NamedTextColor.WHITE))
-                meta.lore(listOf(
+                meta.lore(
+                    listOf(
                     screen(player, "panel.head.confidence", "color" to colorTag, "value" to "$confPct"),
                     screen(player, "panel.head.families", "families" to snap.families.joinToString()),
                     if (snap.shadowAction != null) screen(player, "panel.head.action", "action" to snap.shadowAction!!)
                     else screen(player, "panel.head.below-threshold"),
-                    screen(player, "panel.head.click-case")
-                ))
+                    screen(player, "panel.head.click-case"),
+                ),
+                )
             }
         }
     }

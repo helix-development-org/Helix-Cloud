@@ -2,9 +2,6 @@ package org.helix.bridge.paper
 
 import io.papermc.paper.chat.ChatRenderer
 import io.papermc.paper.event.player.AsyncChatEvent
-import java.time.LocalDate
-import java.time.LocalTime
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
@@ -20,15 +17,15 @@ import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
 import org.bukkit.scoreboard.Criteria
 import org.bukkit.scoreboard.DisplaySlot
-import org.bukkit.scoreboard.Objective
 import org.bukkit.scoreboard.Scoreboard
-import org.helix.wire.ServiceNodeApi
 import org.helix.api.bridge.HeartbeatReport
 import org.helix.api.bridge.ResourceProbe
-import org.helix.api.display.DisplayBulkRequest
 import org.helix.api.display.DisplayProfile
 import org.helix.api.message.LegacyToMini
-import org.helix.api.proxy.JoinRequest
+import org.helix.wire.ServiceNodeApi
+import java.time.LocalDate
+import java.time.LocalTime
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Paper-side bridge between a backend server and the Helix-Cloud node.

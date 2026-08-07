@@ -13,7 +13,6 @@ import org.helix.api.addon.DashboardPanel
  * default (it is simply never generated for that addon).
  */
 object DefaultAddonPanel {
-
     /**
      * Generates the default page for one enabled addon.
      *

@@ -10,7 +10,6 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
-
 /**
  * DSL for [paginate]: declares where a page's content items come from, how
  * to render and react to clicks on them, and hides all per-viewer paging
@@ -118,7 +117,6 @@ class PaginationBuilder<T> internal constructor(private val contentSlots: IntArr
 
     private data class PaginationSession<T>(val items: List<T>, var page: Int)
 }
-
 
 /**
  * Turns a slot selection into a self-managing, paginated content grid:

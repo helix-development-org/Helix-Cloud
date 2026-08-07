@@ -1,11 +1,5 @@
 package org.helix.addons.permissions
 
-import java.nio.file.Path
-import kotlin.io.path.createTempDirectory
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionHandler
 import org.helix.api.action.ActionInvocation
@@ -16,6 +10,12 @@ import org.helix.api.addon.JoinGate
 import org.helix.api.addon.PermissionResolver
 import org.helix.api.addon.PlayerDataProvider
 import org.helix.api.proxy.PermissionCheckRequest
+import java.nio.file.Path
+import kotlin.io.path.createTempDirectory
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /**
  * Fake context capturing everything the addon registers.

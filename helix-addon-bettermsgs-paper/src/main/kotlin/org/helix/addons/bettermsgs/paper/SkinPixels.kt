@@ -1,8 +1,8 @@
 package org.helix.addons.bettermsgs.paper
 
+import org.bukkit.Bukkit
 import java.util.concurrent.ConcurrentHashMap
 import javax.imageio.ImageIO
-import org.bukkit.Bukkit
 
 /**
  * Resolves player faces as 8x8 pixel colors, so heads can be drawn as

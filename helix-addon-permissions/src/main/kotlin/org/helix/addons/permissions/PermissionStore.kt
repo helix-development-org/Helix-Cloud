@@ -245,6 +245,7 @@ class PermissionStore(
     fun expand(group: PermissionGroup): List<PermissionGroup> {
         val visited = linkedSetOf<String>()
         val ordered = mutableListOf<PermissionGroup>()
+
         /** Depth-first parent traversal with cycle guard. */
         fun visit(current: PermissionGroup) {
             if (!visited.add(current.name)) {

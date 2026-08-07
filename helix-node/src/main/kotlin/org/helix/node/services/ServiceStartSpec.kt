@@ -1,7 +1,7 @@
 package org.helix.node.services
 
-import java.nio.file.Path
 import org.helix.api.task.TaskDefinition
+import java.nio.file.Path
 
 /**
  * Everything an executor needs to start one prepared service.

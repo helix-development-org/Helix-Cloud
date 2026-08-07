@@ -1,5 +1,6 @@
 package org.helix.wire
 
+import org.slf4j.LoggerFactory
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.net.ServerSocket
@@ -9,7 +10,6 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.net.ssl.SSLContext
-import org.slf4j.LoggerFactory
 
 /**
  * A request handler for one wire endpoint.

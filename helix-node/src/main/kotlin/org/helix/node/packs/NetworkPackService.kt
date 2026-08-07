@@ -1,12 +1,12 @@
 package org.helix.node.packs
 
+import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
-import org.slf4j.LoggerFactory
 
 /**
  * Builds the single network resource pack out of the `pack.zip` files of

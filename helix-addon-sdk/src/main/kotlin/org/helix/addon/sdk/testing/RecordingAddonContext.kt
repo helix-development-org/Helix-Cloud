@@ -1,6 +1,5 @@
 package org.helix.addon.sdk.testing
 
-import java.nio.file.Path
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionHandler
 import org.helix.api.action.ActionInvocation
@@ -21,6 +20,7 @@ import org.helix.api.addon.ProfileSettingProvider
 import org.helix.api.player.OnlinePlayer
 import org.helix.api.storage.AddonStorage
 import org.helix.api.storage.InMemoryAddonStorage
+import java.nio.file.Path
 
 /**
  * In-memory [AddonContext] for addon unit tests.
