@@ -763,9 +763,14 @@ class HelixVelocityBridgePlugin @Inject constructor(
             return
         }
         if (result.lines.isEmpty()) {
-            val key = if (result.success) "command.result.done" else "command.result.failed"
-            val fallback = if (result.success) "Done." else "Failed."
-            player.sendMessage(translate(player, "helix.translations.velocity.$key", fallback))
+            // A command that succeeded without any output stays silent — no
+            // generic "Done." confirmation. Only a bare failure gets a
+            // prefixed, localized notice instead of leaving the player guessing.
+            if (!result.success) {
+                player.sendMessage(
+                    translate(player, "helix.translations.velocity.command.error", "That command could not be completed."),
+                )
+            }
             return
         }
         result.lines.forEach { line -> player.sendMessage(screen(line, ctxFor(player.username))) }

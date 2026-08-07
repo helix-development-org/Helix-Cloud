@@ -372,12 +372,12 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         )
         val player = server.getPlayerExact(playerName) ?: return
         if (result == null) {
-            player.sendMessage(colored("&cThis chat channel is currently unavailable."))
+            player.sendMessage(colored(prefixed("<red>This chat channel is currently unavailable.")))
             return
         }
         result.lines.forEach { line -> player.sendMessage(colored(line)) }
         if (!result.success && result.lines.isEmpty()) {
-            player.sendMessage(colored("&cThis chat channel is not available to you."))
+            player.sendMessage(colored(prefixed("<red>This chat channel is not available to you.")))
         }
     }
 
@@ -843,6 +843,20 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
             'f' -> NamedTextColor.WHITE
             else -> null
         }
+    }
+
+    /**
+     * Prepends the network prefix (`network.prefix` bridge value) to a
+     * chat line, so bridge-originated player messages match the
+     * `{prefix} {message}` default of every addon message. A no-op while no
+     * prefix is configured.
+     *
+     * @param text the raw message text.
+     * @return the prefixed text.
+     */
+    private fun prefixed(text: String): String {
+        val prefix = bridgeValues["network.prefix"]?.takeIf { it.isNotBlank() } ?: return text
+        return "$prefix $text"
     }
 
     private fun colored(text: String): Component =

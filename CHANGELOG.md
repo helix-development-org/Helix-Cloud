@@ -1,6 +1,25 @@
 # Changelog
 
-## 0.86.0 — 2026-08-06
+## 0.86.1 — 2026-08-07
+
+### Spieler-Nachrichten: durchgängig {prefix} {message}, keine Debug-Ausgaben
+- **Keine generischen "Done."/"Failed."-Bestätigungen mehr an Spieler**: Ein
+  Player-Command, der ohne Ausgabe erfolgreich ist, bleibt jetzt stumm;
+  ein Fehlschlag ohne Text bekommt eine prefixte, lokalisierte Meldung
+  statt "Failed." (Node-Templates `command.result.done/failed` durch
+  `command.error` ersetzt).
+- **`/bans` und `/permissions` ingame**: Die an die Admin-Actions
+  delegierten Roh-Zeilen werden jetzt mit dem Netzwerk-Prefix versehen
+  (nur der Ingame-Pfad — CLI/Panel/Discord bleiben prefixfrei), ebenso die
+  Hilfe-/Usage-Zeilen von `/permissions`.
+- **Paper-Chat-Channel-Fallbacks** ("channel unavailable"/"not available to
+  you") tragen jetzt den Prefix statt hartkodiertem Roh-Englisch.
+- **BetterMSGs**: Die DM-Bestätigung und der Eingabe-Prompt laufen über eine
+  neue prefixte Chat-Variante (die eigene Translations-Klasse stellte den
+  Netzwerk-Prefix bisher nicht voran); GUI-Texte bleiben bewusst prefixfrei.
+- Die Prefix-Automatik (`prefixed()` in `format`/`formatFor`) war schon vorher
+  der Default für alle regulären Addon-Nachrichten — dieser Release schließt
+  die verbliebenen Umgehungs-Pfade.
 
 ### Neu: Helix-Wire — eigenes helix://-Protokoll für die Service-Kommunikation
 - **Neues Modul `helix-wire`**: ein togglebarer, eigener Transport zwischen

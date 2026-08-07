@@ -153,8 +153,14 @@ class BansAddon : AddonBase() {
         }
     }
 
-    private fun delegate(action: String, arguments: List<String>): ActionResult =
-        context.actions.invoke(ActionInvocation(action = action, arguments = arguments, source = ActionSource.ADDON))
+    // The ban.* actions answer in plain lines (also used by CLI/panel/Discord).
+    // On the in-game /bans path each line is prefixed with the literal {prefix},
+    // which the proxy bridge fills, so staff see the network prefix like every
+    // other player message — without prefixing the admin channels.
+    private fun delegate(action: String, arguments: List<String>): ActionResult {
+        val result = context.actions.invoke(ActionInvocation(action = action, arguments = arguments, source = ActionSource.ADDON))
+        return result.copy(lines = result.lines.map { "{prefix} $it" })
+    }
 
     private fun setBan(invocation: ActionInvocation): ActionResult {
         val arguments = invocation.arguments

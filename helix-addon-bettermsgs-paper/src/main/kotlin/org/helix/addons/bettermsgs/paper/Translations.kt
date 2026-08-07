@@ -63,6 +63,32 @@ class Translations(private val client: NodeClient) {
         render(text(player, key, fallback, *params))
 
     /**
+     * Resolves a key as a chat line WITH the network prefix, so player
+     * messages match the `{prefix} {message}` default of every other addon.
+     * Use this for chat feedback, not for GUI item text ([component]).
+     *
+     * @param player receiving player.
+     * @param key key below the addon namespace.
+     * @param fallback template used while the key is not yet synced.
+     * @param params placeholder name to value pairs.
+     * @return the rendered, prefixed component.
+     */
+    fun chatComponent(player: Player, key: String, fallback: String, vararg params: Pair<String, String>): Component {
+        val prefix = networkPrefix(player)
+        val body = text(player, key, fallback, *params)
+        return render(if (prefix.isBlank()) body else "$prefix $body")
+    }
+
+    private fun networkPrefix(player: Player): String {
+        val current = snapshot
+        val language = current.playerLanguages[player.name.lowercase()]
+            ?: player.locale().language.takeIf { it in current.languages }
+            ?: current.defaultLanguage
+        val flat = "helix.translations.network.prefix"
+        return (current.values[language]?.get(flat) ?: current.values[current.defaultLanguage]?.get(flat)).orEmpty()
+    }
+
+    /**
      * Renders raw MiniMessage/legacy text into a component.
      *
      * @param text the template.
