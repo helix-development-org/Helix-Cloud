@@ -59,6 +59,19 @@
   --chart-scale-04: oklch(0.68 0.02 106);
   --chart-scale-05: oklch(0.55 0.025 106);
   --chart-scale-pattern-color: oklch(0.96 0.005 106);
+  --syntax-keyword: #7c3aed;
+  --syntax-string: #15803d;
+  --syntax-number: #b45309;
+  --syntax-atom: #0e7490;
+  --syntax-property: #0369a1;
+  --syntax-comment: #6b7280;
+  --syntax-tag: #be185d;
+  --syntax-attribute: #9333ea;
+  --syntax-variable: #a16207;
+  --syntax-type: #0e7490;
+  --syntax-punct: #64748b;
+  --syntax-escape: #be185d;
+  --syntax-meta: #6b7280;
 }
 
 .dark {
@@ -112,6 +125,19 @@
   --chart-scale-04: oklch(0.58 0.06 270);
   --chart-scale-05: oklch(0.68 0.07 270);
   --chart-scale-pattern-color: oklch(0.145 0 0);
+  --syntax-keyword: #c4b5fd;
+  --syntax-string: #86efac;
+  --syntax-number: #fdba74;
+  --syntax-atom: #67e8f9;
+  --syntax-property: #7dd3fc;
+  --syntax-comment: #9ca3af;
+  --syntax-tag: #f9a8d4;
+  --syntax-attribute: #d8b4fe;
+  --syntax-variable: #fde68a;
+  --syntax-type: #67e8f9;
+  --syntax-punct: #94a3b8;
+  --syntax-escape: #f9a8d4;
+  --syntax-meta: #9ca3af;
 }
 
 @theme inline {

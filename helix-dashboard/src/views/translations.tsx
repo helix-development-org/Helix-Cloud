@@ -2,11 +2,16 @@ import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { usePoll } from "@/lib/use-poll"
+import { minimessage } from "@/lib/cm-minimessage"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { CodeEditor } from "@/components/code-editor"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
+import { MiniMessagePreview } from "@/components/minimessage-preview"
+
+// One shared MiniMessage language instance reused by every row editor.
+const MINIMESSAGE = minimessage()
 
 interface TranslationEntry {
   key: string
@@ -147,7 +152,7 @@ function TranslationRow({ entry, language, onSave, onReset, onDelete }: {
   const fallback = entry.defaults[language] ?? ""
   const initial = custom ?? fallback
   const deletable = !Object.keys(entry.defaults).length
-  let current = initial
+  const [current, setCurrent] = useState(initial)
   return (
     <div className="grid gap-2 lg:grid-cols-[340px_1fr_auto] lg:items-start">
       <div className="pt-2">
@@ -159,10 +164,10 @@ function TranslationRow({ entry, language, onSave, onReset, onDelete }: {
           )}
         </div>
       </div>
-      <Textarea className="font-mono text-xs" defaultValue={initial}
-        placeholder={entry.defaults[language] === undefined ? "empty — falls back to the default language" : undefined}
-        rows={Math.min(8, Math.max(1, initial.split("\n").length))}
-        onChange={(e) => (current = e.target.value)} />
+      <div className="flex flex-col gap-2">
+        <CodeEditor language={MINIMESSAGE} value={current} onChange={setCurrent} />
+        <MiniMessagePreview value={current} />
+      </div>
       <div className="flex gap-2">
         <Button size="sm" onClick={() => onSave(current)}>Save</Button>
         {custom !== undefined && <Button size="sm" variant="ghost" onClick={onReset}>Reset</Button>}

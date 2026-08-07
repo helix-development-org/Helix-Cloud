@@ -1,13 +1,14 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { File, Folder, FolderOpen } from "lucide-react"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { ago } from "@/lib/format"
+import { languageForFile, languageLabel } from "@/lib/cm-language"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { CodeEditor } from "@/components/code-editor"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Textarea } from "@/components/ui/textarea"
 
 interface Entry {
   name: string
@@ -68,6 +69,8 @@ export function FilesView() {
     } catch (e) { toast.error((e as Error).message) }
   }
 
+  const language = useMemo(() => (editing ? languageForFile(editing.path) : null), [editing?.path]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const crumbs = path ? path.split("/") : []
 
   return (
@@ -121,14 +124,17 @@ export function FilesView() {
         <Card>
           <CardContent className="flex flex-col gap-3 p-4">
             <div className="flex items-center justify-between">
-              <span className="font-mono text-xs">{root}/{editing.path}</span>
+              <span className="flex items-center gap-2 font-mono text-xs">
+                {root}/{editing.path}
+                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{languageLabel(editing.path)}</span>
+              </span>
               <div className="flex gap-2">
                 <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>Close</Button>
                 <Button size="sm" onClick={save}>Save</Button>
               </div>
             </div>
-            <Textarea className="min-h-[45vh] font-mono text-xs" value={editing.content}
-              onChange={(ev) => setEditing({ ...editing, content: ev.target.value })} />
+            <CodeEditor className="min-h-[45vh]" language={language} value={editing.content}
+              onChange={(content) => setEditing((cur) => (cur ? { ...cur, content } : cur))} />
           </CardContent>
         </Card>
       )}

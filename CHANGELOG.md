@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.87.0 — 2026-08-07
+
+### Neu: Syntax-Highlighting im Web-Panel (Dateien & Übersetzungen)
+
+- **Datei-Manager** — Dateien, die im Panel geöffnet werden, bekommen jetzt
+  echtes **Syntax-Highlighting** statt eines schlichten Textfelds. Der Editor
+  basiert auf CodeMirror 6, erkennt die Sprache an der Datei-Endung und deckt
+  YAML/YML, JSON, TOML, Properties/Config/INI/Env, XML, HTML, Markdown, Shell
+  sowie Kotlin/Java ab (unbekannte Endungen bleiben Klartext). Zeilennummern,
+  Klammer-Matching, Code-Folding und Undo/Redo inklusive; ein Badge zeigt den
+  erkannten Typ.
+- **Übersetzungen** — der Message-Editor hebt **MiniMessage** hervor: Farb-
+  und Dekorations-Tags, Hex-Farben (`<#rrggbb>`), `<gradient>`/`<rainbow>`,
+  funktionale Tags (`<click>`, `<hover>`, …) sowie `{platzhalter}` werden
+  eingefärbt. Darunter rendert eine **Live-Vorschau** die Nachricht mit
+  Farben, per-Zeichen interpolierten Verläufen und Formatierung so, wie sie
+  beim Spieler ankommt; Platzhalter bleiben als dynamische Werte markiert.
+- **Umsetzung**: neuer, wiederverwendbarer `CodeEditor` mit einer einzigen,
+  über CSS-Variablen theme-fähigen (Light/Dark) Highlight-Palette; eigener
+  MiniMessage-Tokenizer (CodeMirror `StreamLanguage`) und ein
+  framework-neutraler MiniMessage-Renderer, den Tokenizer und Vorschau teilen.
+
 ## 0.86.0 — 2026-08-06
 
 ### Neu: Helix-Wire — eigenes helix://-Protokoll für die Service-Kommunikation
