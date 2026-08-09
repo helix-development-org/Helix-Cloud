@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.88.0 — 2026-08-09
+
+### Performance: Quick-Wins & Instrumentierung (aus dem Performance-Audit)
+
+Erste, risikoarme Umsetzung aus dem Subsystem-Performance-Audit. Fokus auf
+player-gefühlte Latenz und Durchsatz unter Last, plus Messpunkte, um die
+größeren Umbauten anschließend gegen Zahlen statt Vermutungen zu tunen.
+
+**Spürbare Quick-Wins**
+- **Velocity:** Der blockierende Node-Roundtrip für `helix.maintenance.bypass`
+  läuft nicht mehr bei *jedem* Connect, sondern nur noch wenn Wartung das
+  Ergebnis überhaupt ändern kann (globale Wartung aktiv oder ein Backend
+  einzeln als Wartung markiert). Entfernt einen Bridge↔Node-Hop vom
+  kritischen Pfad jedes Logins. (`HelixVelocityBridgePlugin`, `BackendRegistry`)
+- **Paper Chat:** Nachrichten werden über `ChatRenderer.viewerUnaware` **einmal**
+  gerendert statt einmal pro Empfänger — aus N identischen MiniMessage-Parses
+  pro Nachricht wird 1.
+- **Paper Tablist:** Header/Footer werden einmal pro Refresh geparst statt
+  `2×N` mal in der Pro-Spieler-Schleife.
+- **Node:** Interne Maschinen-Routen (`/api/v1/internal/*`) landen nicht mehr
+  im durablen Audit-Log — entfernt einen prozessweiten Lock + Durable-Write
+  vom Hot-Path jedes Bridge-Calls und verhindert, dass echte Admin-Aktionen
+  aus dem begrenzten Audit-Ring verdrängt werden. Latenz-Metriken bleiben.
+- **Node:** `PermissionResolverRegistry.evaluate` alloziert keine
+  Zwischenliste (`flatten()`) mehr pro Permission-Check.
+- **Node:** `IdentityRegistry` schreibt sein Dokument kompakt (`prettyPrint=false`)
+  statt mit Whitespace — die Datei wird bei jedem Join maschinell geschrieben.
+
+**Instrumentierung (messen vor optimieren)**
+- Join-Apply-Latenz auf dem Node wird gemessen; langsame Joins (Identity-/
+  Address-Persistenz auf dem Request-Pfad) werden geloggt.
+- Paper misst die Scoreboard-Refresh-Dauer auf dem Main-Thread und warnt bei
+  langsamen Refreshes (TPS-relevant).
+
 ## 0.86.1 — 2026-08-07
 
 ### Spieler-Nachrichten: durchgängig {prefix} {message}, keine Debug-Ausgaben

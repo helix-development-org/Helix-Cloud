@@ -421,7 +421,13 @@ class HelixVelocityBridgePlugin @Inject constructor(
     @Subscribe
     fun onChooseInitialServer(event: PlayerChooseInitialServerEvent) {
         val name = event.player.username
-        val bypass = hasPermission(name, "helix.maintenance.bypass")
+        // Only pay the blocking node round-trip for the bypass permission when
+        // maintenance can actually change the outcome — global maintenance on,
+        // or some backend individually maintenance-flagged. Otherwise every
+        // single connect blocked the event thread on a permission hop for
+        // nothing (perf audit: the one clearly player-facing quick win).
+        val maintenanceRelevant = maintenance.get() || registry?.hasMaintenanceBackends() == true
+        val bypass = maintenanceRelevant && hasPermission(name, "helix.maintenance.bypass")
         if (maintenance.get() && !bypass) {
             event.player.disconnect(
                 translate(

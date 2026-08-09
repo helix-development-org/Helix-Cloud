@@ -16,7 +16,9 @@ import org.helix.api.storage.AddonStorage
  * @property storage node-scoped document store (owner `identity`).
  */
 class IdentityRegistry(private val storage: AddonStorage) {
-    private val json = Json { prettyPrint = true }
+    // Compact rather than pretty: this document is machine-written on every
+    // join and never hand-edited, so whitespace is pure payload/GC overhead.
+    private val json = Json { prettyPrint = false }
     private val nameByUuid = linkedMapOf<String, String>()
     private val uuidByName = linkedMapOf<String, String>()
 

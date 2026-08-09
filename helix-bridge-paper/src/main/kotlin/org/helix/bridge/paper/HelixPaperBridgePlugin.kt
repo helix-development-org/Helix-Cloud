@@ -35,6 +35,9 @@ import java.util.concurrent.ConcurrentHashMap
  * addon-resolved display profiles. The first heartbeat moves the service
  * to `RUNNING` on the node.
  */
+/** A main-thread scoreboard refresh slower than this is logged (perf instrumentation). */
+private const val SLOW_SCOREBOARD_REFRESH_MS = 5.0
+
 class HelixPaperBridgePlugin : JavaPlugin(), Listener {
     private val json = Json { ignoreUnknownKeys = true }
     private val scoreboardMapSerializer = MapSerializer(String.serializer(), ScoreboardData.serializer())
@@ -277,8 +280,11 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         }
         val format = bridgeValues["chat.format"] ?: return
         val profile = displayProfiles[event.player.name.lowercase()] ?: DisplayProfile()
+        // Viewer-unaware: the rendered component is identical for every
+        // recipient, so Paper parses the MiniMessage format ONCE and reuses the
+        // shared Component instead of re-rendering per online player.
         event.renderer(
-            ChatRenderer { source, _, message, _ ->
+            ChatRenderer.viewerUnaware { source, _, message ->
                 val plainMessage = PlainTextComponentSerializer.plainText().serialize(message)
                 colored(
                     format
@@ -464,11 +470,13 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
                 return
             }
         }
+        // Header/footer contain only global tokens, so the rendered components
+        // are identical for every viewer: parse the MiniMessage once here
+        // instead of 2×N times inside the per-player loop.
+        val headerComponent = colored(placeholders(header))
+        val footerComponent = colored(placeholders(footer))
         server.onlinePlayers.forEach { player ->
-            player.sendPlayerListHeaderAndFooter(
-                colored(placeholders(header)),
-                colored(placeholders(footer)),
-            )
+            player.sendPlayerListHeaderAndFooter(headerComponent, footerComponent)
         }
     }
 
@@ -529,6 +537,7 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
      * redone once per line per online player instead of once per refresh.
      */
     private fun refreshScoreboards() {
+        val startNanos = System.nanoTime()
         val board = activeBoard()?.takeIf { it.enabled && it.lines.isNotEmpty() }
         if (board == null) {
             clearAllScoreboards()
@@ -543,6 +552,20 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
             if (server.getPlayerExact(name) == null) {
                 playerBoards.remove(name)
             }
+        }
+        // Instrumentation: this runs on the main server thread, so a slow
+        // refresh directly costs TPS. A rising number here is the signal to do
+        // the parse-once scoreboard rework (perf audit).
+        val elapsedMs = (System.nanoTime() - startNanos) / 1_000_000.0
+        if (elapsedMs >= SLOW_SCOREBOARD_REFRESH_MS) {
+            logger.warning(
+                String.format(
+                    java.util.Locale.ROOT,
+                    "Scoreboard refresh took %.1f ms on the main thread for %d players (MiniMessage re-parse per player)",
+                    elapsedMs,
+                    server.onlinePlayers.size,
+                ),
+            )
         }
     }
 

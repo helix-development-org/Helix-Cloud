@@ -72,6 +72,13 @@ class BackendRegistry(
      *  still be picked (holders of `helix.maintenance.bypass`).
      * @return the registered server, or `null` when no fallback exists.
      */
+    /**
+     * Whether any managed backend is currently maintenance-flagged.
+     *
+     * @return `true` when a `bypassMaintenance` decision can still change routing.
+     */
+    fun hasMaintenanceBackends(): Boolean = maintenanceBackends.isNotEmpty()
+
     fun fallback(exclude: String? = null, bypassMaintenance: Boolean = false): RegisteredServer? {
         val candidates = managed.keys.mapNotNull { name ->
             proxy.getServer(name).map { server ->

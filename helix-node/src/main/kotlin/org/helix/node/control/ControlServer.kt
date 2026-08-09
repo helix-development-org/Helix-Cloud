@@ -67,6 +67,9 @@ import java.security.KeyStore
 /** Logger for the top-level route builders (outside the [ControlServer] class). */
 private val logger = LoggerFactory.getLogger("org.helix.node.control.ControlRoutes")
 
+/** A join whose on-request persistence exceeds this is logged as slow (perf instrumentation). */
+private const val SLOW_JOIN_APPLY_MS = 25.0
+
 /** Maximum time a proxy long-poll is held open before returning empty. */
 private const val POLL_TIMEOUT_MS = 25_000L
 
@@ -130,22 +133,34 @@ fun Application.controlModule(dependencies: ControlDependencies, isTls: Boolean 
         val startNanos = System.nanoTime()
         proceed()
         val path = call.request.path()
-        if (path.startsWith("/api/") && !path.startsWith("/api/v1/internal/poll")) {
-            val status = call.response.status()?.value ?: 0
-            dependencies.apiMetrics.record((System.nanoTime() - startNanos) / 1_000_000.0, status)
-            val actor = call.principal<PanelPrincipal>()?.name ?: "anonymous"
-            val outcome = when {
-                status == 401 || status == 403 -> "denied"
-                status in 200..399 -> "ok"
-                else -> "error"
-            }
-            dependencies.audit.record(
-                "http",
-                actor,
-                "${call.request.httpMethod.value} $path → $status",
-                outcome,
-            )
+        if (!path.startsWith("/api/")) {
+            return@intercept
         }
+        val status = call.response.status()?.value ?: 0
+        // Latency metrics for everything except the always-open long-poll.
+        if (!path.startsWith("/api/v1/internal/poll")) {
+            dependencies.apiMetrics.record((System.nanoTime() - startNanos) / 1_000_000.0, status)
+        }
+        // Durable audit only for operator/admin traffic. Internal machine
+        // routes (heartbeat, permission-check, roster, display, translations,
+        // poll, …) are high-frequency chatter: auditing them takes a
+        // process-wide lock and a durable write on every hot bridge call and
+        // evicts real admin actions from the bounded audit ring.
+        if (path.startsWith("/api/v1/internal/")) {
+            return@intercept
+        }
+        val actor = call.principal<PanelPrincipal>()?.name ?: "anonymous"
+        val outcome = when {
+            status == 401 || status == 403 -> "denied"
+            status in 200..399 -> "ok"
+            else -> "error"
+        }
+        dependencies.audit.record(
+            "http",
+            actor,
+            "${call.request.httpMethod.value} $path → $status",
+            outcome,
+        )
     }
     routing {
         staticResources("/", "dashboard") {
@@ -1062,12 +1077,26 @@ internal fun applyPlayerEvent(dependencies: ControlDependencies, event: PlayerEv
     }
     when (event.type) {
         "join" -> {
+            // Instrumentation: identity/address persistence still runs on the
+            // request path, so time it — a rising number here is the join
+            // throughput ceiling under reconnect storms (see perf audit).
+            val startNanos = System.nanoTime()
             dependencies.nativePermissions.update(event.name, event.permissions)
             dependencies.identityRegistry.recordJoin(event.name, event.uuid)
             val address = event.address
             val uuid = event.uuid
             if (!address.isNullOrBlank() && !uuid.isNullOrBlank()) {
                 dependencies.addressHashes.record(uuid, address)
+            }
+            val elapsedMs = (System.nanoTime() - startNanos) / 1_000_000.0
+            if (elapsedMs >= SLOW_JOIN_APPLY_MS) {
+                logger.warn(
+                    "Slow join apply for {}: {} ms (identity/address persistence on the request path)",
+                    event.name,
+                    String.format(java.util.Locale.ROOT, "%.1f", elapsedMs),
+                )
+            } else if (logger.isDebugEnabled) {
+                logger.debug("Join apply for {}: {} ms", event.name, String.format(java.util.Locale.ROOT, "%.1f", elapsedMs))
             }
         }
         "leave" -> dependencies.nativePermissions.clear(event.name)

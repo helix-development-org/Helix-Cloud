@@ -51,9 +51,11 @@ class PermissionResolverRegistry {
      * @return `true` when any resolver grants.
      */
     fun evaluate(request: PermissionCheckRequest): Boolean =
-        resolvers.values.flatten().any { resolver ->
-            runCatching { resolver.has(request) }
-                .onFailure { logger.error("permission resolver failed for {}", request.name, it) }
-                .getOrDefault(false)
+        resolvers.values.any { owned ->
+            owned.any { resolver ->
+                runCatching { resolver.has(request) }
+                    .onFailure { logger.error("permission resolver failed for {}", request.name, it) }
+                    .getOrDefault(false)
+            }
         }
 }
