@@ -3,9 +3,9 @@ package org.helix.addons.nick
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
+import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
-import org.helix.addon.sdk.AddonBase
 import org.helix.api.display.DisplayProfile
 import org.helix.api.message.Messages
 

@@ -1,9 +1,9 @@
 package org.helix.node.storage
 
-import javax.sql.DataSource
-import java.nio.file.Path
 import org.helix.api.storage.AddonStorage
 import org.slf4j.LoggerFactory
+import java.nio.file.Path
+import javax.sql.DataSource
 
 /**
  * [StorageProvider] for the `postgres` mode: all addons share one pooled

@@ -8,7 +8,7 @@ import java.util.UUID
 class IGuardApiImpl(
     private val engine: CheckEngine,
     private val exemptions: ExemptionManager,
-    private val bans: de.tytoss.iguard.ban.BanCoordinator
+    private val bans: de.tytoss.iguard.ban.BanCoordinator,
 ) : IGuardApi {
     override fun snapshot(playerId: UUID) = engine.snapshot(playerId)
 

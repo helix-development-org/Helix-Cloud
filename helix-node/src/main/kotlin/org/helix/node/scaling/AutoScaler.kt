@@ -1,12 +1,12 @@
 package org.helix.node.scaling
 
-import java.util.concurrent.ConcurrentHashMap
 import org.helix.api.service.ServiceState
 import org.helix.api.task.TaskDefinition
 import org.helix.node.services.ManagedService
 import org.helix.node.services.ServiceManager
 import org.helix.node.tasks.TaskStore
 import org.slf4j.LoggerFactory
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Keeps service capacity in line with demand.

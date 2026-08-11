@@ -1,9 +1,5 @@
 package org.helix.addons.guard
 
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import kotlin.math.roundToInt
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -17,6 +13,10 @@ import org.helix.api.action.ActionSource
 import org.helix.api.addon.AddonContext
 import org.helix.api.message.Messages
 import org.helix.api.storage.AddonStorage
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import kotlin.math.roundToInt
 
 /**
  * One anticheat violation reported by an IGuard Paper service.

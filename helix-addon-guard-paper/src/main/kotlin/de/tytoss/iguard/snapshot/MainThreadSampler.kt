@@ -45,14 +45,16 @@ class MainThreadSampler(
     private val store: SnapshotStore,
     private val exemptions: ExemptionManager,
     private val config: ExemptionConfig,
-    private val samplerConfig: SamplerConfig
+    private val samplerConfig: SamplerConfig,
 ) : Listener {
     private val tick = AtomicLong()
+
     // Accessed only from the main thread (sample()), so a plain access-ordered LinkedHashMap is safe
     // and bounded — the previous ConcurrentHashMap grew unbounded with distinct block-states.
     private val collisionCache = object : LinkedHashMap<String, List<Box>>(512, 0.75f, true) {
         override fun removeEldestEntry(eldest: Map.Entry<String, List<Box>>) = size > 4096
     }
+
     // Per-player cache of the last scanned block neighborhood, so a player who stays within the same
     // block reuses the expensive collision scan instead of re-running it every sample. Invalidated
     // by nearby block changes (see onBlockBreak/onBlockPlace) so a mined-through block does not
@@ -60,8 +62,11 @@ class MainThreadSampler(
     private val lastScan = HashMap<UUID, CachedScan>()
     private var cursor = 0
     private var task: BukkitTask? = null
+
     @Volatile private var lastSampleNanos = 0L
+
     @Volatile private var maximumSampleNanos = 0L
+
     @Volatile private var lastSampledPlayers = 0
 
     /** Registers the exemption listeners and starts the per-tick sampling task. */
@@ -144,7 +149,7 @@ class MainThreadSampler(
             player.velocity.let { Vec3(it.x, it.y, it.z) },
             environmentTags.any { it !in TELEMETRY_ONLY_TAGS },
             environmentTags,
-            chunkLoaded
+            chunkLoaded,
         )
         store.update(player.uniqueId, player.name, player.entityId, frame)
     }
@@ -207,7 +212,7 @@ class MainThreadSampler(
                     box.minZ,
                     box.maxX,
                     box.maxY,
-                    box.maxZ
+                    box.maxZ,
                 )
             }.toList()
         }
@@ -311,7 +316,7 @@ private data class CachedScan(
     val by: Int,
     val bz: Int,
     val collisions: List<Box>,
-    val nearDynamic: Boolean
+    val nearDynamic: Boolean,
 )
 
 private fun BoundingBox.toBox() = Box(minX, minY, minZ, maxX, maxY, maxZ)
@@ -327,6 +332,7 @@ private fun Material.slipperiness() = when (this) {
 
 private fun Material.isDynamicEnvironment() = when (this) {
     Material.PISTON, Material.STICKY_PISTON, Material.PISTON_HEAD, Material.MOVING_PISTON,
-    Material.BUBBLE_COLUMN, Material.COBWEB, Material.POWDER_SNOW -> true
+    Material.BUBBLE_COLUMN, Material.COBWEB, Material.POWDER_SNOW,
+    -> true
     else -> false
 }

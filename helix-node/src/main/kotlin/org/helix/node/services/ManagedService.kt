@@ -1,9 +1,9 @@
 package org.helix.node.services
 
-import java.nio.file.Path
 import org.helix.api.service.ServiceInfo
 import org.helix.api.service.ServiceState
 import org.helix.api.task.TaskDefinition
+import java.nio.file.Path
 
 /**
  * Mutable runtime record of one service inside the node.

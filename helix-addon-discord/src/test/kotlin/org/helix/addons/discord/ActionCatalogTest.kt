@@ -1,12 +1,12 @@
 package org.helix.addons.discord
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionInvoker
 import org.helix.api.action.ActionResult
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class ActionCatalogTest {
     private val descriptors = listOf(

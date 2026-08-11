@@ -12,7 +12,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.add
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -22,16 +21,10 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
 import org.bukkit.Bukkit
-import java.io.ByteArrayOutputStream
-import java.net.URI
-import java.net.http.HttpClient
 import org.helix.api.action.ActionInvocation
 import org.helix.wire.ServiceNodeApi
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import java.time.Duration
+import java.io.ByteArrayOutputStream
 import java.time.Instant
 import java.util.Base64
 import java.util.UUID
@@ -69,7 +62,7 @@ class HelixNodeStore(
     controlUrl: String,
     private val controlToken: String,
     private val history: HistoryConfig,
-    private val logger: Logger
+    private val logger: Logger,
 ) : GuardStore {
     private val api = ServiceNodeApi(
         controlUrl,
@@ -227,7 +220,7 @@ class HelixNodeStore(
                 row.string("name"),
                 row.string("check"),
                 row.double("vl"),
-                row.string("details")
+                row.string("details"),
             )
         }.filter { serverId == null || it.serverId == serverId }
             .drop((safePage - 1) * 10)
@@ -278,8 +271,11 @@ class HelixNodeStore(
     // --- Health / queue metrics ---
 
     override fun isAvailable(): Boolean = available.get()
+
     override fun queueSize(): Int = queued.get()
+
     override fun droppedRecords(): Long = dropped.get()
+
     override fun writtenRecords(): Long = written.get()
 
     // --- Internals ---
@@ -361,7 +357,7 @@ class HelixNodeStore(
                 }.toSet(),
                 summary["evidence"]?.toIntOrNull() ?: 0,
                 summary["shadow"]?.takeUnless { it == "none" },
-                summary["recipe"].orEmpty()
+                summary["recipe"].orEmpty(),
             )
         }
     }
@@ -389,7 +385,7 @@ class HelixNodeStore(
         put(
             "summary",
             "opened=${record.openedAt} evidence=${record.evidenceCount} shadow=${record.shadowAction ?: "none"} " +
-                "recipe=${record.recipeVersion} calibrated=${record.calibrated}"
+                "recipe=${record.recipeVersion} calibrated=${record.calibrated}",
         )
     }.toString()
 
@@ -423,7 +419,10 @@ class HelixNodeStore(
 }
 
 private fun JsonObject.string(key: String): String = get(key)?.jsonPrimitive?.contentOrNull.orEmpty()
+
 private fun JsonObject.long(key: String): Long = get(key)?.jsonPrimitive?.longOrNull ?: 0L
+
 private fun JsonObject.double(key: String): Double = get(key)?.jsonPrimitive?.doubleOrNull ?: 0.0
+
 private fun JsonObject.uuid(key: String): UUID? =
     get(key)?.jsonPrimitive?.contentOrNull?.let { runCatching { UUID.fromString(it) }.getOrNull() }

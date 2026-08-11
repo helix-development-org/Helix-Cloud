@@ -7,19 +7,7 @@ import com.velocitypowered.api.event.player.ServerPostConnectEvent
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent
 import com.velocitypowered.api.proxy.Player
 import com.velocitypowered.api.proxy.ProxyServer
-import java.net.URI
-import java.net.http.HttpClient
-import org.helix.api.action.ActionInvocation
-import org.helix.wire.ServiceNodeApi
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import java.time.Duration
-import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import net.labymod.serverapi.api.model.component.ServerAPIComponent
 import net.labymod.serverapi.core.model.feature.DiscordRPC
 import net.labymod.serverapi.core.model.feature.Emote
@@ -33,7 +21,14 @@ import net.labymod.serverapi.integration.voicechat.model.VoiceChatMute
 import net.labymod.serverapi.server.velocity.LabyModPlayer
 import net.labymod.serverapi.server.velocity.LabyModProtocolService
 import net.labymod.serverapi.server.velocity.event.LabyModPlayerJoinEvent
+import org.helix.api.action.ActionInvocation
+import org.helix.wire.ServiceNodeApi
 import org.slf4j.Logger
+import java.net.http.HttpClient
+import java.time.Duration
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 
 /**
  * Velocity component of the Helix LabyMod addon — the network's single

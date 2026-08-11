@@ -1,11 +1,11 @@
 package org.helix.node.services.docker
 
-import java.util.concurrent.atomic.AtomicBoolean
 import org.helix.node.config.NodeConfig
 import org.helix.node.services.ServiceExecutor
 import org.helix.node.services.ServiceHandle
 import org.helix.node.services.ServiceStartSpec
 import org.slf4j.LoggerFactory
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Runs services as containers in the Helix docker network.

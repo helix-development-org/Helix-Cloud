@@ -43,7 +43,7 @@ class MovementEvaluatorTest {
             delta,
             ground(),
             profile,
-            state
+            state,
         )
 
         assertFalse(evaluation.failed("movement.speed.a"))
@@ -64,7 +64,7 @@ class MovementEvaluatorTest {
             delta,
             air,
             profile,
-            state
+            state,
         )
 
         assertFalse(evaluation.failed("movement.speed.a"))
@@ -86,7 +86,7 @@ class MovementEvaluatorTest {
             delta,
             staleGroundSnapshot,
             profile,
-            state
+            state,
         )
 
         assertFalse(evaluation.failed("movement.speed.a"))
@@ -105,7 +105,7 @@ class MovementEvaluatorTest {
             delta,
             ground(),
             profile,
-            state
+            state,
         )
 
         assertTrue(evaluation.failed("movement.speed.a"))
@@ -197,7 +197,7 @@ class MovementEvaluatorTest {
             delta,
             air,
             profile,
-            state
+            state,
         )
 
         assertTrue(evaluation.failed("movement.nofall.a"))
@@ -251,7 +251,7 @@ class MovementEvaluatorTest {
             supportingCollision = false,
             collisionBoxes = emptyList(),
             exemptEnvironment = true,
-            environmentTags = setOf("liquid")
+            environmentTags = setOf("liquid"),
         )
         val evaluation = evaluator.evaluate(movement(Vec3(0.0, 1.0, 0.0), true), Vec3(0.1, 0.0, 0.0), liquid, profile, state)
 
@@ -378,7 +378,7 @@ class MovementEvaluatorTest {
     private fun MovementEvaluation.failed(checkId: String) = failures.any { it.checkId == checkId }
 
     private fun movement(position: Vec3, onGround: Boolean) = MovementFrame(
-        UUID(0, 1), 1, 1, "V_1_21_11", true, false, position, 0f, 0f, onGround
+        UUID(0, 1), 1, 1, "V_1_21_11", true, false, position, 0f, 0f, onGround,
     )
 
     private fun ground() = EnvironmentFrame(
@@ -408,6 +408,6 @@ class MovementEvaluatorTest {
         velocity = Vec3(0.0, 0.0, 0.0),
         exemptEnvironment = false,
         environmentTags = emptySet(),
-        chunkLoaded = true
+        chunkLoaded = true,
     )
 }

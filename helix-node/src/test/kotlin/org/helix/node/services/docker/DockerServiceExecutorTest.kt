@@ -1,5 +1,9 @@
 package org.helix.node.services.docker
 
+import org.helix.api.environment.Environment
+import org.helix.api.task.TaskDefinition
+import org.helix.node.config.NodeConfig
+import org.helix.node.services.ServiceStartSpec
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.createTempDirectory
@@ -8,10 +12,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.helix.api.environment.Environment
-import org.helix.api.task.TaskDefinition
-import org.helix.node.config.NodeConfig
-import org.helix.node.services.ServiceStartSpec
 
 class DockerServiceExecutorTest {
     private class FakeRunner(

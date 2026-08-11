@@ -1,11 +1,11 @@
 package org.helix.node.control.auth
 
-import java.security.SecureRandom
-import java.util.Base64
-import java.util.concurrent.ConcurrentHashMap
 import org.helix.api.proxy.PermissionCheckRequest
 import org.helix.node.gates.PermissionService
 import org.helix.node.players.PlayerRegistry
+import java.security.SecureRandom
+import java.util.Base64
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Web-panel authentication and authorization.

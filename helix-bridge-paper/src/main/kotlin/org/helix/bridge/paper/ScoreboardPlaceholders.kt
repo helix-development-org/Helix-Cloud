@@ -10,7 +10,6 @@ package org.helix.bridge.paper
  * on top, per viewer, on the already globally-substituted text.
  */
 object ScoreboardPlaceholders {
-
     /** Board placeholder values shared by every viewer during one refresh tick. */
     data class Global(
         val online: Int,

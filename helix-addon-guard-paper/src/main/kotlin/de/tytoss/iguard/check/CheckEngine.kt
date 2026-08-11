@@ -4,9 +4,9 @@ import com.github.retrooper.packetevents.protocol.player.ClientVersion
 import de.tytoss.iguard.alert.AlertService
 import de.tytoss.iguard.api.ExemptionManager
 import de.tytoss.iguard.api.IGuardPlayerSnapshot
+import de.tytoss.iguard.config.DetectionConfig
 import de.tytoss.iguard.config.DynamicConfig
 import de.tytoss.iguard.config.ExemptionConfig
-import de.tytoss.iguard.config.DetectionConfig
 import de.tytoss.iguard.config.SanctionConfig
 import de.tytoss.iguard.model.AttackFrame
 import de.tytoss.iguard.model.BlockAction
@@ -16,12 +16,12 @@ import de.tytoss.iguard.model.ClientAction
 import de.tytoss.iguard.model.ClientActionFrame
 import de.tytoss.iguard.model.ClientIdentityFrame
 import de.tytoss.iguard.model.ClientTickFrame
-import de.tytoss.iguard.model.InventoryClickFrame
 import de.tytoss.iguard.model.EnvironmentFrame
+import de.tytoss.iguard.model.InventoryClickFrame
 import de.tytoss.iguard.model.MovementFrame
 import de.tytoss.iguard.model.PacketFrame
-import de.tytoss.iguard.model.SafePosition
 import de.tytoss.iguard.model.ResetFrame
+import de.tytoss.iguard.model.SafePosition
 import de.tytoss.iguard.model.ServerAbilitiesFrame
 import de.tytoss.iguard.model.ServerTeleportFrame
 import de.tytoss.iguard.model.ServerVelocityFrame
@@ -44,28 +44,28 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import java.time.Duration
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 import java.util.logging.Logger
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.round
 import kotlin.math.sin
 import kotlin.math.sqrt
-import kotlin.math.round
 
 internal data class CheckFailure(
     val checkId: String,
     val weight: Double,
     val evidence: Map<String, Any>,
     val family: de.tytoss.iguard.model.EvidenceFamily = ConfidenceModel.family(checkId),
-    val deterministic: Boolean = false
+    val deterministic: Boolean = false,
 )
 
 internal class PlayerState {
@@ -88,6 +88,7 @@ internal class PlayerState {
     var sprinting = false
     var sneaking = false
     var clientFlying = false
+
     // Bedrock (Geyser/Floodgate) players run different movement physics than Java, so the Java
     // prediction would false-positive them. Resolved once from the uuid; movement checks are skipped
     // for Bedrock while deterministic/combat/world checks stay active.
@@ -194,7 +195,7 @@ class CheckEngine(
     private val setbacks: SetbackService,
     private val enforcement: Enforcement,
     private val notifications: de.tytoss.iguard.notify.NotificationService,
-    private val logger: Logger
+    private val logger: Logger,
 ) {
     // Dedicated worker pool so detection never competes with Dispatchers.Default (storage cleanup,
     // command coroutines). One daemon thread per stripe; per-player ordering is preserved because a
@@ -206,7 +207,7 @@ class CheckEngine(
     private val engineJob = SupervisorJob()
     private val engineScope = CoroutineScope(
         engineJob + workerExecutor.asCoroutineDispatcher() +
-            CoroutineExceptionHandler { _, error -> logger.severe("IGuard check worker failed: ${error.stackTraceToString()}") }
+            CoroutineExceptionHandler { _, error -> logger.severe("IGuard check worker failed: ${error.stackTraceToString()}") },
     )
     private val channels = List(workerCount) { Channel<PacketFrame>(queueCapacity) }
     private val queued = List(workerCount) { AtomicInteger() }
@@ -254,18 +255,25 @@ class CheckEngine(
 
     /** The player's last published API snapshot, or null. */
     fun snapshot(playerId: UUID) = published[playerId]
+
     /** The player's most recent open incident, or null. */
     fun incidentSnapshot(playerId: UUID) = incidentTracker.latest(playerId)
+
     /** Incidents updated within the given window (panel grid). */
     fun recentIncidents(withinMillis: Long = 60_000) = incidentTracker.recent(withinMillis)
+
     /** Frames dropped because a stripe queue was full. */
     fun totalDroppedPackets() = totalDropped.get()
+
     /** Frames processed without an evaluable environment snapshot. */
     fun unevaluatedFrameCount() = unevaluatedFrames.get()
+
     /** Players with a published snapshot. */
     fun trackedPlayers() = published.size
+
     /** Current per-stripe queue depths. */
     fun queueSizes() = queued.map(AtomicInteger::get)
+
     /** (processed frames, average micros, maximum micros) since startup. */
     fun processingMetrics(): Triple<Long, Double, Double> {
         val count = processedFrames.get()
@@ -367,7 +375,7 @@ class CheckEngine(
         state: PlayerState,
         environment: EnvironmentFrame,
         profile: VersionProfile,
-        playerName: String
+        playerName: String,
     ) {
         val invalid = movementEvaluator.badPacketFailure(incoming)
         if (invalid != null) {
@@ -426,7 +434,7 @@ class CheckEngine(
             val failures = evaluation.failures
             applyResults(
                 incoming, state, environment, playerName, failures,
-                setOf("movement.fly.a", "movement.speed.a", "movement.nofall.a", "movement.phase.a", "movement.step.a", "movement.spider.a", "movement.jesus.a")
+                setOf("movement.fly.a", "movement.speed.a", "movement.nofall.a", "movement.phase.a", "movement.step.a", "movement.spider.a", "movement.jesus.a"),
             )
             val extra = ArrayList<CheckFailure>(2)
             // The impulse heuristics below model dry-land physics only: swimming (dolphin's grace,
@@ -462,7 +470,8 @@ class CheckEngine(
                 // takeoff (previous tick roughly level) so descending/apex frames don't fire.
                 val jumpBoost = if (environment.jumpAmplifier >= 0) 0.1 * (environment.jumpAmplifier + 1) else 0.0
                 if (supportReliable && state.airTicks <= 1 && state.lastVerticalDelta <= 0.02 &&
-                    delta.y > 0.72 + jumpBoost && "climbable" !in environment.environmentTags) {
+                    delta.y > 0.72 + jumpBoost && "climbable" !in environment.environmentTags
+                ) {
                     extra += CheckFailure("movement.highjump.a", 1.5, mapOf("dy" to delta.y.rounded(), "airTicks" to state.airTicks))
                 }
             }
@@ -582,7 +591,7 @@ class CheckEngine(
             logger.info(
                 "Client identity ${playerName ?: frame.playerId}: ${state.clientFingerprint.family} " +
                     "(${state.clientFingerprint.confidence}), brand=${state.clientBrand ?: "unknown"}, " +
-                    "channels=${state.clientChannels.size}"
+                    "channels=${state.clientChannels.size}",
             )
         }
     }
@@ -591,7 +600,7 @@ class CheckEngine(
         frame: PacketFrame,
         state: PlayerState,
         environment: EnvironmentFrame,
-        playerName: String
+        playerName: String,
     ) {
         val fingerprint = state.clientFingerprint
         val failures = buildList {
@@ -606,9 +615,9 @@ class CheckEngine(
                             "confidence" to fingerprint.confidence,
                             "brand" to (state.clientBrand ?: "unknown"),
                             "signals" to fingerprint.signals.joinToString(","),
-                            "channels" to state.clientChannels.take(12).joinToString(",")
-                        )
-                    )
+                            "channels" to state.clientChannels.take(12).joinToString(","),
+                        ),
+                    ),
                 )
             }
             if (fingerprint.brandSpoofed && !state.brandSpoofReported) {
@@ -620,9 +629,9 @@ class CheckEngine(
                         mapOf(
                             "brand" to (state.clientBrand ?: "unknown"),
                             "conflict" to fingerprint.brandSpoofSignals.joinToString(","),
-                            "assessment" to "mod-loader traffic conflicts with declared vanilla brand; suspicion only"
-                        )
-                    )
+                            "assessment" to "mod-loader traffic conflicts with declared vanilla brand; suspicion only",
+                        ),
+                    ),
                 )
             }
         }
@@ -660,7 +669,7 @@ class CheckEngine(
                 applyResults(
                     frame, state, environment, playerName,
                     listOf(CheckFailure("movement.timer.a", 1.0, mapOf("clientTps" to rate.rounded(), "samples" to state.clientTickTimes.size, "rtt" to state.confirmedRttMillis))),
-                    setOf("movement.timer.a")
+                    setOf("movement.timer.a"),
                 )
             }
         }
@@ -688,7 +697,7 @@ class CheckEngine(
         state.pendingTeleportTarget = Vec3(
             if (frame.relativeX) basePosition.x + frame.position.x else frame.position.x,
             if (frame.relativeY) basePosition.y + frame.position.y else frame.position.y,
-            if (frame.relativeZ) basePosition.z + frame.position.z else frame.position.z
+            if (frame.relativeZ) basePosition.z + frame.position.z else frame.position.z,
         )
         state.pendingTeleportId = frame.teleportId
         state.serverVelocity = frame.deltaMovement
@@ -747,14 +756,14 @@ class CheckEngine(
         if (frame.interactionSequence >= 0 && state.lastInteractionSequence >= 0 && frame.interactionSequence < state.lastInteractionSequence - 4) {
             failures += CheckFailure(
                 "protocol.badpackets.a", 1.0,
-                mapOf("reason" to "interaction-sequence-regression", "sequence" to frame.interactionSequence, "previous" to state.lastInteractionSequence)
+                mapOf("reason" to "interaction-sequence-regression", "sequence" to frame.interactionSequence, "previous" to state.lastInteractionSequence),
             )
         }
         if (frame.interactionSequence >= 0) state.lastInteractionSequence = max(state.lastInteractionSequence, frame.interactionSequence)
         if (frame.action == BlockAction.PLACE && listOf(frame.cursorX, frame.cursorY, frame.cursorZ).any { it !in 0.0f..1.0f || !it.isFinite() }) {
             failures += CheckFailure(
                 "protocol.badpackets.a", 2.0, mapOf("reason" to "invalid-block-cursor"),
-                deterministic = true
+                deterministic = true,
             )
         }
         val movement = state.lastMovement
@@ -774,7 +783,7 @@ class CheckEngine(
                 if (state.placementTimes.size >= 6 && frame.blockY <= movement.position.y - 0.4 && dot < 0.25) {
                     failures += CheckFailure(
                         "world.scaffold.a", 1.0,
-                        mapOf("placementsPerSecond" to state.placementTimes.size, "lookDot" to dot.rounded(), "distance" to distance.rounded())
+                        mapOf("placementsPerSecond" to state.placementTimes.size, "lookDot" to dot.rounded(), "distance" to distance.rounded()),
                     )
                 }
                 if (state.placementTimes.size >= 9) {
@@ -812,7 +821,7 @@ class CheckEngine(
         while (state.digStarts.size > 32) state.digStarts.remove(state.digStarts.keys.first())
         applyResults(
             frame, state, environment, playerName, failures,
-            setOf("protocol.badpackets.a", "world.interactionreach.a", "world.scaffold.a", "world.fastplace.a", "world.nuker.a", "world.fastbreak.a", "world.nofacing.a")
+            setOf("protocol.badpackets.a", "world.interactionreach.a", "world.scaffold.a", "world.fastplace.a", "world.nuker.a", "world.fastbreak.a", "world.nofacing.a"),
         )
     }
 
@@ -825,8 +834,8 @@ class CheckEngine(
                 CheckFailure(
                     "inventory.impossible.a", if (invalid) 2.0 else 1.0,
                     mapOf("window" to frame.windowId, "state" to (frame.stateId ?: -1), "slot" to frame.slot, "button" to frame.button, "type" to frame.clickType),
-                    deterministic = invalid
-                )
+                    deterministic = invalid,
+                ),
             )
             state.lastInventoryClickAt = frame.receivedAt
             // Bedrock (Geyser) clients can legitimately keep walking with an open inventory.
@@ -846,7 +855,7 @@ class CheckEngine(
         state: PlayerState,
         environment: EnvironmentFrame,
         profile: VersionProfile,
-        playerName: String
+        playerName: String,
     ) {
         if (exemptions.isExempt(frame.playerId, frame.receivedAt) || environment.exemptEnvironment || !environment.chunkLoaded) return
         val movement = state.lastMovement ?: return
@@ -869,7 +878,7 @@ class CheckEngine(
                 if (cps > 13.0 && deviation / mean.coerceAtLeast(1.0) < 0.035) {
                     failures += CheckFailure(
                         "combat.autoclicker.a", 1.0,
-                        mapOf("cps" to cps.rounded(), "meanInterval" to mean.rounded(), "deviation" to deviation.rounded(), "samples" to intervals.size)
+                        mapOf("cps" to cps.rounded(), "meanInterval" to mean.rounded(), "deviation" to deviation.rounded(), "samples" to intervals.size),
                     )
                 }
             }
@@ -945,7 +954,7 @@ class CheckEngine(
         environment: EnvironmentFrame,
         playerName: String,
         failures: List<CheckFailure>,
-        evaluated: Set<String>
+        evaluated: Set<String>,
     ) {
         val settings = dynamic.get()
         val failedIds = failures.mapTo(HashSet(), CheckFailure::checkId)
@@ -979,7 +988,7 @@ class CheckEngine(
                 evidence,
                 incident.incidentId,
                 incident.confidence,
-                incident.shadowAction
+                incident.shadowAction,
             )
             storage.enqueue(record, incident.incident)
             if (violationLevel >= config.alertVl) alerts.record(record)
@@ -1005,7 +1014,7 @@ class CheckEngine(
             exemptions.expiresAt(frame.playerId),
             state.violations.toMap(),
             state.droppedPackets,
-            Instant.ofEpochMilli(frame.receivedAt)
+            Instant.ofEpochMilli(frame.receivedAt),
         )
     }
 }
@@ -1017,7 +1026,7 @@ private fun MovementFrame.withFallback(previous: MovementFrame?, environment: En
     return copy(
         position = if (positionChanged) position else fallbackPosition,
         yaw = if (rotationChanged) yaw else fallbackYaw,
-        pitch = if (rotationChanged) pitch else fallbackPitch
+        pitch = if (rotationChanged) pitch else fallbackPitch,
     )
 }
 
@@ -1057,7 +1066,7 @@ private const val SCAN_COVERAGE_UP = 1.9
 private val SETBACK_CHECKS = setOf(
     "movement.fly.a", "movement.speed.a", "movement.nofall.a", "movement.phase.a",
     "movement.step.a", "movement.spider.a", "movement.jesus.a", "movement.highjump.a",
-    "movement.airjump.a"
+    "movement.airjump.a",
 )
 
 private fun Double.rounded() = round(this * 10000.0) / 10000.0

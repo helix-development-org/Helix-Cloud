@@ -15,8 +15,8 @@ import de.tytoss.iguard.model.MovementFrame
 import de.tytoss.iguard.model.OutboxEvent
 import de.tytoss.iguard.model.PacketFrame
 import de.tytoss.iguard.model.ReplayRecord
-import de.tytoss.iguard.model.TimelineFrame
 import de.tytoss.iguard.model.SanctionRecord
+import de.tytoss.iguard.model.TimelineFrame
 import de.tytoss.iguard.storage.GuardStore
 import java.io.ByteArrayOutputStream
 import java.time.Instant
@@ -37,7 +37,7 @@ internal data class IncidentAssignment(
     val incidentId: UUID,
     val confidence: Double,
     val shadowAction: String?,
-    val incident: IncidentRecord
+    val incident: IncidentRecord,
 )
 
 private data class Capture(
@@ -45,7 +45,7 @@ private data class Capture(
     val windowStart: Long,
     val windowEnd: Long,
     val frames: MutableList<PacketFrame>,
-    var incident: IncidentRecord
+    var incident: IncidentRecord,
 )
 
 private class TrackedIncident(
@@ -56,7 +56,7 @@ private class TrackedIncident(
     var deterministic: Boolean = false,
     var evidenceCount: Int = 0,
     var playerName: String = "unknown",
-    var lastOutboxAction: String? = null
+    var lastOutboxAction: String? = null,
 )
 
 private class IncidentPlayerState {
@@ -74,10 +74,11 @@ internal class IncidentTracker(
     private val sanctions: SanctionConfig,
     private val dynamic: AtomicReference<DynamicConfig>,
     private val enforcement: Enforcement,
-    private val notifications: de.tytoss.iguard.notify.NotificationService
+    private val notifications: de.tytoss.iguard.notify.NotificationService,
 ) {
     // Players already enforced this session -> escalate to the repeat-offender ban duration.
     private val enforced = ConcurrentHashMap.newKeySet<UUID>()
+
     // GZIP compression runs here, off the stripe worker: previously a 512KB compress ran inline under
     // synchronized(state), stalling the stripe and filling its channel (drops for all its players).
     private val replayExecutor = Executors.newSingleThreadExecutor { runnable ->
@@ -145,7 +146,7 @@ internal class IncidentTracker(
                 incident.familyScores.keys.toSet(),
                 incident.evidenceCount,
                 shadowAction,
-                ConfidenceModel.RECIPE_VERSION
+                ConfidenceModel.RECIPE_VERSION,
             )
             latest[frame.playerId] = snapshot
             val incidentRecord = snapshot.toRecord()
@@ -156,7 +157,7 @@ internal class IncidentTracker(
                     frame.receivedAt - config.replayPreMillis,
                     frame.receivedAt + config.replayPostMillis,
                     state.replay.filterTo(ArrayList()) { it.receivedAt >= frame.receivedAt - config.replayPreMillis },
-                    incidentRecord
+                    incidentRecord,
                 )
             } else {
                 state.captures[incident.id]?.incident = incidentRecord
@@ -171,8 +172,8 @@ internal class IncidentTracker(
                 storage.enqueueSanction(
                     SanctionRecord(
                         UUID.randomUUID(), incident.id, frame.playerId, shadowAction, !enforce, frame.receivedAt,
-                        frame.receivedAt + banHours * 60L * 60L * 1000L, reason
-                    )
+                        frame.receivedAt + banHours * 60L * 60L * 1000L, reason,
+                    ),
                 )
                 // Shadow alerts go to the proxy here; the enforce outbox+network-ban is written by
                 // enforcement.ban() (below) so it is shared with manual bans and never double-emitted.
@@ -180,13 +181,14 @@ internal class IncidentTracker(
                     storage.enqueueOutbox(
                         OutboxEvent(
                             UUID.randomUUID(), 1, frame.receivedAt, serverId, frame.playerId, playerName,
-                            incident.id, "shadow.sanction", mapOf(
+                            incident.id, "shadow.sanction",
+                                mapOf(
                                 "action" to shadowAction,
                                 "confidence" to confidence,
                                 "calibrated" to calibrated,
-                                "families" to incident.familyScores.keys.joinToString(",")
-                            )
-                        )
+                                "families" to incident.familyScores.keys.joinToString(","),
+                            ),
+                        ),
                     )
                 }
                 if (enforce) {
@@ -196,7 +198,7 @@ internal class IncidentTracker(
                 // Notify staff of the flagged incident (webhook applies its own confidence gate + cooldown).
                 notifications.incident(
                     frame.playerId, playerName, confidence, incident.familyScores.keys.toSet(),
-                    incident.evidenceCount, shadowAction, ConfidenceModel.RECIPE_VERSION
+                    incident.evidenceCount, shadowAction, ConfidenceModel.RECIPE_VERSION,
                 )
             }
             return IncidentAssignment(incident.id, confidence, shadowAction, incidentRecord)
@@ -248,9 +250,9 @@ internal class IncidentTracker(
                     "gzip",
                     if (truncated) compressed.copyOf(config.replayMaxBytes) else compressed,
                     truncated,
-                    capturedAt + config.replayRetentionDays * 86_400_000L
+                    capturedAt + config.replayRetentionDays * 86_400_000L,
                 ),
-                incident
+                incident,
             )
         }
     }
@@ -264,7 +266,7 @@ internal class IncidentTracker(
 
     private fun IncidentSnapshot.toRecord() = IncidentRecord(
         incidentId, openedAt.toEpochMilli(), updatedAt.toEpochMilli(), serverId, playerId, playerName,
-        confidence, calibrated, families, evidenceCount, shadowAction, recipeVersion
+        confidence, calibrated, families, evidenceCount, shadowAction, recipeVersion,
     )
 
     private fun describe(frame: PacketFrame): String = when (frame) {
@@ -277,7 +279,6 @@ internal class IncidentTracker(
         is ClientIdentityFrame -> "identity channel=${frame.channel} bytes=${frame.payload.size}"
         else -> frame::class.simpleName ?: "frame"
     }
-
 }
 
 private fun Double.fmt() = "%.5f".format(java.util.Locale.ROOT, this)

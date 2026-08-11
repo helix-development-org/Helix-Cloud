@@ -1,9 +1,9 @@
 package org.helix.node.services
 
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 import org.helix.api.proxy.ProxyCommand
 import org.slf4j.LoggerFactory
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /**
  * Restarts services and whole tasks with a chat countdown.

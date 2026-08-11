@@ -1,10 +1,10 @@
 package org.helix.addons.friends
 
+import org.helix.api.storage.InMemoryAddonStorage
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.helix.api.storage.InMemoryAddonStorage
 
 class FriendStoreTest {
     @Test

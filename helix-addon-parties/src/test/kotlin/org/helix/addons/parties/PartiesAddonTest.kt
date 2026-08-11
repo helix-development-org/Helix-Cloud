@@ -1,11 +1,11 @@
 package org.helix.addons.parties
 
+import org.helix.addon.sdk.testing.RecordingAddonContext
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.helix.addon.sdk.testing.RecordingAddonContext
 
 class PartiesAddonTest {
     private val context = RecordingAddonContext(createTempDirectory("parties"))

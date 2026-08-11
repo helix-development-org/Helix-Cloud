@@ -9,15 +9,14 @@ import de.tytoss.iguard.api.IGuardApiImpl
 import de.tytoss.iguard.check.CheckEngine
 import de.tytoss.iguard.check.Enforcement
 import de.tytoss.iguard.command.IGuardCommand
-import de.tytoss.iguard.gui.GuiService
-import de.tytoss.iguard.replay.ReplayService
-import de.tytoss.iguard.spectate.SpectateService
-import de.tytoss.iguard.config.DynamicConfig
 import de.tytoss.iguard.config.IGuardConfig
+import de.tytoss.iguard.gui.GuiService
 import de.tytoss.iguard.packet.IGuardPacketListener
+import de.tytoss.iguard.replay.ReplayService
 import de.tytoss.iguard.setback.SetbackService
 import de.tytoss.iguard.snapshot.MainThreadSampler
 import de.tytoss.iguard.snapshot.SnapshotStore
+import de.tytoss.iguard.spectate.SpectateService
 import de.tytoss.iguard.storage.GuardStore
 import de.tytoss.iguard.storage.HelixNodeStore
 import kotlinx.coroutines.CoroutineScope
@@ -116,7 +115,7 @@ class IGuardPlugin : JavaPlugin(), Listener {
             ?: "IGuard: ${ban.reason}\nUntil: $until"
         event.disallow(
             org.bukkit.event.player.AsyncPlayerPreLoginEvent.Result.KICK_BANNED,
-            net.kyori.adventure.text.Component.text(screen)
+            net.kyori.adventure.text.Component.text(screen),
         )
     }
 
@@ -137,7 +136,7 @@ class IGuardPlugin : JavaPlugin(), Listener {
             System.getenv("HELIX_CONTROL_URL").orEmpty(),
             System.getenv("HELIX_CONTROL_TOKEN").orEmpty(),
             loaded.history,
-            logger
+            logger,
         )
         storage = helixStore
         logger.info("IGuard storage: helix node (${System.getenv("HELIX_CONTROL_URL")})")
@@ -146,7 +145,7 @@ class IGuardPlugin : JavaPlugin(), Listener {
         val nodeTranslations = NodeTranslations(
             System.getenv("HELIX_CONTROL_URL").orEmpty(),
             System.getenv("HELIX_CONTROL_TOKEN").orEmpty(),
-            "helix.guard"
+            "helix.guard",
         )
         translations = nodeTranslations
         server.scheduler.runTaskTimerAsynchronously(this, Runnable { nodeTranslations.sync() }, 1L, TRANSLATION_SYNC_TICKS)
@@ -183,7 +182,7 @@ class IGuardPlugin : JavaPlugin(), Listener {
             setbackService,
             enforcement,
             notificationService,
-            logger
+            logger,
         )
         engine = checkEngine
         val packets = IGuardPacketListener(checkEngine)

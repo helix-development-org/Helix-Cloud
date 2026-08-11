@@ -16,35 +16,29 @@ import com.velocitypowered.api.plugin.Plugin
 import com.velocitypowered.api.proxy.Player
 import com.velocitypowered.api.proxy.ProxyServer
 import com.velocitypowered.api.proxy.server.ServerPing
-import java.util.UUID
 import com.velocitypowered.api.scheduler.ScheduledTask
-import java.time.Duration
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicBoolean
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.minimessage.MiniMessage
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.bridge.HeartbeatReport
 import org.helix.api.bridge.ResourceProbe
-import org.helix.api.i18n.TranslationsSnapshot
 import org.helix.api.message.LegacyToMini
 import org.helix.api.player.PlayerEvent
 import org.helix.api.player.PlayerLocaleReport
 import org.helix.api.player.PlayerPermissionsReport
 import org.helix.api.player.PlayerRosterReport
 import org.helix.api.player.RosterPlayer
-import org.helix.api.proxy.JoinDecision
 import org.helix.api.proxy.JoinRequest
 import org.helix.api.proxy.PermissionCheckRequest
-import org.helix.api.proxy.PermissionDecision
 import org.helix.api.proxy.ProxyCommand
 import org.helix.api.proxy.ProxyPoll
-import org.helix.api.proxy.RoutingSnapshot
 import org.helix.wire.ServiceNodeApi
-import org.helix.wire.WireCodec
 import org.slf4j.Logger
+import java.time.Duration
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Velocity-side bridge between the proxy and the Helix-Cloud node.
@@ -769,9 +763,14 @@ class HelixVelocityBridgePlugin @Inject constructor(
             return
         }
         if (result.lines.isEmpty()) {
-            val key = if (result.success) "command.result.done" else "command.result.failed"
-            val fallback = if (result.success) "Done." else "Failed."
-            player.sendMessage(translate(player, "helix.translations.velocity.$key", fallback))
+            // A command that succeeded without any output stays silent — no
+            // generic "Done." confirmation. Only a bare failure gets a
+            // prefixed, localized notice instead of leaving the player guessing.
+            if (!result.success) {
+                player.sendMessage(
+                    translate(player, "helix.translations.velocity.command.error", "That command could not be completed."),
+                )
+            }
             return
         }
         result.lines.forEach { line -> player.sendMessage(screen(line, ctxFor(player.username))) }
@@ -852,8 +851,10 @@ class HelixVelocityBridgePlugin @Inject constructor(
             "player" to player,
             "network" to networkName.ifBlank { "the network" },
             "prefix" to networkPrefix,
-            "server" to (proxy.getPlayer(player).flatMap { it.currentServer }
-                .map { it.serverInfo.name }.orElse("")),
+            "server" to (
+                proxy.getPlayer(player).flatMap { it.currentServer }
+                .map { it.serverInfo.name }.orElse("")
+            ),
             "online" to proxy.playerCount.toString(),
             "max" to proxy.configuration.showMaxPlayers.toString(),
             "date" to now.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")),

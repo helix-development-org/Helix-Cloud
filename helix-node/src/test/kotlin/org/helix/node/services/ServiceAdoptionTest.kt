@@ -1,13 +1,5 @@
 package org.helix.node.services
 
-import java.io.ByteArrayInputStream
-import java.nio.file.Files
-import kotlin.io.path.createTempDirectory
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 import org.helix.api.bridge.HeartbeatReport
 import org.helix.api.environment.Environment
 import org.helix.api.execution.ExecutorType
@@ -16,6 +8,14 @@ import org.helix.api.task.TaskDefinition
 import org.helix.node.control.auth.ServiceTokenRegistry
 import org.helix.node.launcher.NodePaths
 import org.helix.node.tasks.TaskStore
+import java.io.ByteArrayInputStream
+import java.nio.file.Files
+import kotlin.io.path.createTempDirectory
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ServiceAdoptionTest {
     private val paths = NodePaths(createTempDirectory("helix")).createAll()

@@ -19,7 +19,7 @@ data class IncidentSnapshot(
     val families: Set<EvidenceFamily>,
     val evidenceCount: Int,
     val shadowAction: String?,
-    val recipeVersion: String
+    val recipeVersion: String,
 )
 
 /** Write model of an incident upsert as persisted through the store. */
@@ -35,7 +35,7 @@ data class IncidentRecord(
     val families: Set<EvidenceFamily>,
     val evidenceCount: Int,
     val shadowAction: String?,
-    val recipeVersion: String
+    val recipeVersion: String,
 )
 
 /** Compressed movement-timeline payload recorded around an incident. */
@@ -47,7 +47,7 @@ data class ReplayRecord(
     val compression: String,
     val payload: ByteArray,
     val truncated: Boolean,
-    val expiresAt: Long
+    val expiresAt: Long,
 )
 
 /** Replay listing entry (window + size) without the payload itself. */
@@ -57,7 +57,7 @@ data class ReplayMetadata(
     val windowStart: Instant,
     val windowEnd: Instant,
     val compressedBytes: Int,
-    val truncated: Boolean
+    val truncated: Boolean,
 )
 
 /** Event for the proxy outbox (shadow alerts, sanction broadcasts); a no-op in Helix deployments. */
@@ -70,7 +70,7 @@ data class OutboxEvent(
     val playerName: String,
     val incidentId: UUID?,
     val type: String,
-    val payload: Map<String, Any>
+    val payload: Map<String, Any>,
 )
 
 /** A sanction decision (shadow or enforced) taken for an incident. */
@@ -82,5 +82,5 @@ data class SanctionRecord(
     val shadow: Boolean,
     val createdAt: Long,
     val expiresAt: Long?,
-    val reason: String
+    val reason: String,
 )

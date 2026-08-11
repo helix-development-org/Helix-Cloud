@@ -1,13 +1,5 @@
 package org.helix.addons.guard
 
-import java.nio.file.Files
-import java.nio.file.Path
-import kotlin.io.path.createTempDirectory
-import kotlin.test.Test
-import kotlin.test.assertContains
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonArray
@@ -20,6 +12,14 @@ import org.helix.api.action.ActionResult
 import org.helix.api.addon.AddonContext
 import org.helix.api.player.OnlinePlayer
 import org.helix.api.proxy.JoinRequest
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.io.path.createTempDirectory
+import kotlin.test.Test
+import kotlin.test.assertContains
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /** [RecordingAddonContext] wrapper that additionally reports service directories. */
 private class GuardTestContext(

@@ -1,9 +1,9 @@
 package org.helix.node.notifications
 
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CopyOnWriteArrayList
 import org.helix.api.addon.NotificationListener
 import org.slf4j.LoggerFactory
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Fans addon-published notifications out to all registered listeners.

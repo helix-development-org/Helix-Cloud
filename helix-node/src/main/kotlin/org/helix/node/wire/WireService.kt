@@ -1,13 +1,13 @@
 package org.helix.node.wire
 
-import java.io.FileInputStream
-import java.security.KeyStore
-import javax.net.ssl.KeyManagerFactory
-import javax.net.ssl.SSLContext
 import org.helix.node.config.NodeConfig
 import org.helix.node.control.ControlDependencies
 import org.helix.node.control.auth.ServiceTokenRegistry
 import org.helix.wire.WireServer
+import java.io.FileInputStream
+import java.security.KeyStore
+import javax.net.ssl.KeyManagerFactory
+import javax.net.ssl.SSLContext
 
 /**
  * Owns the node's Helix-Wire endpoint: the [WireServer], its endpoint

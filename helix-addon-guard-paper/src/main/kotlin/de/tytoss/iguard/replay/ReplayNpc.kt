@@ -29,7 +29,7 @@ import java.util.UUID
  */
 class ReplayNpc(
     private val viewer: Player,
-    private val profile: UserProfile
+    private val profile: UserProfile,
 ) {
     val entityId: Int = SpigotReflectionUtil.generateEntityId()
     private val pm get() = PacketEvents.getAPI().playerManager
@@ -39,22 +39,22 @@ class ReplayNpc(
         // The tab-list entry must reach the client before the entity spawns or the skin won't resolve;
         // UPDATE_LISTED(false) keeps the NPC out of the visible player list.
         val info = WrapperPlayServerPlayerInfoUpdate.PlayerInfo(
-            profile, false, 0, GameMode.SURVIVAL, null, null
+            profile, false, 0, GameMode.SURVIVAL, null, null,
         )
         send(
             WrapperPlayServerPlayerInfoUpdate(
                 EnumSet.of(
                     WrapperPlayServerPlayerInfoUpdate.Action.ADD_PLAYER,
-                    WrapperPlayServerPlayerInfoUpdate.Action.UPDATE_LISTED
+                    WrapperPlayServerPlayerInfoUpdate.Action.UPDATE_LISTED,
                 ),
-                info
-            )
+                info,
+            ),
         )
         send(
             WrapperPlayServerSpawnEntity(
                 entityId, Optional.of(profile.uuid), EntityTypes.PLAYER,
-                Vector3d(x, y, z), pitch, yaw, yaw, 0, Optional.of(Vector3d(0.0, 0.0, 0.0))
-            )
+                Vector3d(x, y, z), pitch, yaw, yaw, 0, Optional.of(Vector3d(0.0, 0.0, 0.0)),
+            ),
         )
         send(WrapperPlayServerEntityHeadLook(entityId, yaw))
     }

@@ -46,6 +46,22 @@ every module — a pull request that fails it will fail CI. Comments elsewhere
 in the code should explain *why* something is done, not *what* the code
 already makes obvious.
 
+## Code style
+
+The repository follows the [official Kotlin coding conventions](https://kotlinlang.org/docs/coding-conventions.html),
+codified in [`.editorconfig`](.editorconfig) (`ktlint_official`). IntelliJ
+picks it up automatically; from the command line you can check or apply it
+with [ktlint](https://ktlint.github.io/):
+
+```bash
+ktlint "helix-**/src/**/*.kt"            # report
+ktlint --format "helix-**/src/**/*.kt"   # apply
+```
+
+The aggressive line-wrapping rules of ktlint's house style are switched off
+in `.editorconfig` on purpose — keep signatures and argument lists formatted
+the way the surrounding code already is, rather than one-argument-per-line.
+
 ## Tests
 
 Add real tests using the existing patterns in the module's `src/test/kotlin`

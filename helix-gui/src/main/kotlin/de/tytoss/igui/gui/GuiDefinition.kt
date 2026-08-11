@@ -1,11 +1,10 @@
 package de.tytoss.igui.gui
 
-import org.bukkit.entity.Player
-import org.bukkit.inventory.ItemStack
 import de.tytoss.igui.internal.GuiRuntime
 import net.kyori.adventure.text.Component
+import org.bukkit.entity.Player
+import org.bukkit.inventory.ItemStack
 import java.util.UUID
-
 
 /**
  * A compiled, registered GUI: the immutable result of
@@ -17,14 +16,12 @@ import java.util.UUID
  */
 class GuiDefinition internal constructor(
     internal val runtime: GuiRuntime,
-
     val id: String,
     internal val rows: Int,
     internal val landingPage: String,
     internal val compiledPages: Map<String, GuiPage>,
     internal val closeHandler: GuiCloseHandler?,
 ) {
-
     /** Ids of all pages declared on this GUI. */
     val pages: Set<String> = compiledPages.keys
 
@@ -83,7 +80,6 @@ internal data class GuiCompiledClick(
     val permission: String?,
     val cooldownMillis: Long,
 )
-
 
 /** Why a click or page open was denied, passed to [de.tytoss.igui.gui.GuiPageBuilder.onDenied]. */
 enum class GuiAccessDenial {

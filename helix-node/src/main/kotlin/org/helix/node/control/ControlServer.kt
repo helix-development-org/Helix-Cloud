@@ -1,5 +1,6 @@
 package org.helix.node.control
 
+import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
@@ -11,20 +12,17 @@ import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.bearer
 import io.ktor.server.auth.principal
-import io.ktor.server.plugins.origin
-import io.ktor.server.request.httpMethod
-import io.ktor.server.request.path
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.engine.sslConnector
-import java.io.FileInputStream
-import java.security.KeyStore
 import io.ktor.server.http.content.staticResources
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.plugins.origin
 import io.ktor.server.plugins.statuspages.StatusPages
+import io.ktor.server.request.httpMethod
+import io.ktor.server.request.path
 import io.ktor.server.request.receive
-import io.ktor.http.ContentType
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
@@ -39,16 +37,11 @@ import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import kotlinx.serialization.json.Json
 import org.helix.api.action.ActionInvocation
-import org.helix.api.bridge.NetworkPackInfo
 import org.helix.api.action.ActionSource
 import org.helix.api.action.PlayerCommandRequest
-import org.helix.api.display.DisplayBulkRequest
-import org.helix.node.control.auth.LoginRequest
-import org.helix.node.control.auth.PanelAuthService
-import org.helix.node.control.auth.PanelPrincipal
-import org.helix.node.control.auth.VerifyRequest
-import org.helix.node.scheduler.ScheduledJob
 import org.helix.api.bridge.HeartbeatReport
+import org.helix.api.bridge.NetworkPackInfo
+import org.helix.api.display.DisplayBulkRequest
 import org.helix.api.i18n.TranslationsSnapshot
 import org.helix.api.player.PlayerEvent
 import org.helix.api.player.PlayerLocaleReport
@@ -62,7 +55,14 @@ import org.helix.api.proxy.ProxyPoll
 import org.helix.api.service.ServiceState
 import org.helix.api.task.TaskDefinition
 import org.helix.node.config.NodeConfig
+import org.helix.node.control.auth.LoginRequest
+import org.helix.node.control.auth.PanelAuthService
+import org.helix.node.control.auth.PanelPrincipal
+import org.helix.node.control.auth.VerifyRequest
+import org.helix.node.scheduler.ScheduledJob
 import org.slf4j.LoggerFactory
+import java.io.FileInputStream
+import java.security.KeyStore
 
 /** Logger for the top-level route builders (outside the [ControlServer] class). */
 private val logger = LoggerFactory.getLogger("org.helix.node.control.ControlRoutes")

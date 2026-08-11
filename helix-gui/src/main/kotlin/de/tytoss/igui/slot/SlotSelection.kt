@@ -8,7 +8,6 @@ package de.tytoss.igui.slot
  * indices follow chest layout: row-major, 9 columns per row.
  */
 sealed interface SlotSelection {
-
     /**
      * Invokes [action] once for each slot in this selection, in an
      * implementation-defined order.
@@ -30,7 +29,6 @@ sealed interface SlotSelection {
             action(slot)
         }
     }
-
 
     /** All slots in the rectangle spanned between two corner slots, inclusive. */
     data class Rectangle(val first: Int, val second: Int) : SlotSelection {
@@ -127,7 +125,6 @@ sealed interface SlotSelection {
         }
     }
 
-
     /** An explicit, arbitrary set of slots, built by [slots]. Duplicate indices are collapsed. */
     class Set internal constructor(slots: IntArray) : SlotSelection {
         private val values: IntArray = slots.distinct().toIntArray()
@@ -144,7 +141,6 @@ sealed interface SlotSelection {
         const val COLUMNS: Int = 9
     }
 }
-
 
 /**
  * A selection matching a single slot.

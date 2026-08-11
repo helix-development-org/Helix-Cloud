@@ -6,8 +6,6 @@ import de.tytoss.igui.gui.GuiClickContext
 import de.tytoss.igui.gui.GuiDefinition
 import de.tytoss.igui.gui.GuiInputCancelledException
 import de.tytoss.igui.gui.GuiInputTimeoutException
-import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -25,6 +23,8 @@ import org.helix.api.addon.ProfileView
 import org.helix.api.addon.ResolvedSetting
 import org.helix.api.i18n.NodeTranslations
 import org.helix.api.message.LegacyToMini
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * The `/profilemenu` GUI, built on the shared Helix-GUIs plugin's IGui
@@ -48,6 +48,7 @@ class ProfileGuiService(
     private val scope: CoroutineScope,
 ) {
     @Volatile private var igui: IGui? = null
+
     @Volatile private var menu: GuiDefinition? = null
     private val views = ConcurrentHashMap<UUID, ProfileView>()
     private val miniMessage = MiniMessage.miniMessage()

@@ -21,9 +21,10 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class SpectateService(
     private val plugin: JavaPlugin,
-    private val translations: NodeTranslations
+    private val translations: NodeTranslations,
 ) : Listener {
     private val miniMessage = MiniMessage.miniMessage()
+
     private data class Session(val world: UUID, val location: Location, val gameMode: GameMode, val flying: Boolean, var targetId: UUID)
 
     private val sessions = ConcurrentHashMap<UUID, Session>()
@@ -37,7 +38,7 @@ class SpectateService(
         val existing = sessions[admin.uniqueId]
         if (existing == null) {
             sessions[admin.uniqueId] = Session(
-                admin.world.uid, admin.location.clone(), admin.gameMode, admin.allowFlight, target.uniqueId
+                admin.world.uid, admin.location.clone(), admin.gameMode, admin.allowFlight, target.uniqueId,
             )
             admin.gameMode = GameMode.SPECTATOR
         } else {

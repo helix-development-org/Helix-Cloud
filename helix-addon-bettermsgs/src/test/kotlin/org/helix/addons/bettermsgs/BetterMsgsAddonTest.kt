@@ -1,13 +1,13 @@
 package org.helix.addons.bettermsgs
 
+import kotlinx.serialization.json.Json
+import org.helix.addon.sdk.testing.RecordingAddonContext
+import org.helix.api.player.OnlinePlayer
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlinx.serialization.json.Json
-import org.helix.addon.sdk.testing.RecordingAddonContext
-import org.helix.api.player.OnlinePlayer
 
 class BetterMsgsAddonTest {
     private val context = RecordingAddonContext(createTempDirectory("bettermsgs"))

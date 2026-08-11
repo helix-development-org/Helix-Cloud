@@ -1,13 +1,13 @@
 package org.helix.node.privacy
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionSource
 import org.helix.api.addon.PlayerDataProvider
 import org.helix.node.actions.ActionRegistry
 import org.helix.node.gates.PlayerDataRegistry
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class PlayerDataActionsTest {
     private val playerData = PlayerDataRegistry()
@@ -19,6 +19,7 @@ class PlayerDataActionsTest {
             "bans",
             object : PlayerDataProvider {
                 override fun export(player: String) = """{"reason":"griefing"}"""
+
                 override fun delete(player: String) = false
             },
         )
@@ -44,6 +45,7 @@ class PlayerDataActionsTest {
             "bans",
             object : PlayerDataProvider {
                 override fun export(player: String): String? = null
+
                 override fun delete(player: String) = true
             },
         )

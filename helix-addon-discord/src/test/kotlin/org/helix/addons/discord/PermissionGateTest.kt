@@ -1,9 +1,9 @@
 package org.helix.addons.discord
 
+import org.helix.api.storage.InMemoryAddonStorage
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import org.helix.api.storage.InMemoryAddonStorage
 
 class PermissionGateTest {
     private val links = LinkStore(InMemoryAddonStorage())

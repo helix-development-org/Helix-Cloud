@@ -1,10 +1,10 @@
 package org.helix.node.gates
 
+import org.helix.api.addon.ProfileInfoEntry
+import org.helix.api.addon.ProfileInfoProvider
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.helix.api.addon.ProfileInfoEntry
-import org.helix.api.addon.ProfileInfoProvider
 
 class ProfileInfoRegistryTest {
     private val registry = ProfileInfoRegistry()
@@ -38,9 +38,12 @@ class ProfileInfoRegistryTest {
 
     @Test
     fun `a throwing provider is skipped instead of failing the whole lookup`() {
-        registry.register("broken", object : ProfileInfoProvider {
+        registry.register(
+            "broken",
+            object : ProfileInfoProvider {
             override fun infoFor(player: String): List<ProfileInfoEntry> = error("boom")
-        })
+        },
+        )
         registry.register("stats", info { listOf(ProfileInfoEntry("Kills", "42")) })
 
         assertEquals(mapOf("stats" to listOf(ProfileInfoEntry("Kills", "42"))), registry.infoFor("steve"))

@@ -13,8 +13,6 @@ import net.kyori.adventure.text.Component
  *  appended element — useful for chaining further layout decisions.
  */
 class GuiTitle internal constructor(
-
     val component: Component,
-
     val finalCursorPixels: Int,
 )

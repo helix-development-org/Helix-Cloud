@@ -1,11 +1,11 @@
 package org.helix.api.i18n
 
+import kotlinx.serialization.json.Json
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
-import kotlinx.serialization.json.Json
 
 /**
  * Node-backed translations for a Paper/Velocity addon component: a local

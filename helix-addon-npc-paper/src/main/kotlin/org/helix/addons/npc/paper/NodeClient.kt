@@ -1,13 +1,13 @@
 package org.helix.addons.npc.paper
 
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import org.slf4j.LoggerFactory
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import org.slf4j.LoggerFactory
 
 /**
  * Minimal HTTP client for the node control API, configured from the same
@@ -60,7 +60,6 @@ class NodeClient(
         val result = runCatching { json.decodeFromString<ActionReply>(body) }.getOrNull() ?: return null
         return if (result.success) result.lines.firstOrNull() else null
     }
-
 
     /**
      * Sends one request, logging failures instead of swallowing them: a

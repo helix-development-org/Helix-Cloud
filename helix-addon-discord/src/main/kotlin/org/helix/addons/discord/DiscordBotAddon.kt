@@ -262,6 +262,7 @@ class DiscordBotAddon : AddonBase() {
             val parts = arg.split("=", limit = 2)
             if (parts.size == 2) parts[0].lowercase() to parts[1] else null
         }.toMap()
+
         /** Parses a comma-separated override into a clean list, or null. */
         fun list(key: String) = overrides[key]?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() }
         val current = DiscordConfig.load(storage)

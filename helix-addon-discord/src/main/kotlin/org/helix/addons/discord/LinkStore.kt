@@ -1,10 +1,10 @@
 package org.helix.addons.discord
 
-import java.security.SecureRandom
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.helix.api.storage.AddonStorage
+import java.security.SecureRandom
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * A confirmed Discord-to-Minecraft account link.

@@ -1,13 +1,13 @@
 package org.helix.addons.labymod
 
+import kotlinx.serialization.json.Json
+import org.helix.addon.sdk.testing.RecordingAddonContext
+import org.helix.api.player.OnlinePlayer
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlinx.serialization.json.Json
-import org.helix.addon.sdk.testing.RecordingAddonContext
-import org.helix.api.player.OnlinePlayer
 
 class LabyModAddonTest {
     private val json = Json { ignoreUnknownKeys = true }

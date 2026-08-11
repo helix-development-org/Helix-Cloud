@@ -1,8 +1,8 @@
 package org.helix.bridge.paper
 
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlinx.serialization.json.Json
 
 class TablistDataTest {
     private val json = Json { ignoreUnknownKeys = true }

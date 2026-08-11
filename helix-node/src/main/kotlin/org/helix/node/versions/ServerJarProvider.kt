@@ -1,11 +1,11 @@
 package org.helix.node.versions
 
+import org.helix.api.environment.Environment
+import org.slf4j.LoggerFactory
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import org.helix.api.environment.Environment
-import org.slf4j.LoggerFactory
 
 /**
  * Provides server jars for services, downloading and caching them under

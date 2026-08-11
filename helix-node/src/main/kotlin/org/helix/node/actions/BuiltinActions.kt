@@ -1,16 +1,16 @@
 package org.helix.node.actions
 
-import java.nio.file.Files
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
 import org.helix.api.environment.Environment
 import org.helix.api.execution.ExecutorType
-import org.helix.api.task.AutoScaleSettings
-import org.helix.api.task.TaskDefinition
 import org.helix.api.message.MapMessages
 import org.helix.api.message.Messages
+import org.helix.api.proxy.ProxyCommand
 import org.helix.api.storage.InMemoryAddonStorage
+import org.helix.api.task.AutoScaleSettings
+import org.helix.api.task.TaskDefinition
 import org.helix.node.languages.LanguageRegistry
 import org.helix.node.launcher.NodePaths
 import org.helix.node.platform.PlatformOverviewService
@@ -18,11 +18,11 @@ import org.helix.node.players.PlayerRegistry
 import org.helix.node.proxy.ProxyCommandQueue
 import org.helix.node.proxy.ProxyEventHub
 import org.helix.node.proxy.ProxyRoutingService
-import org.helix.api.proxy.ProxyCommand
 import org.helix.node.services.RestartCoordinator
 import org.helix.node.services.ServiceManager
 import org.helix.node.tasks.TaskStore
 import org.helix.node.versions.VersionCatalog
+import java.nio.file.Files
 
 /**
  * Registers the built-in platform actions.
@@ -78,6 +78,7 @@ class BuiltinActions(
         deliver = { command -> deliver(command) },
         eventSink = eventSink,
     )
+
     /**
      * Registers every built-in action.
      *

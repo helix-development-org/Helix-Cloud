@@ -14,7 +14,7 @@ import kotlin.math.floor
 /** Conservative, rate-limited teleports back to the last safe position after a hard check failure. */
 class SetbackService(
     private val plugin: JavaPlugin,
-    private val snapshots: SnapshotStore
+    private val snapshots: SnapshotStore,
 ) {
     private val lastSetback = ConcurrentHashMap<UUID, Long>()
 
@@ -24,7 +24,9 @@ class SetbackService(
         val previous = lastSetback.putIfAbsent(playerId, now)
         if (previous != null && now - previous < 1000) return
         lastSetback[playerId] = now
-        Bukkit.getScheduler().runTask(plugin, Runnable {
+        Bukkit.getScheduler().runTask(
+            plugin,
+            Runnable {
             val player = Bukkit.getPlayer(playerId) ?: return@Runnable
             val current = snapshots.view(playerId)?.current ?: return@Runnable
             if (current.tick - safe.tick !in 0..20 || current.worldId != safe.worldId) return@Runnable
@@ -34,7 +36,8 @@ class SetbackService(
             if (!isCollisionFree(world, safe, width, height)) return@Runnable
             player.teleport(Location(world, safe.position.x, safe.position.y, safe.position.z, safe.yaw, safe.pitch))
             plugin.logger.fine("Set back ${player.name} after $reason")
-        })
+        },
+        )
     }
 
     private fun isCollisionFree(world: World, safe: SafePosition, width: Double, height: Double): Boolean {
@@ -45,7 +48,7 @@ class SetbackService(
             safe.position.z - half,
             safe.position.x + half,
             safe.position.y + height - 0.01,
-            safe.position.z + half
+            safe.position.z + half,
         )
         for (x in floor(box.minX).toInt()..floor(box.maxX).toInt()) {
             for (z in floor(box.minZ).toInt()..floor(box.maxZ).toInt()) {

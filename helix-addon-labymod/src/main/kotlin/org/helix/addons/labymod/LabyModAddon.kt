@@ -1,10 +1,5 @@
 package org.helix.addons.labymod
 
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
-import java.util.concurrent.ScheduledExecutorService
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicLong
 import kotlinx.serialization.json.Json
 import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionInvocation
@@ -12,6 +7,11 @@ import org.helix.api.action.ActionResult
 import org.helix.api.action.ActionSource
 import org.helix.api.addon.PlayerListener
 import org.helix.api.player.OnlinePlayer
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * LabyMod integration addon — the node side of the network's LabyMod 4
@@ -366,6 +366,7 @@ class LabyModAddon : AddonBase() {
             val parts = argument.split("=", limit = 2)
             if (parts.size == 2) parts[0].lowercase() to parts[1] else null
         }.toMap()
+
         /** Parses a boolean override, or null to keep the current value. */
         fun flag(key: String, current: Boolean) = overrides[key]?.toBooleanStrictOrNull() ?: current
         val updated = config.copy(

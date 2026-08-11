@@ -10,7 +10,7 @@ data class VersionProfile(
     val baseGroundSpeed: Double,
     val baseAirSpeed: Double,
     val sprintMultiplier: Double,
-    val reach: Double
+    val reach: Double,
 )
 
 /**

@@ -1,11 +1,5 @@
 package org.helix.node.proxy
 
-import java.io.ByteArrayInputStream
-import java.nio.file.Files
-import kotlin.io.path.createTempDirectory
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import org.helix.api.bridge.HeartbeatReport
 import org.helix.api.environment.Environment
 import org.helix.api.execution.ExecutorType
@@ -16,6 +10,12 @@ import org.helix.node.services.FakeExecutor
 import org.helix.node.services.ServiceManager
 import org.helix.node.services.WorkspacePreparer
 import org.helix.node.tasks.TaskStore
+import java.io.ByteArrayInputStream
+import java.nio.file.Files
+import kotlin.io.path.createTempDirectory
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class ProxyRoutingServiceTest {
     private val paths = NodePaths(createTempDirectory("helix")).createAll()

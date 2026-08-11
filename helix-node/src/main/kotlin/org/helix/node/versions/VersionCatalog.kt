@@ -1,9 +1,9 @@
 package org.helix.node.versions
 
-import java.nio.file.Files
-import java.nio.file.Path
 import org.helix.api.environment.Environment
 import org.tomlj.Toml
+import java.nio.file.Files
+import java.nio.file.Path
 
 /**
  * Available platform versions loaded from `config/versions.toml`.

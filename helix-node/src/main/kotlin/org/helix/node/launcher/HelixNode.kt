@@ -1,38 +1,31 @@
 package org.helix.node.launcher
 
-import java.nio.file.Path
-import java.util.concurrent.Callable
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.system.exitProcess
+import kotlinx.serialization.json.Json
 import org.helix.api.action.ActionSource
 import org.helix.api.execution.ExecutorType
+import org.helix.api.message.GlobalPlaceholders
+import org.helix.api.platform.MetricSample
+import org.helix.api.proxy.JoinDecision
+import org.helix.api.service.ServiceState
 import org.helix.node.actions.ActionRegistry
 import org.helix.node.actions.BuiltinActions
 import org.helix.node.addons.AddonActions
-import org.helix.api.message.GlobalPlaceholders
+import org.helix.node.addons.AddonManager
 import org.helix.node.audit.AuditLog
 import org.helix.node.backup.BackupActions
 import org.helix.node.backup.BackupService
-import org.helix.node.files.FileManagerService
-import org.helix.node.control.auth.PanelAuthService
-import org.helix.node.addons.AddonManager
 import org.helix.node.cli.NodeCli
 import org.helix.node.config.NodeConfig
 import org.helix.node.config.NodeConfigLoader
 import org.helix.node.control.ControlDependencies
 import org.helix.node.control.ControlServer
+import org.helix.node.control.auth.PanelAuthService
 import org.helix.node.control.auth.ServiceTokenRegistry
 import org.helix.node.dashboard.DashboardPanelRegistry
 import org.helix.node.display.BridgeValueStore
 import org.helix.node.display.DisplayResolverRegistry
 import org.helix.node.events.EventLog
-import org.helix.node.logging.LogBuffer
-import kotlinx.serialization.json.Json
-import org.helix.node.languages.LanguageRegistry
-import org.helix.node.messages.MessageBundle
-import org.helix.node.messages.MessageRegistry
+import org.helix.node.files.FileManagerService
 import org.helix.node.gates.JoinGateRegistry
 import org.helix.node.gates.NativePermissionCache
 import org.helix.node.gates.NativePermissionProvider
@@ -42,27 +35,26 @@ import org.helix.node.gates.PlayerDataRegistry
 import org.helix.node.gates.ProfileInfoRegistry
 import org.helix.node.gates.ProfileSettingRegistry
 import org.helix.node.identity.IdentityRegistry
-import org.helix.node.privacy.AddressHashRegistry
-import org.helix.node.privacy.PlayerDataActions
-import org.helix.node.whitelist.WhitelistActions
-import org.helix.node.whitelist.WhitelistStore
-import org.helix.api.proxy.JoinDecision
+import org.helix.node.languages.LanguageRegistry
+import org.helix.node.logging.LogBuffer
+import org.helix.node.messages.MessageBundle
+import org.helix.node.messages.MessageRegistry
 import org.helix.node.notifications.NotificationBus
 import org.helix.node.packs.NetworkPackService
-import org.helix.api.platform.MetricSample
-import org.helix.api.service.ServiceState
 import org.helix.node.platform.ApiMetrics
 import org.helix.node.platform.HeartbeatWatchdog
 import org.helix.node.platform.MetricsHistory
 import org.helix.node.platform.NodeHealthService
 import org.helix.node.platform.PlatformOverviewService
-import org.helix.node.scheduler.JobScheduler
 import org.helix.node.players.PlayerRegistry
+import org.helix.node.privacy.AddressHashRegistry
+import org.helix.node.privacy.PlayerDataActions
 import org.helix.node.proxy.ProxyCommandQueue
 import org.helix.node.proxy.ProxyEventHub
 import org.helix.node.proxy.ProxyRoutingService
 import org.helix.node.resources.ClasspathInternalResources
 import org.helix.node.scaling.AutoScaler
+import org.helix.node.scheduler.JobScheduler
 import org.helix.node.services.AdoptedProcessHandle
 import org.helix.node.services.ForwardingSecret
 import org.helix.node.services.ManagedService
@@ -80,7 +72,15 @@ import org.helix.node.storage.StorageProvider
 import org.helix.node.tasks.TaskStore
 import org.helix.node.versions.ServerJarProvider
 import org.helix.node.versions.VersionCatalog
+import org.helix.node.whitelist.WhitelistActions
+import org.helix.node.whitelist.WhitelistStore
 import org.slf4j.LoggerFactory
+import java.nio.file.Path
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.system.exitProcess
 
 /**
  * Wires and runs the complete node: task store, service manager, control
@@ -271,8 +271,7 @@ class HelixNode(
                     "<hover:show_text:'<gray>Connect to <white>{server}'><aqua>{server}</aqua></hover></click>",
                 "command.sent" to "{prefix} <gray>Sent to <white>{server}<gray>.",
                 "command.unavailable" to "{prefix} <red>Command is currently unavailable.",
-                "command.result.done" to "{prefix} <green>Done.",
-                "command.result.failed" to "{prefix} <red>Failed.",
+                "command.error" to "{prefix} <red>That command could not be completed.",
                 "kick.default" to "{prefix} <red>You were kicked from the network.",
                 "join.denied" to "<red>You may not join this network.",
                 "motd.maintenance" to "<red>Maintenance",
@@ -293,8 +292,7 @@ class HelixNode(
                     "<hover:show_text:'<gray>Verbinde zu <white>{server}'><aqua>{server}</aqua></hover></click>",
                 "command.sent" to "{prefix} <gray>Weitergeleitet zu <white>{server}<gray>.",
                 "command.unavailable" to "{prefix} <red>Der Befehl ist gerade nicht verfügbar.",
-                "command.result.done" to "{prefix} <green>Erledigt.",
-                "command.result.failed" to "{prefix} <red>Fehlgeschlagen.",
+                "command.error" to "{prefix} <red>Der Befehl konnte nicht ausgeführt werden.",
                 "kick.default" to "{prefix} <red>Du wurdest vom Netzwerk geworfen.",
                 "join.denied" to "<red>Du darfst dieses Netzwerk nicht betreten.",
                 "motd.maintenance" to "<red>Wartungsarbeiten",
@@ -537,6 +535,7 @@ class HelixNode(
     private val jobSchedulerExecutor = Executors.newSingleThreadScheduledExecutor { runnable ->
         Thread(runnable, "helix-job-scheduler").apply { isDaemon = true }
     }
+
     /** Control API dependencies, kept as its own property so the launcher can
      *  reach [org.helix.node.control.auth.PanelAuthService] for the
      *  `session.revoke` admin action without exposing it via [ControlServer]. */
@@ -944,7 +943,8 @@ class HelixNode(
             }
             val workspace = Path.of(entry.workspace)
             val handle = when (entry.executor) {
-                ExecutorType.PROCESS -> entry.pid
+                ExecutorType.PROCESS ->
+                    entry.pid
                     ?.let { pid -> ProcessHandle.of(pid).orElse(null) }
                     ?.takeIf { ProcessIdentity.survived(it, entry.processStartInstantEpochMs) }
                     ?.let { AdoptedProcessHandle(it, workspace.resolve("service.log")) }

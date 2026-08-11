@@ -1,5 +1,8 @@
 package org.helix.node.audit
 
+import kotlinx.serialization.json.Json
+import org.helix.api.audit.AuditEntry
+import org.slf4j.LoggerFactory
 import java.io.RandomAccessFile
 import java.nio.file.Files
 import java.nio.file.Path
@@ -7,9 +10,6 @@ import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import kotlinx.serialization.json.Json
-import org.helix.api.audit.AuditEntry
-import org.slf4j.LoggerFactory
 
 /**
  * [AuditSink] appending to `audit.jsonl`, one JSON object per line.

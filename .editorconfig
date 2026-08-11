@@ -1,0 +1,37 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+[*.{kt,kts}]
+# Official Kotlin code style (https://kotlinlang.org/docs/coding-conventions.html).
+ktlint_code_style = ktlint_official
+ktlint_standard_filename = disabled
+# The aggressive line-wrapping rules of ktlint's house style are turned off:
+# the project's existing signature/argument/chain formatting is kept as the
+# authors wrote it. Only the unambiguous conventions below stay enforced.
+max_line_length = off
+ktlint_standard_function-signature = disabled
+ktlint_standard_class-signature = disabled
+ktlint_standard_parameter-list-wrapping = disabled
+ktlint_standard_argument-list-wrapping = disabled
+ktlint_standard_multiline-expression-wrapping = disabled
+ktlint_standard_binary-expression-wrapping = disabled
+ktlint_standard_chain-method-continuation = disabled
+ktlint_standard_condition-wrapping = disabled
+ktlint_standard_if-else-wrapping = disabled
+ktlint_standard_multiline-if-else = disabled
+ktlint_standard_if-else-bracing = disabled
+ktlint_standard_multiline-loop = disabled
+ktlint_standard_statement-wrapping = disabled
+ktlint_standard_property-wrapping = disabled
+ktlint_standard_string-template-indent = disabled
+ktlint_standard_function-expression-body = disabled
+ktlint_standard_function-literal = disabled
+ktlint_standard_annotation = disabled
+ktlint_standard_indent = disabled
