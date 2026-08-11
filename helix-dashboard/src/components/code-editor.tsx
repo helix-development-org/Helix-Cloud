@@ -75,10 +75,12 @@ interface CodeEditorProps {
   language?: Extension | null
   readOnly?: boolean
   className?: string
+  /** Focus the editor right after it mounts (e.g. when opened on demand). */
+  autoFocus?: boolean
 }
 
 /** A CodeMirror 6 editor with syntax highlighting, wired to a controlled value. */
-export function CodeEditor({ value, onChange, language, readOnly, className }: CodeEditorProps) {
+export function CodeEditor({ value, onChange, language, readOnly, className, autoFocus }: CodeEditorProps) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView | null>(null)
   const langCompartment = useRef(new Compartment())
@@ -102,6 +104,7 @@ export function CodeEditor({ value, onChange, language, readOnly, className }: C
     })
     const editor = new EditorView({ state, parent: host.current })
     view.current = editor
+    if (autoFocus) editor.focus()
     return () => { editor.destroy(); view.current = null }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

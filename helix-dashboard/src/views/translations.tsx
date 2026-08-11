@@ -153,6 +153,10 @@ function TranslationRow({ entry, language, onSave, onReset, onDelete }: {
   const initial = custom ?? fallback
   const deletable = !Object.keys(entry.defaults).length
   const [current, setCurrent] = useState(initial)
+  // Mounting a full CodeMirror editor per row is expensive; with hundreds of
+  // keys that froze the page. Keep rows lightweight and only spin up the real
+  // editor once a row is actually opened for editing.
+  const [editing, setEditing] = useState(false)
   return (
     <div className="grid gap-2 lg:grid-cols-[340px_1fr_auto] lg:items-start">
       <div className="pt-2">
@@ -165,7 +169,17 @@ function TranslationRow({ entry, language, onSave, onReset, onDelete }: {
         </div>
       </div>
       <div className="flex flex-col gap-2">
-        <CodeEditor language={MINIMESSAGE} value={current} onChange={setCurrent} />
+        {editing ? (
+          <CodeEditor language={MINIMESSAGE} value={current} onChange={setCurrent} autoFocus />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="min-h-[2.25rem] w-full whitespace-pre-wrap break-words rounded-md border border-input bg-transparent px-3 py-2 text-left font-mono text-xs leading-relaxed hover:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            {current || <span className="text-muted-foreground">Click to edit…</span>}
+          </button>
+        )}
         <MiniMessagePreview value={current} />
       </div>
       <div className="flex gap-2">

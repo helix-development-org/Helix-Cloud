@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.89.0 — 2026-08-11
+
+### Web-Panel: In-Game-getreue Vorschau & schnellere Übersetzungs-Seite
+
+- **In-Game-getreue MiniMessage-Vorschau**: Die Live-Vorschau rendert jetzt in
+  der echten **Minecraft-Schriftart** mit dem charakteristischen harten
+  Schlagschatten auf dem gekachelten, abgedunkelten **Dirt-Hintergrund** des
+  Menü-/Disconnect-Screens, damit eine Nachricht exakt so aussieht wie im
+  Client. `<bold>`/`<italic>` nutzen die passenden Font-Schnitte,
+  `<obfuscated>` animiert wie im Spiel (respektiert `prefers-reduced-motion`).
+- **Performance der Übersetzungs-Seite**: Zeilen mounten den vollen
+  CodeMirror-Editor jetzt erst beim Öffnen (Klick/Fokus) statt für alle
+  hunderten Keys gleichzeitig; die Seite lädt dadurch sofort statt sekundenlang
+  zu hängen. Die Live-Vorschau bleibt pro Zeile sichtbar.
+
 ## 0.87.0 — 2026-08-07
 
 ### Neu: Syntax-Highlighting im Web-Panel (Dateien & Übersetzungen)

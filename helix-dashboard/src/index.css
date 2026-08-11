@@ -213,3 +213,58 @@
     -webkit-font-smoothing: antialiased;
   }
 }
+
+/*
+ * Minecraft chat preview. Font faces and the hard offset drop shadow mirror the
+ * in-game text; the tiled, darkened dirt behind it is the classic Minecraft
+ * menu/disconnect-screen background, so a message previews the way it renders
+ * in-game. Font: "Minecraft" (freeware, Craftron Gaming).
+ */
+@font-face {
+  font-family: "Minecraft";
+  src: url("./assets/minecraft/1_Minecraft-Regular.woff") format("woff");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Minecraft";
+  src: url("./assets/minecraft/2_Minecraft-Italic.woff") format("woff");
+  font-weight: normal;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Minecraft";
+  src: url("./assets/minecraft/3_Minecraft-Bold.woff") format("woff");
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Minecraft";
+  src: url("./assets/minecraft/4_Minecraft-BoldItalic.woff") format("woff");
+  font-weight: bold;
+  font-style: italic;
+  font-display: swap;
+}
+
+.mc-preview {
+  /* 16px dirt tile scaled to chunky 32px blocks and repeated, like the
+     Minecraft menu background. Pixelated so the grain stays crisp. */
+  background-image: url("./assets/minecraft/dirt.png");
+  background-repeat: repeat;
+  background-size: 32px 32px;
+  image-rendering: pixelated;
+}
+.mc-preview-inner {
+  /* Subtle dark wash on top of the dirt for text contrast, as on the
+     disconnect screen. */
+  background-color: rgba(0, 0, 0, 0.35);
+  font-family: "Minecraft", ui-monospace, monospace;
+  font-size: 20px;
+  line-height: 1.45;
+  color: #ffffff;
+  /* Hard, un-blurred offset shadow — identical to adventure-webui. */
+  text-shadow: 2px 2px hsl(0, 0%, 24%);
+}
