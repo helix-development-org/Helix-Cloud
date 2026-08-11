@@ -335,6 +335,23 @@ Referenz-Implementierungen in diesem Repo:
   da neuere Clients sonst ihr eingebautes Item-Modell statt des
   Overrides-Arrays verwenden und der Carrier als schlichtes Papier
   rendert).
+- `helix-addon-lobby` (+ `helix-addon-lobby-paper`) — macht ausgewählte
+  Tasks zu Lobbys. Welche Tasks Lobbys sind, wählt man im Dashboard-Panel
+  **Lobby**; die Paper-Komponente aktiviert sich nur, wenn ihr `HELIX_TASK`
+  in der Liste steht (sonst No-op). Pro Task (oder als `*`-Default) ein
+  konfigurierbares Hotbar-Layout: jedes Item hat Slot/Material/MiniMessage-
+  Name-Lore/Glow/Permission und eine Aktion — entweder ein Command
+  (`RUN_COMMAND`, als klickender Spieler ausgeführt, z. B. `profilemenu`,
+  `translationsmenu`) oder das eingebaute **Server-Menü**
+  (`OPEN_SERVER_MENU`). Das Server-Menü ist ein IGui-Chest über das geteilte
+  `Helix-GUIs`, listet die live joinbaren Backends (Node-Action
+  `lobby.servers`) nach Task gruppiert und verbindet per BungeeCord-Connect-
+  Kanal des Proxys. Dazu toggelbarer Lobby-Schutz (Adventure, Build-Lock,
+  Item-Lock, kein Schaden/Hunger, Void→Spawn); `helix.lobby.bypass`
+  nimmt Operatoren aus. Die Config liegt im Node-Storage und wird als
+  `lobby.config`-Bridge-Value verteilt, das die Paper-Seite pollt — so
+  greifen Dashboard-Änderungen ohne Neustart. Referenz für ein per-Task
+  aktives Paper-Addon mit geteiltem GUI und Bridge-Value-Config.
 
 ## Lifecycle
 

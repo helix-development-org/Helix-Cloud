@@ -1,0 +1,7 @@
+{
+  "message.no-servers": "<red>Momentan sind keine Server verfügbar.",
+  "message.connecting": "<gray>Verbinde zu <yellow>{server}</yellow>…",
+  "message.menu-starting": "<gray>Die Lobby startet noch — versuch es gleich nochmal.",
+  "menu.entry.players": "<gray>Spieler: <white>{players}/{max}",
+  "menu.entry.connect": "<green>Zum Verbinden klicken"
+}

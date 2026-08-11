@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.90.0 — 2026-08-12
+
+### Neu: Lobby-Addon (`helix.lobby` + `helix-addon-lobby-paper`)
+
+- **Lobby-Instanzen frei kennzeichnen**: Im neuen Dashboard-Panel **Lobby**
+  wählt man per Checkbox aus allen Tasks, welche als **Lobby** gelten. Nur auf
+  deren Backends wird das Addon aktiv (erkannt über `HELIX_TASK`) — überall
+  sonst ist es ein No-op, selbst wenn installiert. Kein Code-Flag, keine
+  Kopplung an den Proxy-Fallback.
+- **Item-gesteuerte Hotbar**: Pro Lobby-Task (oder als `*`-Default für alle) ein
+  konfigurierbares Hotbar-Layout. Jedes Item hat **Slot, Material, MiniMessage-
+  Name/Lore, Glow, optionale Permission** und eine **Aktion**: entweder einen
+  **Command** (`RUN_COMMAND`, als klickender Spieler ausgeführt — z. B.
+  `profilemenu`, `translationsmenu`) oder das **eingebaute Server-Menü**
+  (`OPEN_SERVER_MENU`). Items tragen einen PersistentData-Marker, damit ein
+  Klick unabhängig vom Slot seiner Aktion zugeordnet wird.
+- **Eingebautes Server-Menü**: Ein IGui-Chest-Menü (über das geteilte
+  `Helix-GUIs`) listet die **live** joinbaren Backends, nach Task gruppiert mit
+  Spielerzahlen; ein Klick verbindet über den **BungeeCord-Connect-Kanal** des
+  Proxys zum am wenigsten ausgelasteten Service. Titel, Zeilen, Material und ob
+  Lobby-Tasks ausgeblendet werden, sind einstellbar. Datenquelle ist die
+  bridge-invocable Node-Action `lobby.servers`.
+- **Toggelbarer Lobby-Schutz**: Adventure-Mode, Inventar-Clear beim Join,
+  kein Block-Abbau/-Platzieren, kein Item-Drop, Inventar-Lock, kein Schaden,
+  kein Hunger und **Void→Spawn-Teleport** (mit einstellbarer Y-Schwelle) —
+  jede Regel einzeln schaltbar. Spieler mit `helix.lobby.bypass` sind
+  ausgenommen (Bauen/Verwalten der Lobby).
+- **Umsetzung**: Node-Addon hält die Config in Storage und published sie als
+  `lobby.config`-Bridge-Value; die Paper-Komponente pollt sie und wendet
+  Layout/Schutz live an, sodass Dashboard-Änderungen netzwerkweit ohne Neustart
+  greifen. Texte laufen über `helix.lobby`-Übersetzungen (panel- und
+  in-game-editierbar).
+
 ## 0.89.0 — 2026-08-11
 
 ### Neu: In-Game-Übersetzungs-Editor (`/translationsmenu`)
