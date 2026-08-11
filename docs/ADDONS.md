@@ -166,6 +166,11 @@ action("bans", "Manage bans.", "bans <set|pardon|list> …",
 
 - `/helix <addons|enable|disable|reload> [id]` (Permission `helix.admin`) —
   Addons anzeigen, aktivieren, deaktivieren, neue `.hxa` live nachladen.
+- `/translationsmenu` (Alias `/tmenu`, Permission `helix.admin`) — aus dem
+  Translations-Addon: In-Game-GUI, das alle `helix.translations.*` Nachrichten
+  nach Addon gruppiert durchblättert und auf einem Dirt-Hintergrund mit
+  Live-MiniMessage-Vorschau bearbeitet (Amboss/Chat-Eingabe). Schreibt über die
+  node-seitigen, `helix.admin`-geprüften `helix.translations.*`-Actions.
 - `/bans …` (Permission `helix.bans`) — aus dem Bans-Addon.
 - `/permissions …` (Permission `helix.permissions`) — aus dem Permissions-Addon.
 

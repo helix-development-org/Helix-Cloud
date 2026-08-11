@@ -296,9 +296,11 @@ internal class GuiRuntime(
      */
     @EventHandler
     fun onPrepareAnvil(event: PrepareAnvilEvent) {
-        if (event.view.topInventory !in inputsByInventory) return
+        val input = inputsByInventory[event.view.topInventory] ?: return
+        val typed = event.view.renameText.orEmpty()
+        val preview = (input.request as? GuiInputRequest.Anvil)?.preview
         val result = ItemStack.of(Material.PAPER)
-        result.editMeta { meta -> meta.itemName(Component.text(event.view.renameText.orEmpty())) }
+        result.editMeta { meta -> meta.itemName(preview?.invoke(typed) ?: Component.text(typed)) }
         event.result = result
         event.view.repairCost = 0
     }

@@ -45,5 +45,7 @@ include(
     "helix-addon-cosmetics",
     "helix-addon-cosmetics-paper",
     "helix-addon-guis",
-    "helix-addon-guis-paper"
+    "helix-addon-guis-paper",
+    "helix-addon-translations",
+    "helix-addon-translations-paper"
 )

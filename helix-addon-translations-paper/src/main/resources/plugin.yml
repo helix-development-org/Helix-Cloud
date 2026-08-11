@@ -1,0 +1,14 @@
+name: Helix-Translations
+version: 1.0.0
+main: org.helix.addons.translations.paper.TranslationsPlugin
+api-version: '1.21'
+authors: [Tytoss]
+description: In-game translations editor GUI with a dirt-textured live MiniMessage preview.
+depend: [Helix-GUIs]
+commands:
+  translationsmenu:
+    description: Browse and edit every network translation in-game.
+    usage: /translationsmenu
+    aliases: [tmenu]
+    permission: helix.admin
+    permission-message: You do not have permission to edit translations.

@@ -6,8 +6,20 @@ internal sealed interface GuiInputRequest {
     /** A [de.tytoss.igui.gui.GuiClickContext.chatInput] request. */
     data class Chat(val prompt: Component?) : GuiInputRequest
 
-    /** A [de.tytoss.igui.gui.GuiClickContext.anvilInput] request. */
-    data class Anvil(val initialValue: String, val title: Component) : GuiInputRequest
+    /**
+     * A [de.tytoss.igui.gui.GuiClickContext.anvilInput] request.
+     *
+     * @property preview optional per-keystroke renderer for the anvil result
+     *  item's name: called with the current rename text on every
+     *  `PrepareAnvilEvent`, so the player sees a live, formatted preview of
+     *  what they are typing (e.g. rendered MiniMessage). `null` shows the raw
+     *  typed text.
+     */
+    data class Anvil(
+        val initialValue: String,
+        val title: Component,
+        val preview: ((String) -> Component)? = null,
+    ) : GuiInputRequest
 
     /** A [de.tytoss.igui.gui.GuiClickContext.signInput] request. */
     data class Sign(val lines: List<Component>) : GuiInputRequest

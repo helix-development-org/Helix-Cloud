@@ -2,6 +2,31 @@
 
 ## 0.89.0 — 2026-08-11
 
+### Neu: In-Game-Übersetzungs-Editor (`/translationsmenu`)
+
+- **Neues Addon `helix.translations`**: `/translationsmenu` (Alias `/tmenu`,
+  Admin-only `helix.admin`) öffnet ein IGui, das **alle** `helix.translations.*`
+  Nachrichten **nach Addon gruppiert** durchblättert (plus globale
+  **Amboss-Suche** über Keys und Texte). Klick auf eine Übersetzung öffnet einen
+  **Editor auf gekacheltem, abgedunkeltem Dirt-Hintergrund** (Menü-/Disconnect-
+  Look) mit einer **live gerenderten MiniMessage-Vorschau** — Farben, Hex,
+  `<gradient>`/`<rainbow>` sowie `<bold>`/`<italic>`/`<obfuscated>` werden
+  pixelgenau dargestellt.
+- **Eingabe**: kurze Werte im **Amboss mit Live-Vorschau pro Tastenanschlag**
+  (der Result-Item-Name rendert die getippte MiniMessage), längere Werte
+  (> 48 Zeichen, jenseits des Amboss-Limits) per **Chat-Eingabe**. Änderungen
+  greifen erst nach einer **„Speichern"-Bestätigung** netzwerkweit; `Reset` und
+  das `Delete` eigener Keys verlangen ebenfalls eine Bestätigung.
+- **Voller Umfang**: Werte bearbeiten, Sprache umschalten, Sprachen
+  hinzufügen/entfernen, Default-Sprache setzen, custom-Keys löschen — analog zum
+  Web-Panel, aber in-game.
+- **Umsetzung**: node-seitige, `helix.admin`-geprüfte, bridge-invocable
+  `helix.translations.*`-Actions (Wrapper um `MessageRegistry`/`LanguageRegistry`
+  mit derselben Propagierung wie die Panel-Routen); der Dirt-Hintergrund und die
+  Preview-Fonts kommen über eine `pack.zip` ins Netzwerk-Resource-Pack. IGui
+  bekam dafür `DisplayBuilder.styledText` (bold-/kursiv-genaue Breiten) und einen
+  optionalen Live-Preview-Hook am Amboss.
+
 ### Web-Panel: In-Game-getreue Vorschau & schnellere Übersetzungs-Seite
 
 - **In-Game-getreue MiniMessage-Vorschau**: Die Live-Vorschau rendert jetzt in

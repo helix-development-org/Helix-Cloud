@@ -9,6 +9,7 @@ import org.helix.api.proxy.JoinDecision
 import org.helix.api.service.ServiceState
 import org.helix.node.actions.ActionRegistry
 import org.helix.node.actions.BuiltinActions
+import org.helix.node.actions.TranslationActions
 import org.helix.node.addons.AddonActions
 import org.helix.node.addons.AddonManager
 import org.helix.node.audit.AuditLog
@@ -664,6 +665,16 @@ class HelixNode(
             restartBackend = ::restartBackend,
             restartLauncher = ::restartLauncher,
             networkPackUrl = ::setNetworkPackUrl,
+        ).registerAll(registry)
+        TranslationActions(
+            messages = messages,
+            languages = languages,
+            adminCheck = { player ->
+                permissionService.check(
+                    org.helix.api.proxy.PermissionCheckRequest(name = player, permission = "helix.admin"),
+                )
+            },
+            onMessagesChanged = { owner -> controlDependencies.onMessagesChanged(owner) },
         ).registerAll(registry)
         addonActions.registerAll(registry)
         BackupActions(backups).registerAll(registry)
