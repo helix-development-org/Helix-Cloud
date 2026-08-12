@@ -24,9 +24,8 @@ enum class AppKind {
  * @property command the command for a command app.
  * @property screen the native screen id for a native app.
  * @property order sort order.
- * @property iconFont the icon glyph's base font (e.g. `helix_phone:icons`);
- *   the row suffix (`_row<n>`) is appended per home-screen row.
- * @property iconChar the icon glyph as a one-character string.
+ * @property iconModel the `CustomModelData` to put on the carrier item so it
+ *   renders this app's icon.
  */
 @Serializable
 data class AppView(
@@ -36,8 +35,7 @@ data class AppView(
     val command: String = "",
     val screen: String = "",
     val order: Int = 0,
-    val iconFont: String = "",
-    val iconChar: String = "",
+    val iconModel: Int = 0,
 )
 
 /**

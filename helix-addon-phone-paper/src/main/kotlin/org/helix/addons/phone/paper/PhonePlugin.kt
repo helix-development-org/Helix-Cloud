@@ -150,8 +150,9 @@ class PhonePlugin : JavaPlugin(), Listener {
             cancelAllInteractions = true
             onOpen { player -> takeover.begin(player) }
             prepare { player -> apps[player.uniqueId] = loadApps(player) }
-            title { ctx -> renderHome(ctx.player) }
+            title { _ -> renderCase() }
             for (index in 0 until PhoneLayout.CAPACITY) {
+                item(PhoneLayout.slotForIndex(index)) { ctx -> apps[ctx.player.uniqueId]?.getOrNull(index)?.let(::appItem) }
                 onClick(PhoneLayout.slotForIndex(index)) { ctx -> tapApp(ctx, index) }
             }
             onClick(PhoneLayout.CLOSE_SLOT) { ctx -> ctx.close() }
@@ -160,7 +161,7 @@ class PhonePlugin : JavaPlugin(), Listener {
         page("navigator") {
             cancelAllInteractions = true
             prepare { player -> servers[player.uniqueId] = loadServers() }
-            title { ctx -> renderNavigator(ctx.player) }
+            title { _ -> renderCase() }
             for (index in 0 until PhoneLayout.CAPACITY) {
                 item(PhoneLayout.slotForIndex(index)) { ctx ->
                     servers[ctx.player.uniqueId]?.getOrNull(index)?.let(::serverItem)
@@ -173,23 +174,21 @@ class PhonePlugin : JavaPlugin(), Listener {
         }
     }
 
-    private fun DisplayBuilder.renderHome(player: Player) {
+    /** Draws the phone case background glyph that overlays the whole inventory. */
+    private fun DisplayBuilder.renderCase() {
         moveTo(0)
         text(PhoneLayout.CASE_CHAR, 0, NamedTextColor.WHITE, PhoneLayout.CASE_FONT)
         toStart()
-        val visible = apps[player.uniqueId] ?: return
-        visible.take(PhoneLayout.CAPACITY).forEachIndexed { index, app ->
-            if (app.iconChar.isEmpty()) return@forEachIndexed
-            moveTo(PhoneLayout.iconX(index))
-            text(app.iconChar, 0, NamedTextColor.WHITE, PhoneLayout.iconFont(app.iconFont, index))
-            toStart()
-        }
     }
 
-    private fun DisplayBuilder.renderNavigator(@Suppress("UNUSED_PARAMETER") player: Player) {
-        moveTo(0)
-        text(PhoneLayout.CASE_CHAR, 0, NamedTextColor.WHITE, PhoneLayout.CASE_FONT)
-        toStart()
+    /** The clickable tile for an app: the carrier item wearing the app's icon model. */
+    private fun appItem(app: AppView): ItemStack = ItemStack(PhoneLayout.CARRIER).apply {
+        editMeta { meta ->
+            meta.setCustomModelData(app.iconModel)
+            if (app.name.isNotBlank()) {
+                meta.displayName(mini.deserialize(app.name).decoration(TextDecoration.ITALIC, false))
+            }
+        }
     }
 
     private suspend fun loadApps(player: Player): List<AppView> =

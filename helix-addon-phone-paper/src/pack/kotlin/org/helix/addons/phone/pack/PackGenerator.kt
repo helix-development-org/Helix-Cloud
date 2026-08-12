@@ -14,9 +14,11 @@ import java.util.zip.ZipOutputStream
 
 /**
  * Draws the Helix-Phone resource pack deterministically: the 176×222 phone
- * case glyph, the built-in 16×16 app icons and the per-row bitmap fonts that
- * place an icon in each home-screen slot row. The uploaded-icon fonts are
- * generated at runtime by the node; this covers only the shipped defaults.
+ * case glyph (background) and the built-in app icons as `CustomModelData`
+ * item models on the carrier item — so a tile is a real, click-aligned
+ * inventory item (the same technique as the cosmetics addon). Uploaded-icon
+ * models are added at runtime by the node, which regenerates the carrier
+ * model files to include both.
  *
  * The single argument is the output `pack.zip` path.
  */
@@ -31,27 +33,21 @@ fun main(args: Array<String>) {
 
     // Phone case: one 176x222 glyph that overlays the whole inventory.
     entries["assets/helix_phone/textures/font/case.png"] = png(WIDTH, HEIGHT, ::drawCase)
+    val caseChar = String(Character.toChars(0xE000))
     entries["assets/helix_phone/font/gui.json"] =
-        """{"providers":[{"type":"bitmap","file":"helix_phone:font/case.png","ascent":13,"height":222,"chars":[""]}]}"""
+        """{"providers":[{"type":"bitmap","file":"helix_phone:font/case.png","ascent":13,"height":222,"chars":["$caseChar"]}]}"""
             .encodeToByteArray()
 
-    // Built-in icons and their per-row fonts.
+    // Built-in app icons as CustomModelData models on the carrier item.
     ICONS.forEach { (name, draw) ->
-        entries["assets/helix_phone/textures/font/icon_$name.png"] = png(ICON, ICON, draw)
+        entries["assets/helix_phone/textures/item/icon_$name.png"] = png(ICON, ICON, draw)
+        entries["assets/helix_phone/models/item/icon_$name.json"] =
+            """{"parent":"minecraft:item/generated","textures":{"layer0":"helix_phone:item/icon_$name"}}"""
+                .encodeToByteArray()
     }
-    ROW_TOP_Y.indices.forEach { row ->
-        val ascent = TITLE_ASCENT - ROW_TOP_Y[row]
-        val providers = ICONS.entries.joinToString(",") { (name, _) ->
-            val codepoint = 0xE000 + ICON_ORDER.indexOf(name)
-            """{"type":"bitmap","file":"helix_phone:font/icon_$name.png","ascent":$ascent,"height":$ICON,""" +
-                """"chars":["${String(Character.toChars(codepoint))}"]}"""
-        }
-        entries["assets/helix_phone/font/icons_row$row.json"] = """{"providers":[$providers]}""".encodeToByteArray()
-    }
-
-    // Hide the vanilla "Inventory" label behind the drawn case.
-    entries["assets/minecraft/lang/en_us.json"] = """{"container.inventory":""}""".encodeToByteArray()
-    entries["assets/minecraft/lang/de_de.json"] = """{"container.inventory":""}""".encodeToByteArray()
+    val all = ICON_ORDER.mapIndexed { index, name -> (index + 1) to "icon_$name" }
+    entries["assets/minecraft/models/item/$CARRIER.json"] = carrierOverrides(all).encodeToByteArray()
+    entries["assets/minecraft/items/$CARRIER.json"] = carrierItemModel(all).encodeToByteArray()
 
     ZipOutputStream(Files.newOutputStream(output)).use { zip ->
         entries.forEach { (name, bytes) ->
@@ -62,6 +58,21 @@ fun main(args: Array<String>) {
             zip.closeEntry()
         }
     }
+}
+
+private fun carrierOverrides(all: List<Pair<Int, String>>): String {
+    val overrides = all.joinToString(",") { (cmd, model) ->
+        """{"predicate":{"custom_model_data":$cmd},"model":"helix_phone:item/$model"}"""
+    }
+    return """{"parent":"minecraft:item/generated","textures":{"layer0":"minecraft:item/$CARRIER"},"overrides":[$overrides]}"""
+}
+
+private fun carrierItemModel(all: List<Pair<Int, String>>): String {
+    val entries = all.joinToString(",") { (cmd, model) ->
+        """{"threshold":$cmd,"model":{"type":"minecraft:model","model":"helix_phone:item/$model"}}"""
+    }
+    return """{"model":{"type":"minecraft:range_dispatch","property":"minecraft:custom_model_data","index":0,""" +
+        """"fallback":{"type":"minecraft:model","model":"minecraft:item/$CARRIER"},"entries":[$entries]}}"""
 }
 
 /** Renders a transparent ARGB image and returns its PNG bytes. */
@@ -77,18 +88,14 @@ private fun png(width: Int, height: Int, draw: (Graphics2D) -> Unit): ByteArray 
 }
 
 private fun drawCase(g: Graphics2D) {
-    // Body.
     g.color = Color(0x14, 0x15, 0x1B)
     g.fillRoundRect(0, 0, WIDTH, HEIGHT, 24, 24)
-    // Screen inset.
     g.color = Color(0x1E, 0x1F, 0x26)
     g.fillRoundRect(6, 16, WIDTH - 12, HEIGHT - 48, 16, 16)
-    // Status bar with a notch.
     g.color = Color(0x2B, 0x2D, 0x36)
     g.fillRoundRect(6, 4, WIDTH - 12, 12, 8, 8)
     g.color = Color(0x14, 0x15, 0x1B)
     g.fillRoundRect(WIDTH / 2 - 18, 4, 36, 7, 6, 6)
-    // Home indicator.
     g.color = Color(0x3A, 0x3D, 0x4A)
     g.fillRoundRect(WIDTH / 2 - 28, HEIGHT - 26, 56, 5, 4, 4)
 }
@@ -155,7 +162,7 @@ private fun drawNetwork(g: Graphics2D) {
     g.drawLine(3, 12, 13, 12)
 }
 
-/** Icon draw order — the index is the icon's codepoint offset from U+E000. */
+/** Icon draw order — the index+1 is the icon's CustomModelData value. */
 private val ICON_ORDER = listOf("default", "messages", "navigator", "profile", "settings", "guard", "network")
 
 /** Icon name to its draw function. */
@@ -169,11 +176,8 @@ private val ICONS: Map<String, (Graphics2D) -> Unit> = linkedMapOf(
     "network" to ::drawNetwork,
 )
 
-/** Pixel Y (from the GUI top) of each app-grid row, aligned to chest rows 1..4. */
-private val ROW_TOP_Y = listOf(36, 54, 72, 90)
-
-/** Title-glyph ascent for the GUI top. */
-private const val TITLE_ASCENT = 13
+/** The carrier item whose model each icon overrides (must match PhoneIcons.CARRIER_MODEL). */
+private const val CARRIER = "heart_of_the_sea"
 
 /** Phone case width. */
 private const val WIDTH = 176

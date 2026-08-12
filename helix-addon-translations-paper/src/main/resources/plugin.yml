@@ -4,7 +4,7 @@ main: org.helix.addons.translations.paper.TranslationsPlugin
 api-version: '1.21'
 authors: [Tytoss]
 description: In-game translations editor GUI with a dirt-textured live MiniMessage preview.
-depend: [Helix-GUIs]
+depend: [Helix-GUIs, packetevents]
 commands:
   translationsmenu:
     description: Browse and edit every network translation in-game.

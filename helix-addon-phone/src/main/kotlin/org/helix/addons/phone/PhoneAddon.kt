@@ -148,14 +148,18 @@ class PhoneAddon : AddonBase() {
      */
     private fun appsFor(player: String): ActionResult {
         val visibleEpoch = playerEpoch[player] ?: epoch
+        val activeAddons = context.installedAddons()
+            .filter { it.state == org.helix.api.addon.AddonState.ENABLED }
+            .map { it.manifest.id }
+            .toSet()
         val views = config.apps
             .filter { it.enabled && it.sinceEpoch <= visibleEpoch }
+            .filter { it.requiresAddon.isBlank() || it.requiresAddon in activeAddons }
             .filter { !it.adminOnly || context.hasPermission(player, ADMIN_PERMISSION) }
             .filter { it.permission.isBlank() || context.hasPermission(player, it.permission) }
             .sortedBy { it.order }
             .map { app ->
-                val (font, char) = icons.resolve(app.icon)
-                AppView(app.id, app.name, app.kind, app.command, app.screen, app.order, font, char)
+                AppView(app.id, app.name, app.kind, app.command, app.screen, app.order, icons.resolve(app.icon))
             }
         return ActionResult.ok(compact.encodeToString(ListSerializer(AppView.serializer()), views))
     }

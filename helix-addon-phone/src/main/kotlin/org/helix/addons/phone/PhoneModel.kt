@@ -20,13 +20,13 @@ data class PhoneConfig(
          * [PhoneApp.adminOnly] so normal players never see them.
          */
         val DEFAULT_APPS: List<PhoneApp> = listOf(
-            PhoneApp("messages", "<white>Messages", AppKind.NATIVE, screen = "messages", icon = "builtin:messages", order = 0),
+            PhoneApp("messages", "<white>Messages", AppKind.NATIVE, screen = "messages", icon = "builtin:messages", order = 0, requiresAddon = "helix.bettermsgs"),
             PhoneApp("navigator", "<white>Navigator", AppKind.NATIVE, screen = "navigator", icon = "builtin:navigator", order = 1),
-            PhoneApp("profile", "<white>Profile", AppKind.COMMAND, command = "profilemenu", icon = "builtin:profile", order = 2),
+            PhoneApp("profile", "<white>Profile", AppKind.COMMAND, command = "profilemenu", icon = "builtin:profile", order = 2, requiresAddon = "helix.profile"),
             PhoneApp("settings", "<white>Settings", AppKind.NATIVE, screen = "settings", icon = "builtin:settings", order = 3),
             PhoneApp(
                 "guard", "<red>iGuard", AppKind.COMMAND, command = "iguard panel",
-                permission = "iguard.panel", adminOnly = true, icon = "builtin:guard", order = 4,
+                permission = "iguard.panel", adminOnly = true, icon = "builtin:guard", order = 4, requiresAddon = "helix.guard",
             ),
             PhoneApp(
                 "network", "<red>Network", AppKind.NATIVE, screen = "network",
@@ -53,6 +53,8 @@ data class PhoneConfig(
  *   `custom:<iconId>` for an uploaded one.
  * @property order sort order on the home screen.
  * @property enabled whether the app is shown at all.
+ * @property requiresAddon an addon id that must be installed and enabled for
+ *   the app to appear; empty means always available (native phone screens).
  * @property sinceEpoch the phone epoch at which this app was added; a player
  *   only sees it once they joined at or after this epoch (node-managed).
  */
@@ -68,6 +70,7 @@ data class PhoneApp(
     val icon: String = "builtin:default",
     val order: Int = 0,
     val enabled: Boolean = true,
+    val requiresAddon: String = "",
     val sinceEpoch: Int = 0,
 )
 
@@ -94,10 +97,8 @@ enum class AppKind {
  * @property command the command for a command app.
  * @property screen the native screen id for a native app.
  * @property order sort order.
- * @property iconFont the icon glyph's base font, for example
- *   `helix_phone:icons` or `helix_phone:uploads`; the paper side appends the
- *   grid row (`_row<n>`).
- * @property iconChar the icon glyph codepoint as a one-character string.
+ * @property iconModel the `CustomModelData` to put on the carrier item so it
+ *   renders this app's icon.
  */
 @Serializable
 data class AppView(
@@ -107,8 +108,7 @@ data class AppView(
     val command: String,
     val screen: String,
     val order: Int,
-    val iconFont: String,
-    val iconChar: String,
+    val iconModel: Int,
 )
 
 /**

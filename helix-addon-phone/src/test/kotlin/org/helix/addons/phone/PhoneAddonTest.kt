@@ -30,21 +30,34 @@ class PhoneAddonTest {
     }
 
     @Test
-    fun `apps carry the resolved built-in icon glyph`() {
+    fun `apps carry the resolved built-in icon model`() {
         join("Steve")
-        val messages = appsFor("Steve").first { it.id == "messages" }
-        assertEquals(PhoneIcons.BUILTIN_FONT, messages.iconFont)
-        assertEquals(String(Character.toChars(0xE001)), messages.iconChar)
+        val messages = appsFor("Steve").firstOrNull { it.id == "messages" }
+        // messages requires helix.bettermsgs, which the test context has no addon for →
+        // it is filtered out; navigator is native (no requirement) and always present.
+        assertEquals(null, messages)
+        val navigator = appsFor("Steve").first { it.id == "navigator" }
+        assertEquals(PhoneIcons.BUILTIN_CMD.getValue("navigator"), navigator.iconModel)
     }
 
     @Test
     fun `admin apps are hidden without the admin permission`() {
         join("Steve")
-        assertFalse(appsFor("Steve").any { it.id == "guard" })
+        // network is admin-only and native (no addon requirement)
+        assertFalse(appsFor("Steve").any { it.id == "network" })
 
-        context.permissionCheck = { _, permission -> permission == "helix.phone.admin" || permission == "iguard.panel" }
+        context.permissionCheck = { _, permission -> permission == "helix.phone.admin" }
         join("Admin")
-        assertTrue(appsFor("Admin").any { it.id == "guard" })
+        assertTrue(appsFor("Admin").any { it.id == "network" })
+    }
+
+    @Test
+    fun `apps whose required addon is absent are hidden`() {
+        join("Steve")
+        // messages/profile/guard require addons the test context has none of
+        val visible = appsFor("Steve").map { it.id }
+        assertFalse(visible.contains("messages"))
+        assertFalse(visible.contains("profile"))
     }
 
     @Test

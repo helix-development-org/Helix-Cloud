@@ -1,13 +1,14 @@
 package org.helix.addons.translations.paper
 
+import com.github.retrooper.packetevents.PacketEvents
+import com.github.retrooper.packetevents.protocol.player.InteractionHand
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerOpenBook
 import de.tytoss.igui.IGui
-import de.tytoss.igui.awaitSharedIGui
+import de.tytoss.igui.display.DisplayBuilder
+import de.tytoss.igui.gui.GuiClickContext
 import de.tytoss.igui.gui.GuiDefinition
 import de.tytoss.igui.gui.GuiInputCancelledException
 import de.tytoss.igui.gui.GuiInputTimeoutException
-import de.tytoss.igui.pagination.paginate
-import de.tytoss.igui.slot.chestSlot
-import de.tytoss.igui.slot.rectTo
 import de.tytoss.igui.texture.GuiTextureDefinition
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -27,61 +28,70 @@ import org.bukkit.Material
 import org.bukkit.command.Command
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
+import org.bukkit.event.EventHandler
+import org.bukkit.event.Listener
+import org.bukkit.event.player.PlayerEditBookEvent
+import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.inventory.ItemStack
-import org.bukkit.plugin.java.JavaPlugin
+import org.bukkit.inventory.meta.BookMeta
 
-/** Per-viewer editor state: cached view, active language, list filters and edit buffer. */
+/** Per-viewer state for the chest translations editor. */
 private class Session {
     @Volatile var view: TranslationsView = TranslationsView()
 
     @Volatile var language: String = "en"
 
-    /** Selected owner group in the list, or `null` while browsing groups/search. */
+    /** Owner group filter (null = all owners). */
     @Volatile var owner: String? = null
 
-    /** Active search query; blank means browse by [owner]. */
+    /** Search query (blank = none). */
     @Volatile var query: String = ""
 
-    /** Key currently open in the editor. */
-    @Volatile var editingKey: String? = null
+    /** Grid shows owner groups instead of keys. */
+    @Volatile var showGroups: Boolean = true
 
-    /** Unsaved, edited value awaiting the "save" confirmation; `null` means none. */
+    /** Key selected for preview/editing (null = none). */
+    @Volatile var selectedKey: String? = null
+
+    /** Current grid page. */
+    @Volatile var page: Int = 0
+
+    /** Edited-but-unsaved value from the book editor (null = none). */
     @Volatile var pending: String? = null
 
-    /** Whether the next delete click confirms an armed deletion. */
+    /** Whether the next delete click confirms. */
     @Volatile var confirmDelete: Boolean = false
 }
 
-/** One owner group in the list GUI. */
+/** One owner group in the browse grid. */
 private data class Group(val owner: String, val count: Int, val edited: Int)
 
 /**
- * Translations editor Paper component: `/translationsmenu` opens an in-game
- * GUI that browses every `helix.translations.*` message grouped by addon and
- * edits it on a dirt-textured live MiniMessage preview, rendered with IGui
- * font glyphs. Reads and writes travel to the Helix node's admin-gated
- * `helix.translations.*` actions, so edits apply network-wide.
+ * Translations editor Paper component: `/translationsmenu` opens a 6-row chest
+ * with a full-window custom background (IGuard/BetterMSGs style). Chest rows
+ * 0-1 are an embedded MiniMessage preview panel, rows 2-4 the key list, row 5
+ * the action buttons. Values are edited in a writable book (multiline, long);
+ * search runs through a virtual anvil. Reads and writes travel to the node's
+ * admin-gated `helix.translations.*` actions.
  */
-class TranslationsPlugin : JavaPlugin() {
+class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
     private val sessions = ConcurrentHashMap<UUID, Session>()
+    private val bookEditing = ConcurrentHashMap.newKeySet<UUID>()
+    private val bookReturn = ConcurrentHashMap<UUID, ItemStack>()
     private var igui: IGui? = null
-    private var listGui: GuiDefinition? = null
-    private var editorGui: GuiDefinition? = null
+    private var gui: GuiDefinition? = null
     private var client: NodeClient? = null
     private lateinit var scope: CoroutineScope
 
-    /** Dispatcher running coroutines on the Bukkit main thread. */
     private val mainDispatcher = object : CoroutineDispatcher() {
         override fun isDispatchNeeded(context: CoroutineContext): Boolean = !Bukkit.isPrimaryThread()
 
         override fun dispatch(context: CoroutineContext, block: Runnable) {
-            if (isEnabled) {
-                server.scheduler.runTask(this@TranslationsPlugin, block)
-            }
+            if (isEnabled) server.scheduler.runTask(this@TranslationsPlugin, block)
         }
     }
 
-    /** Boots the node client, installs the dirt texture and builds both GUIs. */
+    /** Boots the node client, installs the background texture and builds the chest GUI. */
     override fun onEnable() {
         val nodeClient = NodeClient.fromEnvironment()
         if (nodeClient == null) {
@@ -91,26 +101,50 @@ class TranslationsPlugin : JavaPlugin() {
         }
         client = nodeClient
         scope = CoroutineScope(SupervisorJob() + mainDispatcher)
+        server.pluginManager.registerEvents(this, this)
         scope.launch {
-            val installed = awaitSharedIGui()
+            val installed = de.tytoss.igui.awaitSharedIGui()
             installed.saveTexture(
-                GuiTextureDefinition("translations.dirt", "", Key.key("translations", "gui"), 176, 222),
+                GuiTextureDefinition("translations.bg", GLYPH, Key.key("translations", "ui"), 176, 222, 177),
             )
             igui = installed
-            listGui = buildListGui(installed)
-            editorGui = buildEditorGui(installed)
-            logger.info("Translations editor GUI ready")
+            gui = buildGui(installed)
+            logger.info("Translations editor (chest) ready")
         }
     }
 
-    /** Cancels this plugin's coroutine scope; the shared IGui is left running. */
+    /** Cancels the coroutine scope; restores any borrowed book hand items. */
     override fun onDisable() {
+        bookReturn.keys.toList().forEach { uuid -> Bukkit.getPlayer(uuid)?.let { restoreBook(it) } }
         if (::scope.isInitialized) {
             igui = null
             scope.cancel()
         }
         client?.close()
         client = null
+    }
+
+    /**
+     * Captures the writable-book editor result as the selected key's pending
+     * value and reopens the editor.
+     *
+     * @param event the edit-book event.
+     */
+    @EventHandler
+    fun onEditBook(event: PlayerEditBookEvent) {
+        val player = event.player
+        if (!bookEditing.remove(player.uniqueId)) return
+        event.isSigning = false
+        restoreBook(player)
+        session(player).pending = pagesToText(event.newBookMeta)
+        scope.launch { gui?.open(player, "main") }
+    }
+
+    /** Restores a book hand item if the player quit mid-edit. */
+    @EventHandler
+    fun onQuit(event: PlayerQuitEvent) {
+        bookEditing.remove(event.player.uniqueId)
+        restoreBook(event.player)
     }
 
     /**
@@ -131,16 +165,22 @@ class TranslationsPlugin : JavaPlugin() {
             player.sendMessage(MiniPreview.render("<red>You do not have permission to edit translations."))
             return true
         }
-        if (listGui == null) {
+        restoreBook(player) // recover a stray book from an aborted edit
+        bookEditing.remove(player.uniqueId)
+        val ready = gui ?: run {
             player.sendMessage(MiniPreview.render("<gray>Translations editor is still starting up…"))
             return true
         }
         scope.launch {
-            val session = session(player)
-            session.owner = null
-            session.query = ""
-            loadView(player, session)
-            listGui?.open(player)
+            val s = session(player)
+            s.showGroups = true
+            s.owner = null
+            s.query = ""
+            s.selectedKey = null
+            s.pending = null
+            s.page = 0
+            loadView(player, s)
+            ready.open(player, "main")
         }
         return true
     }
@@ -150,236 +190,267 @@ class TranslationsPlugin : JavaPlugin() {
     private suspend fun loadView(player: Player, session: Session) {
         val view = withContext(Dispatchers.IO) { client?.view(player.name) } ?: return
         session.view = view
-        if (session.language !in view.languages) {
-            session.language = view.defaultLanguage
+        if (session.language !in view.languages) session.language = view.defaultLanguage
+    }
+
+    // ---------------------------------------------------------------- gui --
+
+    private suspend fun buildGui(installed: IGui): GuiDefinition = installed.gui("translations") {
+        rows = 6
+        landingPage = "main"
+        page("main") {
+            permission = "helix.admin"
+            cancelAllInteractions = true
+            prepare { player -> loadView(player, session(player)) }
+            title { ctx -> drawTitle(this, ctx.player) }
+            for (i in 0 until LIST_COUNT) {
+                val slot = LIST_START + i
+                item(slot) { ctx -> listItem(session(ctx.player), i) }
+                onClick(slot) { ctx -> onListClick(ctx.player, i) }
+            }
+            for (b in 0 until BUTTON_COUNT) {
+                val slot = BUTTON_ROW + b
+                item(slot) { ctx -> buttonItem(session(ctx.player), b) }
+                onClick(slot) { ctx -> onButtonClick(ctx.player, ctx, b) }
+            }
+        }
+        onClose { ctx -> session(ctx.player).confirmDelete = false }
+    }
+
+    private fun selectable(session: Session): Boolean = session.selectedKey != null && !session.showGroups
+
+    private fun displayValue(session: Session): String = session.pending ?: currentValue(session)
+
+    private fun drawTitle(display: DisplayBuilder, player: Player) {
+        val s = session(player)
+        igui?.cachedTexture("translations.bg")?.let { bg ->
+            display.centeredTexture(bg)
+            display.toStart()
+        }
+        val header = when {
+            s.showGroups -> "Translations · ${s.language}"
+            s.selectedKey != null -> {
+                val mark = if (s.pending != null) " ·unsaved" else " ${statusOf(s)}"
+                ellipsize(s.selectedKey!!.removePrefix("helix.translations."), 20) + " ·" + s.language + mark
+            }
+            else -> "${s.owner ?: "Keys"} · ${s.language}"
+        }
+        display.centeredText(ellipsize(header, 34), 0, color = NamedTextColor.WHITE)
+        if (selectable(s)) {
+            val value = displayValue(s)
+            if (value.isEmpty()) line(display, "(empty)", 1, NamedTextColor.GRAY)
+            else drawPreview(display, value, listOf(1, 2), PREVIEW_MAX_CHARS)
+        } else {
+            line(display, if (s.query.isNotBlank()) "search: ${s.query}" else "pick a key to edit", 1, NamedTextColor.GRAY)
         }
     }
 
-    private fun currentValue(session: Session): String {
-        val entry = session.view.entries.find { it.key == session.editingKey } ?: return ""
-        return entry.values[session.language]
+    private fun line(display: DisplayBuilder, text: String, row: Int, color: NamedTextColor) {
+        display.moveTo(PREVIEW_X)
+        display.styledText(text, row, color)
+        display.toStart()
+    }
+
+    private fun drawPreview(display: DisplayBuilder, value: String, rows: List<Int>, maxChars: Int) {
+        val lines = MiniPreview.linesOf(value)
+        lines.take(rows.size).forEachIndexed { i, runs ->
+            display.moveTo(PREVIEW_X)
+            var budget = maxChars
+            for (run in runs) {
+                if (budget <= 0) break
+                val t = if (run.text.length > budget) run.text.substring(0, budget) else run.text
+                budget -= t.length
+                if (t.isEmpty()) continue
+                display.styledText(
+                    t, rows[i], run.color ?: NamedTextColor.WHITE,
+                    run.bold, run.italic, run.obfuscated, run.underlined, run.strikethrough,
+                )
+            }
+            if (lines.size > rows.size && i == rows.size - 1) display.styledText("...", rows[i], NamedTextColor.GRAY)
+            display.toStart()
+        }
+    }
+
+    private fun statusOf(session: Session): String {
+        val entry = entryOf(session) ?: return ""
+        return when {
+            entry.values.containsKey(session.language) -> "· edited"
+            entry.defaults[session.language] == null -> "· no value"
+            else -> "· default"
+        }
+    }
+
+    // -------------------------------------------------------------- items --
+
+    private fun listItem(session: Session, index: Int): ItemStack? {
+        return if (session.showGroups) {
+            pageWindow(groups(session), session.page).getOrNull(index)?.let { groupItem(it) }
+        } else {
+            pageWindow(filteredEntries(session), session.page).getOrNull(index)?.let { keyItem(it, session) }
+        }
+    }
+
+    private fun buttonItem(s: Session, b: Int): ItemStack? = when (b) {
+        0 -> button(Material.ARROW, "<gray>‹ Previous")
+        1 -> button(Material.ARROW, "<gray>Next ›")
+        2 -> button(if (s.showGroups) Material.CHEST else Material.BOOK, if (s.showGroups) "<gold>Groups" else "<gray>Show groups")
+        3 -> button(Material.COMPASS, "<aqua>Search", if (s.query.isBlank()) "<dark_gray>—" else "<gray>${s.query}")
+        4 -> if (selectable(s)) button(Material.WRITABLE_BOOK, "<aqua>Edit in book", "<gray>multiline / long") else button(Material.GRAY_DYE, "<dark_gray>Edit")
+        5 -> if (selectable(s) && s.pending != null) button(Material.LIME_DYE, "<green>Save") else button(Material.GRAY_DYE, "<dark_gray>Save")
+        6 -> if (selectable(s)) button(Material.WATER_BUCKET, "<yellow>Reset") else button(Material.GRAY_DYE, "<dark_gray>Reset")
+        7 -> button(Material.PAPER, "<yellow>Language: <white>${s.language}", "<gray>click to cycle")
+        8 -> button(Material.BARRIER, "<red>Close")
+        else -> null
+    }
+
+    private fun groupItem(group: Group): ItemStack =
+        button(Material.WRITABLE_BOOK, "<white>${group.owner}", "<gray>${group.count} keys", "<yellow>${group.edited} edited")
+
+    private fun keyItem(entry: TranslationEntry, session: Session): ItemStack {
+        val shortKey = entry.key.removePrefix("helix.translations.")
+        val effective = entry.values[session.language]
             ?: entry.defaults[session.language]
             ?: entry.defaults[session.view.defaultLanguage]
             ?: ""
+        val item = ItemStack.of(if (entry.key == session.selectedKey) Material.MAP else Material.PAPER)
+        item.editMeta { meta ->
+            meta.itemName(Component.text(ellipsize(shortKey, 40), NamedTextColor.WHITE))
+            val lore = mutableListOf(MiniPreview.render(if (effective.isEmpty()) "<dark_gray>(empty)" else effective))
+            when {
+                entry.values.containsKey(session.language) -> lore += MiniPreview.render("<yellow>edited")
+                entry.defaults[session.language] == null -> lore += MiniPreview.render("<gray>no value in ${session.language}")
+            }
+            meta.lore(lore)
+        }
+        return item
     }
 
-    private fun editingEntry(session: Session): TranslationEntry? =
-        session.view.entries.find { it.key == session.editingKey }
-
-    // ---------------------------------------------------------------- list --
-
-    private suspend fun buildListGui(installed: IGui): GuiDefinition = installed.gui("translations.list") {
-        rows = 6
-        landingPage = "groups"
-
-        page("groups") {
-            permission = "helix.admin"
-            prepare { player -> loadView(player, session(player)) }
-            title { _ -> centeredText("Translations", 0, 88, NamedTextColor.DARK_GRAY) }
-            paginate<Group>(chestSlot(1, 1) rectTo chestSlot(4, 9)) {
-                previousSlot = chestSlot(6, 1)
-                nextSlot = chestSlot(6, 9)
-                source { player ->
-                    val s = session(player)
-                    s.view.entries.groupBy { it.owner }
-                        .map { (owner, list) -> Group(owner, list.size, list.count { it.values.containsKey(s.language) }) }
-                        .sortedBy { it.owner }
-                }
-                render { _, group -> groupItem(group) }
-                onClick { ctx, group ->
-                    val s = session(ctx.player)
-                    s.owner = group.owner
-                    s.query = ""
-                    ctx.openPage("keys")
-                }
-            }
-            onClick(chestSlot(5, 3)) { ctx -> startSearch(ctx.player, ctx) }
-            onClick(chestSlot(5, 5)) { ctx -> ctx.openPage("languages") }
-            onClick(chestSlot(5, 7)) { ctx -> ctx.close() }
-            item(chestSlot(5, 3)) { button(Material.COMPASS, "<aqua>Search") }
-            item(chestSlot(5, 5)) { button(Material.BOOK, "<yellow>Languages") }
-            item(chestSlot(5, 7)) { button(Material.BARRIER, "<red>Close") }
+    private fun button(material: Material, name: String, vararg lore: String): ItemStack {
+        val item = ItemStack.of(material)
+        item.editMeta { meta ->
+            meta.itemName(MiniPreview.render(name))
+            if (lore.isNotEmpty()) meta.lore(lore.map { MiniPreview.render(it) })
         }
-
-        page("keys") {
-            permission = "helix.admin"
-            prepare { player -> loadView(player, session(player)) }
-            title { context ->
-                val s = session(context.player)
-                val label = if (s.query.isNotBlank()) "Search: ${s.query}" else (s.owner ?: "Keys")
-                centeredText(ellipsize(label, 30), 0, 88, NamedTextColor.DARK_GRAY)
-            }
-            paginate<TranslationEntry>(chestSlot(1, 1) rectTo chestSlot(4, 9)) {
-                previousSlot = chestSlot(6, 1)
-                nextSlot = chestSlot(6, 9)
-                source { player -> keyEntries(session(player)) }
-                render { context, entry -> keyItem(entry, session(context.player).language, session(context.player)) }
-                onClick { ctx, entry ->
-                    val s = session(ctx.player)
-                    s.editingKey = entry.key
-                    s.pending = null
-                    s.confirmDelete = false
-                    editorGui?.open(ctx.player)
-                }
-            }
-            onClick(chestSlot(5, 3)) { ctx -> ctx.openPage("groups") }
-            onClick(chestSlot(5, 5)) { ctx -> startSearch(ctx.player, ctx) }
-            item(chestSlot(5, 3)) { button(Material.ARROW, "<gray>Back to groups") }
-            item(chestSlot(5, 5)) { button(Material.COMPASS, "<aqua>Search") }
-        }
-
-        page("languages") {
-            permission = "helix.admin"
-            prepare { player -> loadView(player, session(player)) }
-            title { context ->
-                val s = session(context.player)
-                centeredText("Languages — active: ${s.language}", 0, 88, NamedTextColor.DARK_GRAY)
-            }
-            paginate<String>(chestSlot(1, 1) rectTo chestSlot(4, 9)) {
-                previousSlot = chestSlot(6, 1)
-                nextSlot = chestSlot(6, 9)
-                source { player -> session(player).view.languages }
-                render { context, language -> languageItem(language, session(context.player)) }
-                onClick { ctx, language ->
-                    session(ctx.player).language = language
-                    ctx.gui.refresh(ctx.player)
-                }
-            }
-            onClick(chestSlot(5, 1)) { ctx -> ctx.openPage("groups") }
-            onClick(chestSlot(5, 3)) { ctx -> addLanguage(ctx.player, ctx) }
-            onClick(chestSlot(5, 5)) { ctx -> languageAction(ctx.player, ctx) { client, name, lang -> client.setDefaultLanguage(name, lang) } }
-            onClick(chestSlot(5, 7)) { ctx -> languageAction(ctx.player, ctx) { client, name, lang -> client.removeLanguage(name, lang) } }
-            item(chestSlot(5, 1)) { button(Material.ARROW, "<gray>Back to groups") }
-            item(chestSlot(5, 3)) { button(Material.SLIME_BALL, "<green>Add language") }
-            item(chestSlot(5, 5)) { context -> button(Material.NETHER_STAR, "<gold>Set default", "<gray>active: ${session(context.player).language}") }
-            item(chestSlot(5, 7)) { context -> button(Material.BARRIER, "<red>Remove language", "<gray>active: ${session(context.player).language}") }
-        }
+        return item
     }
 
-    private fun keyEntries(session: Session): List<TranslationEntry> {
-        val all = session.view.entries
-        val query = session.query.trim().lowercase()
-        val lang = session.language
-        val filtered = if (query.isNotBlank()) {
-            all.filter { entry ->
-                entry.key.lowercase().contains(query) ||
-                    (entry.values[lang] ?: entry.defaults[lang] ?: "").lowercase().contains(query)
-            }
-        } else {
-            all.filter { it.owner == session.owner }
-        }
-        return filtered.sortedBy { it.key }
-    }
+    // ------------------------------------------------------------ actions --
 
-    private suspend fun startSearch(player: Player, ctx: de.tytoss.igui.gui.GuiClickContext) {
-        val query = try {
-            ctx.anvilInput(title = Component.text("Search translations"))
-        } catch (ignored: GuiInputCancelledException) {
-            return
-        } catch (ignored: GuiInputTimeoutException) {
-            return
-        }
+    private fun onListClick(player: Player, index: Int) {
         val s = session(player)
-        s.query = query.trim()
-        s.owner = null
-        ctx.openPage("keys")
-    }
-
-    private suspend fun addLanguage(player: Player, ctx: de.tytoss.igui.gui.GuiClickContext) {
-        val language = try {
-            ctx.anvilInput(title = Component.text("New language code (e.g. fr)"))
-        } catch (ignored: GuiInputCancelledException) {
-            return
-        } catch (ignored: GuiInputTimeoutException) {
-            return
-        }.trim().lowercase()
-        if (language.isBlank()) return
-        val nodeClient = client ?: return
-        val ok = withContext(Dispatchers.IO) { nodeClient.addLanguage(player.name, language) }
-        feedback(player, ok, "Added $language", "Could not add $language")
-        loadView(player, session(player))
-        ctx.openPage("languages")
-    }
-
-    private suspend fun languageAction(
-        player: Player,
-        ctx: de.tytoss.igui.gui.GuiClickContext,
-        action: (NodeClient, String, String) -> Boolean,
-    ) {
-        val s = session(player)
-        val nodeClient = client ?: return
-        val language = s.language
-        val ok = withContext(Dispatchers.IO) { action(nodeClient, player.name, language) }
-        feedback(player, ok, "Done: $language", "Failed for $language")
-        loadView(player, s)
-        ctx.gui.refresh(player)
-    }
-
-    // -------------------------------------------------------------- editor --
-
-    private suspend fun buildEditorGui(installed: IGui): GuiDefinition = installed.gui("translations.editor") {
-        rows = 6
-        landingPage = "editor"
-        page("editor") {
-            permission = "helix.admin"
-            prepare { player -> loadView(player, session(player)) }
-            title { context ->
-                moveTo(0)
-                texture(installed.cachedTexture("translations.dirt"))
-                toStart()
-                val s = session(context.player)
-                val key = s.editingKey ?: return@title
-                val shortKey = key.removePrefix("helix.translations.")
-                centeredText(ellipsize(shortKey, 28), 0, 88, NamedTextColor.WHITE)
-                moveTo(8)
-                val marker = if (s.pending != null) " (unsaved)" else ""
-                styledText("Language: ${s.language}$marker", 1, NamedTextColor.YELLOW)
-                toStart()
-                val value = s.pending ?: currentValue(s)
-                if (value.isEmpty()) {
-                    moveTo(8)
-                    styledText("(empty)", 2, NamedTextColor.GRAY, italic = true)
-                    toStart()
-                } else {
-                    MiniPreview.draw(this, value, 8, 2, 5, PREVIEW_MAX_CHARS)
-                }
-            }
-            item(chestSlot(6, 1)) { button(Material.ARROW, "<gray>Back") }
-            item(chestSlot(6, 2)) { button(Material.PAPER, "<yellow>Language", "<gray>cycle active language") }
-            item(chestSlot(6, 4)) { button(Material.WRITABLE_BOOK, "<aqua>Edit value") }
-            item(chestSlot(6, 5)) { context -> if (session(context.player).pending != null) button(Material.LIME_DYE, "<green>Save") else null }
-            item(chestSlot(6, 6)) { context -> if (session(context.player).pending != null) button(Material.GRAY_DYE, "<gray>Discard") else null }
-            item(chestSlot(6, 8)) { button(Material.WATER_BUCKET, "<yellow>Reset to default") }
-            item(chestSlot(6, 9)) { context -> deleteButton(session(context.player)) }
-            onClick(chestSlot(6, 1)) { ctx ->
-                session(ctx.player).confirmDelete = false
-                listGui?.open(ctx.player)
-            }
-            onClick(chestSlot(6, 2)) { ctx -> cycleLanguage(ctx.player, ctx) }
-            onClick(chestSlot(6, 4)) { ctx -> editValue(ctx.player, ctx) }
-            onClick(chestSlot(6, 5)) { ctx -> saveValue(ctx.player, ctx) }
-            onClick(chestSlot(6, 6)) { ctx ->
-                val s = session(ctx.player)
-                s.pending = null
-                s.confirmDelete = false
-                ctx.gui.refresh(ctx.player)
-            }
-            onClick(chestSlot(6, 8)) { ctx -> resetValue(ctx.player, ctx) }
-            onClick(chestSlot(6, 9)) { ctx -> deleteKey(ctx.player, ctx) }
-        }
-    }
-
-    private fun deleteButton(session: Session): ItemStack? {
-        val entry = editingEntry(session) ?: return null
-        if (entry.defaults.isNotEmpty()) return null // only custom-created keys are deletable
-        return if (session.confirmDelete) {
-            button(Material.REDSTONE_BLOCK, "<red>Confirm delete", "<gray>click again to delete this key")
+        if (s.showGroups) {
+            val group = pageWindow(groups(s), s.page).getOrNull(index) ?: return
+            s.owner = group.owner
+            s.showGroups = false
+            s.page = 0
+            refresh(player)
         } else {
-            button(Material.BARRIER, "<red>Delete key")
+            val entry = pageWindow(filteredEntries(s), s.page).getOrNull(index) ?: return
+            s.selectedKey = entry.key
+            s.pending = null
+            s.confirmDelete = false
+            refresh(player)
         }
     }
 
-    private suspend fun cycleLanguage(player: Player, ctx: de.tytoss.igui.gui.GuiClickContext) {
+    private fun onButtonClick(player: Player, ctx: GuiClickContext, b: Int) {
+        val s = session(player)
+        when (b) {
+            0 -> if (s.page > 0) { s.page--; refresh(player) }
+            1 -> if ((s.page + 1) * PAGE_SIZE < listSize(s)) { s.page++; refresh(player) }
+            2 -> { s.showGroups = !s.showGroups; s.owner = null; s.query = ""; s.selectedKey = null; s.page = 0; refresh(player) }
+            3 -> search(player, ctx)
+            4 -> openBook(player)
+            5 -> saveCurrent(player)
+            6 -> resetCurrent(player)
+            7 -> cycleLanguage(player)
+            8 -> scope.launch { gui?.close(player) }
+        }
+    }
+
+    private fun refresh(player: Player) {
+        scope.launch { gui?.refresh(player) }
+    }
+
+    private fun search(player: Player, ctx: GuiClickContext) {
+        scope.launch {
+            val query = try {
+                ctx.anvilInput(title = Component.text("Search translations"))
+            } catch (ignored: GuiInputCancelledException) {
+                return@launch
+            } catch (ignored: GuiInputTimeoutException) {
+                return@launch
+            }
+            val s = session(player)
+            s.query = query.trim()
+            s.showGroups = false
+            s.owner = null
+            s.selectedKey = null
+            s.page = 0
+            gui?.open(player, "main")
+        }
+    }
+
+    // ---------------------------------------------------------- book edit --
+
+    private fun openBook(player: Player) {
+        val s = session(player)
+        if (!selectable(s)) return
+        val ready = gui ?: return
+        val initial = displayValue(s)
+        bookReturn[player.uniqueId] = player.inventory.itemInMainHand.clone()
+        bookEditing.add(player.uniqueId)
+        scope.launch {
+            ready.close(player)
+            val book = ItemStack.of(Material.WRITABLE_BOOK)
+            book.editMeta(BookMeta::class.java) { meta ->
+                textToPages(initial).forEach { meta.addPages(Component.text(it)) }
+            }
+            player.inventory.setItemInMainHand(book)
+            PacketEvents.getAPI().playerManager.sendPacket(player, WrapperPlayServerOpenBook(InteractionHand.MAIN_HAND))
+        }
+    }
+
+    private fun restoreBook(player: Player) {
+        bookReturn.remove(player.uniqueId)?.let { player.inventory.setItemInMainHand(it) }
+    }
+
+    private fun pagesToText(meta: BookMeta): String =
+        (1..meta.pageCount).joinToString("\n") { meta.getPage(it) }.trimEnd('\n')
+
+    private fun textToPages(text: String): List<String> =
+        if (text.isEmpty()) listOf("") else text.chunked(BOOK_PAGE_CHARS)
+
+    private fun saveCurrent(player: Player) {
+        val s = session(player)
+        val key = s.selectedKey ?: return
+        if (!selectable(s)) return
+        val value = s.pending ?: return
+        val nodeClient = client ?: return
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) { nodeClient.set(player.name, key, s.language, value) }
+            feedback(player, ok, "Saved ${key.removePrefix("helix.translations.")} (${s.language})", "Save failed")
+            if (ok) s.pending = null
+            loadView(player, s)
+            gui?.refresh(player)
+        }
+    }
+
+    private fun resetCurrent(player: Player) {
+        val s = session(player)
+        val key = s.selectedKey ?: return
+        if (!selectable(s)) return
+        val nodeClient = client ?: return
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) { nodeClient.reset(player.name, key, s.language) }
+            feedback(player, ok, "Reset ${key.removePrefix("helix.translations.")} (${s.language})", "Nothing to reset")
+            s.pending = null
+            loadView(player, s)
+            gui?.refresh(player)
+        }
+    }
+
+    private fun cycleLanguage(player: Player) {
         val s = session(player)
         val languages = s.view.languages
         if (languages.isNotEmpty()) {
@@ -387,139 +458,78 @@ class TranslationsPlugin : JavaPlugin() {
             s.language = languages[(index + 1) % languages.size]
         }
         s.pending = null
-        s.confirmDelete = false
-        ctx.gui.refresh(player)
+        refresh(player)
     }
 
-    private suspend fun editValue(player: Player, ctx: de.tytoss.igui.gui.GuiClickContext) {
-        val s = session(player)
-        s.confirmDelete = false
-        val current = s.pending ?: currentValue(s)
-        val entered = try {
-            if (current.length > ANVIL_MAX_CHARS) {
-                ctx.chatInput(MiniPreview.render("<gray>Type the new value in chat (it is long); <white>cancel</white> to abort:"))
-            } else {
-                ctx.anvilInput(
-                    initialValue = current,
-                    title = Component.text("Edit — see live preview"),
-                    preview = { typed -> MiniPreview.render(typed.ifEmpty { " " }) },
-                )
-            }
-        } catch (ignored: GuiInputCancelledException) {
-            return
-        } catch (ignored: GuiInputTimeoutException) {
-            return
-        }
-        if (entered.equals("cancel", ignoreCase = true)) {
-            editorGui?.open(player)
-            return
-        }
-        s.pending = entered
-        editorGui?.open(player)
-    }
+    // ------------------------------------------------------------- helpers --
 
-    private suspend fun saveValue(player: Player, ctx: de.tytoss.igui.gui.GuiClickContext) {
-        val s = session(player)
-        val key = s.editingKey ?: return
-        val pending = s.pending ?: return
-        val nodeClient = client ?: return
-        val ok = withContext(Dispatchers.IO) { nodeClient.set(player.name, key, s.language, pending) }
-        feedback(player, ok, "Saved ${key.removePrefix("helix.translations.")} (${s.language})", "Save failed")
-        if (ok) s.pending = null
-        loadView(player, s)
-        ctx.gui.refresh(player)
-    }
+    private fun entryOf(session: Session): TranslationEntry? =
+        session.view.entries.find { it.key == session.selectedKey }
 
-    private suspend fun resetValue(player: Player, ctx: de.tytoss.igui.gui.GuiClickContext) {
-        val s = session(player)
-        val key = s.editingKey ?: return
-        val nodeClient = client ?: return
-        s.confirmDelete = false
-        val ok = withContext(Dispatchers.IO) { nodeClient.reset(player.name, key, s.language) }
-        feedback(player, ok, "Reset ${key.removePrefix("helix.translations.")} (${s.language})", "Nothing to reset")
-        s.pending = null
-        loadView(player, s)
-        ctx.gui.refresh(player)
-    }
-
-    private suspend fun deleteKey(player: Player, ctx: de.tytoss.igui.gui.GuiClickContext) {
-        val s = session(player)
-        val key = s.editingKey ?: return
-        val entry = editingEntry(s) ?: return
-        if (entry.defaults.isNotEmpty()) return
-        if (!s.confirmDelete) {
-            s.confirmDelete = true
-            ctx.gui.refresh(player)
-            return
-        }
-        val nodeClient = client ?: return
-        val ok = withContext(Dispatchers.IO) { nodeClient.deleteKey(player.name, key) }
-        feedback(player, ok, "Deleted ${key.removePrefix("helix.translations.")}", "Delete failed")
-        s.confirmDelete = false
-        s.editingKey = null
-        loadView(player, s)
-        listGui?.open(player)
-    }
-
-    // --------------------------------------------------------------- items --
-
-    private fun groupItem(group: Group): ItemStack =
-        button(
-            Material.WRITABLE_BOOK,
-            "<white>${group.owner}",
-            "<gray>${group.count} keys",
-            "<yellow>${group.edited} edited",
-        )
-
-    private fun keyItem(entry: TranslationEntry, language: String, session: Session): ItemStack {
-        val shortKey = entry.key.removePrefix("helix.translations.")
-        val effective = entry.values[language]
-            ?: entry.defaults[language]
+    private fun currentValue(session: Session): String {
+        val entry = entryOf(session) ?: return ""
+        return entry.values[session.language]
+            ?: entry.defaults[session.language]
             ?: entry.defaults[session.view.defaultLanguage]
             ?: ""
-        val item = ItemStack(Material.PAPER)
-        item.editMeta { meta ->
-            meta.displayName(Component.text(ellipsize(shortKey, 40), NamedTextColor.WHITE))
-            val lore = mutableListOf(MiniPreview.render(if (effective.isEmpty()) "<dark_gray>(empty)" else effective))
-            when {
-                entry.values.containsKey(language) -> lore += MiniPreview.render("<yellow>edited")
-                entry.defaults[language] == null -> lore += MiniPreview.render("<gray>no value in $language")
+    }
+
+    private fun filteredEntries(session: Session): List<TranslationEntry> {
+        val all = session.view.entries
+        val query = session.query.trim().lowercase()
+        val lang = session.language
+        val filtered = when {
+            query.isNotBlank() -> all.filter { e ->
+                e.key.lowercase().contains(query) ||
+                    (e.values[lang] ?: e.defaults[lang] ?: "").lowercase().contains(query)
             }
-            meta.lore(lore)
+            session.owner != null -> all.filter { it.owner == session.owner }
+            else -> all
         }
-        return item
+        return filtered.sortedBy { it.key }
     }
 
-    private fun languageItem(language: String, session: Session): ItemStack {
-        val markers = buildList {
-            if (language == session.view.defaultLanguage) add("<gold>★ default")
-            if (language == session.language) add("<green>active")
-        }
-        return button(Material.PAPER, "<white>$language", *markers.toTypedArray())
-    }
+    private fun groups(session: Session): List<Group> =
+        session.view.entries.groupBy { it.owner }
+            .map { (owner, list) -> Group(owner, list.size, list.count { it.values.containsKey(session.language) }) }
+            .sortedBy { it.owner }
 
-    private fun button(material: Material, name: String, vararg lore: String): ItemStack {
-        val item = ItemStack(material)
-        item.editMeta { meta ->
-            meta.displayName(MiniPreview.render(name))
-            if (lore.isNotEmpty()) meta.lore(lore.map { MiniPreview.render(it) })
-        }
-        return item
+    private fun listSize(session: Session): Int =
+        if (session.showGroups) groups(session).size else filteredEntries(session).size
+
+    private fun <T> pageWindow(items: List<T>, page: Int): List<T> {
+        val from = (page * PAGE_SIZE).coerceIn(0, items.size)
+        val to = (from + PAGE_SIZE).coerceAtMost(items.size)
+        return items.subList(from, to)
     }
 
     private fun feedback(player: Player, ok: Boolean, success: String, failure: String) {
-        val message = if (ok) "<green>$success" else "<red>$failure"
-        player.sendMessage(MiniPreview.render(message))
+        player.sendMessage(MiniPreview.render(if (ok) "<green>$success" else "<red>$failure"))
     }
 
     private fun ellipsize(text: String, max: Int): String =
         if (text.length <= max) text else text.take((max - 3).coerceAtLeast(0)) + "..."
 
     private companion object {
-        /** Above this length the anvil's ~50-char client cap forces chat input. */
-        const val ANVIL_MAX_CHARS = 48
+        /** Private-use glyph bound to the background; no char literal so file rewrites can't drop it. */
+        val GLYPH: String = String(Character.toChars(0xE000))
 
-        /** Characters rendered per preview row before truncating with `...`. */
+        /** First list slot (chest row 2); rows 0-1 are the preview panel. */
+        const val LIST_START = 18
+        const val LIST_COUNT = 27
+        const val PAGE_SIZE = 27
+
+        /** First button slot (chest row 5). */
+        const val BUTTON_ROW = 45
+        const val BUTTON_COUNT = 9
+
+        /** Left pixel of embedded preview text. */
+        const val PREVIEW_X = 10
+
+        /** Characters rendered per preview row before truncating. */
         const val PREVIEW_MAX_CHARS = 30
+
+        /** Characters per writable-book page. */
+        const val BOOK_PAGE_CHARS = 250
     }
 }

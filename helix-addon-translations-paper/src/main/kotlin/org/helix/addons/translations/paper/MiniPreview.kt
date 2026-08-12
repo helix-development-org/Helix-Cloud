@@ -121,6 +121,14 @@ object MiniPreview {
         }
     }
 
+    /**
+     * Flattens [value] into styled runs and splits them into lines on `\n`.
+     *
+     * @param value the template.
+     * @return one styled-run list per line.
+     */
+    fun linesOf(value: String): List<List<Run>> = splitLines(runs(value))
+
     private fun splitLines(runs: List<Run>): List<List<Run>> {
         val lines = ArrayList<MutableList<Run>>()
         lines.add(ArrayList())
