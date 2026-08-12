@@ -19,6 +19,16 @@
 </div>
 
 <div class="card">
+  <div class="card-head"><h2>Phone mode</h2><div class="sub">hand out a single item that opens the in-game phone (helix.phone) instead of the hotbar layout</div></div>
+  <div class="card-body"><div class="grid c2">
+    <label class="checkbox"><input type="checkbox" id="ph-enabled"> enable phone mode (overrides the layout above)</label>
+    <div class="field"><label>Hotbar slot (0–8)</label><input type="number" id="ph-slot" min="0" max="8"></div>
+    <div class="field"><label>Item material</label><input class="mono" id="ph-material" placeholder="COMPASS"></div>
+    <div class="field"><label>Item name (MiniMessage)</label><input class="mono" id="ph-name"></div>
+  </div></div>
+</div>
+
+<div class="card">
   <div class="card-head"><h2>Protection</h2><div class="sub">each rule is independent · players with <code>helix.lobby.bypass</code> are exempt</div></div>
   <div class="card-body">
     <div id="protection" class="grid c2"></div>
@@ -130,6 +140,13 @@ function renderProtection() {
   document.getElementById("voidY").value = cfg.protection.voidTeleportY ?? 0;
 }
 
+function renderPhone() {
+  document.getElementById("ph-enabled").checked = !!cfg.phone.enabled;
+  document.getElementById("ph-slot").value = cfg.phone.slot ?? 4;
+  document.getElementById("ph-material").value = cfg.phone.material || "COMPASS";
+  document.getElementById("ph-name").value = cfg.phone.name || "";
+}
+
 function renderServerMenu() {
   document.getElementById("sm-title").value = cfg.serverMenu.title || "";
   document.getElementById("sm-rows").value = cfg.serverMenu.rows || 3;
@@ -138,6 +155,10 @@ function renderServerMenu() {
 }
 
 function collect() {
+  cfg.phone.enabled = document.getElementById("ph-enabled").checked;
+  cfg.phone.slot = Math.max(0, Math.min(8, parseInt(document.getElementById("ph-slot").value) || 4));
+  cfg.phone.material = document.getElementById("ph-material").value || "COMPASS";
+  cfg.phone.name = document.getElementById("ph-name").value;
   cfg.protection.voidTeleportY = parseInt(document.getElementById("voidY").value) || 0;
   cfg.serverMenu.title = document.getElementById("sm-title").value;
   cfg.serverMenu.rows = Math.max(1, Math.min(6, parseInt(document.getElementById("sm-rows").value) || 3));
@@ -169,6 +190,7 @@ function normalize(c) {
   if (!c.layouts["*"]) c.layouts["*"] = { items: [] };
   c.protection = Object.assign({ adventureMode: true, clearInventoryOnJoin: true, preventBlockBreak: true, preventBlockPlace: true, preventItemDrop: true, preventItemMove: true, preventDamage: true, preventHunger: true, voidTeleport: true, voidTeleportY: 0 }, c.protection || {});
   c.serverMenu = Object.assign({ title: "<dark_gray>Server selector", rows: 3, excludeLobbyTasks: true, entryMaterial: "PAPER" }, c.serverMenu || {});
+  c.phone = Object.assign({ enabled: false, slot: 4, material: "COMPASS", name: "<green>Phone" }, c.phone || {});
   return c;
 }
 
@@ -178,7 +200,7 @@ async function load() {
   const tl = await Helix.action("task.list");
   tasks = (tl.success ? tl.lines : []).map(l => l.split(/\s+/)[0]).filter(Boolean);
   current = "*";
-  renderTasks(); renderLayoutSelect(); renderItems(); renderProtection(); renderServerMenu();
+  renderTasks(); renderLayoutSelect(); renderItems(); renderProtection(); renderPhone(); renderServerMenu();
 }
 Helix.ready(load);
 </script>

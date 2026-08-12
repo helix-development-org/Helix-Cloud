@@ -352,6 +352,21 @@ Referenz-Implementierungen in diesem Repo:
   `lobby.config`-Bridge-Value verteilt, das die Paper-Seite pollt — so
   greifen Dashboard-Änderungen ohne Neustart. Referenz für ein per-Task
   aktives Paper-Addon mit geteiltem GUI und Bridge-Value-Config.
+- `helix-addon-phone` (+ `helix-addon-phone-paper`) — ein In-Game-Handy als
+  zentrale Oberfläche. Das Gehäuse ist eine 176×222-Titel-Glyphe, die (wie bei
+  BetterMSGs) über das **gesamte** Inventar liegt; das echte Inventar wird per
+  `InventoryTakeover` ausgeliehen. Apps liegen als Icon-Glyphen auf einem
+  4×5-Grid; ein Tap führt einen Command aus (`COMMAND`) oder öffnet einen
+  nativen Screen (`NATIVE`: Navigator = Server-Auswahl, Messages = BetterMSGs).
+  App-Icons sind **hochgeladene PNGs**: das Panel legt Apps an und lädt Logos
+  hoch, die zur Laufzeit ins Netzwerk-Pack injiziert werden (neue
+  `AddonContext.contributePackAsset`/`rebuildNetworkPack`; `NetworkPackService`
+  merged Laufzeit-Beiträge + führt eine Pack-Generation). Sichtbarkeit ist pro
+  Join versioniert: das Handy führt eine **Epoch**, stempelt Spieler beim Join
+  und zeigt eine App nur bei `sinceEpoch ≤ Spieler-Epoch` — neue Apps/Icons
+  erreichen nur Spieler, die nach dem Rebuild neu joinen (kein Mid-Session-Swap,
+  keine kaputten Glyphen). Kann per Lobby-**Phone-Modus** als einziges
+  Hotbar-Item ausgegeben werden.
 
 ## Lifecycle
 

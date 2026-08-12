@@ -9,7 +9,7 @@ plugins {
 
 allprojects {
     group = "org.helix"
-    version = "0.90.0"
+    version = "0.91.0"
 
     repositories {
         mavenCentral()
@@ -92,6 +92,7 @@ val addonModules = listOf(
     "helix-addon-cosmetics",
     "helix-addon-translations",
     "helix-addon-lobby",
+    "helix-addon-phone",
 )
 
 tasks.register("releaseBundle") {

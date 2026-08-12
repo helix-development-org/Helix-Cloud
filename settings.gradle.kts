@@ -49,5 +49,7 @@ include(
     "helix-addon-translations",
     "helix-addon-translations-paper",
     "helix-addon-lobby",
-    "helix-addon-lobby-paper"
+    "helix-addon-lobby-paper",
+    "helix-addon-phone",
+    "helix-addon-phone-paper"
 )

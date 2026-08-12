@@ -470,6 +470,10 @@ class HelixNode(
             )
         },
         onChange = { rebuildNetworkPack() },
+        packContributor = { path, bytes -> networkPack.contributeAsset(path, bytes) },
+        packRemover = { path -> networkPack.removeAsset(path) },
+        rebuildPack = { rebuildNetworkPack() },
+        packGeneration = { networkPack.generation() },
     )
 
     private val overviewService = PlatformOverviewService(version(), taskStore, manager)

@@ -112,6 +112,10 @@ class AddonManager(
     private val sharedAddressPlayers: (String) -> List<String> = { emptyList() },
     private val storageConnection: () -> org.helix.api.addon.StorageConnection? = { null },
     private val onChange: () -> Unit = {},
+    private val packContributor: (path: String, bytes: ByteArray) -> Unit = { _, _ -> },
+    private val packRemover: (path: String) -> Unit = {},
+    private val rebuildPack: () -> Unit = {},
+    private val packGeneration: () -> Int = { 0 },
 ) {
     private val logger = LoggerFactory.getLogger(AddonManager::class.java)
     private val json = Json { ignoreUnknownKeys = true }
@@ -654,5 +658,19 @@ class AddonManager(
         override fun registerNotificationListener(listener: NotificationListener) {
             notifications.register(record.manifest.id, listener)
         }
+
+        override fun contributePackAsset(path: String, bytes: ByteArray) {
+            packContributor(path, bytes)
+        }
+
+        override fun removePackAsset(path: String) {
+            packRemover(path)
+        }
+
+        override fun rebuildNetworkPack() {
+            rebuildPack()
+        }
+
+        override fun networkPackGeneration(): Int = packGeneration()
     }
 }

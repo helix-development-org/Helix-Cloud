@@ -1,0 +1,8 @@
+{
+  "id": "helix.phone",
+  "name": "Helix Phone",
+  "version": "1.0.0",
+  "main": "org.helix.addons.phone.PhoneAddon",
+  "description": "An in-game phone GUI that hosts apps (messages, navigator, profile, settings, admin tools). Apps and their uploaded PNG icons are managed from the dashboard; icons are injected into the network resource pack at runtime and reach players on their next join.",
+  "permissions": ["helix.phone.admin"]
+}
