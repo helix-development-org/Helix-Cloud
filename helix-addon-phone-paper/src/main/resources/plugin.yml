@@ -1,0 +1,10 @@
+name: HelixPhone
+version: 1.0.0
+main: org.helix.addons.phone.paper.PhonePlugin
+api-version: '1.21'
+description: In-game phone GUI hosting apps (messages, navigator, profile, settings, admin tools), driven by the helix.phone addon.
+depend: [Helix-GUIs]
+commands:
+  phone:
+    description: Opens your phone.
+    usage: /phone

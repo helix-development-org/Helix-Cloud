@@ -16,6 +16,7 @@ data class LobbyConfig(
     val layouts: Map<String, LobbyLayout> = emptyMap(),
     val protection: ProtectionSettings = ProtectionSettings(),
     val serverMenu: ServerMenuSettings = ServerMenuSettings(),
+    val phone: PhoneItemSettings = PhoneItemSettings(),
 ) {
     /** The layout a lobby task should use: its own, else the `*` fallback, else empty. */
     fun layoutFor(task: String): LobbyLayout = layouts[task] ?: layouts["*"] ?: LobbyLayout()
@@ -60,6 +61,15 @@ data class ProtectionSettings(
     val clearInventoryOnJoin: Boolean = true,
     val voidTeleport: Boolean = true,
     val voidTeleportY: Int = 0,
+)
+
+/** Phone-mode: a single hotbar item that opens `/phone` replaces the layout. */
+@Serializable
+data class PhoneItemSettings(
+    val enabled: Boolean = false,
+    val slot: Int = 4,
+    val material: String = "COMPASS",
+    val name: String = "<green>Phone",
 )
 
 /** The built-in server selector's appearance. */

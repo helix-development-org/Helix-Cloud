@@ -252,6 +252,57 @@ interface AddonContext {
     }
 
     /**
+     * Contributes a loose file to the network resource pack at runtime, in
+     * addition to the addon's build-time `pack.zip`.
+     *
+     * The [path] is the in-pack asset path, for example
+     * `assets/helix_phone/textures/font/appicon_calc.png`. Contributions
+     * survive restarts and are merged into `network.zip` on the next
+     * [rebuildNetworkPack]. Call [rebuildNetworkPack] once after writing all
+     * assets so the pack (and its SHA-1) refreshes exactly once.
+     *
+     * @param path the in-pack asset path.
+     * @param bytes the file content.
+     */
+    fun contributePackAsset(path: String, bytes: ByteArray) {
+    }
+
+    /**
+     * Removes a previously contributed pack asset. A no-op if the path was
+     * never contributed.
+     *
+     * @param path the in-pack asset path to remove.
+     */
+    fun removePackAsset(path: String) {
+    }
+
+    /**
+     * Rebuilds the network resource pack from all addon `pack.zip` files and
+     * runtime contributions, republishes its SHA-1 and, when the content
+     * changed, advances [networkPackGeneration] by one.
+     *
+     * Clients already online are not re-sent the pack; only players who
+     * join afterwards receive the new pack — mirror that on the client side
+     * by gating pack-dependent content on the generation a player joined
+     * with (see [networkPackGeneration]).
+     */
+    fun rebuildNetworkPack() {
+    }
+
+    /**
+     * The current network pack generation: a monotonically increasing
+     * counter that advances by one whenever a [rebuildNetworkPack] changes
+     * the pack's content. Stable across restarts.
+     *
+     * Use it to gate pack-dependent content (custom glyphs/icons) so a
+     * player only sees assets present in the pack version they actually
+     * loaded at join.
+     *
+     * @return the current generation, or `0` before the first pack build.
+     */
+    fun networkPackGeneration(): Int = 0
+
+    /**
      * Whether this addon is active for the given task.
      *
      * Tasks can turn addons off individually; addons with per-service

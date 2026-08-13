@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.91.0 — 2026-08-12
+
+### Neu: In-Game-Handy mit App-System (`helix.phone` + `helix-addon-phone-paper`)
+
+- **Ein Handy als zentrale Oberfläche**: `/phone` (bzw. das Lobby-Handy-Item)
+  öffnet ein GUI, das das **gesamte Inventar** als Bildschirm nutzt — das
+  Gehäuse ist eine 176×222-Titel-Glyphe, die über Chest, Spieler-Inventar und
+  Hotbar liegt; das echte Inventar wird crash-sicher ausgeliehen und beim
+  Schließen wiederhergestellt (`InventoryTakeover`, aus BetterMSGs übernommen).
+- **App-Grid**: Apps liegen als Icon-Glyphen auf einem 4×5-Home-Grid; ein Tap
+  führt entweder einen **Command** aus (`COMMAND`, z. B. `profilemenu`) oder
+  öffnet einen **nativen Screen** (`NATIVE`): **Navigator** (Server-Auswahl,
+  verbindet per Proxy), **Messages** (öffnet BetterMSGs). Default-Apps:
+  Messages, Navigator, Profile, Settings + Admin-Apps iGuard (`/iguard panel`)
+  & Network (permission-gated `helix.phone.admin`).
+- **App-Icons als hochgeladene PNGs**: Im Dashboard-Panel legt man Apps an und
+  lädt pro App ein **PNG-Logo** hoch. Das Icon wird zur Laufzeit ins
+  **Netzwerk-Resource-Pack** injiziert (neue `AddonContext`-API
+  `contributePackAsset`/`rebuildNetworkPack`; `NetworkPackService` merged jetzt
+  auch Laufzeit-Beiträge und führt eine **monotone Pack-Generation**). Mitgeliefert
+  werden gezeichnete Default-Icons.
+- **Versioniert pro Join**: Ein neu gebautes Pack wird **nicht** an Online-Spieler
+  nachgeschoben. Das Handy führt eine **Epoch**; beim Join wird sie pro Spieler
+  gestempelt, und eine App erscheint nur, wenn `sinceEpoch ≤ Spieler-Epoch` — d. h.
+  eine neue App (und ihr frisch gebackenes Icon) taucht **nur bei Spielern auf, die
+  danach neu joinen** und das Pack sicher geladen haben. Keine kaputten Glyphen.
+- **Lobby-Integration**: Im Lobby-Panel schaltet **Phone-Modus** die Hotbar auf ein
+  **einziges Item**, das `/phone` öffnet — das Handy ersetzt dann das Item-Layout.
+
 ## 0.90.0 — 2026-08-12
 
 ### Neu: Lobby-Addon (`helix.lobby` + `helix-addon-lobby-paper`)

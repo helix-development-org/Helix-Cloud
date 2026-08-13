@@ -1,0 +1,7 @@
+{
+  "message.starting": "<gray>Das Handy startet noch — versuch es gleich nochmal.",
+  "message.no-app": "<red>Diese App ist nicht verfügbar.",
+  "screen.settings.title": "<white>Einstellungen",
+  "screen.network.title": "<white>Netzwerk",
+  "app.opening": "<gray>Öffne <white>{app}</white>…"
+}

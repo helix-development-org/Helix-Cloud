@@ -93,6 +93,62 @@ class NetworkPackServiceTest {
     }
 
     @Test
+    fun `runtime contribution is merged and wins over addon entries`() {
+        val a = fakePack("a.zip", mapOf("assets/helix_phone/x.png" to "FROM-ADDON"))
+        service.contributeAsset("assets/helix_phone/x.png", "FROM-UPLOAD".encodeToByteArray())
+        service.contributeAsset("assets/helix_phone/icon.png", "ICON".encodeToByteArray())
+
+        service.rebuild(listOf("helix.a" to a))
+
+        val merged = entriesOf(service.packFile()!!)
+        assertEquals("FROM-UPLOAD", merged["assets/helix_phone/x.png"])
+        assertEquals("ICON", merged["assets/helix_phone/icon.png"])
+    }
+
+    @Test
+    fun `contribution alone builds a pack even without addon packs`() {
+        service.contributeAsset("assets/helix_phone/icon.png", "ICON".encodeToByteArray())
+
+        service.rebuild(emptyList())
+
+        assertEquals("ICON", entriesOf(service.packFile()!!)["assets/helix_phone/icon.png"])
+    }
+
+    @Test
+    fun `generation advances only when content changes`() {
+        val a = fakePack("a.zip", mapOf("assets/a.png" to "A"))
+
+        service.rebuild(listOf("helix.a" to a))
+        val first = service.generation()
+        // same input → no bump
+        service.rebuild(listOf("helix.a" to a))
+        assertEquals(first, service.generation())
+        // new asset → exactly one bump
+        service.contributeAsset("assets/helix_phone/icon.png", "ICON".encodeToByteArray())
+        service.rebuild(listOf("helix.a" to a))
+        assertEquals(first + 1, service.generation())
+    }
+
+    @Test
+    fun `generation persists across service instances`() {
+        val out = directory.resolve("persist")
+        val a = fakePack("pa.zip", mapOf("assets/a.png" to "A"))
+        val first = NetworkPackService(out)
+        first.rebuild(listOf("helix.a" to a))
+        val generation = first.generation()
+
+        val reopened = NetworkPackService(out)
+        assertEquals(generation, reopened.generation())
+    }
+
+    @Test
+    fun `rejects contribution paths escaping the runtime area`() {
+        service.contributeAsset("../escape.png", "NOPE".encodeToByteArray())
+        service.rebuild(emptyList())
+        assertNull(service.packFile())
+    }
+
+    @Test
     fun `public url override is persisted and clearable`() {
         assertNull(service.publicUrl())
 

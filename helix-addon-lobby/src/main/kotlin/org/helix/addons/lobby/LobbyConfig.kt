@@ -24,6 +24,7 @@ data class LobbyConfig(
     val layouts: Map<String, LobbyLayout> = mapOf("*" to LobbyLayout.DEFAULT),
     val protection: ProtectionSettings = ProtectionSettings(),
     val serverMenu: ServerMenuSettings = ServerMenuSettings(),
+    val phone: PhoneItemSettings = PhoneItemSettings(),
 ) {
     /**
      * Resolves the layout a lobby task should use: its own if present,
@@ -166,6 +167,24 @@ data class ServerMenuSettings(
     val rows: Int = 3,
     val excludeLobbyTasks: Boolean = true,
     val entryMaterial: String = "PAPER",
+)
+
+/**
+ * Phone-mode: when enabled, a lobby hands out a single hotbar item that
+ * opens the in-game phone (`/phone`, from the helix.phone addon) instead of
+ * the configured [LobbyLayout] items. The phone then hosts everything.
+ *
+ * @property enabled whether phone mode replaces the normal hotbar.
+ * @property slot the hotbar slot 0..8 the phone item occupies.
+ * @property material the phone item's material.
+ * @property name the phone item's display name (MiniMessage).
+ */
+@Serializable
+data class PhoneItemSettings(
+    val enabled: Boolean = false,
+    val slot: Int = 4,
+    val material: String = "COMPASS",
+    val name: String = "<green>Phone",
 )
 
 /**

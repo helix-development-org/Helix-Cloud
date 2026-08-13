@@ -1,0 +1,125 @@
+<div class="card">
+  <div class="card-head"><h2>Phone apps</h2>
+    <div class="sub">apps on the in-game phone home screen · a new app reaches players on their next join</div>
+    <div class="right">
+      <button class="btn sm subtle" id="add">+ App</button>
+      <button class="btn" id="save">Save</button>
+    </div>
+  </div>
+  <div class="card-body"><div id="apps"></div></div>
+</div>
+
+<style>
+.app-row{border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px}
+.icon-prev{width:40px;height:40px;border:1px solid var(--line);border-radius:8px;image-rendering:pixelated;background:var(--surface-2);object-fit:contain}
+.icon-box{display:flex;align-items:center;gap:10px}
+</style>
+
+<script>
+"use strict";
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const KINDS = ["COMMAND", "NATIVE"];
+const BUILTIN = ["default", "messages", "navigator", "profile", "settings", "guard", "network"];
+const SCREENS = ["messages", "navigator", "settings", "network"];
+
+let apps = [];
+let uploadedIds = [];
+const localIcons = {}; // iconId -> dataURL just uploaded this session (for preview)
+
+function defApp() {
+  return { id: "", name: "<white>App", kind: "COMMAND", command: "", screen: "", permission: "", adminOnly: false, icon: "builtin:default", order: apps.length, enabled: true };
+}
+
+function iconPreview(a) {
+  if (a.icon && a.icon.indexOf("custom:") === 0) {
+    const id = a.icon.slice(7);
+    if (localIcons[id]) return `<img class="icon-prev" src="${localIcons[id]}">`;
+    return `<div class="icon-prev" title="uploaded icon '${esc(id)}'"></div>`;
+  }
+  return `<div class="icon-prev" style="display:flex;align-items:center;justify-content:center;font-size:10px" title="built-in">${esc((a.icon || "").replace("builtin:", ""))}</div>`;
+}
+
+function render() {
+  document.getElementById("apps").innerHTML = apps.length ? apps.map((a, i) => `
+    <div class="app-row">
+      <div class="row" style="justify-content:space-between">
+        <div class="icon-box">${iconPreview(a)}<b>${esc(a.id || "(new app)")}</b></div>
+        <div class="row">
+          <label class="checkbox"><input type="checkbox" data-i="${i}" data-f="enabled" ${a.enabled ? "checked" : ""}> enabled</label>
+          <button class="btn sm danger" data-rm="${i}">Remove</button>
+        </div>
+      </div>
+      <div class="grid c2" style="margin-top:8px">
+        <div class="field"><label>Id (stable)</label><input class="mono" data-i="${i}" data-f="id" value="${esc(a.id)}" placeholder="calculator"></div>
+        <div class="field"><label>Name (MiniMessage)</label><input class="mono" data-i="${i}" data-f="name" value="${esc(a.name)}"></div>
+        <div class="field"><label>Kind</label><select data-i="${i}" data-f="kind">${KINDS.map(k => `<option ${k === a.kind ? "selected" : ""}>${k}</option>`).join("")}</select></div>
+        <div class="field" data-cmd="${i}" style="${a.kind === "COMMAND" ? "" : "display:none"}"><label>Command (no /)</label><input class="mono" data-i="${i}" data-f="command" value="${esc(a.command)}" placeholder="profilemenu"></div>
+        <div class="field" data-scr="${i}" style="${a.kind === "NATIVE" ? "" : "display:none"}"><label>Native screen</label><select data-i="${i}" data-f="screen"><option value=""></option>${SCREENS.map(s => `<option ${s === a.screen ? "selected" : ""}>${s}</option>`).join("")}</select></div>
+        <div class="field"><label>Permission (optional)</label><input class="mono" data-i="${i}" data-f="permission" value="${esc(a.permission)}"></div>
+        <div class="field"><label>Order</label><input type="number" data-i="${i}" data-f="order" value="${a.order || 0}"></div>
+        <div class="field"><label>Icon</label>
+          <select data-i="${i}" data-f="iconsel">
+            ${BUILTIN.map(b => `<option value="builtin:${b}" ${a.icon === "builtin:" + b ? "selected" : ""}>built-in: ${b}</option>`).join("")}
+            ${uploadedIds.map(u => `<option value="custom:${esc(u)}" ${a.icon === "custom:" + u ? "selected" : ""}>uploaded: ${esc(u)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field"><label>Upload PNG icon (uses this app's id)</label><input type="file" accept="image/png" data-upload="${i}"></div>
+        <label class="checkbox" style="align-self:end"><input type="checkbox" data-i="${i}" data-f="adminOnly" ${a.adminOnly ? "checked" : ""}> admin only</label>
+      </div>
+    </div>`).join("") : `<div class="sub">no apps — add one</div>`;
+  bind();
+}
+
+function bind() {
+  document.querySelectorAll("#apps [data-f]").forEach(el => {
+    const ev = el.type === "checkbox" ? "onchange" : (el.tagName === "SELECT" ? "onchange" : "oninput");
+    el[ev] = () => {
+      const a = apps[+el.dataset.i], f = el.dataset.f;
+      if (f === "enabled" || f === "adminOnly") a[f] = el.checked;
+      else if (f === "order") a.order = parseInt(el.value) || 0;
+      else if (f === "iconsel") a.icon = el.value;
+      else a[f] = el.value;
+      if (f === "kind") render();
+    };
+  });
+  document.querySelectorAll("[data-rm]").forEach(b => b.onclick = () => { apps.splice(+b.dataset.rm, 1); render(); });
+  document.querySelectorAll("[data-upload]").forEach(inp => inp.onchange = () => uploadIcon(+inp.dataset.upload, inp.files[0]));
+}
+
+async function uploadIcon(index, file) {
+  const a = apps[index];
+  if (!file) return;
+  if (!a.id) return Helix.toast("give the app an id first");
+  const reader = new FileReader();
+  reader.onload = async () => {
+    const dataUrl = reader.result;
+    const r = await Helix.action("phone.icon.put", a.id, dataUrl);
+    if (r.success) {
+      localIcons[a.id] = dataUrl;
+      a.icon = "custom:" + a.id;
+      if (!uploadedIds.includes(a.id)) uploadedIds.push(a.id);
+      Helix.toast("icon uploaded — visible to players on next join");
+      render();
+    } else {
+      Helix.toast(r.lines[0] || "upload failed");
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+document.getElementById("add").onclick = () => { apps.push(defApp()); render(); };
+document.getElementById("save").onclick = async () => {
+  for (const a of apps) if (!a.id) return Helix.toast("every app needs an id");
+  const r = await Helix.action("phone.set", JSON.stringify({ apps }));
+  Helix.toast(r.lines[0] || (r.success ? "saved" : "failed"));
+};
+
+async function load() {
+  const r = await Helix.action("phone.get");
+  try { apps = (JSON.parse(r.lines[0] || "{}").apps) || []; } catch (e) { apps = []; }
+  const il = await Helix.action("phone.icons");
+  try { uploadedIds = JSON.parse(il.lines[0] || "[]"); } catch (e) { uploadedIds = []; }
+  render();
+}
+Helix.ready(load);
+</script>
