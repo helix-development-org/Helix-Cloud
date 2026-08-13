@@ -1,0 +1,10 @@
+name: HelixLobby
+version: 1.0.0
+main: org.helix.addons.lobby.paper.LobbyPlugin
+api-version: '1.21'
+description: Lobby hotbar (items run commands / open the server selector) with toggleable lobby protection, driven by the helix.lobby addon.
+depend: [Helix-GUIs]
+permissions:
+  helix.lobby.bypass:
+    description: Exempts a player from lobby protection (build, damage, item lock, void teleport).
+    default: op

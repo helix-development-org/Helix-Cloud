@@ -8,6 +8,7 @@ import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.format.TextColor
+import net.kyori.adventure.text.format.TextDecoration
 
 /**
  * Builds a pixel-precise GUI title [Component] using the resource-pack font
@@ -181,6 +182,47 @@ class DisplayBuilder internal constructor(
     ) {
         component.append(Component.text(value, color).font(font))
         cursor = Math.addExact(cursor, widths.measure(value))
+    }
+
+    /**
+     * Like [text], but applies MiniMessage-style decorations and keeps the
+     * cursor accurate for them: the client renders `bold` by drawing each
+     * glyph twice offset by one pixel (so every glyph advances one pixel
+     * more), while `italic`, `obfuscated`, `underlined` and `strikethrough`
+     * keep the plain advance. Used to preview a formatted MiniMessage line
+     * faithfully, one styled run at a time.
+     *
+     * @param value the text to render.
+     * @param line the text row whose default font/vertical position to use;
+     *   ignored when [font] is passed explicitly.
+     * @param color color of the text.
+     * @param bold whether to render bold (widens every glyph by one pixel).
+     * @param italic whether to render italic.
+     * @param obfuscated whether to render the animated obfuscated effect.
+     * @param underlined whether to underline.
+     * @param strikethrough whether to strike through.
+     * @param font font to render with; defaults to the row font for [line].
+     */
+    fun styledText(
+        value: String,
+        line: Int,
+        color: TextColor = NamedTextColor.DARK_GRAY,
+        bold: Boolean = false,
+        italic: Boolean = false,
+        obfuscated: Boolean = false,
+        underlined: Boolean = false,
+        strikethrough: Boolean = false,
+        font: Key = fonts.textRow(line),
+    ) {
+        component.append(
+            Component.text(value, color).font(font)
+                .decoration(TextDecoration.BOLD, bold)
+                .decoration(TextDecoration.ITALIC, italic)
+                .decoration(TextDecoration.OBFUSCATED, obfuscated)
+                .decoration(TextDecoration.UNDERLINED, underlined)
+                .decoration(TextDecoration.STRIKETHROUGH, strikethrough),
+        )
+        cursor = Math.addExact(cursor, widths.measure(value) + if (bold) value.length else 0)
     }
 
     /**

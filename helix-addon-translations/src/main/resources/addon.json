@@ -1,0 +1,7 @@
+{
+  "id": "helix.translations",
+  "name": "Translations Editor",
+  "version": "1.0.0",
+  "main": "org.helix.addons.translations.TranslationsAddon",
+  "description": "In-game translation editor: the /translationsmenu Paper GUI that browses every helix.translations.* message grouped by addon and edits it on a dirt-textured live MiniMessage preview. Reads and writes go through the node's admin-gated helix.translations.* actions."
+}

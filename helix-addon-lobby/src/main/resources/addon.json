@@ -1,0 +1,8 @@
+{
+  "id": "helix.lobby",
+  "name": "Helix Lobby",
+  "version": "1.0.0",
+  "main": "org.helix.addons.lobby.LobbyAddon",
+  "description": "Turns selected tasks into lobbies: a configurable hotbar whose items run commands or open the built-in server selector, plus toggleable lobby protection. Everything (item layout, lobby tasks, protection) is edited in the dashboard.",
+  "permissions": ["helix.lobby.admin"]
+}

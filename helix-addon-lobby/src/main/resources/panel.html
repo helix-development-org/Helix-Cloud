@@ -1,0 +1,184 @@
+<div class="card">
+  <div class="card-head"><h2>Lobby tasks</h2>
+    <div class="sub">tasks whose services act as lobbies — items &amp; protection only apply there</div>
+    <div class="right"><button class="btn" id="save-top">Save</button></div>
+  </div>
+  <div class="card-body"><div id="tasks" class="row" style="flex-wrap:wrap;gap:10px"></div></div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Hotbar layout</h2>
+    <div class="sub">items a player receives on join · each runs a command or opens the server selector</div>
+    <div class="right">
+      <select id="layout" style="max-width:220px"></select>
+      <button class="btn sm subtle" id="add-item">+ Item</button>
+      <button class="btn sm danger" id="del-layout">Delete layout</button>
+    </div>
+  </div>
+  <div class="card-body"><div id="items"></div></div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Protection</h2><div class="sub">each rule is independent · players with <code>helix.lobby.bypass</code> are exempt</div></div>
+  <div class="card-body">
+    <div id="protection" class="grid c2"></div>
+    <div class="field" style="max-width:240px;margin-top:12px">
+      <label>Void teleport below Y</label><input type="number" id="voidY" step="1">
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Server selector</h2><div class="sub">the GUI opened by an <b>OPEN_SERVER_MENU</b> item</div></div>
+  <div class="card-body"><div class="grid c2">
+    <div class="field"><label>Title (MiniMessage)</label><input class="mono" id="sm-title"></div>
+    <div class="field"><label>Rows (1–6)</label><input type="number" id="sm-rows" min="1" max="6"></div>
+    <div class="field"><label>Entry material</label><input class="mono" id="sm-material" placeholder="PAPER"></div>
+    <label class="checkbox" style="align-self:end"><input type="checkbox" id="sm-exclude"> hide lobby tasks from the list</label>
+  </div></div>
+</div>
+
+<div class="row" style="margin:4px 0 20px"><button class="btn" id="save-bottom">Save</button></div>
+
+<style>
+.item-row{border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px}
+.item-row .grid{gap:10px}
+.tasktag{border:1px solid var(--line);border-radius:var(--radius-sm);padding:6px 10px}
+</style>
+
+<script>
+"use strict";
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const ACTIONS = ["RUN_COMMAND", "OPEN_SERVER_MENU"];
+const PROT = [
+  ["adventureMode", "Adventure game mode"],
+  ["clearInventoryOnJoin", "Clear inventory on join"],
+  ["preventBlockBreak", "Prevent block break"],
+  ["preventBlockPlace", "Prevent block place"],
+  ["preventItemDrop", "Prevent item drop"],
+  ["preventItemMove", "Lock inventory (no item move)"],
+  ["preventDamage", "Prevent all damage"],
+  ["preventHunger", "Prevent hunger"],
+  ["voidTeleport", "Teleport to spawn in the void"],
+];
+
+let cfg = null;
+let tasks = [];      // known task names from task.list
+let current = "*";   // layout being edited
+
+function defItem() { return { slot: 0, material: "COMPASS", name: "", lore: [], action: "RUN_COMMAND", command: "", permission: "", glow: false }; }
+function layout() { if (!cfg.layouts[current]) cfg.layouts[current] = { items: [] }; return cfg.layouts[current]; }
+function layoutNames() { return Array.from(new Set(["*", ...cfg.lobbyTasks, ...Object.keys(cfg.layouts)])); }
+
+function renderTasks() {
+  const names = Array.from(new Set([...tasks, ...cfg.lobbyTasks]));
+  const box = document.getElementById("tasks");
+  box.innerHTML = names.length
+    ? names.map(n => `<label class="checkbox tasktag"><input type="checkbox" data-task="${esc(n)}" ${cfg.lobbyTasks.includes(n) ? "checked" : ""}> ${esc(n)}</label>`).join("")
+    : `<div class="sub">no tasks found — create a task first</div>`;
+  box.querySelectorAll("[data-task]").forEach(c => c.onchange = () => {
+    const n = c.dataset.task;
+    if (c.checked) { if (!cfg.lobbyTasks.includes(n)) cfg.lobbyTasks.push(n); }
+    else cfg.lobbyTasks = cfg.lobbyTasks.filter(t => t !== n);
+    renderLayoutSelect();
+  });
+}
+
+function renderLayoutSelect() {
+  document.getElementById("layout").innerHTML = layoutNames()
+    .map(n => `<option value="${esc(n)}" ${n === current ? "selected" : ""}>${n === "*" ? "★ default (all lobbies)" : esc(n)}</option>`).join("");
+  document.getElementById("del-layout").disabled = current === "*";
+}
+
+function renderItems() {
+  const items = layout().items;
+  document.getElementById("items").innerHTML = items.length ? items.map((it, i) => `
+    <div class="item-row">
+      <div class="row" style="justify-content:space-between">
+        <b>Slot ${it.slot}</b><button class="btn sm danger" data-rm="${i}">Remove</button>
+      </div>
+      <div class="grid c2" style="margin-top:8px">
+        <div class="field"><label>Hotbar slot (0–8)</label><input type="number" min="0" max="8" data-i="${i}" data-f="slot" value="${it.slot}"></div>
+        <div class="field"><label>Material</label><input class="mono" data-i="${i}" data-f="material" value="${esc(it.material)}"></div>
+        <div class="field"><label>Display name (MiniMessage)</label><input class="mono" data-i="${i}" data-f="name" value="${esc(it.name)}"></div>
+        <div class="field"><label>Action</label><select data-i="${i}" data-f="action">${ACTIONS.map(a => `<option ${a === it.action ? "selected" : ""}>${a}</option>`).join("")}</select></div>
+        <div class="field" data-cmd="${i}" style="${it.action === "RUN_COMMAND" ? "" : "display:none"}"><label>Command (no leading /)</label><input class="mono" data-i="${i}" data-f="command" value="${esc(it.command)}" placeholder="profilemenu"></div>
+        <div class="field"><label>Permission (optional)</label><input class="mono" data-i="${i}" data-f="permission" value="${esc(it.permission)}"></div>
+        <div class="field"><label>Lore (one line per row)</label><textarea class="mono" rows="2" data-i="${i}" data-f="lore">${esc((it.lore || []).join("\n"))}</textarea></div>
+        <label class="checkbox" style="align-self:end"><input type="checkbox" data-i="${i}" data-f="glow" ${it.glow ? "checked" : ""}> glow effect</label>
+      </div>
+    </div>`).join("") : `<div class="sub">no items yet — add one</div>`;
+
+  document.querySelectorAll("#items [data-f]").forEach(el => {
+    const ev = el.type === "checkbox" ? "onchange" : "oninput";
+    el[ev] = () => {
+      const it = layout().items[+el.dataset.i], f = el.dataset.f;
+      if (f === "slot") it.slot = Math.max(0, Math.min(8, parseInt(el.value) || 0));
+      else if (f === "glow") it.glow = el.checked;
+      else if (f === "lore") it.lore = el.value.split("\n").map(s => s.trimEnd()).filter(s => s.length);
+      else it[f] = el.value;
+      if (f === "action") { const c = document.querySelector(`[data-cmd="${el.dataset.i}"]`); if (c) c.style.display = el.value === "RUN_COMMAND" ? "" : "none"; }
+    };
+  });
+  document.querySelectorAll("[data-rm]").forEach(b => b.onclick = () => { layout().items.splice(+b.dataset.rm, 1); renderItems(); });
+}
+
+function renderProtection() {
+  document.getElementById("protection").innerHTML = PROT
+    .map(([k, label]) => `<label class="checkbox"><input type="checkbox" data-p="${k}" ${cfg.protection[k] ? "checked" : ""}> ${label}</label>`).join("");
+  document.querySelectorAll("[data-p]").forEach(c => c.onchange = () => cfg.protection[c.dataset.p] = c.checked);
+  document.getElementById("voidY").value = cfg.protection.voidTeleportY ?? 0;
+}
+
+function renderServerMenu() {
+  document.getElementById("sm-title").value = cfg.serverMenu.title || "";
+  document.getElementById("sm-rows").value = cfg.serverMenu.rows || 3;
+  document.getElementById("sm-material").value = cfg.serverMenu.entryMaterial || "PAPER";
+  document.getElementById("sm-exclude").checked = cfg.serverMenu.excludeLobbyTasks !== false;
+}
+
+function collect() {
+  cfg.protection.voidTeleportY = parseInt(document.getElementById("voidY").value) || 0;
+  cfg.serverMenu.title = document.getElementById("sm-title").value;
+  cfg.serverMenu.rows = Math.max(1, Math.min(6, parseInt(document.getElementById("sm-rows").value) || 3));
+  cfg.serverMenu.entryMaterial = document.getElementById("sm-material").value || "PAPER";
+  cfg.serverMenu.excludeLobbyTasks = document.getElementById("sm-exclude").checked;
+  // drop empty layouts except the default so the map stays tidy
+  for (const k of Object.keys(cfg.layouts)) if (k !== "*" && (!cfg.layouts[k].items || !cfg.layouts[k].items.length)) delete cfg.layouts[k];
+}
+
+async function save() {
+  collect();
+  const r = await Helix.action("lobby.set", JSON.stringify(cfg));
+  Helix.toast(r.lines[0] || (r.success ? "saved" : "failed"));
+}
+
+document.getElementById("layout").onchange = e => { current = e.target.value; renderItems(); renderLayoutSelect(); };
+document.getElementById("add-item").onclick = () => { layout().items.push(defItem()); renderItems(); };
+document.getElementById("del-layout").onclick = () => {
+  if (current === "*") return;
+  delete cfg.layouts[current]; current = "*"; renderLayoutSelect(); renderItems();
+};
+document.getElementById("save-top").onclick = save;
+document.getElementById("save-bottom").onclick = save;
+
+function normalize(c) {
+  c = c || {};
+  c.lobbyTasks = Array.isArray(c.lobbyTasks) ? c.lobbyTasks : [];
+  c.layouts = c.layouts && typeof c.layouts === "object" ? c.layouts : { "*": { items: [] } };
+  if (!c.layouts["*"]) c.layouts["*"] = { items: [] };
+  c.protection = Object.assign({ adventureMode: true, clearInventoryOnJoin: true, preventBlockBreak: true, preventBlockPlace: true, preventItemDrop: true, preventItemMove: true, preventDamage: true, preventHunger: true, voidTeleport: true, voidTeleportY: 0 }, c.protection || {});
+  c.serverMenu = Object.assign({ title: "<dark_gray>Server selector", rows: 3, excludeLobbyTasks: true, entryMaterial: "PAPER" }, c.serverMenu || {});
+  return c;
+}
+
+async function load() {
+  const r = await Helix.action("lobby.get");
+  try { cfg = normalize(JSON.parse(r.lines[0] || "{}")); } catch (e) { cfg = normalize({}); }
+  const tl = await Helix.action("task.list");
+  tasks = (tl.success ? tl.lines : []).map(l => l.split(/\s+/)[0]).filter(Boolean);
+  current = "*";
+  renderTasks(); renderLayoutSelect(); renderItems(); renderProtection(); renderServerMenu();
+}
+Helix.ready(load);
+</script>

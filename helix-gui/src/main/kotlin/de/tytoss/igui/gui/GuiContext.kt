@@ -60,6 +60,9 @@ class GuiClickContext internal constructor(
      *
      * @param initialValue text pre-filled in the anvil's rename field.
      * @param title title of the anvil inventory.
+     * @param preview optional per-keystroke renderer for the result item's
+     *  name, giving a live formatted preview of the typed text (e.g. rendered
+     *  MiniMessage); `null` shows the raw typed text.
      * @return the text the player entered.
      * @throws GuiInputCancelledException if the input is cancelled.
      * @throws GuiInputTimeoutException if the player does not respond in time.
@@ -67,7 +70,8 @@ class GuiClickContext internal constructor(
     suspend fun anvilInput(
         initialValue: String = "",
         title: Component = Component.text("Input"),
-    ): String = inputRequester(GuiInputRequest.Anvil(initialValue, title)) as String
+        preview: ((String) -> Component)? = null,
+    ): String = inputRequester(GuiInputRequest.Anvil(initialValue, title, preview)) as String
 
     /**
      * Opens a virtual sign and waits for the player to submit its lines,
