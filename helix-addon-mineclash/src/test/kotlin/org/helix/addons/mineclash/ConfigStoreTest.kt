@@ -24,7 +24,10 @@ class ConfigStoreTest {
         assertEquals("5000", store.setting("war.pointsWin"))
         assertEquals(13, store.documents("cards").size)
         assertEquals("zombie", store.documents("cards").first().id)
-        assertEquals(listOf("buildings", "cards", "chests", "perks", "servers"), store.collectionNames())
+        assertEquals(listOf("buildings", "cards", "chests", "perks", "servers", "warSpawns"), store.collectionNames())
+        assertEquals(7, store.documents("warSpawns").size)
+        assertEquals("NETHER", store.document("warSpawns", "blaze")?.body?.get("dimension")?.jsonPrimitive?.content)
+        assertEquals("1000", store.setting("war.baseMinDistance"))
 
         store.setSetting("war.pointsWin", "7000")
         val reloaded = ConfigStore(storage)

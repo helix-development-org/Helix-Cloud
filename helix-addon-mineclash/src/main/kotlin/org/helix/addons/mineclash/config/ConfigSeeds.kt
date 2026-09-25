@@ -120,6 +120,15 @@ object ConfigSeeds {
         int("war.maxDeckCards", 8, "Maximum cards in a war deck")
         int("war.baseZoneRadius", 20, "Visible sphere around the base crystal")
         int("war.arenaZoneRadius", 12, "Visible sphere around arena crystals")
+        int("war.baseMinDistance", 1000, "Minimum distance between the two bases (blocks)")
+        int("war.baseBorderMargin", 150, "Minimum distance of bases from the world border")
+        int("war.biomeCellSize", 280, "Size of one biome zone; every land biome gets at least one")
+        int("war.endBorder", 400, "World border edge length of the war End")
+        bool("war.stronghold", true, "Place a stronghold with an End portal in every war world")
+        int("war.strongholdMinBaseDistance", 350, "Minimum distance of the stronghold from both bases")
+        int("war.customSpawnIntervalSeconds", 10, "Interval of the rule-based card mob spawner")
+        dbl("war.customSpawnChance", 0.5, "Chance per player and interval to attempt a rule-based card mob")
+        int("war.customSpawnMaxPerPlayer", 4, "Maximum rule-based card mobs near one player")
     }
 
     /** Collections (name → documents) with their seed content. */
@@ -130,6 +139,7 @@ object ConfigSeeds {
             "buildings" to buildings(),
             "perks" to perks(),
             "servers" to servers(),
+            "warSpawns" to warSpawns(),
         )
     }
 
@@ -162,6 +172,36 @@ object ConfigSeeds {
             chest("BOSS", 4, 2, 28800, 120, 5, 6, 25, listOf(5, 10, 25, 35, 25)),
             chest("WAR_WIN", 5, 0, 3600, 150, 5, 6, 20, listOf(5, 15, 30, 30, 20)),
             chest("WAR_LOSE", 6, 0, 1800, 40, 0, 3, 10, listOf(40, 30, 20, 7, 3)),
+        )
+    }
+
+    /**
+     * Rule-based card mob spawns of the war (document id = card id): cards whose mob never spawns
+     * naturally in the war overworld. `dimension` OVERWORLD/NETHER/END, `biomes` empty = any,
+     * `underground` = only below the surface, `weight` relative pick weight, `chance` extra roll after
+     * the pick (rare bosses), `maxAlive` cap per war, `boss` = the real boss of that dimension carries
+     * the card (no spawner).
+     */
+    private fun warSpawns(): List<ConfigDocument> {
+        fun rule(card: String, order: Int, dimension: String, biomes: List<String> = emptyList(), underground: Boolean = false,
+                 maxY: Int = 320, weight: Int = 1, chance: Double = 1.0, maxAlive: Int = 3, boss: Boolean = false) =
+            ConfigDocument(card, order, buildJsonObject {
+                put("dimension", JsonPrimitive(dimension))
+                put("biomes", buildJsonArray { biomes.forEach { add(JsonPrimitive(it)) } })
+                put("underground", JsonPrimitive(underground)); put("maxY", JsonPrimitive(maxY))
+                put("weight", JsonPrimitive(weight)); put("chance", JsonPrimitive(chance))
+                put("maxAlive", JsonPrimitive(maxAlive)); put("boss", JsonPrimitive(boss))
+            })
+        val snowy = listOf("SNOWY_PLAINS", "ICE_SPIKES", "SNOWY_TAIGA", "GROVE", "SNOWY_SLOPES", "FROZEN_PEAKS", "SNOWY_BEACH")
+        val village = listOf("PLAINS", "SUNFLOWER_PLAINS", "MEADOW", "SAVANNA", "DESERT", "TAIGA", "SNOWY_PLAINS")
+        return listOf(
+            rule("hoehlenspinne", 0, "OVERWORLD", underground = true, maxY = 40, weight = 3, maxAlive = 6),
+            rule("snow_golem", 1, "OVERWORLD", snowy, weight = 2, maxAlive = 4),
+            rule("evoker", 2, "OVERWORLD", listOf("DARK_FOREST", "PALE_GARDEN"), weight = 1, maxAlive = 2),
+            rule("iron_golem", 3, "OVERWORLD", village, weight = 1, maxAlive = 2),
+            rule("blaze", 4, "NETHER", weight = 3, maxAlive = 6),
+            rule("wither", 5, "NETHER", listOf("SOUL_SAND_VALLEY"), weight = 1, chance = 0.1, maxAlive = 1),
+            rule("enderdragon", 6, "END", boss = true, maxAlive = 1),
         )
     }
 
