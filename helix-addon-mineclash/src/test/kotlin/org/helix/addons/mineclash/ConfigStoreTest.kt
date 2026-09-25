@@ -43,7 +43,7 @@ class ConfigStoreTest {
         val before = store.version()
         assertEquals("true", store.setSetting("towers.decor", "TRUE"))
         assertFailsWith<IllegalArgumentException> { store.setSetting("war.pointsWin", "abc") }
-        assertFailsWith<IllegalArgumentException> { store.setSetting("deck.slotCosts", "1,x") }
+        assertFailsWith<IllegalArgumentException> { store.setSetting("cardLevels.copies", "1,x") }
         assertEquals("free text", store.setSetting("custom.key", " free text "))
         assertEquals(before + 2, store.version())
     }

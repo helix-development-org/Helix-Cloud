@@ -49,8 +49,8 @@ class MineClashAddonTest {
         assertTrue(load.success)
         val profile = json.decodeFromString<PlayerProfile>(load.lines.single())
         assertEquals("Alice", profile.name)
-        assertEquals(4, profile.deckSlots)
-        assertEquals(listOf("zombie", "skelettbogenschuetze", "hoehlenspinne", "snow_golem"), profile.deck)
+        assertEquals(8, profile.deckSlots)
+        assertEquals(listOf("zombie", "skelettbogenschuetze", "hoehlenspinne", "snow_golem", "evoker", "phantom", "witch", "blaze"), profile.deck)
         assertEquals(8, profile.cards.size)
         assertEquals(0L, profile.wallet["ROSEN"])
 

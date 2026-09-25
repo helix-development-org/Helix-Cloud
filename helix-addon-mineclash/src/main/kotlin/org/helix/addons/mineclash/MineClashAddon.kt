@@ -39,6 +39,7 @@ class MineClashAddon : AddonBase() {
 
     /** Registers stores, actions and the dashboard panel. */
     override fun enable() {
+        loadMessages()
         config = ConfigStore(context.storage())
         profiles = openProfiles()
         matchmaker = Matchmaker(timeoutMillis = (config.setting("queue.timeoutSeconds")?.toLongOrNull() ?: 600L) * 1000)
@@ -120,7 +121,7 @@ class MineClashAddon : AddonBase() {
             val name = inv.arguments.getOrNull(1) ?: ""
             val existing = profiles.load(uuid)
             val profile = existing?.let { if (name.isNotBlank() && it.name != name) it.copy(name = name) else it }
-                ?: PlayerProfile.starter(uuid, name, starterDeck(), config.setting("deck.startSlots")?.toIntOrNull() ?: 4).also(profiles::save)
+                ?: PlayerProfile.starter(uuid, name, starterDeck(), config.setting("deck.maxSize")?.toIntOrNull() ?: 8).also(profiles::save)
             ActionResult.ok(json.encodeToString(profile))
         }
         action("mineclash.profile.save", "Machine API: stores a player profile from JSON.", "mineclash.profile.save <uuid> <json…>", bridgeInvocable = true) { inv ->

@@ -20,7 +20,7 @@ data class ChestSlot(val rarity: String, val openingStarted: Long = -1)
  * @property wallet currency name to amount (`SMARAGDE`, `DIAMANTEN`, `ROSEN`).
  * @property cards card id to owned copies.
  * @property deck card ids in deck order.
- * @property deckSlots purchased deck slots.
+ * @property deckSlots deck slots of the player (fixed at deck.maxSize; no longer purchasable).
  * @property chestSlots chest slots waiting to be opened.
  * @property wins match wins.
  * @property losses match losses.
