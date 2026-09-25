@@ -133,7 +133,11 @@ fun <T> GuiPageBuilder.paginate(
     block: PaginationBuilder<T>.() -> Unit,
 ) {
     val slots = ArrayList<Int>()
-    selection.forEach(54, slots::add)
+    selection.forEach(
+        (de.tytoss.igui.layout.GuiGrid.MAX_CHEST_ROWS + de.tytoss.igui.layout.GuiGrid.PLAYER_INVENTORY_ROWS) *
+            de.tytoss.igui.layout.GuiGrid.COLUMNS,
+        slots::add,
+    )
     val pagination = PaginationBuilder<T>(slots.toIntArray()).apply(block)
     pagination.validate()
     prepare(pagination::prepare)

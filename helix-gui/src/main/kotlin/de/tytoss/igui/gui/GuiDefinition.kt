@@ -1,6 +1,7 @@
 package de.tytoss.igui.gui
 
 import de.tytoss.igui.internal.GuiRuntime
+import de.tytoss.igui.layout.GuiGrid
 import net.kyori.adventure.text.Component
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
@@ -18,12 +19,16 @@ class GuiDefinition internal constructor(
     internal val runtime: GuiRuntime,
     val id: String,
     internal val rows: Int,
+    internal val playerInventory: Boolean,
     internal val landingPage: String,
     internal val compiledPages: Map<String, GuiPage>,
     internal val closeHandler: GuiCloseHandler?,
 ) {
     /** Ids of all pages declared on this GUI. */
     val pages: Set<String> = compiledPages.keys
+
+    /** Slot and pixel geometry of this GUI (chest rows, plus the player inventory if included). */
+    val grid: GuiGrid = GuiGrid(rows, playerInventory)
 
     /**
      * Opens this GUI for a player, closing whatever inventory (GUI or

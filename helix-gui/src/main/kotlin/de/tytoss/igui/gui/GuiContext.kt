@@ -1,5 +1,8 @@
 package de.tytoss.igui.gui
 
+import de.tytoss.igui.layout.GuiArea
+import de.tytoss.igui.layout.GuiCell
+import de.tytoss.igui.layout.GuiGrid
 import net.kyori.adventure.text.Component
 import org.bukkit.entity.Player
 import org.bukkit.event.inventory.InventoryClickEvent
@@ -30,6 +33,18 @@ class GuiClickContext internal constructor(
 ) {
     /** The raw inventory slot that was clicked. */
     val slot: Int get() = event.rawSlot
+
+    /** The clicked grid cell (column and row across the whole window), see [GuiGrid]. */
+    val cell: GuiCell? get() = gui.grid.cell(event.rawSlot)
+
+    /**
+     * The clicked cell relative to [area]'s top-left corner — the "where
+     * inside this region" of a multi-slot button, image or card spot.
+     *
+     * @param area the region to resolve against.
+     * @return the relative cell, or `null` if the click lies outside [area].
+     */
+    fun cellIn(area: GuiArea): GuiCell? = cell?.let(area::relative)
 
     /**
      * Navigates the clicking player to another page of the same GUI.
