@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+### Neu: MineClash-Addon (`mineclash`)
+
+- **Node-Seite des Kartenkampfspiels MineClash**: Die gesamte Spielkonfiguration
+  (Karten, Truhen, Gebäude, Perks, Balancing, Serverrollen pro Task) liegt als
+  typisierte Settings und Dokument-Sammlungen im Addon-Storage, wird im
+  Dashboard-Panel **MineClash** editiert und den Spielservern als ein Bundle
+  (`mineclash.config.bundle`, versioniert) geliefert — kein YAML mehr auf den
+  Servern. Fehlende Standardwerte werden beim Start eingespielt
+  (`mineclash.config.seed [force]`).
+- **Spielerprofile** (Wallet, Kartensammlung, Deck, Truhen, Dorf, Tutorial) und
+  **Match-Historie** landen im zentralen PostgreSQL (Schema `mineclash`,
+  JSONB + Ranglisten-Spalten); ohne Postgres im Dokument-Store.
+  `mineclash.top` liefert die Rosen-Rangliste.
+- **Arena-Matchmaking** in der Node: Spielserver melden Warteschlangen-Beitritte
+  (`mineclash.queue.join/leave`) und holen per `mineclash.queue.poll` die Matches,
+  die sie hosten, sowie Spieler, die sie per BungeeCord-Connect zum Host schicken.
+- **Clan-Zugehörigkeit** kommt aus dem Clan-Addon (`mineclash.clan.of`).
+- Das HXA bündelt optional `paper.jar` (das MineClash-Paper-Plugin mit NMS,
+  gebaut im MineClash-Repository) und `pack.zip` (Karten-, Truhen- und
+  HUD-Assets; Trägeritem `brick`, damit es nicht mit Cosmetics kollidiert).
+
+
 ## 0.91.0 — 2026-08-12
 
 ### Neu: In-Game-Handy mit App-System (`helix.phone` + `helix-addon-phone-paper`)

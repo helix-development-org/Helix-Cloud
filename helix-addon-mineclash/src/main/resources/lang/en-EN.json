@@ -1,0 +1,6 @@
+{
+  "queue.joined": "<gray>You joined the <white>{mode}</white> queue.",
+  "queue.left": "<gray>You left the queue.",
+  "queue.already": "<yellow>You are already queued.",
+  "queue.matched": "<green>Match found! Connecting you to <white>{server}</white>…"
+}

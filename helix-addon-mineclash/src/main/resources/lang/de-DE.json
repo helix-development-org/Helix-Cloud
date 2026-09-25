@@ -1,0 +1,6 @@
+{
+  "queue.joined": "<gray>Du bist in der <white>{mode}</white>-Warteschlange.",
+  "queue.left": "<gray>Du hast die Warteschlange verlassen.",
+  "queue.already": "<yellow>Du bist bereits in der Warteschlange.",
+  "queue.matched": "<green>Match gefunden! Du wirst zu <white>{server}</white> verbunden…"
+}

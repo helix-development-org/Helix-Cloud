@@ -1,0 +1,308 @@
+[
+  {
+    "id": "zombie",
+    "sortOrder": 0,
+    "body": {
+      "name": "Zombie",
+      "cost": 2,
+      "rarity": "NORMAL",
+      "type": "TROOP",
+      "mob": "ZOMBIE",
+      "egg": "ZOMBIE_SPAWN_EGG",
+      "count": 3,
+      "hp": 20.0,
+      "damage": 4.0,
+      "towerDamage": 6.0,
+      "speed": 0.25,
+      "range": 1.5,
+      "targets": "GROUND",
+      "ability": null,
+      "abilityParams": {},
+      "enabled": true
+    }
+  },
+  {
+    "id": "skelettbogenschuetze",
+    "sortOrder": 1,
+    "body": {
+      "name": "Skelettbogenschütze",
+      "cost": 2,
+      "rarity": "NORMAL",
+      "type": "TROOP",
+      "mob": "SKELETON",
+      "egg": "SKELETON_SPAWN_EGG",
+      "count": 2,
+      "hp": 12.0,
+      "damage": 3.0,
+      "towerDamage": 3.0,
+      "speed": 0.25,
+      "range": 12.0,
+      "targets": "BOTH",
+      "ability": "ranged",
+      "abilityParams": {},
+      "enabled": true
+    }
+  },
+  {
+    "id": "hoehlenspinne",
+    "sortOrder": 2,
+    "body": {
+      "name": "Höhlenspinne",
+      "cost": 4,
+      "rarity": "NORMAL",
+      "type": "TROOP",
+      "mob": "CAVE_SPIDER",
+      "egg": "CAVE_SPIDER_SPAWN_EGG",
+      "count": 2,
+      "hp": 24.0,
+      "damage": 3.0,
+      "towerDamage": 4.0,
+      "speed": 0.3,
+      "range": 1.5,
+      "targets": "GROUND",
+      "ability": "poison",
+      "abilityParams": {
+        "duration": 3.0,
+        "amplifier": 0.0
+      },
+      "enabled": true
+    }
+  },
+  {
+    "id": "snow_golem",
+    "sortOrder": 3,
+    "body": {
+      "name": "Snow Golem",
+      "cost": 4,
+      "rarity": "SPECIAL",
+      "type": "TROOP",
+      "mob": "SNOW_GOLEM",
+      "egg": null,
+      "count": 1,
+      "hp": 30.0,
+      "damage": 4.0,
+      "towerDamage": 4.0,
+      "speed": 0.22,
+      "range": 10.0,
+      "targets": "BOTH",
+      "ability": "snowball",
+      "abilityParams": {},
+      "enabled": true
+    }
+  },
+  {
+    "id": "evoker",
+    "sortOrder": 4,
+    "body": {
+      "name": "Evoker",
+      "cost": 5,
+      "rarity": "ELITE",
+      "type": "TROOP",
+      "mob": "EVOKER",
+      "egg": "EVOKER_SPAWN_EGG",
+      "count": 1,
+      "hp": 45.0,
+      "damage": 8.0,
+      "towerDamage": 8.0,
+      "speed": 0.22,
+      "range": 6.0,
+      "targets": "GROUND",
+      "ability": "fangs_aoe",
+      "abilityParams": {
+        "radius": 2.5
+      },
+      "enabled": true
+    }
+  },
+  {
+    "id": "phantom",
+    "sortOrder": 5,
+    "body": {
+      "name": "Phantom",
+      "cost": 5,
+      "rarity": "SPECIAL",
+      "type": "TROOP",
+      "mob": "PHANTOM",
+      "egg": "PHANTOM_SPAWN_EGG",
+      "count": 1,
+      "hp": 40.0,
+      "damage": 6.0,
+      "towerDamage": 6.0,
+      "speed": 0.32,
+      "range": 1.5,
+      "targets": "BOTH",
+      "ability": "flying",
+      "abilityParams": {},
+      "enabled": true
+    }
+  },
+  {
+    "id": "witch",
+    "sortOrder": 6,
+    "body": {
+      "name": "Witch",
+      "cost": 5,
+      "rarity": "ELITE",
+      "type": "TROOP",
+      "mob": "WITCH",
+      "egg": "WITCH_SPAWN_EGG",
+      "count": 1,
+      "hp": 50.0,
+      "damage": 6.0,
+      "towerDamage": 6.0,
+      "speed": 0.24,
+      "range": 8.0,
+      "targets": "BOTH",
+      "ability": "random_heal_damage",
+      "abilityParams": {
+        "healChance": 0.5,
+        "healAmount": 6.0
+      },
+      "enabled": true
+    }
+  },
+  {
+    "id": "blaze",
+    "sortOrder": 7,
+    "body": {
+      "name": "Blaze",
+      "cost": 5,
+      "rarity": "ELITE",
+      "type": "TROOP",
+      "mob": "BLAZE",
+      "egg": "BLAZE_SPAWN_EGG",
+      "count": 1,
+      "hp": 40.0,
+      "damage": 7.0,
+      "towerDamage": 7.0,
+      "speed": 0.28,
+      "range": 9.0,
+      "targets": "BOTH",
+      "ability": "fire",
+      "abilityParams": {
+        "burnSeconds": 3.0
+      },
+      "enabled": true
+    }
+  },
+  {
+    "id": "slime",
+    "sortOrder": 8,
+    "body": {
+      "name": "Slime",
+      "cost": 6,
+      "rarity": "SPECIAL",
+      "type": "TROOP",
+      "mob": "SLIME",
+      "egg": "SLIME_SPAWN_EGG",
+      "count": 1,
+      "hp": 70.0,
+      "damage": 8.0,
+      "towerDamage": 10.0,
+      "speed": 0.22,
+      "range": 1.5,
+      "targets": "GROUND",
+      "ability": "split",
+      "abilityParams": {
+        "generations": 2.0,
+        "childrenPerSplit": 2.0
+      },
+      "enabled": true
+    }
+  },
+  {
+    "id": "enderman",
+    "sortOrder": 9,
+    "body": {
+      "name": "Enderman",
+      "cost": 6,
+      "rarity": "TITAN",
+      "type": "TROOP",
+      "mob": "ENDERMAN",
+      "egg": "ENDERMAN_SPAWN_EGG",
+      "count": 1,
+      "hp": 60.0,
+      "damage": 14.0,
+      "towerDamage": 14.0,
+      "speed": 0.3,
+      "range": 2.0,
+      "targets": "GROUND",
+      "ability": "teleport",
+      "abilityParams": {
+        "radius": 2.0
+      },
+      "enabled": true
+    }
+  },
+  {
+    "id": "iron_golem",
+    "sortOrder": 10,
+    "body": {
+      "name": "Iron Golem",
+      "cost": 7,
+      "rarity": "ELITE",
+      "type": "TROOP",
+      "mob": "IRON_GOLEM",
+      "egg": null,
+      "count": 1,
+      "hp": 140.0,
+      "damage": 18.0,
+      "towerDamage": 22.0,
+      "speed": 0.18,
+      "range": 2.0,
+      "targets": "GROUND",
+      "ability": null,
+      "abilityParams": {},
+      "enabled": true
+    }
+  },
+  {
+    "id": "enderdragon",
+    "sortOrder": 11,
+    "body": {
+      "name": "Enderdragon",
+      "cost": 8,
+      "rarity": "BOSS",
+      "type": "TROOP",
+      "mob": "ENDER_DRAGON",
+      "egg": null,
+      "count": 1,
+      "hp": 120.0,
+      "damage": 16.0,
+      "towerDamage": 20.0,
+      "speed": 0.3,
+      "range": 4.0,
+      "targets": "BOTH",
+      "ability": "dragon_aoe",
+      "abilityParams": {
+        "radius": 3.0
+      },
+      "enabled": true
+    }
+  },
+  {
+    "id": "wither",
+    "sortOrder": 12,
+    "body": {
+      "name": "Wither",
+      "cost": 8,
+      "rarity": "BOSS",
+      "type": "TROOP",
+      "mob": "WITHER",
+      "egg": null,
+      "count": 1,
+      "hp": 120.0,
+      "damage": 14.0,
+      "towerDamage": 18.0,
+      "speed": 0.26,
+      "range": 12.0,
+      "targets": "BOTH",
+      "ability": "wither_shot",
+      "abilityParams": {
+        "witherSeconds": 4.0,
+        "radius": 2.0
+      },
+      "enabled": true
+    }
+  }
+]

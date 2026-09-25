@@ -368,6 +368,21 @@ Referenz-Implementierungen in diesem Repo:
   keine kaputten Glyphen). Kann per Lobby-**Phone-Modus** als einziges
   Hotbar-Item ausgegeben werden.
 
+- `helix-addon-mineclash` — Node-Seite von **MineClash** (Clash-Royale-artiges
+  Kartenkampfspiel, Paper-Plugin mit NMS aus dem eigenen Repository). Hält die
+  komplette Spielkonfiguration als typisierte Settings + Dokument-Sammlungen
+  (`cards`, `chests`, `buildings`, `perks`, `servers`) im Addon-Storage — Panel
+  **MineClash** zum Editieren, `mineclash.config.bundle`/`.version` als
+  bridge-invocable Machine-API für die Spielserver (Poll auf Versionsänderung,
+  Reload ohne Neustart). Spielerprofile und Match-Historie im zentralen
+  PostgreSQL (Schema `mineclash`, Repository-Interface mit Dokument-Store-
+  Fallback), Matchmaking in der Node (`mineclash.queue.*`: Services pollen
+  Matches, die sie hosten, und Spieler, die sie per BungeeCord-Connect
+  weiterschicken), Clan-Zugehörigkeit über `clan.list`/`clan.detail`
+  (`mineclash.clan.of`). Referenz für ein Addon, dessen Paper-Komponente
+  ausschließlich über `POST /internal/action` mit der Node spricht und dessen
+  `paper.jar`/`pack.zip` aus einem fremden Build in `libs/` vendored werden.
+
 ## Lifecycle
 
 | Zustand | Bedeutung |

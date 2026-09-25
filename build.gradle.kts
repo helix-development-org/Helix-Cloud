@@ -93,6 +93,7 @@ val addonModules = listOf(
     "helix-addon-translations",
     "helix-addon-lobby",
     "helix-addon-phone",
+    "helix-addon-mineclash",
 )
 
 tasks.register("releaseBundle") {

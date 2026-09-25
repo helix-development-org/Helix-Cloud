@@ -1,0 +1,11 @@
+{
+  "id": "mineclash",
+  "name": "MineClash",
+  "version": "1.0.0",
+  "main": "org.helix.addons.mineclash.MineClashAddon",
+  "description": "MineClash card battle game: network-wide configuration, player profiles, matchmaking and clan war support for the MineClash Paper servers.",
+  "permissions": [
+    "mineclash.admin",
+    "mineclash.play"
+  ]
+}
