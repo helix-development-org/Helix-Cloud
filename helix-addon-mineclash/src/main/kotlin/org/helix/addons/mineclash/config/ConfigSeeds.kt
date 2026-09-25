@@ -111,6 +111,8 @@ object ConfigSeeds {
         int("war.spectateSeconds", 10, "Spectator time after death")
         int("war.baseLoadedRadius", 100, "Force-load radius around bases")
         int("war.startPodests", 3, "Defense pedestals per base at start")
+        int("war.podestRespawnSeconds", 120, "Seconds until fallen pedestal guardians return with the same card")
+        dbl("war.troopPlayerDamageFactor", 0.5, "Multiplier on card damage when troops hit players")
         bool("war.keepCards", false, "Keep cards earned in the war")
         int("war.arenaDefenseSlots", 3, "Defense slots per arena")
         int("war.arenaDefenseCooldownSeconds", 30, "Arena defense cooldown")
