@@ -38,6 +38,15 @@ class ConfigStoreTest {
     }
 
     @Test
+    fun `lifts untouched superseded defaults but keeps custom values`() {
+        val storage = InMemoryAddonStorage()
+        ConfigStore(storage).setSetting("war.baseZoneRadius", "20")
+        assertEquals("50", ConfigStore(storage).setting("war.baseZoneRadius"), "old default 20 becomes 50")
+        ConfigStore(storage).setSetting("war.baseZoneRadius", "35")
+        assertEquals("35", ConfigStore(storage).setting("war.baseZoneRadius"), "custom value stays")
+    }
+
+    @Test
     fun `validates values against seed types and bumps the version`() {
         val store = ConfigStore(InMemoryAddonStorage())
         val before = store.version()

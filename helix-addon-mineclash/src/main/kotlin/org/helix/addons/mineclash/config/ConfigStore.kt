@@ -160,8 +160,8 @@ class ConfigStore(private val storage: AddonStorage) {
     }
 
     /**
-     * Inserts seed settings and documents that are missing; with [force] every seed overwrites
-     * the stored value.
+     * Inserts seed settings and documents that are missing and lifts untouched superseded defaults
+     * ([ConfigSeeds.supersededDefaults]); with [force] every seed overwrites the stored value.
      *
      * @param force overwrite existing values.
      * @return number of written entries.
@@ -171,7 +171,8 @@ class ConfigStore(private val storage: AddonStorage) {
         var written = 0
         val values = settings.values.toMutableMap()
         for (definition in ConfigSeeds.settings) {
-            if (force || definition.key !in values) {
+            val stale = values[definition.key]?.let { it in ConfigSeeds.supersededDefaults[definition.key].orEmpty() } == true
+            if (force || definition.key !in values || stale) {
                 values[definition.key] = definition.default
                 written++
             }

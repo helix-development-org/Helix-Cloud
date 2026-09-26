@@ -134,6 +134,15 @@ object ConfigSeeds {
     }
 
     /** Collections (name → documents) with their seed content. */
+    /**
+     * Earlier seed defaults that were replaced by a new default. A stored value equal to one of these
+     * was never customised, so [ConfigStore.seed] lifts it to the current default on start-up;
+     * values an admin changed stay untouched.
+     */
+    val supersededDefaults: Map<String, Set<String>> = mapOf(
+        "war.baseZoneRadius" to setOf("20"),
+    )
+
     val collections: Map<String, List<ConfigDocument>> by lazy {
         linkedMapOf(
             "cards" to cards(),
