@@ -29,7 +29,7 @@
   "table.deck_count": "{count}/{max} cards",
   "table.hint.1": "Click a deck card:",
   "table.hint.2": "top: Remove.",
-  "table.hint.3": "Pick a collection card,",
+  "table.hint.3": "Pick a card below,",
   "table.hint.4": "then press Select.",
   "table.preview_none": "Click a card",
   "table.preview_rarity": "{rarity} · Level {level}",

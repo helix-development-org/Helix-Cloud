@@ -29,7 +29,7 @@
   "table.deck_count": "{count}/{max} Karten",
   "table.hint.1": "Deckkarte anklicken:",
   "table.hint.2": "oben: Entfernen.",
-  "table.hint.3": "Sammlungskarte wählen,",
+  "table.hint.3": "Karte unten wählen,",
   "table.hint.4": "dann unten Wählen.",
   "table.preview_none": "Karte anklicken",
   "table.preview_rarity": "{rarity} · Stufe {level}",
