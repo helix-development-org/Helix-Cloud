@@ -28,6 +28,11 @@ fun main(args: Array<String>) {
         "assets/$NAMESPACE/font/spaces.json" to spacesFont(),
     )
     entries.putAll(textRowFonts())
+    // Full-window GUIs (drawn over the player inventory, see helix-gui `playerInventory`) need the vanilla
+    // container "Inventory" label hidden; provided once here for every addon instead of per addon.
+    val emptyInventoryLabel = """{"container.inventory": ""}""".toByteArray()
+    entries["assets/minecraft/lang/en_us.json"] = emptyInventoryLabel
+    entries["assets/minecraft/lang/de_de.json"] = emptyInventoryLabel
     ZipOutputStream(Files.newOutputStream(output)).use { zip ->
         entries.forEach { (name, bytes) ->
             val entry = ZipEntry(name)

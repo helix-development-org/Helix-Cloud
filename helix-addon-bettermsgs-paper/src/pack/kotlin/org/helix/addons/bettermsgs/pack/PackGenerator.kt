@@ -55,10 +55,7 @@ fun main(args: Array<String>) {
         g.fillRect(0, 0, 2, 2)
     }
     entries["assets/bettermsgs/font/pixels.json"] = pixelFont()
-    // hide the vanilla container "Inventory" label under the drawn chat
-    val emptyInventoryLabel = """{"container.inventory": ""}""".toByteArray()
-    entries["assets/minecraft/lang/en_us.json"] = emptyInventoryLabel
-    entries["assets/minecraft/lang/de_de.json"] = emptyInventoryLabel
+    // the vanilla container "Inventory" label is hidden by the shared Helix-GUIs pack (full-window GUIs)
     ZipOutputStream(Files.newOutputStream(output)).use { zip ->
         entries.forEach { (name, bytes) ->
             val entry = ZipEntry(name)

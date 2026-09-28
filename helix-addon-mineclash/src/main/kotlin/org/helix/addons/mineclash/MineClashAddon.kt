@@ -11,6 +11,7 @@ import org.helix.addons.mineclash.profile.MatchRecord
 import org.helix.addons.mineclash.profile.PlayerProfile
 import org.helix.addons.mineclash.profile.PostgresProfileRepository
 import org.helix.addons.mineclash.profile.ProfileRepository
+import org.helix.addons.mineclash.profile.StatsReporter
 import org.helix.addons.mineclash.queue.Matchmaker
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
@@ -39,6 +40,7 @@ class MineClashAddon : AddonBase() {
     private lateinit var profiles: ProfileRepository
     private lateinit var matchmaker: Matchmaker
     private lateinit var clans: ClanLookup
+    private lateinit var stats: StatsReporter
 
     /** Registers stores, actions and the dashboard panel. */
     override fun enable() {
@@ -47,6 +49,7 @@ class MineClashAddon : AddonBase() {
         profiles = openProfiles()
         matchmaker = Matchmaker(timeoutMillis = (config.setting("queue.timeoutSeconds")?.toLongOrNull() ?: 600L) * 1000)
         clans = ClanLookup(context.actions)
+        stats = StatsReporter(context.actions) { uuid -> profiles.load(uuid)?.name?.takeIf { it.isNotBlank() } }
         registerConfigActions()
         registerProfileActions()
         registerQueueActions()
@@ -139,6 +142,7 @@ class MineClashAddon : AddonBase() {
             val record = runCatching { json.decodeFromString<MatchRecord>(inv.arguments.joinToString(" ")) }
                 .getOrElse { return@action ActionResult.error("invalid match json: ${it.message}") }
             profiles.recordMatch(record)
+            stats.report(record) // network-wide stats (helix.stats), when installed
             ActionResult.ok("recorded")
         }
         action("mineclash.top", "Best players by roses as JSON.", "mineclash.top [limit]") { inv ->
