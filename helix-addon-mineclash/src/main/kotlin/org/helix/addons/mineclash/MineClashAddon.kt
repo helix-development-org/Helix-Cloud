@@ -16,6 +16,9 @@ import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
 import org.slf4j.LoggerFactory
 
+/** Permission for the write config actions (panel/REST/console), granted through the permissions addon. */
+private const val ADMIN_PERMISSION = "mineclash.admin"
+
 /**
  * MineClash node addon: the single source of truth for the card battle game.
  *
@@ -80,13 +83,13 @@ class MineClashAddon : AddonBase() {
         action("mineclash.config.export", "Settings with types and defaults as JSON (panel).") {
             ActionResult.ok(config.settingsExportJson())
         }
-        action("mineclash.config.set", "Sets a setting; the value is validated against its type.", "mineclash.config.set <key> <value…>") { inv ->
+        action("mineclash.config.set", "Sets a setting; the value is validated against its type.", "mineclash.config.set <key> <value…>", permission = ADMIN_PERMISSION) { inv ->
             val key = inv.arguments.firstOrNull() ?: return@action ActionResult.error("usage: mineclash.config.set <key> <value…>")
             val raw = inv.arguments.drop(1).joinToString(" ")
             runCatching { config.setSetting(key, raw) }
                 .fold({ ActionResult.ok("$key = $it") }, { ActionResult.error(it.message ?: "invalid value") })
         }
-        action("mineclash.config.reset", "Resets a setting to its default.", "mineclash.config.reset <key>") { inv ->
+        action("mineclash.config.reset", "Resets a setting to its default.", "mineclash.config.reset <key>", permission = ADMIN_PERMISSION) { inv ->
             val key = inv.arguments.firstOrNull() ?: return@action ActionResult.error("usage: mineclash.config.reset <key>")
             config.resetSetting(key)?.let { ActionResult.ok("$key = $it") } ?: ActionResult.error("no default for '$key'")
         }
@@ -97,7 +100,7 @@ class MineClashAddon : AddonBase() {
             val collection = inv.arguments.firstOrNull() ?: return@action ActionResult.error("usage: mineclash.config.docs <collection>")
             ActionResult.ok(json.encodeToString(config.documents(collection)))
         }
-        action("mineclash.config.doc.set", "Creates or replaces a document from JSON.", "mineclash.config.doc.set <collection> <id> <sortOrder> <json…>") { inv ->
+        action("mineclash.config.doc.set", "Creates or replaces a document from JSON.", "mineclash.config.doc.set <collection> <id> <sortOrder> <json…>", permission = ADMIN_PERMISSION) { inv ->
             val args = inv.arguments
             if (args.size < 4) return@action ActionResult.error("usage: mineclash.config.doc.set <collection> <id> <sortOrder> <json…>")
             val sortOrder = args[2].toIntOrNull() ?: return@action ActionResult.error("sortOrder must be a number")
@@ -106,11 +109,11 @@ class MineClashAddon : AddonBase() {
             config.putDocument(args[0], ConfigDocument(args[1], sortOrder, body))
             ActionResult.ok("stored ${args[0]}/${args[1]} (version ${config.version()})")
         }
-        action("mineclash.config.doc.remove", "Removes a document.", "mineclash.config.doc.remove <collection> <id>") { inv ->
+        action("mineclash.config.doc.remove", "Removes a document.", "mineclash.config.doc.remove <collection> <id>", permission = ADMIN_PERMISSION) { inv ->
             if (inv.arguments.size < 2) return@action ActionResult.error("usage: mineclash.config.doc.remove <collection> <id>")
             if (config.removeDocument(inv.arguments[0], inv.arguments[1])) ActionResult.ok("removed") else ActionResult.error("no such document")
         }
-        action("mineclash.config.seed", "Inserts missing defaults; 'force' overwrites everything.", "mineclash.config.seed [force]") { inv ->
+        action("mineclash.config.seed", "Inserts missing defaults; 'force' overwrites everything.", "mineclash.config.seed [force]", permission = ADMIN_PERMISSION) { inv ->
             ActionResult.ok("${config.seed(force = inv.arguments.firstOrNull().equals("force", true))} entries written")
         }
     }
