@@ -18,7 +18,7 @@ import { TranslationsView } from "@/views/translations"
 import { SettingsView } from "@/views/settings"
 import { AddonPanelView } from "@/views/addon-panel"
 import { IngameMenuView } from "@/views/ingame-menu"
-import { isIngame, takeTicketFromUrl } from "@/lib/ingame"
+import { isIngame, onModeChange, requestHud, requestMouse, takeTicketFromUrl } from "@/lib/ingame"
 
 const TITLES: Record<string, string> = {
   overview: "Overview", tasks: "Tasks", services: "Services", players: "Players", proxy: "Proxy",
@@ -35,6 +35,10 @@ export function App() {
   // In-game (Helix Admin mod): quick menu first, the full dashboard on request
   const [ingame] = useState(isIngame)
   const [fullDashboard, setFullDashboard] = useState(false)
+  // Back in the walkable HUD mode (Escape in the mod) → quick menu again; the full dashboard needs the mouse
+  useEffect(() => (ingame ? onModeChange((mode) => { if (mode !== "mouse") setFullDashboard(false) }) : undefined), [ingame])
+  const openDashboard = () => { setFullDashboard(true); requestMouse() }
+  const backToMenu = () => { setFullDashboard(false); requestHud() }
 
   const establish = async (tok: string) => {
     setToken(tok)
@@ -76,7 +80,7 @@ export function App() {
   if (!identity) return (<><LoginView establish={establish} /><Toaster /></>)
   if (ingame && !fullDashboard) {
     document.documentElement.classList.add("ingame-transparent")
-    return (<><IngameMenuView identity={identity} onOpenDashboard={() => setFullDashboard(true)} /><Toaster /></>)
+    return (<><IngameMenuView identity={identity} onOpenDashboard={openDashboard} /><Toaster /></>)
   }
   document.documentElement.classList.remove("ingame-transparent")
 
@@ -108,7 +112,7 @@ export function App() {
         </ViewTransition>
       </AppShell>
       {ingame && (
-        <button onClick={() => setFullDashboard(false)}
+        <button onClick={backToMenu}
           className="fixed bottom-4 right-4 z-50 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg">
           ← In-game menu
         </button>

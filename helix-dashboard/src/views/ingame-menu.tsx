@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { api, type ActionResult, type Identity } from "@/lib/api"
-import { closeOverlay, mc } from "@/lib/ingame"
+import { closeOverlay, mc, onModeChange, onNavKey, requestMouse, type IngameMode, type NavKey } from "@/lib/ingame"
 import { usePoll } from "@/lib/use-poll"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -56,15 +56,91 @@ async function game(op: string, args: Record<string, unknown> = {}, success?: (r
   }
 }
 
+const TABS = ["main", "players", "server"] as const
+type Tab = (typeof TABS)[number]
+
+/** Everything the arrow keys can select inside the menu (tab triggers are switched with left/right instead). */
+const NAV_SELECTOR = "[data-nav-scope] button:not([disabled]), [data-nav-scope] input:not([disabled])"
+
+/**
+ * Keyboard steering of the menu while the mod shows it as walkable HUD: up/down move the selection, left/right
+ * switch tabs, select clicks (an input field switches the mod to typing mode), back goes back or closes.
+ */
+function useMenuNav(root: React.RefObject<HTMLDivElement | null>, tab: Tab, setTab: (t: Tab) => void) {
+  const active = useRef(0)
+  const items = () => Array.from(root.current?.querySelectorAll<HTMLElement>(NAV_SELECTOR) ?? []).filter((el) => el.offsetParent !== null)
+  const mark = (scroll: boolean) => {
+    const list = items()
+    root.current?.querySelectorAll("[data-nav-active]").forEach((el) => el.removeAttribute("data-nav-active"))
+    if (list.length === 0) return
+    active.current = Math.min(Math.max(active.current, 0), list.length - 1)
+    const el = list[active.current]
+    el.setAttribute("data-nav-active", "")
+    if (scroll) el.scrollIntoView({ block: "nearest" })
+  }
+
+  useEffect(() => {
+    // content changes (player list, detail view) → keep a valid selection visible
+    const observer = new MutationObserver(() => mark(false))
+    if (root.current) observer.observe(root.current, { childList: true, subtree: true })
+    mark(false)
+    return () => observer.disconnect()
+  })
+
+  useEffect(() => onNavKey((key: NavKey) => {
+    const list = items()
+    switch (key) {
+      case "up":
+        active.current = active.current <= 0 ? list.length - 1 : active.current - 1
+        break
+      case "down":
+        active.current = active.current >= list.length - 1 ? 0 : active.current + 1
+        break
+      case "left":
+      case "right": {
+        const i = TABS.indexOf(tab)
+        setTab(TABS[(i + (key === "left" ? TABS.length - 1 : 1)) % TABS.length])
+        active.current = 0
+        break
+      }
+      case "select": {
+        const el = list[active.current]
+        if (el instanceof HTMLInputElement) {
+          el.focus()
+          requestMouse()
+        } else el?.click()
+        break
+      }
+      case "back": {
+        const back = root.current?.querySelector<HTMLElement>("[data-nav-back]")
+        if (back) {
+          back.click()
+          active.current = 0
+        } else closeOverlay()
+        break
+      }
+    }
+    requestAnimationFrame(() => mark(true))
+  }), [tab])
+}
+
 /**
  * Compact txAdmin-style quick menu shown by the Helix Admin client mod (Right Shift): own tools and the
  * world (Main), every online player network-wide with in-game and moderation actions (Players) and the
  * servers (Server). "Open dashboard" switches to the full dashboard in the same overlay.
+ *
+ * While the mod shows it as HUD the player keeps walking; the menu is steered with the arrow keys, Enter and
+ * Backspace ([useMenuNav]), Right Alt switches to mouse and typing.
  */
 export function IngameMenuView({ identity, onOpenDashboard }: { identity: Identity; onOpenDashboard: () => void }) {
+  const root = useRef<HTMLDivElement>(null)
+  const [tab, setTab] = useState<Tab>("main")
+  const [mode, setMode] = useState<IngameMode>("hud")
+  useEffect(() => onModeChange(setMode), [])
+  useMenuNav(root, tab, setTab)
   return (
     <div className="dark pointer-events-none fixed inset-0 text-foreground">
-      <div className="pointer-events-auto absolute left-4 top-4 bottom-4 flex w-[400px] flex-col overflow-hidden rounded-xl border border-border bg-background/95 shadow-2xl backdrop-blur">
+      <div ref={root} className="pointer-events-auto absolute left-4 top-4 bottom-4 flex w-[400px] flex-col overflow-hidden rounded-xl border border-border bg-background/95 shadow-2xl backdrop-blur">
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
             <div className="text-sm font-semibold">Helix Admin</div>
@@ -72,20 +148,26 @@ export function IngameMenuView({ identity, onOpenDashboard }: { identity: Identi
           </div>
           <Button size="sm" variant="ghost" onClick={closeOverlay}>✕</Button>
         </div>
-        <Tabs defaultValue="main" className="flex min-h-0 flex-1 flex-col">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className="flex min-h-0 flex-1 flex-col">
           <TabsList className="mx-4 mt-3 grid grid-cols-3">
             <TabsTrigger value="main">Main</TabsTrigger>
             <TabsTrigger value="players">Players</TabsTrigger>
             <TabsTrigger value="server">Server</TabsTrigger>
           </TabsList>
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          <div data-nav-scope className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
             <TabsContent value="main"><MainTab /></TabsContent>
             <TabsContent value="players"><PlayersTab /></TabsContent>
             <TabsContent value="server"><ServerTab /></TabsContent>
           </div>
         </Tabs>
-        <div className="border-t border-border p-3">
+        <div data-nav-scope className="border-t border-border p-3">
           <Button className="w-full" onClick={onOpenDashboard}>Open dashboard</Button>
+          {mode === "hud" && (
+            <div className="mt-2 text-center text-[11px] text-muted-foreground">
+              ↑↓ select · ←→ tab · Enter use · ⌫ back · Right Alt mouse
+            </div>
+          )}
+          {mode === "mouse" && <div className="mt-2 text-center text-[11px] text-muted-foreground">Esc – back to walking</div>}
         </div>
       </div>
     </div>
@@ -197,7 +279,7 @@ function PlayerDetail({ name, player, onBack, onChanged }: { name: string; playe
     game(op, { name, ...args }, success ? () => success : undefined).then(onChanged)
   return (
     <>
-      <Button size="sm" variant="ghost" className="mb-2 -ml-2" onClick={onBack}>← Players</Button>
+      <Button data-nav-back size="sm" variant="ghost" className="mb-2 -ml-2" onClick={onBack}>← Players</Button>
       <div className="mb-3">
         <div className="text-lg font-semibold">{name}</div>
         {player ? (

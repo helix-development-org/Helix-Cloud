@@ -6,6 +6,7 @@ import net.dimaskama.mcef.api.MCEFApi
 import net.fabricmc.api.ClientModInitializer
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry
 import net.fabricmc.fabric.api.client.networking.v1.C2SPlayChannelEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
@@ -24,6 +25,10 @@ import org.lwjgl.glfw.GLFW
  * `ticket` (the panel page opens in the embedded browser) or `denied`. Every outcome is shown in the action bar,
  * so a missing permission or a server without the panel is never silent. Later presses reopen the page as it
  * was left.
+ *
+ * The quick menu opens as a HUD layer: the player keeps walking and looking around and steers the menu with the
+ * arrow keys, Enter and Backspace; Right Alt (or an input field / the full dashboard) switches to mouse and typing
+ * ([AdminScreen]), Escape goes back. Right Shift closes the HUD menu.
  */
 object HelixAdminClient : ClientModInitializer {
     /** Version of this mod, sent in `hello`. */
@@ -36,6 +41,19 @@ object HelixAdminClient : ClientModInitializer {
     /** The panel key (default Right Shift, rebindable in the controls). */
     val openKey: KeyMapping = KeyMapping("key.helix-admin.open", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_SHIFT, CATEGORY)
 
+    /** Switches between the walkable HUD menu and mouse/typing mode (default Right Alt / Option). */
+    val mouseKey: KeyMapping = KeyMapping("key.helix-admin.mouse", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_ALT, CATEGORY)
+
+    /** Navigation of the HUD menu: page event name → key (arrows, Enter, Backspace by default). */
+    private val navKeys: List<Pair<String, KeyMapping>> = listOf(
+        "up" to GLFW.GLFW_KEY_UP,
+        "down" to GLFW.GLFW_KEY_DOWN,
+        "left" to GLFW.GLFW_KEY_LEFT,
+        "right" to GLFW.GLFW_KEY_RIGHT,
+        "select" to GLFW.GLFW_KEY_ENTER,
+        "back" to GLFW.GLFW_KEY_BACKSPACE,
+    ).map { (name, key) -> name to KeyMapping("key.helix-admin.nav_$name", InputConstants.Type.KEYSYM, key, CATEGORY) }
+
     private val LOG = org.slf4j.LoggerFactory.getLogger("helix-admin")
 
     @Volatile
@@ -45,6 +63,14 @@ object HelixAdminClient : ClientModInitializer {
         MCEFApi.initialize() // lädt Chromium im Hintergrund (beim ersten Start einmalig herunter)
         AdminChannel.registerTypes()
         KeyBindingHelper.registerKeyBinding(openKey)
+        KeyBindingHelper.registerKeyBinding(mouseKey)
+        navKeys.forEach { KeyBindingHelper.registerKeyBinding(it.second) }
+        HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("helix-admin", "panel")) { graphics, _ ->
+            if (PanelBrowser.mode == PanelBrowser.Mode.HUD) {
+                val mc = Minecraft.getInstance()
+                PanelBrowser.draw(graphics, graphics.guiWidth(), graphics.guiHeight(), mc.font)
+            }
+        }
 
         ClientPlayNetworking.registerGlobalReceiver(AdminChannel.TYPE) { payload, context ->
             context.client().execute { onMessage(payload.json) }
@@ -62,12 +88,22 @@ object HelixAdminClient : ClientModInitializer {
         ClientPlayConnectionEvents.DISCONNECT.register { _, _ ->
             awaitingTicket = false
             AdminChannel.reset()
-            Minecraft.getInstance().execute { AdminScreen.release() }
+            Minecraft.getInstance().execute { PanelBrowser.release() }
         }
-        ClientTickEvents.END_CLIENT_TICK.register { client ->
-            while (openKey.consumeClick()) {
-                if (client.screen == null) onKeyPressed(client)
-            }
+        ClientTickEvents.END_CLIENT_TICK.register { client -> onTick(client) }
+    }
+
+    private fun onTick(client: Minecraft) {
+        // Maus-Modus von einem anderen Screen verdrängt (Chat, Tod, …) → zurück ins HUD-Menü
+        if (PanelBrowser.mode == PanelBrowser.Mode.MOUSE && client.screen !is AdminScreen) PanelBrowser.showHud()
+        while (openKey.consumeClick()) {
+            if (client.screen != null) continue
+            if (PanelBrowser.mode == PanelBrowser.Mode.HUD) PanelBrowser.close() else onKeyPressed(client)
+        }
+        val hud = PanelBrowser.mode == PanelBrowser.Mode.HUD && client.screen == null
+        while (mouseKey.consumeClick()) if (hud) PanelBrowser.showMouse()
+        for ((name, key) in navKeys) {
+            while (key.consumeClick()) if (hud) PanelBrowser.nav(name)
         }
     }
 
@@ -91,7 +127,10 @@ object HelixAdminClient : ClientModInitializer {
             status(client, "helix-admin.loading", init.stage.name.lowercase(), (init.percentage * 100).toInt())
             return
         }
-        if (AdminScreen.reopen()) return
+        if (PanelBrowser.ready) {
+            PanelBrowser.showHud()
+            return
+        }
         if (awaitingTicket) {
             status(client, "helix-admin.opening")
             return
@@ -118,13 +157,16 @@ object HelixAdminClient : ClientModInitializer {
                 awaitingTicket = false
                 val url = json.get("url")?.asString ?: return
                 LOG.info("ticket received, opening {}", url.substringBefore('#'))
-                runCatching { AdminScreen.open(url) }.onFailure {
+                runCatching {
+                    PanelBrowser.load(url)
+                    PanelBrowser.showHud()
+                }.onFailure {
                     LOG.error("could not open the panel", it)
                     status(Minecraft.getInstance(), "helix-admin.browser_failed", it.message ?: it.javaClass.simpleName)
                 }
             }
             "result" -> AdminChannel.onResult(json)
-            "close" -> AdminScreen.closeIfOpen()
+            "close" -> PanelBrowser.close()
         }
     }
 }

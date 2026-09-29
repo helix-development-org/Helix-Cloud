@@ -13,7 +13,8 @@ import org.cef.handler.CefMessageRouterHandlerAdapter
 /**
  * JavaScript bridge of the panel page: `window.cefQuery({request: JSON.stringify({op, args}), onSuccess, onFailure})`.
  *
- * Local ops are handled by the mod (`close` closes the overlay, `ping` answers with the mod version);
+ * Local ops are handled by the mod (`close` hides the panel, `interact` switches to mouse/typing mode, `hud` back to
+ * the walkable HUD menu, `ping` answers with the mod version and mode);
  * everything else is forwarded as an in-game action to the server ([AdminChannel.call]), which checks
  * the Helix permission and executes it. The page receives the server's JSON result.
  */
@@ -51,10 +52,21 @@ object JsBridge {
         val args = json.getAsJsonObject("args") ?: JsonObject()
         when (op) {
             "close" -> {
-                Minecraft.getInstance().execute { AdminScreen.closeIfOpen() }
+                Minecraft.getInstance().execute { PanelBrowser.close() }
                 callback.success("{}")
             }
-            "ping" -> callback.success(JsonObject().apply { addProperty("mod", HelixAdminClient.VERSION) }.toString())
+            "interact" -> {
+                Minecraft.getInstance().execute { PanelBrowser.showMouse() }
+                callback.success("{}")
+            }
+            "hud" -> {
+                Minecraft.getInstance().execute { PanelBrowser.showHud() }
+                callback.success("{}")
+            }
+            "ping" -> callback.success(JsonObject().apply {
+                addProperty("mod", HelixAdminClient.VERSION)
+                addProperty("mode", PanelBrowser.mode.name.lowercase())
+            }.toString())
             else -> AdminChannel.call(op, args).whenComplete { result, error ->
                 if (error != null) callback.failure(500, error.cause?.message ?: error.message ?: "failed")
                 else callback.success((result.get("data") ?: JsonObject()).toString())

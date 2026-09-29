@@ -615,6 +615,10 @@ Chromium (MCEF Modern). „Open dashboard“ öffnet im selben Overlay das volle
 - **Ablauf:** Mod → `hello` auf Kanal `helix:admin` → Paper-Teil antwortet `welcome` (nur mit `helix.staff.menu`).
   Taste → `open` → Paper holt `POST /internal/panel-ticket` → Mod lädt `<panel-url>/#ticket=…&ingame=1` →
   Dashboard löst `/auth/ticket` ein (Session wie beim Code-Login, Rechte `helix.panel.*` gelten weiter).
+- **Bedienung:** Das Schnellmenü liegt als HUD-Ebene über dem Spiel (Laufen/Umschauen bleibt möglich);
+  Pfeiltasten/Enter/Backspace kommen als `helix-nav`-Events auf der Seite an, Moduswechsel als `helix-mode`
+  (`hud`/`mouse`/`closed`). Rechts-Alt, Eingabefelder und das volle Dashboard schalten per Bridge-Op `interact`
+  in den Maus-Modus, Esc bzw. `hud` zurück.
 - **Panel-URL:** `admin.panelurl <host|url|->` (öffentlich erreichbare Dashboard-Adresse). Der Host reicht:
   ohne Schema wird `http://` ergänzt, `http://` ohne Port bekommt den Control-Port der Node, `https://` ohne
   Port bleibt (Reverse-Proxy). Ohne Angabe nutzt der Server die Adresse, mit der der Spieler verbunden ist,

@@ -14,7 +14,11 @@ In den `mods`-Ordner einer Fabric-Installation für 1.21.11:
 - MCEF Modern 0.3.3+mc1.21.11 (lädt Chromium beim ersten Start einmalig herunter)
 - `helix-admin-<version>.jar` (aus diesem Build bzw. `build/release/` von Helix-Cloud)
 
-Die Taste lässt sich unter *Steuerung → Helix Admin* ändern. Esc oder ✕ schließt das Panel.
+**Bedienung:** Das Schnellmenü erscheint als HUD – du läufst und schaust normal weiter. Pfeiltasten hoch/runter
+wählen, links/rechts wechseln den Tab, Enter führt aus, Backspace geht zurück (bzw. schließt), Rechts-Shift
+schließt. Rechts-Alt (Option) schaltet in den Maus-/Tipp-Modus; Eingabefelder und „Open dashboard“ tun das
+automatisch. Esc führt aus dem Maus-Modus zurück ins laufbare Menü. Alle Tasten lassen sich unter
+*Steuerung → Helix Admin* ändern.
 
 ## Bauen
 

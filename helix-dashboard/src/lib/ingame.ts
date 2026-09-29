@@ -62,3 +62,33 @@ export function mc<T = Record<string, unknown>>(op: string, args: Record<string,
 export function closeOverlay() {
   mc("close").catch(() => {})
 }
+
+/** How the mod currently shows the panel: walkable HUD menu, mouse/typing mode, or hidden. */
+export type IngameMode = "hud" | "mouse" | "closed"
+
+/** Navigation keys the mod forwards while the HUD menu is shown (arrows, Enter, Backspace by default). */
+export type NavKey = "up" | "down" | "left" | "right" | "select" | "back"
+
+/** Subscribes to the mod's mode changes (`helix-mode` events); returns the unsubscribe function. */
+export function onModeChange(listener: (mode: IngameMode) => void): () => void {
+  const handler = (e: Event) => listener((e as CustomEvent<IngameMode>).detail)
+  window.addEventListener("helix-mode", handler)
+  return () => window.removeEventListener("helix-mode", handler)
+}
+
+/** Subscribes to navigation keys from the mod (`helix-nav` events); returns the unsubscribe function. */
+export function onNavKey(listener: (key: NavKey) => void): () => void {
+  const handler = (e: Event) => listener((e as CustomEvent<NavKey>).detail)
+  window.addEventListener("helix-nav", handler)
+  return () => window.removeEventListener("helix-nav", handler)
+}
+
+/** Asks the mod for mouse/typing mode (input fields, full dashboard). */
+export function requestMouse() {
+  mc("interact").catch(() => {})
+}
+
+/** Asks the mod to go back to the walkable HUD menu. */
+export function requestHud() {
+  mc("hud").catch(() => {})
+}

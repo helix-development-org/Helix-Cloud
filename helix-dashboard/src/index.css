@@ -275,3 +275,9 @@ html.ingame-transparent body,
 html.ingame-transparent #root {
   background: transparent !important;
 }
+
+/* Keyboard selection of the in-game quick menu (arrow keys forwarded by the mod) */
+[data-nav-active] {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}

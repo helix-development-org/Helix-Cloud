@@ -9,5 +9,12 @@
   "helix-admin.browser_failed": "Helix Admin: the embedded browser could not start: %s",
   "helix-admin.page_loading": "Loading the admin panel …",
   "helix-admin.page_failed": "The admin panel could not be loaded",
-  "helix-admin.esc": "Esc closes"
+  "helix-admin.esc": "Esc – back to the menu",
+  "key.helix-admin.mouse": "Mouse/typing mode",
+  "key.helix-admin.nav_up": "Menu: up",
+  "key.helix-admin.nav_down": "Menu: down",
+  "key.helix-admin.nav_left": "Menu: tab left",
+  "key.helix-admin.nav_right": "Menu: tab right",
+  "key.helix-admin.nav_select": "Menu: select",
+  "key.helix-admin.nav_back": "Menu: back"
 }
