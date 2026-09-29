@@ -125,6 +125,9 @@ class AdminScreen private constructor() : Screen(Component.literal("Helix Admin"
 
     companion object {
         private val LOG = org.slf4j.LoggerFactory.getLogger("helix-admin")
+        private const val BRIDGE_CHECK =
+            "if (typeof window.cefQuery !== 'function' && !sessionStorage.getItem('helix.bridgeReload')) {" +
+                " sessionStorage.setItem('helix.bridgeReload', '1'); location.reload() }"
         private var browser: MCEFBrowser? = null
         private var loadedUrl: String? = null
         @Volatile private var loadError: String? = null
@@ -154,6 +157,9 @@ class AdminScreen private constructor() : Screen(Component.literal("Helix Admin"
                             if (frame?.isMain != true) return@guard
                             LOG.info("panel page loaded: HTTP {} {}", httpStatusCode, frame.url.orEmpty().substringBefore('#'))
                             if (httpStatusCode >= 400) loadError = "HTTP $httpStatusCode"
+                            // Die JS-Brücke wird erst nach dem Erzeugen des Browsers angemeldet; fehlt window.cefQuery
+                            // auf der ersten Seite, einmal neu laden (Sitzung liegt im localStorage)
+                            if (frame.url.orEmpty().startsWith("http")) frame.executeJavaScript(BRIDGE_CHECK, frame.url, 0)
                         }
                     }
 
