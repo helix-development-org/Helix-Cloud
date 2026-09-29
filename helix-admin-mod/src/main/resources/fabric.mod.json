@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "helix-admin",
+  "version": "${version}",
+  "name": "Helix Admin",
+  "description": "In-game admin panel for Helix networks: press Right Shift for the quick menu, open the full dashboard from there.",
+  "authors": ["Tytoss"],
+  "license": "Proprietary",
+  "environment": "client",
+  "entrypoints": {
+    "client": [{ "adapter": "kotlin", "value": "org.helix.admin.mod.HelixAdminClient" }]
+  },
+  "depends": {
+    "minecraft": "~1.21.11",
+    "fabricloader": ">=0.19.5",
+    "fabric-api": "*",
+    "fabric-language-kotlin": ">=1.14.0",
+    "mcef-modern": ">=0.3.3"
+  }
+}
