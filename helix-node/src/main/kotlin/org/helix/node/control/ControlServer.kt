@@ -58,6 +58,9 @@ import org.helix.node.config.NodeConfig
 import org.helix.node.control.auth.LoginRequest
 import org.helix.node.control.auth.PanelAuthService
 import org.helix.node.control.auth.PanelPrincipal
+import org.helix.node.control.auth.TicketIssueRequest
+import org.helix.node.control.auth.TicketRequest
+import org.helix.node.control.auth.TicketResponse
 import org.helix.node.control.auth.VerifyRequest
 import org.helix.node.scheduler.ScheduledJob
 import org.slf4j.LoggerFactory
@@ -405,6 +408,12 @@ private fun io.ktor.server.routing.Route.publicAuthRoutes(dependencies: ControlD
         if (!withinRateLimit(dependencies.authRateLimiter)) return@post
         val request = call.receive<VerifyRequest>()
         call.respond(dependencies.panelAuth.verify(request.name, request.code))
+    }
+    // in-game admin panel: the client redeems the one-time ticket its Paper server obtained for it
+    post("/auth/ticket") {
+        if (!withinRateLimit(dependencies.authRateLimiter)) return@post
+        val request = call.receive<TicketRequest>()
+        call.respond(dependencies.panelAuth.redeemTicket(request.ticket))
     }
 }
 
@@ -1076,6 +1085,13 @@ internal fun applyPlayerEvent(dependencies: ControlDependencies, event: PlayerEv
 }
 
 private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDependencies) {
+    // in-game admin panel: a Paper service asks for a one-time login ticket for a player it hosts
+    post("/internal/panel-ticket") {
+        if (!requireBridge(dependencies)) return@post
+        val request = call.receive<TicketIssueRequest>()
+        val ticket = dependencies.panelAuth.issueTicket(request.player)
+        call.respond(TicketResponse(ticket, PanelAuthService.TICKET_TTL_MS / 1000))
+    }
     post("/internal/heartbeat") {
         val report = call.receive<HeartbeatReport>()
         if (!requireBridge(dependencies, report.serviceId)) return@post

@@ -1,7 +1,7 @@
 # REST-API-Referenz
 
 Basis-URL: `http://<host>:<port>/api/v1` (Default `127.0.0.1:8080`).
-Alle Endpunkte (außer `/auth/request-code` und `/auth/verify`) erfordern
+Alle Endpunkte (außer `/auth/request-code`, `/auth/verify` und `/auth/ticket`) erfordern
 `Authorization: Bearer <token>`; ohne gültiges Token antwortet die API mit
 `401`. Ein Token ist entweder das statische `control.token` (voller
 Admin-Zugriff, auch von Bridges/Wrapper genutzt) oder ein per Minecraft-Login
@@ -19,6 +19,7 @@ Das Dashboard unter `/` ist statisch und nutzt dieselbe API.
 |---|---|---|
 | POST | `/auth/request-code` | **Öffentlich.** Body `{"name": "<mcname>"}`. Prüft, ob der Spieler online ist und `helix.panel.login` besitzt, generiert einen Code und schickt ihn ihm ingame. |
 | POST | `/auth/verify` | **Öffentlich.** Body `{"name", "code"}`. Prüft den Code und liefert `{token, identity}` — das Session-Token für alle weiteren Aufrufe. |
+| POST | `/auth/ticket` | **Öffentlich.** Body `{"ticket"}`. Löst ein Einmal-Ticket des In-Game-Panels (Helix-Admin-Mod) ein und liefert `{token, identity}` wie `/auth/verify`. Tickets sind 60 s gültig und nur einmal verwendbar. |
 | GET | `/auth/me` | Der eingeloggte Aufrufer: `{name, admin, views}` (erlaubte Dashboard-Views). |
 | POST | `/auth/logout` | Invalidiert das aktuelle Session-Token. |
 
@@ -167,6 +168,7 @@ alles, was die Konsole kann.
 | POST | `/internal/player-command` | Spieler-Command ausführen: `{player, command, arguments}` → ActionResult (Permission wird geprüft) |
 | POST | `/internal/display` | Display-Profil eines Spielers: `{name}` → `{prefix, name, suffix, color}` (komponentenweise über alle Resolver gemerged) |
 | GET | `/internal/bridge-values` | von Addons publizierte globale Werte (Tablist, Chat-Format) |
+| POST | `/internal/panel-ticket` | Per-Service-Token: Body `{"player"}` → `{ticket, expiresInSeconds}` — Einmal-Ticket für einen online Spieler mit `helix.panel.login` (Paper-Teil von `helix.admin`, wenn der Spieler das In-Game-Panel öffnet). Das Dashboard nimmt es als `#ticket=…&ingame=1` entgegen. |
 | POST | `/internal/action` | Beliebige Action mit per-Service-Token ausführen: `{action, arguments}` → ActionResult — nur für Actions mit `bridgeInvocable = true` (z.B. `profile.texture.*`, `guard.store.*`); `POST /api/v1/actions` akzeptiert nur Admin-Token oder eine `helix.admin`-Session, niemals ein per-Service-Token |
 
 ## Beispiele
