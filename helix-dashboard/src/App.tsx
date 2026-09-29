@@ -17,6 +17,8 @@ import { FilesView } from "@/views/files"
 import { TranslationsView } from "@/views/translations"
 import { SettingsView } from "@/views/settings"
 import { AddonPanelView } from "@/views/addon-panel"
+import { IngameMenuView } from "@/views/ingame-menu"
+import { isIngame, takeTicketFromUrl } from "@/lib/ingame"
 
 const TITLES: Record<string, string> = {
   overview: "Overview", tasks: "Tasks", services: "Services", players: "Players", proxy: "Proxy",
@@ -30,6 +32,9 @@ export function App() {
   const [panels, setPanels] = useState<PanelInfo[]>([])
   const [version, setVersion] = useState("")
   const [view, setView] = useState("overview")
+  // In-game (Helix Admin mod): quick menu first, the full dashboard on request
+  const [ingame] = useState(isIngame)
+  const [fullDashboard, setFullDashboard] = useState(false)
 
   const establish = async (tok: string) => {
     setToken(tok)
@@ -47,6 +52,15 @@ export function App() {
 
   useEffect(() => {
     setUnauthorizedHandler(() => { setToken(""); setIdentity(null) })
+    const ticket = takeTicketFromUrl()
+    if (ticket) {
+      // one-time login ticket from the in-game panel: exchange it for a session
+      api<{ token: string }>("/auth/ticket", { method: "POST", body: { ticket } })
+        .then((res) => establish(res.token))
+        .catch(() => setToken(""))
+        .finally(() => setBooting(false))
+      return
+    }
     const stored = localStorage.getItem("helix.token")
     if (stored) establish(stored).catch(() => setToken("")).finally(() => setBooting(false))
     else setBooting(false)
@@ -58,8 +72,13 @@ export function App() {
     setIdentity(null)
   }
 
-  if (booting) return <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Loading…</div>
+  if (booting) return ingame ? null : <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Loading…</div>
   if (!identity) return (<><LoginView establish={establish} /><Toaster /></>)
+  if (ingame && !fullDashboard) {
+    document.documentElement.classList.add("ingame-transparent")
+    return (<><IngameMenuView identity={identity} onOpenDashboard={() => setFullDashboard(true)} /><Toaster /></>)
+  }
+  document.documentElement.classList.remove("ingame-transparent")
 
   const allowed = (v: string) => v.startsWith("panel:") ? panels.some((p) => p.id === v.slice(6)) : identity.admin || identity.views.includes(v)
   const current = allowed(view) ? view : (identity.admin ? "overview" : identity.views[0] ?? (panels[0] ? "panel:" + panels[0].id : "overview"))
@@ -88,6 +107,12 @@ export function App() {
         {current.startsWith("panel:") && <AddonPanelView panelId={current.slice(6)} />}
         </ViewTransition>
       </AppShell>
+      {ingame && (
+        <button onClick={() => setFullDashboard(false)}
+          className="fixed bottom-4 right-4 z-50 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg">
+          ← In-game menu
+        </button>
+      )}
       <Toaster />
     </>
   )

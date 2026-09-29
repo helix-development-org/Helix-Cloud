@@ -268,3 +268,10 @@
   /* Hard, un-blurred offset shadow — identical to adventure-webui. */
   text-shadow: 2px 2px hsl(0, 0%, 24%);
 }
+
+/* In-game quick menu (Helix Admin mod): the game world stays visible around the panel */
+html.ingame-transparent,
+html.ingame-transparent body,
+html.ingame-transparent #root {
+  background: transparent !important;
+}
