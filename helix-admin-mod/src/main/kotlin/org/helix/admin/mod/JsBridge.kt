@@ -14,7 +14,7 @@ import org.cef.handler.CefMessageRouterHandlerAdapter
  * JavaScript bridge of the panel page: `window.cefQuery({request: JSON.stringify({op, args}), onSuccess, onFailure})`.
  *
  * Local ops are handled by the mod (`close` hides the panel, `interact` switches to mouse/typing mode, `hud` back to
- * the walkable HUD menu, `ping` answers with the mod version and mode);
+ * the walkable HUD menu, `expired` drops a page without session so the next key press signs in again, `ping` answers with the mod version and mode);
  * everything else is forwarded as an in-game action to the server ([AdminChannel.call]), which checks
  * the Helix permission and executes it. The page receives the server's JSON result.
  */
@@ -57,6 +57,10 @@ object JsBridge {
             }
             "interact" -> {
                 Minecraft.getInstance().execute { PanelBrowser.showMouse() }
+                callback.success("{}")
+            }
+            "expired" -> {
+                Minecraft.getInstance().execute { PanelBrowser.markStale() }
                 callback.success("{}")
             }
             "hud" -> {

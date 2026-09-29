@@ -31,9 +31,6 @@ object PanelBrowser {
     enum class Mode { CLOSED, HUD, MOUSE }
 
     private val LOG = org.slf4j.LoggerFactory.getLogger("helix-admin")
-    private const val BRIDGE_CHECK =
-        "if (typeof window.cefQuery !== 'function' && !sessionStorage.getItem('helix.bridgeReload')) {" +
-            " sessionStorage.setItem('helix.bridgeReload', '1'); location.reload() }"
 
     /** Current mode. */
     var mode: Mode = Mode.CLOSED
@@ -42,30 +39,48 @@ object PanelBrowser {
     internal var browser: MCEFBrowser? = null
         private set
     private var loadedUrl: String? = null
+    /** URL waiting for the new browser to exist (it starts on about:blank so the JS bridge is there first). */
+    @Volatile private var pendingUrl: String? = null
+    /** The page lost its session – the next key press fetches a fresh ticket. */
+    @Volatile private var stale = false
     @Volatile private var loadError: String? = null
     @Volatile private var loadedOnce = false
     private var sizeW = 0
     private var sizeH = 0
 
     /** Whether a usable page is there (reopen without a new ticket). */
-    val ready: Boolean get() = browser != null && loadError == null
+    val ready: Boolean get() = browser != null && loadError == null && !stale
 
     /** Loads [url] (a fresh ticket URL) – a new browser starts directly with it. */
     fun load(url: String) {
+        stale = false
         val existing = browser
-        // loadURL() direkt nach createBrowser() geht verloren, weil der native Browser asynchron entsteht
-        val b = existing ?: MCEFApi.getInstance().createBrowser(url, true).also {
-            browser = it
-            JsBridge.install(it.cefBrowser.client)
-            installLoadHandler(it)
-        }
         if (loadedUrl != url) {
             loadError = null
             loadedOnce = false
-            if (existing != null) b.cefBrowser.loadURL(url)
             loadedUrl = url
         }
+        if (existing == null) {
+            // Erst about:blank: der native Browser entsteht asynchron (loadURL() direkt danach ginge verloren),
+            // und die JS-Brücke muss angemeldet sein, bevor das Panel lädt – sonst fehlt window.cefQuery.
+            // Die Panel-URL folgt, sobald about:blank fertig ist (onLoadingStateChange).
+            pendingUrl = url
+            MCEFApi.getInstance().createBrowser("about:blank", true).also {
+                browser = it
+                JsBridge.install(it.cefBrowser.client)
+                installLoadHandler(it)
+            }
+        } else {
+            existing.cefBrowser.loadURL(url)
+        }
         fitToWindow()
+    }
+
+    /** The page has no session any more (e.g. expired): hide it; the next key press gets a fresh ticket. */
+    fun markStale() {
+        stale = true
+        loadedUrl = null
+        close()
     }
 
     /** Shows the panel as HUD layer (walking stays possible). */
@@ -160,6 +175,8 @@ object PanelBrowser {
         browser?.close()
         browser = null
         loadedUrl = null
+        pendingUrl = null
+        stale = false
         loadError = null
         loadedOnce = false
         sizeW = 0
@@ -173,7 +190,13 @@ object PanelBrowser {
                 guard("loading state") {
                     val current = browser?.url.orEmpty()
                     LOG.info("panel loading={} {}", isLoading, current.substringBefore('#'))
-                    if (!isLoading && current.startsWith("http") && loadError == null) loadedOnce = true
+                    val pending = pendingUrl
+                    if (!isLoading && pending != null && browser != null) {
+                        pendingUrl = null
+                        browser.loadURL(pending)
+                    } else if (!isLoading && current.startsWith("http") && loadError == null) {
+                        loadedOnce = true
+                    }
                 }
             }
 
@@ -182,9 +205,6 @@ object PanelBrowser {
                     if (frame?.isMain != true) return@guard
                     LOG.info("panel page loaded: HTTP {} {}", httpStatusCode, frame.url.orEmpty().substringBefore('#'))
                     if (httpStatusCode >= 400) loadError = "HTTP $httpStatusCode"
-                    // Die JS-Brücke wird erst nach dem Erzeugen des Browsers angemeldet; fehlt window.cefQuery
-                    // auf der ersten Seite, einmal neu laden (Sitzung liegt im localStorage)
-                    if (frame.url.orEmpty().startsWith("http")) frame.executeJavaScript(BRIDGE_CHECK, frame.url, 0)
                 }
             }
 

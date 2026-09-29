@@ -18,7 +18,7 @@ import { TranslationsView } from "@/views/translations"
 import { SettingsView } from "@/views/settings"
 import { AddonPanelView } from "@/views/addon-panel"
 import { IngameMenuView } from "@/views/ingame-menu"
-import { isIngame, onModeChange, requestHud, requestMouse, takeTicketFromUrl } from "@/lib/ingame"
+import { isIngame, onModeChange, reportExpired, requestHud, requestMouse, takeTicketFromUrl } from "@/lib/ingame"
 
 const TITLES: Record<string, string> = {
   overview: "Overview", tasks: "Tasks", services: "Services", players: "Players", proxy: "Proxy",
@@ -77,6 +77,7 @@ export function App() {
   }
 
   if (booting) return ingame ? null : <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Loading…</div>
+  if (!identity && ingame) return <IngameSignedOut />
   if (!identity) return (<><LoginView establish={establish} /><Toaster /></>)
   if (ingame && !fullDashboard) {
     document.documentElement.classList.add("ingame-transparent")
@@ -119,6 +120,19 @@ export function App() {
       )}
       <Toaster />
     </>
+  )
+}
+
+/**
+ * In-game without a session (ticket rejected or session expired): no login form – the mod drops the page and
+ * the next Right Shift signs in with a fresh ticket.
+ */
+function IngameSignedOut() {
+  useEffect(() => { reportExpired() }, [])
+  return (
+    <div className="dark fixed left-4 top-4 w-[400px] rounded-xl border border-border bg-background/95 p-4 text-sm text-foreground shadow-2xl">
+      Session expired – press Right Shift again.
+    </div>
   )
 }
 

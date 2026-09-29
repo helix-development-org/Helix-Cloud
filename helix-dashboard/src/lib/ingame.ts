@@ -92,3 +92,8 @@ export function requestMouse() {
 export function requestHud() {
   mc("hud").catch(() => {})
 }
+
+/** Tells the mod the page has no session (ticket failed or expired): it hides the panel and signs in anew next time. */
+export function reportExpired() {
+  mc("expired").catch(() => {})
+}
