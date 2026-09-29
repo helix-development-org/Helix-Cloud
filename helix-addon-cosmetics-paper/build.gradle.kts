@@ -39,18 +39,20 @@ tasks.withType<Jar>().configureEach {
     exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
 }
 
-// The cosmetics resource pack (self-drawn wing/headwear textures + hand-authored
-// item models) is generated deterministically at build time and bundled into the HXA.
+// The cosmetics resource pack (Blockbench exports in src/pack/resources/cosmetics) is
+// assembled deterministically at build time and bundled into the HXA.
 sourceSets {
     create("pack")
 }
 
 val generatePack by tasks.registering(JavaExec::class) {
     group = "build"
-    description = "Draws the cosmetic textures, writes the item models and assembles pack.zip."
+    description = "Assembles pack.zip from the Blockbench cosmetic models and textures."
     classpath = sourceSets["pack"].runtimeClasspath
     mainClass.set("org.helix.addons.cosmetics.pack.PackGeneratorKt")
     val output = layout.buildDirectory.file("pack/pack.zip")
-    argumentProviders.add(CommandLineArgumentProvider { listOf(output.get().asFile.absolutePath) })
+    val source = layout.projectDirectory.dir("src/pack/resources/cosmetics")
+    argumentProviders.add(CommandLineArgumentProvider { listOf(output.get().asFile.absolutePath, source.asFile.absolutePath) })
+    inputs.dir(source)
     outputs.file(output)
 }
