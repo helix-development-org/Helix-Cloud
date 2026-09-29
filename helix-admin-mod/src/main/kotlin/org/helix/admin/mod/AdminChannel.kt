@@ -7,6 +7,7 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 import net.minecraft.network.FriendlyByteBuf
 import net.minecraft.network.codec.StreamCodec
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
+import net.minecraft.resources.Identifier
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -25,7 +26,9 @@ object AdminChannel {
         override fun type(): CustomPacketPayload.Type<Message> = TYPE
     }
 
-    val TYPE: CustomPacketPayload.Type<Message> = CustomPacketPayload.createType("helix:admin")
+    // createType() only takes a path in the minecraft namespace, so the id is built explicitly
+    val TYPE: CustomPacketPayload.Type<Message> =
+        CustomPacketPayload.Type(Identifier.fromNamespaceAndPath("helix", "admin"))
 
     private val CODEC: StreamCodec<FriendlyByteBuf, Message> = CustomPacketPayload.codec(
         { message, buf -> buf.writeBytes(message.json.toString().toByteArray(Charsets.UTF_8)) },
