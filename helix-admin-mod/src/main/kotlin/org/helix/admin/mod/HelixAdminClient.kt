@@ -6,6 +6,7 @@ import net.dimaskama.mcef.api.MCEFApi
 import net.fabricmc.api.ClientModInitializer
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper
+import net.fabricmc.fabric.api.client.networking.v1.C2SPlayChannelEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.fabricmc.loader.api.FabricLoader
@@ -18,9 +19,11 @@ import org.lwjgl.glfw.GLFW
 /**
  * Entry point of the Helix Admin client mod: Right Shift opens the in-game admin panel of a Helix network.
  *
- * On join the mod says `hello`; a network running the `helix.admin` addon answers `welcome` (only for players
- * allowed to use the panel). Pressing the key asks the server for a one-time login ticket and opens the panel
- * page with it in the embedded browser; later presses reopen the page as it was left.
+ * As soon as the server registers the channel `helix:admin` (network running the `helix.admin` addon) the mod
+ * says `hello`. Pressing the key always asks the server directly (`open`); it answers with a one-time login
+ * `ticket` (the panel page opens in the embedded browser) or `denied`. Every outcome is shown in the action bar,
+ * so a missing permission or a server without the panel is never silent. Later presses reopen the page as it
+ * was left.
  */
 object HelixAdminClient : ClientModInitializer {
     /** Version of this mod, sent in `hello`. */
@@ -33,9 +36,7 @@ object HelixAdminClient : ClientModInitializer {
     /** The panel key (default Right Shift, rebindable in the controls). */
     val openKey: KeyMapping = KeyMapping("key.helix-admin.open", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_SHIFT, CATEGORY)
 
-    /** Whether the current server offered the panel to this player. */
-    @Volatile
-    private var enabled = false
+    private val LOG = org.slf4j.LoggerFactory.getLogger("helix-admin")
 
     @Volatile
     private var awaitingTicket = false
@@ -48,15 +49,17 @@ object HelixAdminClient : ClientModInitializer {
         ClientPlayNetworking.registerGlobalReceiver(AdminChannel.TYPE) { payload, context ->
             context.client().execute { onMessage(payload.json) }
         }
-        ClientPlayConnectionEvents.JOIN.register { _, _, _ ->
-            enabled = false
-            AdminChannel.send(JsonObject().apply {
-                addProperty("type", "hello")
-                addProperty("version", VERSION)
-            })
+        // hello erst, wenn der Server den Kanal angemeldet hat (beim JOIN ist das oft noch nicht der Fall)
+        C2SPlayChannelEvents.REGISTER.register { _, _, _, channels ->
+            if (channels.any { it == AdminChannel.TYPE.id() }) {
+                LOG.info("server offers helix:admin")
+                AdminChannel.send(JsonObject().apply {
+                    addProperty("type", "hello")
+                    addProperty("version", VERSION)
+                })
+            }
         }
         ClientPlayConnectionEvents.DISCONNECT.register { _, _ ->
-            enabled = false
             awaitingTicket = false
             AdminChannel.reset()
             Minecraft.getInstance().execute { AdminScreen.release() }
@@ -69,7 +72,11 @@ object HelixAdminClient : ClientModInitializer {
     }
 
     private fun onKeyPressed(client: Minecraft) {
-        if (!enabled) return
+        if (!ClientPlayNetworking.canSend(AdminChannel.TYPE)) {
+            status(client, "helix-admin.unavailable")
+            LOG.info("key pressed, but the server does not offer helix:admin")
+            return
+        }
         val init = MCEFApi.initialize()
         if (!init.isDone) {
             client.player?.displayClientMessage(
@@ -80,11 +87,20 @@ object HelixAdminClient : ClientModInitializer {
         if (AdminScreen.reopen()) return
         if (awaitingTicket) return
         awaitingTicket = AdminChannel.send(JsonObject().apply { addProperty("type", "open") })
+        if (awaitingTicket) status(client, "helix-admin.opening")
+    }
+
+    private fun status(client: Minecraft, key: String) {
+        client.player?.displayClientMessage(Component.translatable(key), true)
     }
 
     private fun onMessage(json: JsonObject) {
         when (json.get("type")?.asString) {
-            "welcome" -> enabled = json.get("enabled")?.asBoolean == true
+            "welcome" -> LOG.info("helix:admin welcome, panel allowed: {}", json.get("enabled")?.asBoolean)
+            "denied" -> {
+                awaitingTicket = false
+                status(Minecraft.getInstance(), if (json.get("reason")?.asString == "unreachable") "helix-admin.unreachable" else "helix-admin.denied")
+            }
             "ticket" -> {
                 awaitingTicket = false
                 val url = json.get("url")?.asString ?: return

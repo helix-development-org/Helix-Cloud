@@ -43,8 +43,10 @@ import java.util.concurrent.ConcurrentHashMap
  * Helix Admin paper component – the server side of the in-game admin panel.
  *
  *  - Talks to the Helix Admin client mod on plugin channel `helix:admin` (one JSON object per message):
- *    `hello` → `welcome {enabled}` (only staff with `helix.staff.menu`), `open` → one-time login `ticket {url}`
- *    obtained from the node (`POST /internal/panel-ticket`), `call {id, op, args}` → `result {id, ok, data|error}`.
+ *    `hello` → `welcome {enabled}`, `open` → one-time login `ticket {url}` obtained from the node
+ *    (`POST /internal/panel-ticket`) or `denied {reason: permission|unreachable}` – the permission is checked at
+ *    open time, after the bridge synced the player's permissions – and `call {id, op, args}` → `result {id, ok,
+ *    data|error}`.
  *  - Executes the in-game ops of [StaffOps] with a permission check on every call: noclip, heal, fly, vanish,
  *    game mode, teleport, time/weather, clearing entities; per player go-to, bring, spectate, freeze, heal,
  *    game mode, inventory. Targets on other servers are reached through the addon's job queue: the actor is
@@ -115,6 +117,7 @@ class AdminPlugin : JavaPlugin(), Listener, PluginMessageListener {
         when (msg.str("type")) {
             "hello" -> send(player, buildJsonObject { put("type", "welcome"); put("enabled", player.hasPermission(StaffOps.MENU)) })
             "open" -> if (player.hasPermission(StaffOps.MENU)) openPanel(player)
+                else send(player, buildJsonObject { put("type", "denied"); put("reason", "permission") })
             "call" -> {
                 val id = msg["id"]?.jsonPrimitive?.longOrNull ?: return
                 val op = msg.str("op").orEmpty()
@@ -144,7 +147,7 @@ class AdminPlugin : JavaPlugin(), Listener, PluginMessageListener {
             val base = panelUrl ?: fallbackPanelUrl(host)
             server.scheduler.runTask(this, Runnable {
                 if (ticket == null) {
-                    player.sendMessage("§cDas Admin-Panel ist gerade nicht erreichbar.")
+                    send(player, buildJsonObject { put("type", "denied"); put("reason", "unreachable") })
                     return@Runnable
                 }
                 send(player, buildJsonObject { put("type", "ticket"); put("url", "$base/#ticket=$ticket&ingame=1") })

@@ -1,5 +1,9 @@
 {
   "key.helix-admin.open": "Open admin panel",
   "key.category.helix-admin.main": "Helix Admin",
-  "helix-admin.loading": "Admin panel is loading the browser… %s%%"
+  "helix-admin.loading": "Admin panel is loading the browser… %s%%",
+  "helix-admin.unavailable": "Helix Admin: this server has no admin panel.",
+  "helix-admin.opening": "Helix Admin: opening the panel…",
+  "helix-admin.denied": "Helix Admin: no access (permission helix.staff.menu missing).",
+  "helix-admin.unreachable": "Helix Admin: the panel is not reachable right now."
 }
