@@ -48,6 +48,8 @@ include(
     "helix-addon-guis-paper",
     "helix-addon-translations",
     "helix-addon-translations-paper",
+    "helix-addon-admin",
+    "helix-addon-admin-paper",
     "helix-addon-lobby",
     "helix-addon-lobby-paper",
     "helix-addon-phone",

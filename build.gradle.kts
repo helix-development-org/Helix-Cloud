@@ -91,6 +91,7 @@ val addonModules = listOf(
     "helix-addon-subtitles",
     "helix-addon-cosmetics",
     "helix-addon-translations",
+    "helix-addon-admin",
     "helix-addon-lobby",
     "helix-addon-phone",
     "helix-addon-mineclash",

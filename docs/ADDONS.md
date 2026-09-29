@@ -606,6 +606,30 @@ wird, müssen die Paper-Server auf **Java 24+** laufen (Helix-Node-Toolchain 24,
 Deployment hier Java 25). Andere Addons können denselben Weg gehen und INpc so
 als geteiltes Framework nutzen.
 
+## In-Game-Admin-Panel (`helix.admin` + Helix-Admin-Mod)
+
+Teammitglieder mit der Fabric-Mod **Helix Admin** (`helix-admin-mod/`, eigener Gradle-Build) öffnen mit
+**Rechts-Shift** ein Panel im Spiel – ein kompaktes Schnellmenü wie bei txAdmin, gerendert per eingebettetem
+Chromium (MCEF Modern). „Open dashboard“ öffnet im selben Overlay das volle Dashboard.
+
+- **Ablauf:** Mod → `hello` auf Kanal `helix:admin` → Paper-Teil antwortet `welcome` (nur mit `helix.staff.menu`).
+  Taste → `open` → Paper holt `POST /internal/panel-ticket` → Mod lädt `<panel-url>/#ticket=…&ingame=1` →
+  Dashboard löst `/auth/ticket` ein (Session wie beim Code-Login, Rechte `helix.panel.*` gelten weiter).
+- **Panel-URL:** `admin.panelurl <url|->` (öffentlich erreichbare Dashboard-Adresse); ohne Angabe nutzt der
+  Server die Adresse, mit der der Spieler verbunden ist, und den Control-Port.
+- **Schnellmenü:** Main (NoClip, Heilen, Füttern, Fliegen, Vanish, Spielmodus, Teleport zu Koordinaten, Spawn,
+  Zeit, Wetter, Gebiet leeren, Ankündigung), Players (alle Spieler netzwerkweit mit Server, Position, Leben,
+  Ping; Hingehen, Herholen, Zuschauen, Einfrieren, Heilen, Spielmodus, Inventar, Nachricht, Verwarnen, Kicken,
+  Bannen), Server (dieser Server: TPS, Speicher, Spieler; alle Server mit Neustart).
+- **Server-übergreifend:** Der Paper-Teil meldet seine Spieler (`admin.presence`), Aktionen für Spieler auf
+  anderen Servern laufen über die Warteschlange `admin.job`/`admin.jobs` (z. B. hinwechseln und auf Ankunft
+  teleportieren).
+- **Rechte** (Präfix `helix.staff.*`, bewusst nicht `helix.admin.*` – dessen Platzhalter würde den Node-Admin
+  `helix.admin` mitvergeben): `menu`, `self`, `world`, `teleport`, `spectate`, `freeze`, `heal`, `gamemode`,
+  `inventory`, `kick`, `warn`, `ban`, `message`, `announce`, `server`.
+- **Mod installieren:** Fabric Loader, Fabric API, Fabric Language Kotlin, MCEF Modern und `helix-admin-*.jar`
+  in den `mods`-Ordner. Chromium lädt MCEF beim ersten Start einmalig herunter. Ohne Mod gibt es das Panel nicht.
+
 ## Eigene Dashboard-Seite beisteuern
 
 **Jedes aktivierte Addon hat immer eine Panel-Seite.** Registriert ein

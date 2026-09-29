@@ -1,0 +1,12 @@
+{
+  "id": "helix.admin",
+  "name": "Helix Admin",
+  "version": "1.0.0",
+  "main": "org.helix.addons.admin.AdminAddon",
+  "description": "In-game admin panel (txAdmin-style quick menu) for the Helix Admin client mod: staff press Right Shift, sign in with a one-time ticket and manage players, the world and servers without leaving the game; the full dashboard opens from the menu.",
+  "permissions": [
+    "helix.staff.menu", "helix.staff.self", "helix.staff.world", "helix.staff.teleport", "helix.staff.spectate",
+    "helix.staff.freeze", "helix.staff.heal", "helix.staff.gamemode", "helix.staff.inventory", "helix.staff.kick",
+    "helix.staff.warn", "helix.staff.ban", "helix.staff.message", "helix.staff.announce", "helix.staff.server"
+  ]
+}
