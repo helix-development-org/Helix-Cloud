@@ -146,7 +146,7 @@ class AdminPlugin : JavaPlugin(), Listener, PluginMessageListener {
         val host = player.virtualHost?.hostString
         server.scheduler.runTaskAsynchronously(this, Runnable {
             val ticket = requestTicket(name)
-            val base = panelUrl ?: fallbackPanelUrl(host)
+            val base = PanelUrl.resolve(panelUrl, host, controlPort())
             server.scheduler.runTask(this, Runnable {
                 if (ticket == null) {
                     logger.warning("panel for $name: no ticket from the node, answering 'unreachable'")
@@ -172,11 +172,8 @@ class AdminPlugin : JavaPlugin(), Listener, PluginMessageListener {
         json.parseToJsonElement(response.body()).jsonObject.str("ticket")
     }.onFailure { logger.warning("panel ticket failed: ${it.message}") }.getOrNull()
 
-    /** Without a configured panel URL: the address the player used to join, on the node's control port. */
-    private fun fallbackPanelUrl(host: String?): String {
-        val port = runCatching { URI.create(httpUrl).port }.getOrDefault(-1).takeIf { it > 0 } ?: 8080
-        return "http://${host?.takeIf { it.isNotBlank() } ?: "127.0.0.1"}:$port"
-    }
+    /** Port of the node's control API (serves the dashboard); 8080 if the URL names none. */
+    private fun controlPort(): Int = runCatching { URI.create(httpUrl).port }.getOrDefault(-1).takeIf { it > 0 } ?: 8080
 
     // ------------------------------------------------------------------ ops
 

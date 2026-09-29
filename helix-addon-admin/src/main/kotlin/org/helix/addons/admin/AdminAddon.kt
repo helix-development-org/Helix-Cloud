@@ -42,8 +42,8 @@ class AdminAddon : AddonBase() {
     private fun registerPanelUrl() {
         action(
             "admin.panelurl",
-            "Shows or sets the externally reachable panel URL the client mod opens ('-' clears it).",
-            "admin.panelurl [url|-]",
+            "Shows or sets the externally reachable panel address the client mod opens ('-' clears it). Host alone is enough – http without a port gets the node's control port.",
+            "admin.panelurl [host|url|-]",
         ) { inv ->
             val value = inv.arguments.firstOrNull()?.trim()
             when {
@@ -53,7 +53,8 @@ class AdminAddon : AddonBase() {
                     publishPanelUrl()
                     ActionResult.ok("panel URL cleared")
                 }
-                !value.startsWith("http://") && !value.startsWith("https://") -> ActionResult.error("URL must start with http:// or https://")
+                "://" in value && !value.startsWith("http://") && !value.startsWith("https://") ->
+                    ActionResult.error("only http:// or https:// (or just the host)")
                 else -> {
                     context.storage().write(PANEL_URL_KEY, value.trimEnd('/'))
                     publishPanelUrl()

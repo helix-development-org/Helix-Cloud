@@ -80,6 +80,7 @@ class AdminAddonTest {
     @Test
     fun `panel url is validated and published`() {
         assertFalse(context.run("admin.panelurl", "ftp://x").success)
+        assertTrue(context.run("admin.panelurl", "127.0.0.1").success, "the host alone is enough")
         assertTrue(context.run("admin.panelurl", "https://panel.example.net/").success)
         assertEquals("https://panel.example.net", context.bridgeValues["admin.panel_url"])
         assertTrue(context.run("admin.panelurl", "-").success)
