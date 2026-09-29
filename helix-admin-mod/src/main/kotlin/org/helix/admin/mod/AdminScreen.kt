@@ -133,7 +133,10 @@ class AdminScreen private constructor() : Screen(Component.literal("Helix Admin"
         /** Opens the overlay with [url] (a fresh login ticket URL → reload; otherwise keep the page). */
         fun open(url: String) {
             val api = MCEFApi.getInstance()
-            val b = browser ?: api.createBrowser("about:blank", true).also {
+            // Neuer Browser startet direkt mit der Ziel-URL: loadURL() direkt nach createBrowser() geht verloren,
+            // weil der native Browser asynchron entsteht
+            val existing = browser
+            val b = existing ?: api.createBrowser(url, true).also {
                 browser = it
                 JsBridge.install(it.cefBrowser.client)
                 // Callbacks kommen nativ aus CEF: Parameter können null sein, Exceptions dürfen nicht hinaus
@@ -166,7 +169,7 @@ class AdminScreen private constructor() : Screen(Component.literal("Helix Admin"
             if (loadedUrl != url) {
                 loadError = null
                 loadedOnce = false
-                b.cefBrowser.loadURL(url)
+                if (existing != null) b.cefBrowser.loadURL(url)
                 loadedUrl = url
             }
             Minecraft.getInstance().setScreen(AdminScreen())
