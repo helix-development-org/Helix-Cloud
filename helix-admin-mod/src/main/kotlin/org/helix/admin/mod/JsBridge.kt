@@ -18,6 +18,7 @@ import org.cef.handler.CefMessageRouterHandlerAdapter
  * the Helix permission and executes it. The page receives the server's JSON result.
  */
 object JsBridge {
+    private val LOG = org.slf4j.LoggerFactory.getLogger("helix-admin")
     private var installedOn: CefClient? = null
 
     /** Installs the bridge once per CEF client. */
@@ -25,8 +26,14 @@ object JsBridge {
         if (installedOn === client) return
         val router = CefMessageRouter.create()
         router.addHandler(object : CefMessageRouterHandlerAdapter() {
-            override fun onQuery(browser: CefBrowser, frame: CefFrame, queryId: Long, request: String, persistent: Boolean, callback: CefQueryCallback): Boolean {
-                handle(request, callback)
+            override fun onQuery(browser: CefBrowser?, frame: CefFrame?, queryId: Long, request: String?, persistent: Boolean, callback: CefQueryCallback?): Boolean {
+                if (callback == null) return false
+                try {
+                    handle(request.orEmpty(), callback)
+                } catch (t: Throwable) {
+                    LOG.error("panel bridge query failed", t)
+                    callback.failure(500, t.message ?: "failed")
+                }
                 return true
             }
         }, true)

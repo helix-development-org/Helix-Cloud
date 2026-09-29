@@ -136,17 +136,30 @@ class AdminScreen private constructor() : Screen(Component.literal("Helix Admin"
             val b = browser ?: api.createBrowser("about:blank", true).also {
                 browser = it
                 JsBridge.install(it.cefBrowser.client)
+                // Callbacks kommen nativ aus CEF: Parameter können null sein, Exceptions dürfen nicht hinaus
                 it.cefBrowser.client.addLoadHandler(object : CefLoadHandlerAdapter() {
-                    override fun onLoadEnd(browser: CefBrowser, frame: CefFrame, httpStatusCode: Int) {
-                        if (!frame.isMain) return
-                        if (httpStatusCode >= 400) loadError = "HTTP $httpStatusCode" else if (browser.url != "about:blank") loadedOnce = true
-                        LOG.info("panel page loaded: HTTP {}", httpStatusCode)
+                    override fun onLoadingStateChange(browser: CefBrowser?, isLoading: Boolean, canGoBack: Boolean, canGoForward: Boolean) {
+                        guard("loading state") {
+                            val current = browser?.url.orEmpty()
+                            LOG.info("panel loading={} {}", isLoading, current.substringBefore('#'))
+                            if (!isLoading && current.startsWith("http") && loadError == null) loadedOnce = true
+                        }
                     }
 
-                    override fun onLoadError(browser: CefBrowser, frame: CefFrame, errorCode: CefLoadHandler.ErrorCode, errorText: String, failedUrl: String) {
-                        if (!frame.isMain || errorCode == CefLoadHandler.ErrorCode.ERR_ABORTED) return
-                        loadError = "$errorCode $errorText".trim()
-                        LOG.warn("panel page failed: {} {} ({})", errorCode, errorText, failedUrl.substringBefore('#'))
+                    override fun onLoadEnd(browser: CefBrowser?, frame: CefFrame?, httpStatusCode: Int) {
+                        guard("load end") {
+                            if (frame?.isMain != true) return@guard
+                            LOG.info("panel page loaded: HTTP {} {}", httpStatusCode, frame.url.orEmpty().substringBefore('#'))
+                            if (httpStatusCode >= 400) loadError = "HTTP $httpStatusCode"
+                        }
+                    }
+
+                    override fun onLoadError(browser: CefBrowser?, frame: CefFrame?, errorCode: CefLoadHandler.ErrorCode?, errorText: String?, failedUrl: String?) {
+                        guard("load error") {
+                            if (frame?.isMain != true || errorCode == CefLoadHandler.ErrorCode.ERR_ABORTED) return@guard
+                            loadError = "$errorCode ${errorText.orEmpty()}".trim()
+                            LOG.warn("panel page failed: {} {} ({})", errorCode, errorText, failedUrl.orEmpty().substringBefore('#'))
+                        }
                     }
                 })
             }
@@ -157,6 +170,14 @@ class AdminScreen private constructor() : Screen(Component.literal("Helix Admin"
                 loadedUrl = url
             }
             Minecraft.getInstance().setScreen(AdminScreen())
+        }
+
+        private inline fun guard(what: String, block: () -> Unit) {
+            try {
+                block()
+            } catch (t: Throwable) {
+                LOG.error("panel browser callback '{}' failed", what, t)
+            }
         }
 
         /** Reopens the overlay with the page as it was left, if a browser exists. */
