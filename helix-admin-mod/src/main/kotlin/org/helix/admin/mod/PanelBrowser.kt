@@ -62,7 +62,7 @@ object PanelBrowser {
         }
         if (existing == null) {
             // Erst about:blank: der native Browser entsteht asynchron (loadURL() direkt danach ginge verloren),
-            // und die JS-Brücke muss angemeldet sein, bevor das Panel lädt – sonst fehlt window.cefQuery.
+            // und die JS-Brücke (Display-Handler) ist angemeldet, bevor das Panel lädt.
             // Die Panel-URL folgt, sobald about:blank fertig ist (onLoadingStateChange).
             pendingUrl = url
             MCEFApi.getInstance().createBrowser("about:blank", true).also {

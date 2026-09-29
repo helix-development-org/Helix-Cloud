@@ -35,4 +35,4 @@ cd helix-admin-mod && ./gradlew build   # → build/libs/helix-admin-<version>.j
 | `HelixAdminClient.kt` | Einstieg, Taste, Handshake (`hello`/`welcome`), Ticket anfordern |
 | `AdminChannel.kt` | Plugin-Kanal `helix:admin` (JSON), Aufrufe mit Antwort (`call`/`result`) |
 | `AdminScreen.kt` | Overlay mit Chromium-Browser (transparent, keine Pause), Eingaben |
-| `JsBridge.kt` | `window.cefQuery` der Seite → lokale Befehle oder Ingame-Aktion auf dem Server |
+| `JsBridge.kt` | Konsolen-Brücke der Seite (`helix-bridge:` → `window.__helixReply`) → lokale Befehle oder Ingame-Aktion auf dem Server |
