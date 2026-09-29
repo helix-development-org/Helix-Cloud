@@ -1,9 +1,13 @@
 {
   "key.helix-admin.open": "Open admin panel",
   "key.category.helix-admin.main": "Helix Admin",
-  "helix-admin.loading": "Admin panel is loading the browser… %s%%",
+  "helix-admin.loading": "Helix Admin: preparing the embedded browser (%s, %s %%). The first time it downloads Chromium – press again in a moment.",
   "helix-admin.unavailable": "Helix Admin: this server has no admin panel.",
   "helix-admin.opening": "Helix Admin: opening the panel…",
   "helix-admin.denied": "Helix Admin: no access (permission helix.staff.menu missing).",
-  "helix-admin.unreachable": "Helix Admin: the panel is not reachable right now."
+  "helix-admin.unreachable": "Helix Admin: the panel is not reachable right now.",
+  "helix-admin.browser_failed": "Helix Admin: the embedded browser could not start: %s",
+  "helix-admin.page_loading": "Loading the admin panel …",
+  "helix-admin.page_failed": "The admin panel could not be loaded",
+  "helix-admin.esc": "Esc closes"
 }

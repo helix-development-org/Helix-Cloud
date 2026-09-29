@@ -72,26 +72,38 @@ object HelixAdminClient : ClientModInitializer {
     }
 
     private fun onKeyPressed(client: Minecraft) {
+        LOG.info("panel key pressed")
         if (!ClientPlayNetworking.canSend(AdminChannel.TYPE)) {
             status(client, "helix-admin.unavailable")
             LOG.info("key pressed, but the server does not offer helix:admin")
             return
         }
         val init = MCEFApi.initialize()
-        if (!init.isDone) {
-            client.player?.displayClientMessage(
-                Component.translatable("helix-admin.loading", (init.percentage * 100).toInt()), true,
-            )
+        val future = init.future
+        if (future.isCompletedExceptionally) {
+            val cause = runCatching { future.join() }.exceptionOrNull()?.let { it.cause ?: it }
+            LOG.error("embedded browser failed to start", cause)
+            status(client, "helix-admin.browser_failed", cause?.message ?: cause?.javaClass?.simpleName ?: "?")
+            return
+        }
+        if (!future.isDone) {
+            LOG.info("browser not ready yet: {} {}%", init.stage, (init.percentage * 100).toInt())
+            status(client, "helix-admin.loading", init.stage.name.lowercase(), (init.percentage * 100).toInt())
             return
         }
         if (AdminScreen.reopen()) return
-        if (awaitingTicket) return
+        if (awaitingTicket) {
+            status(client, "helix-admin.opening")
+            return
+        }
         awaitingTicket = AdminChannel.send(JsonObject().apply { addProperty("type", "open") })
+        LOG.info("open requested: {}", awaitingTicket)
         if (awaitingTicket) status(client, "helix-admin.opening")
     }
 
-    private fun status(client: Minecraft, key: String) {
-        client.player?.displayClientMessage(Component.translatable(key), true)
+    /** Status line in the chat – the action bar is overwritten by server HUDs every tick. */
+    private fun status(client: Minecraft, key: String, vararg args: Any) {
+        client.player?.displayClientMessage(Component.translatable(key, *args), false)
     }
 
     private fun onMessage(json: JsonObject) {
@@ -99,12 +111,17 @@ object HelixAdminClient : ClientModInitializer {
             "welcome" -> LOG.info("helix:admin welcome, panel allowed: {}", json.get("enabled")?.asBoolean)
             "denied" -> {
                 awaitingTicket = false
+                LOG.info("panel denied: {}", json.get("reason")?.asString)
                 status(Minecraft.getInstance(), if (json.get("reason")?.asString == "unreachable") "helix-admin.unreachable" else "helix-admin.denied")
             }
             "ticket" -> {
                 awaitingTicket = false
                 val url = json.get("url")?.asString ?: return
-                AdminScreen.open(url)
+                LOG.info("ticket received, opening {}", url.substringBefore('#'))
+                runCatching { AdminScreen.open(url) }.onFailure {
+                    LOG.error("could not open the panel", it)
+                    status(Minecraft.getInstance(), "helix-admin.browser_failed", it.message ?: it.javaClass.simpleName)
+                }
             }
             "result" -> AdminChannel.onResult(json)
             "close" -> AdminScreen.closeIfOpen()

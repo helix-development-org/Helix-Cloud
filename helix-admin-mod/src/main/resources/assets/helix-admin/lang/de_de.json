@@ -1,9 +1,13 @@
 {
   "key.helix-admin.open": "Admin-Panel öffnen",
   "key.category.helix-admin.main": "Helix Admin",
-  "helix-admin.loading": "Admin-Panel lädt den Browser … %s %%",
+  "helix-admin.loading": "Helix Admin: Der eingebettete Browser wird vorbereitet (%s, %s %%). Beim ersten Mal lädt er Chromium herunter – gleich nochmal drücken.",
   "helix-admin.unavailable": "Helix Admin: Dieser Server bietet kein Admin-Panel an.",
   "helix-admin.opening": "Helix Admin: Panel wird geöffnet …",
   "helix-admin.denied": "Helix Admin: Kein Zugriff (Recht helix.staff.menu fehlt).",
-  "helix-admin.unreachable": "Helix Admin: Das Panel ist gerade nicht erreichbar."
+  "helix-admin.unreachable": "Helix Admin: Das Panel ist gerade nicht erreichbar.",
+  "helix-admin.browser_failed": "Helix Admin: Der eingebettete Browser konnte nicht starten: %s",
+  "helix-admin.page_loading": "Admin-Panel wird geladen …",
+  "helix-admin.page_failed": "Das Admin-Panel konnte nicht geladen werden",
+  "helix-admin.esc": "Esc schließt"
 }

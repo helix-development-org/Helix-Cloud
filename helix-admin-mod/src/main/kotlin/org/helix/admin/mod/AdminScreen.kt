@@ -15,6 +15,10 @@ import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.client.renderer.RenderPipelines
 import net.minecraft.network.chat.Component
 import org.joml.Matrix3x2f
+import org.cef.browser.CefBrowser
+import org.cef.browser.CefFrame
+import org.cef.handler.CefLoadHandler
+import org.cef.handler.CefLoadHandlerAdapter
 import org.lwjgl.glfw.GLFW
 
 /**
@@ -39,7 +43,21 @@ class AdminScreen private constructor() : Screen(Component.literal("Helix Admin"
 
     override fun render(graphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
         val b = browser ?: return
-        val view = b.textureView ?: return
+        val error = loadError
+        val view = b.textureView
+        if (error != null || view == null || !loadedOnce) {
+            // Seite noch nicht da (oder Fehler): sichtbarer Hinweis statt eines durchsichtigen, leeren Browsers
+            graphics.fill(0, 0, width, height, 0xC0101018.toInt())
+            val lines = if (error != null) {
+                listOf(Component.translatable("helix-admin.page_failed"), Component.literal(error), Component.literal(loadedUrl.orEmpty().substringBefore('#')), Component.translatable("helix-admin.esc"))
+            } else {
+                listOf(Component.translatable("helix-admin.page_loading"), Component.literal(loadedUrl.orEmpty().substringBefore('#')), Component.translatable("helix-admin.esc"))
+            }
+            lines.forEachIndexed { i, line ->
+                graphics.drawCenteredString(font, line, width / 2, height / 2 - 20 + i * 12, if (i == 0) -0x1 else -0x555556)
+            }
+            if (error != null || view == null) return
+        }
         graphics.guiRenderState.submitGuiElement(
             BlitRenderState(
                 RenderPipelines.GUI_TEXTURED,
@@ -106,8 +124,11 @@ class AdminScreen private constructor() : Screen(Component.literal("Helix Admin"
     }
 
     companion object {
+        private val LOG = org.slf4j.LoggerFactory.getLogger("helix-admin")
         private var browser: MCEFBrowser? = null
         private var loadedUrl: String? = null
+        @Volatile private var loadError: String? = null
+        @Volatile private var loadedOnce = false
 
         /** Opens the overlay with [url] (a fresh login ticket URL → reload; otherwise keep the page). */
         fun open(url: String) {
@@ -115,8 +136,23 @@ class AdminScreen private constructor() : Screen(Component.literal("Helix Admin"
             val b = browser ?: api.createBrowser("about:blank", true).also {
                 browser = it
                 JsBridge.install(it.cefBrowser.client)
+                it.cefBrowser.client.addLoadHandler(object : CefLoadHandlerAdapter() {
+                    override fun onLoadEnd(browser: CefBrowser, frame: CefFrame, httpStatusCode: Int) {
+                        if (!frame.isMain) return
+                        if (httpStatusCode >= 400) loadError = "HTTP $httpStatusCode" else if (browser.url != "about:blank") loadedOnce = true
+                        LOG.info("panel page loaded: HTTP {}", httpStatusCode)
+                    }
+
+                    override fun onLoadError(browser: CefBrowser, frame: CefFrame, errorCode: CefLoadHandler.ErrorCode, errorText: String, failedUrl: String) {
+                        if (!frame.isMain || errorCode == CefLoadHandler.ErrorCode.ERR_ABORTED) return
+                        loadError = "$errorCode $errorText".trim()
+                        LOG.warn("panel page failed: {} {} ({})", errorCode, errorText, failedUrl.substringBefore('#'))
+                    }
+                })
             }
             if (loadedUrl != url) {
+                loadError = null
+                loadedOnce = false
                 b.cefBrowser.loadURL(url)
                 loadedUrl = url
             }
@@ -125,7 +161,7 @@ class AdminScreen private constructor() : Screen(Component.literal("Helix Admin"
 
         /** Reopens the overlay with the page as it was left, if a browser exists. */
         fun reopen(): Boolean {
-            if (browser == null) return false
+            if (browser == null || loadError != null) return false
             Minecraft.getInstance().setScreen(AdminScreen())
             return true
         }
@@ -141,6 +177,8 @@ class AdminScreen private constructor() : Screen(Component.literal("Helix Admin"
             browser?.close()
             browser = null
             loadedUrl = null
+            loadError = null
+            loadedOnce = false
         }
     }
 }

@@ -114,7 +114,9 @@ class AdminPlugin : JavaPlugin(), Listener, PluginMessageListener {
     override fun onPluginMessageReceived(channel: String, player: Player, message: ByteArray) {
         if (channel != CHANNEL) return
         val msg = runCatching { json.parseToJsonElement(String(message, Charsets.UTF_8)).jsonObject }.getOrNull() ?: return
-        when (msg.str("type")) {
+        val type = msg.str("type")
+        if (type != "call") logger.info("helix:admin '$type' from ${player.name} (panel permission: ${player.hasPermission(StaffOps.MENU)})")
+        when (type) {
             "hello" -> send(player, buildJsonObject { put("type", "welcome"); put("enabled", player.hasPermission(StaffOps.MENU)) })
             "open" -> if (player.hasPermission(StaffOps.MENU)) openPanel(player)
                 else send(player, buildJsonObject { put("type", "denied"); put("reason", "permission") })
@@ -147,9 +149,11 @@ class AdminPlugin : JavaPlugin(), Listener, PluginMessageListener {
             val base = panelUrl ?: fallbackPanelUrl(host)
             server.scheduler.runTask(this, Runnable {
                 if (ticket == null) {
+                    logger.warning("panel for $name: no ticket from the node, answering 'unreachable'")
                     send(player, buildJsonObject { put("type", "denied"); put("reason", "unreachable") })
                     return@Runnable
                 }
+                logger.info("panel for $name: ticket issued, page $base")
                 send(player, buildJsonObject { put("type", "ticket"); put("url", "$base/#ticket=$ticket&ingame=1") })
             })
         })
