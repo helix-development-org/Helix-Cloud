@@ -32,7 +32,10 @@ import kotlin.math.sin
  * cross-world teleports of players with passengers); they are just kept close to the wearer so they stay tracked.
  *
  * Passengers do not turn with their vehicle, so the body yaw and the flap are sent as transformation every tick
- * (interpolated on the client) – for other viewers in step with the player's own rotation updates.
+ * (interpolated on the client). The body yaw is not the server's `bodyYaw`: clients only send the head yaw and
+ * compute the body themselves, the server's value drifts off from what anyone sees. [BodyYaw] follows the head the
+ * way the client does (body stays until the head turns past a limit, catches up while walking) – smooth and the
+ * same for everyone.
  *
  * Every outgoing `SET_PASSENGERS` of a wearer gets the wing ids added (the server's own packets would otherwise
  * dismount them); the mount is resent when a viewer starts tracking the wearer or a wing, and periodically.
@@ -41,6 +44,7 @@ class PassengerWings {
     private data class Pair(val name: String, val right: ItemDisplay, val left: ItemDisplay)
 
     private val worn = ConcurrentHashMap<UUID, Pair>()
+    private val bodies = ConcurrentHashMap<UUID, BodyYaw>()
 
     /** Wearer entity id → wing entity ids, read by the packet listener off the main thread. */
     private val mounts = ConcurrentHashMap<Int, IntArray>()
@@ -144,8 +148,10 @@ class PassengerWings {
             }
             val show = visible(player)
             val flap = flapDegrees(player, tick)
-            apply(pair.right, if (show) wingTransform(player, -flap) else HIDDEN)
-            apply(pair.left, if (show) wingTransform(player, flap) else HIDDEN)
+            val body = bodies.getOrPut(uuid) { BodyYaw(player.location.yaw) }
+                .update(player.location.yaw, player.location.x, player.location.z)
+            apply(pair.right, if (show) wingTransform(body, -flap) else HIDDEN)
+            apply(pair.left, if (show) wingTransform(body, flap) else HIDDEN)
             if (tick % REMOUNT_TICKS == 0L) mount(player)
         }
     }
@@ -175,6 +181,7 @@ class PassengerWings {
 
     private fun despawn(player: Player, pair: Pair) {
         worn.remove(player.uniqueId)
+        bodies.remove(player.uniqueId)
         mounts.remove(player.entityId)
         pair.right.remove()
         pair.left.remove()
@@ -204,9 +211,9 @@ class PassengerWings {
     private fun visible(player: Player): Boolean =
         player.gameMode != GameMode.SPECTATOR && !player.isInvisible && player.pose in SHOWN_POSES
 
-    /** One wing hinged at the spine behind the back; [flap] is the signed sweep angle in degrees. */
-    private fun wingTransform(player: Player, flap: Float): Transformation {
-        val bodyYaw = Math.toRadians(-player.bodyYaw.toDouble()).toFloat()
+    /** One wing hinged at the spine behind the back of a body facing [bodyYawDegrees]; [flap] is the signed sweep. */
+    private fun wingTransform(bodyYawDegrees: Float, flap: Float): Transformation {
+        val bodyYaw = Math.toRadians(-bodyYawDegrees.toDouble()).toFloat()
         val back = Vector3f(0f, NECK_BELOW_SEAT + BACK_DROP, -BACK_OFFSET).rotateY(bodyYaw)
         val rotation = Quaternionf().rotateY(bodyYaw).rotateY(Math.toRadians(flap.toDouble()).toFloat())
         return Transformation(back, rotation, Vector3f(WING_SCALE, WING_SCALE, WING_SCALE), Quaternionf())
@@ -242,11 +249,63 @@ class PassengerWings {
         /** Sweep-back angle: resting flap, faster and wider while flying or gliding. */
         fun flapDegrees(player: Player, tick: Long): Float {
             val airborne = player.isFlying || player.isGliding
-            val period = if (airborne) 14.0 else 50.0
-            val amplitude = if (airborne) 18.0 else 7.0
+            val period = if (airborne) 14.0 else 60.0
+            val amplitude = if (airborne) 18.0 else 3.0
             val base = if (airborne) 18.0 else 26.0
             val phase = (tick + (player.uniqueId.hashCode() and 63)) * 2 * Math.PI / period
             return (base + amplitude * sin(phase)).toFloat()
+        }
+    }
+}
+
+/**
+ * Body yaw of a player the way clients animate it: the body keeps its direction until the head turns more than
+ * [HEAD_LIMIT] degrees away (then it is dragged along), and turns towards the head while the player walks.
+ *
+ * @param yaw initial body yaw in degrees.
+ */
+class BodyYaw(private var yaw: Float) {
+    private var lastX = Double.NaN
+    private var lastZ = Double.NaN
+
+    /**
+     * Advances one tick.
+     *
+     * @param headYaw the player's head yaw in degrees.
+     * @param x the player's x position.
+     * @param z the player's z position.
+     * @return the body yaw in degrees.
+     */
+    fun update(headYaw: Float, x: Double, z: Double): Float {
+        val moved = !lastX.isNaN() && (x - lastX) * (x - lastX) + (z - lastZ) * (z - lastZ) > MOVE_SQ
+        lastX = x
+        lastZ = z
+        val diff = wrap(headYaw - yaw)
+        yaw = when {
+            moved -> yaw + diff * CATCH_UP
+            diff > HEAD_LIMIT -> headYaw - HEAD_LIMIT
+            diff < -HEAD_LIMIT -> headYaw + HEAD_LIMIT
+            else -> yaw
+        }
+        yaw = wrap(yaw)
+        return yaw
+    }
+
+    private companion object {
+        /** Max head turn relative to the body before the body follows. */
+        const val HEAD_LIMIT = 45f
+
+        /** Share of the head/body difference closed per tick while walking. */
+        const val CATCH_UP = 0.3f
+
+        /** Squared horizontal distance per tick that counts as walking. */
+        const val MOVE_SQ = 0.0004
+
+        fun wrap(degrees: Float): Float {
+            var d = degrees % 360f
+            if (d >= 180f) d -= 360f
+            if (d < -180f) d += 360f
+            return d
         }
     }
 }
