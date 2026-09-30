@@ -138,9 +138,9 @@ class PassengerWings {
                 update(player, pair.name)
                 return@forEach
             }
-            if (tick % KEEP_CLOSE_TICKS == 0L) {
-                pair.right.teleport(player.location)
-                pair.left.teleport(player.location)
+            if (tick % KEEP_CLOSE_TICKS == 0L && pair.right.location.distanceSquared(player.location) > KEEP_CLOSE_DISTANCE_SQ) {
+                pair.right.teleport(anchor(player))
+                pair.left.teleport(anchor(player))
             }
             val show = visible(player)
             val flap = flapDegrees(player, tick)
@@ -181,12 +181,18 @@ class PassengerWings {
     }
 
     private fun spawn(player: Player, model: String): ItemDisplay =
-        player.world.spawn(player.location, ItemDisplay::class.java) { entity ->
+        player.world.spawn(anchor(player), ItemDisplay::class.java) { entity ->
             entity.billboard = Display.Billboard.FIXED
             entity.isPersistent = false
             entity.transformation = HIDDEN
             entity.setItemStack(ItemStack.of(Material.PAPER).apply { setData(DataComponentTypes.ITEM_MODEL, Key.key("helix_cosmetics", model)) })
         }
+
+    /**
+     * Server-side position of the wing displays: at the player, but always yaw/pitch 0 – an entity's own
+     * rotation is applied on top of the transformation, so taking the player's facing would turn the wings twice.
+     */
+    private fun anchor(player: Player) = player.location.clone().apply { yaw = 0f; pitch = 0f }
 
     private fun apply(display: ItemDisplay, transformation: Transformation) {
         if (display.transformation == transformation) return
@@ -221,8 +227,12 @@ class PassengerWings {
         /** Client-side interpolation of the orientation (sent every tick). */
         const val SMOOTH_TICKS = 1
 
-        /** Server-side reposition (keeps the displays tracked) and periodic remount. */
+        /**
+         * Server-side reposition to keep the displays tracked – only when they drifted off, the client places
+         * mounted displays itself and every teleport packet is a chance for a visible hiccup.
+         */
         const val KEEP_CLOSE_TICKS = 10L
+        const val KEEP_CLOSE_DISTANCE_SQ = 16.0
         const val REMOUNT_TICKS = 40L
 
         val SHOWN_POSES = setOf(Pose.STANDING, Pose.SNEAKING)
