@@ -61,6 +61,7 @@ import org.helix.node.services.ForwardingSecret
 import org.helix.node.services.ManagedService
 import org.helix.node.services.ProcessIdentity
 import org.helix.node.services.ProcessServiceExecutor
+import org.helix.node.services.PaperclipCache
 import org.helix.node.services.ServiceManager
 import org.helix.node.services.ServiceRegistryFile
 import org.helix.node.services.WorkspacePreparer
@@ -156,6 +157,7 @@ class HelixNode(
                 paths.config.resolve("forwarding.secret"),
             ),
             legacyForwarding = config.proxy.legacyForwarding,
+            paperclipCache = PaperclipCache(paths.cache.resolve("paperclip")),
         ),
         executors = mapOf(
             ExecutorType.PROCESS to ProcessServiceExecutor(),
