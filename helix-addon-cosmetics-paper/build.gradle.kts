@@ -12,10 +12,16 @@ repositories {
         name = "papermc"
         url = uri("https://repo.papermc.io/repository/maven-public/")
     }
+    maven {
+        name = "codemc"
+        url = uri("https://repo.codemc.io/repository/maven-releases/")
+    }
 }
 
 dependencies {
     compileOnly(libs.paper.api)
+    // packetevents is its own plugin on the servers (shipped by the guard addon); optional here
+    compileOnly(libs.packetevents.spigot)
     implementation(libs.kotlinx.serialization.json)
     implementation(rootProject.project("helix-wire"))
 }

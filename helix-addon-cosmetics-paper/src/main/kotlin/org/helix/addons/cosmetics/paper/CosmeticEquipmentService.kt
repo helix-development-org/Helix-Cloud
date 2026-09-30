@@ -17,15 +17,18 @@ import java.util.concurrent.ConcurrentHashMap
  * follow every movement, turn and animation exactly (no entity lagging behind).
  *
  *  - headwear: a helmet-slot item with the cosmetic's item model – the model's `head` display puts it on the head
- *  - wings: a chest-slot item with an `equippable` asset whose `wings` layer draws them on the elytra model
+ *  - wings (only as fallback, when packetevents is missing – normally [PassengerWings] shows the Blockbench
+ *    wings): a chest-slot item with an `equippable` asset whose `wings` layer draws them on the elytra model
  *
  * Only packets are faked ([Player.sendEquipmentChange]); the real inventory is untouched. Viewers are everyone
  * tracking the wearer plus the wearer (whose client then shows it in F5 and in its armor slot). The real
  * equipment is resent by the server on armor changes and when a viewer starts tracking – the plugin reapplies the
  * cosmetic right after ([refresh]) and periodically. While a cosmetic is worn it wins over real armor in that slot
  * (cosmetics are meant for lobbies, not for game servers with armor).
+ *
+ * @property elytraWings whether wings are shown on the elytra layer (fallback without packetevents).
  */
-class CosmeticEquipmentService {
+class CosmeticEquipmentService(private val elytraWings: Boolean) {
     private val wings = ConcurrentHashMap<UUID, String>()
     private val headwear = ConcurrentHashMap<UUID, String>()
 
@@ -35,8 +38,9 @@ class CosmeticEquipmentService {
      * @param player the wearer.
      * @param customModelData the wings' `CustomModelData`, or null for none.
      */
-    fun updateWings(player: Player, customModelData: Int?) =
-        update(wings, player, customModelData?.let(CosmeticModels::wings), EquipmentSlot.CHEST)
+    fun updateWings(player: Player, customModelData: Int?) {
+        if (elytraWings) update(wings, player, customModelData?.let(CosmeticModels::wings), EquipmentSlot.CHEST)
+    }
 
     /**
      * Sets or clears [player]'s headwear.

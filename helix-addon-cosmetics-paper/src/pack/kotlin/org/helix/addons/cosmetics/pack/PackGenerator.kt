@@ -23,15 +23,17 @@ import kotlin.io.path.nameWithoutExtension
  *
  *  - headwear: item definition `helix_cosmetics:<name>` → the Blockbench model, whose `head` display transform
  *    ([HEAD_DISPLAY]) puts the neck-pivoted model on the head
- *  - wings: equipment asset `helix_cosmetics:<name>` with a `wings` layer – the vanilla elytra model with an HD
- *    texture generated from the Blockbench wing art ([elytraTexture]); `<name>_icon` is the inventory icon
+ *  - wings: item definitions `helix_cosmetics:<name>_right` / `_left` → the Blockbench wing models, shown by
+ *    item displays mounted client-side on the player; as fallback (no packetevents) the equipment asset
+ *    `helix_cosmetics:<name>` with a `wings` layer – the vanilla elytra model with an HD texture generated from
+ *    the Blockbench wing art ([elytraTexture]); `<name>_icon` is its inventory icon
  */
 private const val NAMESPACE = "helix_cosmetics"
 
 /** Headwear models (item definitions of the same name). */
 internal val HEADWEAR = listOf("crown_silver", "crown_bronze", "crown_gold", "halo_white", "halo_dark", "halo_rainbow")
 
-/** Wing themes: equipment assets `wings_<id>`, art in `textures/wings_<id>.png`, icon model `wings_<id>_right`. */
+/** Wing themes: models `wings_<id>_right`/`_left`, art in `textures/wings_<id>.png`, elytra asset `wings_<id>`. */
 internal val WINGS = listOf("angel", "fairy", "ice", "fire", "demon", "dragon")
 
 /**
@@ -58,7 +60,7 @@ fun main(args: Array<String>) {
 
     val models = files(source.resolve("models"), "json")
     val textures = files(source.resolve("textures"), "png")
-    val required = HEADWEAR + WINGS.map { "wings_${it}_right" }
+    val required = HEADWEAR + WINGS.flatMap { listOf("wings_${it}_right", "wings_${it}_left") }
     val missing = required.filterNot { it in models } + WINGS.map { "wings_$it" }.filterNot { it in textures }
     require(missing.isEmpty()) { "missing Blockbench exports: $missing" }
 
@@ -76,6 +78,8 @@ fun main(args: Array<String>) {
     WINGS.forEach { id ->
         val name = "wings_$id"
         entries["assets/$NAMESPACE/items/${name}_icon.json"] = itemDefinition("${name}_right")
+        entries["assets/$NAMESPACE/items/${name}_right.json"] = itemDefinition("${name}_right")
+        entries["assets/$NAMESPACE/items/${name}_left.json"] = itemDefinition("${name}_left")
         entries["assets/$NAMESPACE/equipment/$name.json"] =
             """{"layers": {"wings": [{"texture": "$NAMESPACE:$name"}]}}""".toByteArray()
         entries["assets/$NAMESPACE/textures/entity/equipment/wings/$name.png"] =

@@ -24,7 +24,9 @@ import org.bukkit.scheduler.BukkitTask
  * periodically as a safety net.
  */
 class CosmeticsPlugin : JavaPlugin(), Listener {
-    private val cosmetics = CosmeticEquipmentService()
+    private lateinit var cosmetics: CosmeticEquipmentService
+    private var wings: PassengerWings? = null
+    private var wingTask: BukkitTask? = null
     private var fetchTask: BukkitTask? = null
     private var trackTask: BukkitTask? = null
     private var client: BridgeValuesClient? = null
@@ -42,6 +44,18 @@ class CosmeticsPlugin : JavaPlugin(), Listener {
         val client = BridgeValuesClient(controlUrl, controlToken, serviceId)
         this.client = client
         server.pluginManager.registerEvents(this, this)
+        // Blockbench-Flügel als Fake-Passagiere brauchen packetevents; ohne fallen sie auf die Elytra-Ebene zurück
+        val packets = server.pluginManager.isPluginEnabled("packetevents")
+        cosmetics = CosmeticEquipmentService(elytraWings = !packets)
+        if (packets) {
+            wings = PassengerWings().also { w ->
+                w.start()
+                w.scheduleMountsWith { player -> server.scheduler.runTaskLater(this, Runnable { if (player.isOnline) w.mount(player) }, MOUNT_DELAY_TICKS) }
+                wingTask = server.scheduler.runTaskTimer(this, Runnable { w.tick(server.onlinePlayers) }, 1L, 1L)
+            }
+        } else {
+            logger.warning("packetevents missing – wings are shown on the elytra layer")
+        }
 
         fetchTask = server.scheduler.runTaskTimerAsynchronously(
             this,
@@ -57,7 +71,10 @@ class CosmeticsPlugin : JavaPlugin(), Listener {
     override fun onDisable() {
         fetchTask?.cancel()
         trackTask?.cancel()
-        cosmetics.shutdown(server.onlinePlayers)
+        wingTask?.cancel()
+        wings?.shutdown(server.onlinePlayers)
+        wings = null
+        if (::cosmetics.isInitialized) cosmetics.shutdown(server.onlinePlayers)
         client?.close()
         client = null
     }
@@ -66,14 +83,23 @@ class CosmeticsPlugin : JavaPlugin(), Listener {
     @EventHandler
     fun onQuit(event: PlayerQuitEvent) {
         cosmetics.remove(event.player.uniqueId)
+        wings?.remove(event.player)
     }
 
     /** A viewer starts tracking a wearer: the server just sent the real equipment – show the cosmetic again. */
     @EventHandler(priority = EventPriority.MONITOR)
     fun onTrack(event: PlayerTrackEntityEvent) {
-        val wearer = event.entity as? Player ?: return
-        if (!cosmetics.wears(wearer.uniqueId)) return
         val viewer = event.player
+        val w = wings
+        // Flügel-Display neu gesehen: nach dem Spawn-Paket wieder aufsetzen
+        w?.wearerOfWing(event.entity.entityId)?.let { uuid ->
+            server.scheduler.runTaskLater(this, Runnable { server.getPlayer(uuid)?.let { w.mount(it, listOf(viewer)) } }, MOUNT_DELAY_TICKS)
+        }
+        val wearer = event.entity as? Player ?: return
+        if (w != null && w.wears(wearer.uniqueId)) {
+            server.scheduler.runTaskLater(this, Runnable { if (wearer.isOnline) w.mount(wearer, listOf(viewer)) }, MOUNT_DELAY_TICKS)
+        }
+        if (!cosmetics.wears(wearer.uniqueId)) return
         server.scheduler.runTask(this, Runnable { cosmetics.refresh(wearer, listOf(viewer)) })
     }
 
@@ -104,6 +130,7 @@ class CosmeticsPlugin : JavaPlugin(), Listener {
                 server.onlinePlayers.forEach { player ->
                     val name = player.name.lowercase()
                     cosmetics.updateWings(player, wings[name])
+                    this.wings?.update(player, wings[name]?.let(CosmeticModels::wings))
                     cosmetics.updateHeadwear(player, headwear[name])
                 }
             },
@@ -113,6 +140,9 @@ class CosmeticsPlugin : JavaPlugin(), Listener {
     private companion object {
         /** How often equipped cosmetics are refetched from the node. */
         const val FETCH_PERIOD_TICKS = 100L
+
+        /** Delay of a fake wing mount after a viewer started tracking (the spawn packets go first). */
+        const val MOUNT_DELAY_TICKS = 2L
 
         /** Safety-net reapplication of all cosmetics (e.g. after an inventory resync). */
         const val REFRESH_PERIOD_TICKS = 40L
