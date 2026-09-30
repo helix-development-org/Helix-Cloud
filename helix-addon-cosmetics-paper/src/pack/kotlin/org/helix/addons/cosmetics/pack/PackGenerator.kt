@@ -1,9 +1,14 @@
 package org.helix.addons.cosmetics.pack
 
+import java.awt.RenderingHints
+import java.awt.geom.AffineTransform
+import java.awt.image.BufferedImage
+import java.io.ByteArrayOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import javax.imageio.ImageIO
 import kotlin.io.path.extension
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.name
@@ -11,35 +16,33 @@ import kotlin.io.path.nameWithoutExtension
 
 /**
  * Assembles the cosmetics resource pack from the Blockbench exports in `src/pack/resources/cosmetics`
- * (JSON models in `models`, PNG textures in `textures`; the editable Blockbench projects live next to them in `blockbench`)
- * plus the carrier-item `CustomModelData` mapping.
+ * (JSON models in `models`, PNG textures in `textures`; the editable Blockbench projects live next to them in
+ * `blockbench`).
  *
- * All cosmetics share one carrier item ([CARRIER_MODEL], a plain paper item never actually held) so a single
- * `CustomModelData` value selects the model; the item is only ever shown by an item display entity.
- * Wings are two models (right and left wing, [WING_LEFT_OFFSET]) so the Paper component can flap them.
+ * The Paper component shows cosmetics as fake equipment, so the client renders them as part of the player model:
+ *
+ *  - headwear: item definition `helix_cosmetics:<name>` → the Blockbench model, whose `head` display transform
+ *    ([HEAD_DISPLAY]) puts the neck-pivoted model on the head
+ *  - wings: equipment asset `helix_cosmetics:<name>` with a `wings` layer – the vanilla elytra model with an HD
+ *    texture generated from the Blockbench wing art ([elytraTexture]); `<name>_icon` is the inventory icon
  */
 private const val NAMESPACE = "helix_cosmetics"
 
-/** `CustomModelData` of the left wing = right wing's value + this offset (mirrored in the Paper component). */
-const val WING_LEFT_OFFSET = 50
+/** Headwear models (item definitions of the same name). */
+internal val HEADWEAR = listOf("crown_silver", "crown_bronze", "crown_gold", "halo_white", "halo_dark", "halo_rainbow")
 
-/** The vanilla item every cosmetic model overrides via `CustomModelData` — never actually used as paper. */
-private const val CARRIER_MODEL = "paper"
+/** Wing themes: equipment assets `wings_<id>`, art in `textures/wings_<id>.png`, icon model `wings_<id>_right`. */
+internal val WINGS = listOf("angel", "fairy", "ice", "fire", "demon", "dragon")
 
-/** Every cosmetic model with its `CustomModelData` (must match the addon's `CosmeticCatalog`). */
-internal val MODELS: List<Pair<Int, String>> = buildList {
-    listOf("angel" to 1001, "fairy" to 1002, "ice" to 1003, "fire" to 1004, "demon" to 1005, "dragon" to 1006)
-        .forEach { (id, cmd) ->
-            add(cmd to "wings_${id}_right")
-            add(cmd + WING_LEFT_OFFSET to "wings_${id}_left")
-        }
-    add(2001 to "crown_silver")
-    add(2002 to "crown_bronze")
-    add(2003 to "halo_white")
-    add(2004 to "crown_gold")
-    add(2005 to "halo_dark")
-    add(2006 to "halo_rainbow")
-}.sortedBy { it.first }
+/**
+ * `head` display of the headwear models. Models are built with 1 unit = 1 skin pixel around the neck (model
+ * centre); the head slot renders the model centre at the head centre at 0.625 skin pixels per unit – so scale
+ * by 1.6 and move down by 4 skin pixels (6.4 units).
+ */
+private const val HEAD_DISPLAY = """"display": {"head": {"rotation": [0, 0, 0], "translation": [0, -6.4, 0], "scale": [1.6, 1.6, 1.6]}}"""
+
+/** Elytra texture: vanilla layout 64×32, generated at [ELYTRA_SCALE]× for detail. */
+private const val ELYTRA_SCALE = 4
 
 /**
  * Entry point: writes `pack.zip`.
@@ -52,20 +55,31 @@ fun main(args: Array<String>) {
     Files.createDirectories(output.parent)
     val entries = linkedMapOf<String, ByteArray>()
     entries["pack.mcmeta"] = packMeta()
-    entries["assets/minecraft/models/item/$CARRIER_MODEL.json"] = carrierOverrides()
-    entries["assets/minecraft/items/$CARRIER_MODEL.json"] = carrierItemModel()
 
     val models = files(source.resolve("models"), "json")
     val textures = files(source.resolve("textures"), "png")
-    val missing = MODELS.map { it.second }.filterNot { it in models }
+    val required = HEADWEAR + WINGS.map { "wings_${it}_right" }
+    val missing = required.filterNot { it in models } + WINGS.map { "wings_$it" }.filterNot { it in textures }
     require(missing.isEmpty()) { "missing Blockbench exports: $missing" }
-    models.forEach { (name, path) -> entries["assets/$NAMESPACE/models/item/$name.json"] = Files.readAllBytes(path) }
-    textures.forEach { (name, path) -> entries["assets/$NAMESPACE/textures/item/$name.png"] = Files.readAllBytes(path) }
-    // jede Texturreferenz eines Modells muss im Pack liegen
+
     models.forEach { (name, path) ->
-        Regex("\"$NAMESPACE:item/([a-z0-9_]+)\"").findAll(Files.readString(path)).forEach {
+        var json = Files.readString(path)
+        if (name in HEADWEAR) json = json.replaceFirst("{", "{\n  $HEAD_DISPLAY,")
+        entries["assets/$NAMESPACE/models/item/$name.json"] = json.toByteArray()
+        Regex("\"$NAMESPACE:item/([a-z0-9_]+)\"").findAll(json).forEach {
             require(it.groupValues[1] in textures) { "model $name references missing texture ${it.groupValues[1]}" }
         }
+    }
+    textures.forEach { (name, path) -> entries["assets/$NAMESPACE/textures/item/$name.png"] = Files.readAllBytes(path) }
+
+    HEADWEAR.forEach { entries["assets/$NAMESPACE/items/$it.json"] = itemDefinition(it) }
+    WINGS.forEach { id ->
+        val name = "wings_$id"
+        entries["assets/$NAMESPACE/items/${name}_icon.json"] = itemDefinition("${name}_right")
+        entries["assets/$NAMESPACE/equipment/$name.json"] =
+            """{"layers": {"wings": [{"texture": "$NAMESPACE:$name"}]}}""".toByteArray()
+        entries["assets/$NAMESPACE/textures/entity/equipment/wings/$name.png"] =
+            elytraTexture(ImageIO.read(textures.getValue(name).toFile()))
     }
 
     ZipOutputStream(Files.newOutputStream(output)).use { zip ->
@@ -88,52 +102,52 @@ private fun files(dir: Path, extension: String): Map<String, Path> =
             .associateBy { it.nameWithoutExtension }
     }
 
+private fun itemDefinition(model: String): ByteArray =
+    """{"model": {"type": "minecraft:model", "model": "$NAMESPACE:item/$model"}}""".toByteArray()
+
+/**
+ * Maps the Blockbench wing art (48×60 in the top-left of the 64×64 texture: shoulder/root on the left, leading
+ * edge along the top, feathers hanging down) onto the elytra wing box (texture offset 22,0; 10×20×2): the art is
+ * turned so the root sits at the shoulder (top) and the tip at the bottom, then drawn onto the back and front
+ * faces; sides, top and bottom take a squeezed copy for matching colours.
+ *
+ * @param art the wing art texture.
+ * @return PNG bytes of the elytra texture.
+ */
+internal fun elytraTexture(art: BufferedImage): ByteArray {
+    val s = ELYTRA_SCALE
+    val wing = art.getSubimage(0, 0, minOf(48, art.width), minOf(60, art.height))
+    // Wurzel nach oben (Schulter), Flügelspitze nach unten, Vorderkante außen
+    val turned = BufferedImage(wing.height, wing.width, BufferedImage.TYPE_INT_ARGB)
+    turned.createGraphics().apply {
+        transform = AffineTransform().apply { translate(wing.height.toDouble(), 0.0); rotate(Math.PI / 2) }
+        drawImage(wing, 0, 0, null)
+        dispose()
+    }
+    val out = BufferedImage(64 * s, 32 * s, BufferedImage.TYPE_INT_ARGB)
+    val g = out.createGraphics()
+    g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR)
+    fun draw(x: Int, y: Int, w: Int, h: Int, mirror: Boolean = false) {
+        if (mirror) g.drawImage(turned, (x + w) * s, y * s, -w * s, h * s, null)
+        else g.drawImage(turned, x * s, y * s, w * s, h * s, null)
+    }
+    draw(36, 2, 10, 20) // back (seen from behind)
+    draw(24, 2, 10, 20, mirror = true) // front
+    draw(22, 2, 2, 20) // side
+    draw(34, 2, 2, 20) // side
+    draw(24, 0, 10, 2) // top
+    draw(34, 0, 10, 2) // bottom
+    g.dispose()
+    return ByteArrayOutputStream().also { ImageIO.write(out, "png", it) }.toByteArray()
+}
+
 private fun packMeta(): ByteArray =
     """
     {
       "pack": {
         "pack_format": 46,
-        "supported_formats": {"min_inclusive": 9, "max_inclusive": 999},
-        "description": "Helix Cosmetics item models"
+        "supported_formats": {"min_inclusive": 46, "max_inclusive": 999},
+        "description": "Helix Cosmetics"
       }
     }
     """.trimIndent().toByteArray()
-
-/** Maps `CustomModelData` values on [CARRIER_MODEL] to each cosmetic's model (legacy override format). */
-private fun carrierOverrides(): ByteArray {
-    val overrides = MODELS.joinToString(",\n    ") { (cmd, model) ->
-        """{"predicate": {"custom_model_data": $cmd}, "model": "$NAMESPACE:item/$model"}"""
-    }
-    return """
-    {
-      "parent": "minecraft:item/generated",
-      "textures": {"layer0": "minecraft:item/paper"},
-      "overrides": [
-        $overrides
-      ]
-    }
-    """.trimIndent().toByteArray()
-}
-
-/**
- * The modern (1.21.4+) item-model definition for [CARRIER_MODEL]; vanilla's built-in definition would otherwise
- * win over the legacy [carrierOverrides] on new clients. Kept alongside the legacy file for older clients.
- */
-private fun carrierItemModel(): ByteArray {
-    val entries = MODELS.joinToString(",\n        ") { (cmd, model) ->
-        """{"threshold": $cmd, "model": {"type": "minecraft:model", "model": "$NAMESPACE:item/$model"}}"""
-    }
-    return """
-    {
-      "model": {
-        "type": "minecraft:range_dispatch",
-        "property": "minecraft:custom_model_data",
-        "index": 0,
-        "fallback": {"type": "minecraft:model", "model": "minecraft:item/paper"},
-        "entries": [
-        $entries
-        ]
-      }
-    }
-    """.trimIndent().toByteArray()
-}
