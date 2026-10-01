@@ -315,26 +315,36 @@ Referenz-Implementierungen in diesem Repo:
   Passagier-Trick, um echtes Reiten nicht zu stören).
 - `helix-addon-cosmetics` (+ `helix-addon-cosmetics-paper`) — anziehbare
   Flügel und Kopfbedeckungen (je 6, rang-/permission-gated), gewählt über
-  das Profile-System als zwei Choice-Settings (`wings`/`headwear`). Jedes
-  Cosmetic ist ein `CustomModelData`-getaggter `PAPER`-Carrier mit eigenem
-  handgeschriebenen Item-Modell (Flügel: zwei flache Panels; Kronen: Band
-  + vier Ecken-Zacken; Halos: flacher quadratischer Ring) und
-  Java2D-gezeichneter Textur, zur Build-Zeit generiert
-  (`:helix-addon-cosmetics-paper:generatePack`) — genau wie bei BetterMSGs,
-  nur mit echten Item-Modellen statt Font-Glyphen. Paper-seitig rendert
-  eine Item-Display-Entity pro Slot, jeden Tick neu positioniert/rotiert
-  nach Spieler-Blickrichtung — kein Rüstungs-/Elytra-Slot wird belegt,
-  also keine Kollision mit echter Ausrüstung. `CustomModelData`-Werte sind
-  bewusst als fester Katalog im Code hinterlegt (nicht zur Laufzeit
-  konfigurierbar), da die Modelle selbst zur Build-Zeit im Resource-Pack
-  gebacken werden. Der Carrier definiert sein Modell **zweifach**:
-  `assets/minecraft/models/item/paper.json` (klassisches Overrides-Array,
-  für ältere/ViaVersion-gebrückte Clients) UND
-  `assets/minecraft/items/paper.json` (moderner `range_dispatch` über
-  `minecraft:custom_model_data`, seit dem Item-Components-Rework nötig,
-  da neuere Clients sonst ihr eingebautes Item-Modell statt des
-  Overrides-Arrays verwenden und der Carrier als schlichtes Papier
-  rendert).
+  das Profile-System als zwei Choice-Settings (`wings`/`headwear`). Modelle
+  und Texturen sind Blockbench-Projekte in
+  `helix-addon-cosmetics-paper/src/pack/resources/cosmetics` (`models`,
+  `textures`, `blockbench`); `:helix-addon-cosmetics-paper:generatePack`
+  baut daraus das Pack. Darstellung ohne Versatz zum Spieler:
+  - **Kopfschmuck** als Fake-Helm (`sendEquipmentChange`, nur Pakete): das
+    Item-Modell sitzt per `head`-Display-Transform auf dem Kopf.
+  - **Flügel** als zwei Item-Displays, die **nur clientseitig** per
+    gefälschtem `SET_PASSENGERS` (packetevents) auf dem Spieler reiten – der
+    Client positioniert sie selbst; serverseitig sind sie keine Passagiere
+    (Paper verweigert Weltwechsel-Teleports von Spielern mit Passagieren)
+    und stehen am Sitzplatz. Körperdrehung nach Client-Logik (`BodyYaw`),
+    sanftes Flattern. Ohne packetevents: Fallback auf die Elytra-Ebene
+    (`equippable`-Asset, HD-Textur aus der Blockbench-Grafik).
+  Ein aktives Cosmetic gewinnt optisch gegen echte Rüstung im selben Slot
+  (gedacht für Lobbys).
+- `helix-addon-cinematic` (+ `helix-addon-cinematic-paper` = Plugin
+  `HelixCinematic`, + Library `helix-library-cinematic`) — **Cinematic AFK**
+  wie in GTA: nach `afkSeconds` (Standard 30) ohne Eingabe fliegt die Kamera
+  Drohnen-Shots um den Spieler (Anflug, leichtes Kreisen, Blick auf den
+  Spieler, Schwarzblende zwischen den Shots, Namenskarte, „AFK“ über dem
+  Kopf für andere). Jede Eingabe beendet es. Kamera = unsichtbares
+  Item-Display + Vanilla-Kamera-Paket: der Spieler bleibt im Spielmodus,
+  sein Körper mit Rang/Name, Untertitel und Cosmetics ist im Bild, der
+  Client blendet Hotbar, Herzen und Hand selbst aus. Einstellungen
+  (`cinematic.config`, `cinematic.set <tasks|afkSeconds|shotSeconds|fade|nameCard|afkTag> <wert>`,
+  Recht `helix.cinematic.admin`, Dashboard-Panel „Cinematic AFK“), Standard
+  nur auf dem Task `Lobby`; Spieler schalten es im Profil ab (`cinematic`).
+  `HelixCinematic` installiert und teilt die **Cinematic-Library** für alle
+  Plugins (wie Helix-GUIs für IGui) – siehe `helix-library-cinematic/README.md`.
 - `helix-addon-lobby` (+ `helix-addon-lobby-paper`) — macht ausgewählte
   Tasks zu Lobbys. Welche Tasks Lobbys sind, wählt man im Dashboard-Panel
   **Lobby**; die Paper-Komponente aktiviert sich nur, wenn ihr `HELIX_TASK`
