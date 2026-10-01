@@ -37,6 +37,7 @@ class AdminAddon : AddonBase() {
         registerPanelUrl()
         registerMachineApi()
         registerStaffActions()
+        registerStaffRelay()
     }
 
     private fun registerPanelUrl() {
@@ -165,6 +166,26 @@ class AdminAddon : AddonBase() {
         }
     }
 
+    /**
+     * Relay for native staff clients (Helix LabyMod addon via the Paper component): runs one of the staff actions
+     * in the name of an in-game staff member – only if that player holds the action's own permission.
+     */
+    private fun registerStaffRelay() {
+        action(
+            "admin.staff",
+            "Runs a staff action for an in-game staff member (Paper component, native panels).",
+            "admin.staff <player> <admin.action> [args…]",
+            bridgeInvocable = true,
+        ) { inv ->
+            val actor = inv.arguments.getOrNull(0)
+            val target = inv.arguments.getOrNull(1)
+            if (actor == null || target == null) return@action ActionResult.error("usage: admin.staff <player> <admin.action> [args…]")
+            val permission = STAFF_RELAY[target] ?: return@action ActionResult.error("not relayable: $target")
+            if (!context.hasPermission(actor, permission)) return@action ActionResult.error("missing permission $permission")
+            context.actions.invoke(ActionInvocation(target, inv.arguments.drop(2), ActionSource.ADDON, actor = actor))
+        }
+    }
+
     /** The signed-in caller (REST session name); console/system calls are attributed to "console". */
     private fun actor(invocation: ActionInvocation): String = invocation.actor?.takeIf { it.isNotBlank() } ?: "console"
 
@@ -179,6 +200,18 @@ class AdminAddon : AddonBase() {
     }
 
     private companion object {
+        /** Staff actions native panels may run through `admin.staff`, with the permission each needs. */
+        val STAFF_RELAY = mapOf(
+            "admin.players" to "helix.staff.menu",
+            "admin.servers" to "helix.staff.menu",
+            "admin.kick" to "helix.staff.kick",
+            "admin.warn" to "helix.staff.warn",
+            "admin.ban" to "helix.staff.ban",
+            "admin.message" to "helix.staff.message",
+            "admin.announce" to "helix.staff.announce",
+            "admin.service.restart" to "helix.staff.server",
+        )
+
         const val PANEL_URL_KEY = "panelUrl"
         const val PANEL_URL_BRIDGE_KEY = "admin.panel_url"
     }

@@ -31,6 +31,27 @@ object StaffOps {
         "player.feed" to "helix.staff.heal",
         "player.gamemode" to "helix.staff.gamemode",
         "player.invsee" to "helix.staff.inventory",
+        // network actions for native panels (relayed to the node's admin.* actions via admin.staff)
+        "net.players" to MENU,
+        "net.servers" to MENU,
+        "net.kick" to "helix.staff.kick",
+        "net.warn" to "helix.staff.warn",
+        "net.ban" to "helix.staff.ban",
+        "net.message" to "helix.staff.message",
+        "net.announce" to "helix.staff.announce",
+        "net.restart" to "helix.staff.server",
+    )
+
+    /** `net.*` op → node staff action relayed through `admin.staff`. */
+    val NODE_ACTIONS: Map<String, String> = mapOf(
+        "net.players" to "admin.players",
+        "net.servers" to "admin.servers",
+        "net.kick" to "admin.kick",
+        "net.warn" to "admin.warn",
+        "net.ban" to "admin.ban",
+        "net.message" to "admin.message",
+        "net.announce" to "admin.announce",
+        "net.restart" to "admin.service.restart",
     )
 
     /** All known ops. */

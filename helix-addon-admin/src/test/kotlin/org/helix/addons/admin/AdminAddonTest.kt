@@ -97,4 +97,14 @@ class AdminAddonTest {
         now = 2_000
         assertTrue(queue.poll("S", 0).jobs.isEmpty(), "expired")
     }
+
+    @Test
+    fun `the staff relay checks the target action's permission for the in-game player`() {
+        context.permissionCheck = { player, permission -> player == "Mod" && permission == "helix.staff.menu" }
+        assertTrue(context.handlers.getValue("admin.staff").first.bridgeInvocable)
+        assertTrue(context.run("admin.staff", "Mod", "admin.players").success)
+        assertFalse(context.run("admin.staff", "Mod", "admin.kick", "Griefer").success, "kick needs helix.staff.kick")
+        assertFalse(context.run("admin.staff", "Guest", "admin.players").success)
+        assertFalse(context.run("admin.staff", "Mod", "admin.panelurl", "x").success, "only staff actions are relayed")
+    }
 }

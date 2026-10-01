@@ -218,6 +218,7 @@ class AdminPlugin : JavaPlugin(), Listener, PluginMessageListener {
             }
             "world.clear" -> done(buildJsonObject { put("removed", clearArea(actor, args.num("radius").toInt())) })
             "server.info" -> done(serverInfo())
+            in StaffOps.NODE_ACTIONS.keys -> relay(actor, id, StaffOps.NODE_ACTIONS.getValue(op), args)
             else -> playerOp(actor, id, op, args)
         }
     }
@@ -320,6 +321,27 @@ class AdminPlugin : JavaPlugin(), Listener, PluginMessageListener {
             })
         }.toString()
         server.scheduler.runTaskAsynchronously(this, Runnable { nodeAction("admin.presence", report) })
+    }
+
+    /**
+     * Native panels: runs a node staff action in [actor]'s name (`admin.staff`, the node checks the permission again)
+     * off the main thread; the reply carries the result lines (`{"lines": [...]}`).
+     */
+    private fun relay(actor: Player, id: Long, action: String, args: JsonObject) {
+        val arguments = (args["args"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
+        val name = actor.name
+        server.scheduler.runTaskAsynchronously(this, Runnable {
+            val result = runCatching { api.action(ActionInvocation("admin.staff", listOf(name, action) + arguments)) }.getOrNull()
+            server.scheduler.runTask(this, Runnable {
+                when {
+                    result == null -> reply(actor, id, error = "node unreachable")
+                    !result.success -> reply(actor, id, error = result.lines.firstOrNull() ?: "failed")
+                    else -> reply(actor, id, buildJsonObject {
+                        put("lines", kotlinx.serialization.json.JsonArray(result.lines.map { kotlinx.serialization.json.JsonPrimitive(it) }))
+                    })
+                }
+            })
+        })
     }
 
     private fun nodeAction(action: String, vararg arguments: String): String? {
