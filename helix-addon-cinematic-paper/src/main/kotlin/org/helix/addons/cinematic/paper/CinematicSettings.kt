@@ -12,21 +12,30 @@ import kotlinx.serialization.json.Json
  * @property fade whether shots are separated by a fade to black.
  * @property nameCard whether the first shot additionally shows the player's name as subtitle.
  * @property afkTag MiniMessage text above AFK players for others (blank: none).
+ * @property mode `screen` (AFK screen) or `cinematic` (camera).
+ * @property afkTitle MiniMessage headline of the AFK screen.
+ * @property afkSubtitle MiniMessage hint below it.
  */
 @Serializable
 data class CinematicSettings(
+    val mode: String = "screen",
     val tasks: List<String> = listOf("Lobby"),
     val afkSeconds: Int = 30,
     val shotSeconds: Int = 8,
     val fade: Boolean = true,
     val nameCard: Boolean = false,
     val afkTag: String = "<gray>AFK",
+    val afkTitle: String = "<white><bold>Du bist AFK",
+    val afkSubtitle: String = "<gray>Klicke oder bewege dich, um weiterzuspielen",
 ) {
     /**
      * @param task this service's task.
      * @return whether the camera runs on it (task names compare case-insensitively).
      */
     fun activeOn(task: String): Boolean = tasks.any { it.equals(task, ignoreCase = true) }
+
+    /** Whether idle players get the cinematic camera instead of the AFK screen. */
+    val cinematic: Boolean get() = mode.equals("cinematic", ignoreCase = true)
 
     /** Parsing of the bridge values. */
     companion object {

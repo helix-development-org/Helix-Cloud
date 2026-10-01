@@ -33,8 +33,10 @@ import kotlin.random.Random
 
 /**
  * HelixCinematic: installs and shares the cinematic library ([Cinematics], `helix-library-cinematic`) for the
- * whole server – other plugins use it with `depend: [HelixCinematic]` and [Cinematics.shared] – and runs its first
- * user, the **cinematic AFK camera** of the `helix.cinematic` addon: after [CinematicSettings.afkSeconds]
+ * whole server – other plugins use it with `depend: [HelixCinematic]` and [Cinematics.shared] – and runs the AFK
+ * handling of the `helix.cinematic` addon. Mode `screen` (default): after [CinematicSettings.afkSeconds] without
+ * input the [AfkScreen] dims the screen ("Du bist AFK – klicke oder bewege dich …") until the first input.
+ * Mode `cinematic`, the **cinematic AFK camera**: after [CinematicSettings.afkSeconds]
  * without input on a task listed in the settings the player becomes the (spectating, invisible) camera, a
  * look-alike NPC with name, subtitle and cosmetics stands in their place, the screen is emptied, and an endless
  * scene of fly-ins ([Shots.flyIn]: straight at the NPC, slowly turning, faster or slower) separated by fades films
@@ -55,6 +57,10 @@ class CinematicPlugin : JavaPlugin(), Listener {
     private val lastInput = ConcurrentHashMap<UUID, Long>()
     private val afkTags = HashMap<UUID, TextDisplay>()
 
+    /** Players currently shown the AFK screen → tick of the last refresh. */
+    private val screens = HashMap<UUID, Int>()
+    private var ticks = 0
+
     /** Installs the library, connects to the node and starts the AFK watcher. */
     override fun onEnable() {
         cinematics = Cinematics.install(this)
@@ -72,7 +78,7 @@ class CinematicPlugin : JavaPlugin(), Listener {
             settings = CinematicSettings.from(values)
             optedOut = CinematicSettings.optedOut(values)
         }, 0L, FETCH_PERIOD_TICKS)
-        tickTask = server.scheduler.runTaskTimer(this, Runnable { tick() }, 20L, 5L)
+        tickTask = server.scheduler.runTaskTimer(this, Runnable { tick() }, 20L, TICK_PERIOD.toLong())
         server.onlinePlayers.forEach { input(it) }
         logger.info("HelixCinematic enabled (task $task)")
     }
@@ -83,16 +89,30 @@ class CinematicPlugin : JavaPlugin(), Listener {
         tickTask?.cancel()
         afkTags.values.forEach { it.remove() }
         afkTags.clear()
+        screens.keys.mapNotNull { server.getPlayer(it) }.forEach { AfkScreen.hide(it) }
+        screens.clear()
         if (::cinematics.isInitialized) Cinematics.uninstall(cinematics)
         client?.close()
         client = null
     }
 
     private fun tick() {
+        ticks += TICK_PERIOD
         val current = settings
         val active = current.activeOn(task)
         val now = System.currentTimeMillis()
+        if (!active || current.cinematic) screens.keys.toList().forEach { id -> server.getPlayer(id)?.let(::wake) }
         server.onlinePlayers.forEach { player ->
+            val id = player.uniqueId
+            screens[id]?.let { shownAt ->
+                if (player.name.lowercase() in optedOut) return@forEach wake(player)
+                if (ticks - shownAt >= AfkScreen.REFRESH_TICKS) {
+                    AfkScreen.show(player, current, fadeIn = false)
+                    screens[id] = ticks
+                }
+                afkTags[id]?.teleport(player.location.add(0.0, SCREEN_TAG_HEIGHT, 0.0).apply { yaw = 0f; pitch = 0f })
+                return@forEach
+            }
             val playback = cinematics.playing(player)
             if (playback != null) {
                 if (playback.scene.name == AFK_SCENE && (!active || player.name.lowercase() in optedOut)) playback.stop()
@@ -101,9 +121,38 @@ class CinematicPlugin : JavaPlugin(), Listener {
             }
             if (!active) return@forEach
             val idleMs = now - (lastInput[player.uniqueId] ?: now.also { lastInput[player.uniqueId] = it })
-            if (idleMs >= current.afkSeconds * 1000L && canStart(player)) startAfk(player, current)
+            if (idleMs < current.afkSeconds * 1000L || player.name.lowercase() in optedOut) return@forEach
+            if (!current.cinematic) {
+                if (player.gameMode != GameMode.SPECTATOR && !player.isSleeping) showScreen(player, current)
+            } else if (canStart(player)) {
+                startAfk(player, current)
+            }
         }
     }
+
+    private fun showScreen(player: Player, current: CinematicSettings) {
+        AfkScreen.show(player, current, fadeIn = true)
+        screens[player.uniqueId] = ticks
+        if (current.afkTag.isNotBlank()) {
+            afkTags[player.uniqueId] = spawnTag(player, current, SCREEN_TAG_HEIGHT)
+        }
+    }
+
+    /** First input after AFK: the screen goes away. */
+    private fun wake(player: Player) {
+        if (screens.remove(player.uniqueId) == null) return
+        AfkScreen.hide(player)
+        afkTags.remove(player.uniqueId)?.remove()
+    }
+
+    private fun spawnTag(player: Player, current: CinematicSettings, height: Double): TextDisplay =
+        player.world.spawn(player.location.add(0.0, height, 0.0), TextDisplay::class.java) { tag ->
+            tag.isPersistent = false
+            tag.billboard = Display.Billboard.CENTER
+            tag.text(MiniMessage.miniMessage().deserialize(current.afkTag))
+            tag.isDefaultBackground = false
+            tag.isShadowed = true
+        }.also { player.hideEntity(this, it) }
 
     private fun canStart(player: Player): Boolean =
         player.name.lowercase() !in optedOut &&
@@ -121,15 +170,7 @@ class CinematicPlugin : JavaPlugin(), Listener {
                 lastInput[player.uniqueId] = System.currentTimeMillis()
             }
         }
-        if (current.afkTag.isNotBlank()) {
-            afkTags[player.uniqueId] = player.world.spawn(player.location.add(0.0, TAG_HEIGHT, 0.0), TextDisplay::class.java) { tag ->
-                tag.isPersistent = false
-                tag.billboard = Display.Billboard.CENTER
-                tag.text(MiniMessage.miniMessage().deserialize(current.afkTag))
-                tag.isDefaultBackground = false
-                tag.isShadowed = true
-            }.also { player.hideEntity(this, it) }
-        }
+        if (current.afkTag.isNotBlank()) afkTags[player.uniqueId] = spawnTag(player, current, TAG_HEIGHT)
     }
 
     /** The endless AFK scene: random drone shots around the player, the first one with the name card. */
@@ -162,6 +203,7 @@ class CinematicPlugin : JavaPlugin(), Listener {
 
     private fun input(player: Player) {
         lastInput[player.uniqueId] = System.currentTimeMillis()
+        if (player.uniqueId in screens) server.scheduler.runTask(this, Runnable { wake(player) })
     }
 
     /** Joining counts as input. */
@@ -172,6 +214,7 @@ class CinematicPlugin : JavaPlugin(), Listener {
     @EventHandler
     fun onQuit(event: PlayerQuitEvent) {
         lastInput.remove(event.player.uniqueId)
+        screens.remove(event.player.uniqueId)
         afkTags.remove(event.player.uniqueId)?.remove()
     }
 
@@ -218,6 +261,12 @@ class CinematicPlugin : JavaPlugin(), Listener {
 
         /** The camera looks at the chest/head of the player. */
         const val TARGET_HEIGHT = 1.3
+
+        /** Period of the AFK watcher in ticks. */
+        const val TICK_PERIOD = 5
+
+        /** AFK tag height above a real (standing) player – above the name tag and a subtitle. */
+        const val SCREEN_TAG_HEIGHT = 2.55
 
         /** AFK tag height above the feet (above the stand-in's name line). */
         const val TAG_HEIGHT = 2.7

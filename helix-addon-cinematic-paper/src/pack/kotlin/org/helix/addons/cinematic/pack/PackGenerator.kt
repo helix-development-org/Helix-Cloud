@@ -12,7 +12,8 @@ import javax.imageio.ImageIO
 /**
  * Resource pack of HelixCinematic: the fade font `helix_cinematic:fade` used by the cinematic library's
  * transitions – U+E000 is a black square drawn 256 units high (shown as title, ×4 → covers the screen),
- * U+E001 a -1 space so several squares join without gaps.
+ * U+E001 a -1 space so several squares join without gaps – and the AFK screen font `helix_cinematic:afk`
+ * (U+E000 a translucent dark square, U+E001 -1, U+E002 -641 = half of five joined squares).
  *
  * @param args `[0]` output path of the pack zip.
  */
@@ -23,9 +24,22 @@ fun main(args: Array<String>) {
         createGraphics().apply { color = Color.BLACK; fillRect(0, 0, 16, 16); dispose() }
     }
     val png = ByteArrayOutputStream().also { ImageIO.write(black, "png", it) }.toByteArray()
+    val dim = BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB).apply {
+        createGraphics().apply { color = Color(8, 8, 12, 185); fillRect(0, 0, 16, 16); dispose() }
+    }
+    val dimPng = ByteArrayOutputStream().also { ImageIO.write(dim, "png", it) }.toByteArray()
     val entries = linkedMapOf(
         "pack.mcmeta" to """{"pack": {"pack_format": 46, "supported_formats": {"min_inclusive": 46, "max_inclusive": 999}, "description": "Helix Cinematic"}}""".toByteArray(),
         "assets/helix_cinematic/textures/font/black.png" to png,
+        "assets/helix_cinematic/textures/font/dim.png" to dimPng,
+        "assets/helix_cinematic/font/afk.json" to """
+            {
+              "providers": [
+                {"type": "bitmap", "file": "helix_cinematic:font/dim.png", "height": 256, "ascent": 150, "chars": ["\uE000"]},
+                {"type": "space", "advances": {"\uE001": -1, "\uE002": -641}}
+              ]
+            }
+        """.trimIndent().toByteArray(),
         "assets/helix_cinematic/font/fade.json" to """
             {
               "providers": [

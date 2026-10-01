@@ -1,8 +1,8 @@
 {
   "id": "helix.cinematic",
-  "name": "Helix Cinematic AFK",
+  "name": "Helix AFK",
   "version": "1.0.0",
   "main": "org.helix.addons.cinematic.CinematicAddon",
-  "description": "GTA-style cinematic AFK camera: after a while standing still the camera flies drone shots around the player (fades, name card, AFK tag for others, hotbar hidden). Per task, players can turn it off in their profile.",
+  "description": "AFK screen for idle players (dimmed \"you are AFK\" overlay, AFK tag for others) or, optionally, a cinematic camera; ships the cinematic library. Per task, players can turn it off in their profile.",
   "permissions": ["helix.cinematic.admin"]
 }

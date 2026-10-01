@@ -33,6 +33,15 @@ class CinematicAddonTest {
         val config = CinematicConfig.parse(context.bridgeValues["cinematic.config"])
         assertEquals(listOf("Lobby"), config.tasks)
         assertEquals(30, config.afkSeconds)
+        assertEquals("screen", config.mode)
+    }
+
+    @Test
+    fun `the mode is validated`() {
+        enable()
+        assertTrue(run("cinematic.set", "mode", "cinematic").success)
+        assertFalse(run("cinematic.set", "mode", "nope").success)
+        assertEquals("cinematic", CinematicConfig.parse(context.bridgeValues["cinematic.config"]).mode)
     }
 
     @Test

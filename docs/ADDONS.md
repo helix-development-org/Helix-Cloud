@@ -332,8 +332,13 @@ Referenz-Implementierungen in diesem Repo:
   Ein aktives Cosmetic gewinnt optisch gegen echte Rüstung im selben Slot
   (gedacht für Lobbys).
 - `helix-addon-cinematic` (+ `helix-addon-cinematic-paper` = Plugin
-  `HelixCinematic`, + Library `helix-library-cinematic`) — **Cinematic AFK**:
-  nach `afkSeconds` (Standard 30) ohne Eingabe wird der Spieler zur
+  `HelixCinematic`, + Library `helix-library-cinematic`) — **AFK**: nach
+  `afkSeconds` (Standard 30) ohne Eingabe zeigt Modus `screen` (Standard)
+  den **AFK-Bildschirm**: abgedunkeltes Bild (halbtransparente
+  Vollbild-Glyphe `helix_cinematic:afk` als Titel) mit „Du bist AFK“ und
+  „Klicke oder bewege dich, um weiterzuspielen“ (Texte `afkTitle`/
+  `afkSubtitle`, MiniMessage), bis zur ersten Eingabe. Modus `cinematic`
+  stattdessen: der Spieler wird zur
   unsichtbaren Kamera (Spectator, Bildschirm komplett leer: kein HUD, Chat,
   Scoreboard, Bossbars), an seiner Stelle steht ein Doppelgänger-NPC mit
   Skin, Rüstung, Name mit Rang, Untertitel und Cosmetics; die Kamera fliegt
@@ -341,8 +346,8 @@ Referenz-Implementierungen in diesem Repo:
   mal schneller, mal langsamer, mit Schwarzblenden dazwischen. Andere sehen
   „AFK“ über dem NPC. Jede Eingabe beendet es und stellt Spielmodus,
   Position und HUD wieder her. Einstellungen
-  (`cinematic.config`, `cinematic.set <tasks|afkSeconds|shotSeconds|fade|nameCard|afkTag> <wert>`,
-  Recht `helix.cinematic.admin`, Dashboard-Panel „Cinematic AFK“), Standard
+  (`cinematic.config`, `cinematic.set <mode|tasks|afkSeconds|afkTitle|afkSubtitle|afkTag|shotSeconds|fade|nameCard> <wert>`,
+  Recht `helix.cinematic.admin`, Dashboard-Panel „AFK“), Standard
   nur auf dem Task `Lobby`; Spieler schalten es im Profil ab (`cinematic`).
   `HelixCinematic` installiert und teilt die **Cinematic-Library** für alle
   Plugins (wie Helix-GUIs für IGui) – siehe `helix-library-cinematic/README.md`.

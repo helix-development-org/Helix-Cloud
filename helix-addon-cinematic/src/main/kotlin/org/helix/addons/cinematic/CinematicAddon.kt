@@ -11,8 +11,8 @@ import org.helix.api.addon.ProfileSettingType
 import org.helix.api.player.OnlinePlayer
 
 /**
- * Cinematic AFK camera (like GTA's idle cinematic): after [CinematicConfig.afkSeconds] without input the Paper
- * component (`helix-addon-cinematic-paper`) flies drone shots around the player.
+ * AFK handling: after [CinematicConfig.afkSeconds] without input the Paper component (`helix-addon-cinematic-paper`)
+ * shows the AFK screen (or, in mode `cinematic`, the cinematic camera).
  *
  * This node side owns the settings ([CinematicConfig], actions `cinematic.config` / `cinematic.set`, dashboard
  * panel), publishes them as bridge value `cinematic.config`, and contributes the profile toggle `cinematic`
@@ -46,11 +46,11 @@ class CinematicAddon : AddonBase() {
                 onFailure = { ActionResult.error(it.message ?: "invalid value") },
             )
         }
-        panel("cinematic", "Cinematic AFK", "/panel.html")
+        panel("cinematic", "AFK", "/panel.html")
 
         context.registerProfileSettingProvider(object : ProfileSettingProvider {
             override fun settingsFor(player: String): List<ProfileSettingDescriptor> =
-                listOf(ProfileSettingDescriptor(KEY_TOGGLE, "Cinematic AFK camera", ProfileSettingType.Toggle, default = "true"))
+                listOf(ProfileSettingDescriptor(KEY_TOGGLE, "AFK screen", ProfileSettingType.Toggle, default = "true"))
 
             override fun onChanged(player: String, key: String, value: String) {
                 if (key == KEY_TOGGLE) publishOptOut(player, value)
