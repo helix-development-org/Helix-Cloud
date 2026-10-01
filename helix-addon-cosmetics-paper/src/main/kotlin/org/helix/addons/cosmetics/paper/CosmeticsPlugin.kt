@@ -9,6 +9,7 @@ import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerChangedWorldEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.player.PlayerRespawnEvent
+import org.bukkit.event.player.PlayerTeleportEvent
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
 
@@ -106,6 +107,15 @@ class CosmeticsPlugin : JavaPlugin(), Listener {
     /** Real armor changed: the server broadcast it – put the cosmetic back on top. */
     @EventHandler(priority = EventPriority.MONITOR)
     fun onArmorChange(event: PlayerArmorChangeEvent) = refreshSoon(event.player)
+
+    /** A teleport may resend the passengers – put the wings back on right after. */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onTeleport(event: PlayerTeleportEvent) {
+        val w = wings ?: return
+        val player = event.player
+        if (!w.wears(player.uniqueId)) return
+        server.scheduler.runTaskLater(this, Runnable { if (player.isOnline) w.mount(player) }, MOUNT_DELAY_TICKS)
+    }
 
     /** Respawn resends the equipment. */
     @EventHandler(priority = EventPriority.MONITOR)

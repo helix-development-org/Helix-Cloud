@@ -142,10 +142,10 @@ class PassengerWings {
                 update(player, pair.name)
                 return@forEach
             }
-            if (tick % KEEP_CLOSE_TICKS == 0L && pair.right.location.distanceSquared(player.location) > KEEP_CLOSE_DISTANCE_SQ) {
-                pair.right.teleport(anchor(player))
-                pair.left.teleport(anchor(player))
-            }
+            // Server-Position = Sitzplatz: fällt der Client-Mount einmal weg, bleiben die Flügel trotzdem am Rücken
+            val seat = anchor(player)
+            pair.right.teleport(seat)
+            pair.left.teleport(seat)
             val show = visible(player)
             val flap = flapDegrees(player, tick)
             val body = bodies.getOrPut(uuid) { BodyYaw(player.location.yaw) }
@@ -196,10 +196,13 @@ class PassengerWings {
         }
 
     /**
-     * Server-side position of the wing displays: at the player, but always yaw/pitch 0 – an entity's own
-     * rotation is applied on top of the transformation, so taking the player's facing would turn the wings twice.
+     * Server-side position of the wing displays: the client-side passenger seat (top of the player's hitbox), so
+     * mounted and unmounted wings look the same – the client only drops the mount on a passengers packet without
+     * them, until the next remount. Always yaw/pitch 0: an entity's own rotation is applied on top of the
+     * transformation, so taking the player's facing would turn the wings twice.
      */
-    private fun anchor(player: Player) = player.location.clone().apply { yaw = 0f; pitch = 0f }
+    private fun anchor(player: Player) =
+        player.location.clone().apply { yaw = 0f; pitch = 0f }.add(0.0, player.boundingBox.height, 0.0)
 
     private fun apply(display: ItemDisplay, transformation: Transformation) {
         if (display.transformation == transformation) return
@@ -234,13 +237,8 @@ class PassengerWings {
         /** Client-side interpolation of the orientation (sent every tick). */
         const val SMOOTH_TICKS = 1
 
-        /**
-         * Server-side reposition to keep the displays tracked – only when they drifted off, the client places
-         * mounted displays itself and every teleport packet is a chance for a visible hiccup.
-         */
-        const val KEEP_CLOSE_TICKS = 10L
-        const val KEEP_CLOSE_DISTANCE_SQ = 16.0
-        const val REMOUNT_TICKS = 40L
+        /** Periodic remount (the client drops it on any passengers packet without the wings). */
+        const val REMOUNT_TICKS = 10L
 
         val SHOWN_POSES = setOf(Pose.STANDING, Pose.SNEAKING)
 
