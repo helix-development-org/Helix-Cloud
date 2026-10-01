@@ -1,6 +1,13 @@
 package org.helix.cinematic
 
+import de.tytoss.inpc.INpc
 import io.papermc.paper.event.player.AsyncChatEvent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
@@ -43,6 +50,9 @@ import java.util.UUID
 class Cinematics private constructor(private val plugin: JavaPlugin) : Listener {
     private val playbacks = HashMap<UUID, Playback>()
     private var task: BukkitTask? = null
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val cleaner = ScreenCleaner()
+    private val services = Services(INpc.install(plugin) {}, scope, cleaner)
 
     /**
      * Plays [scene] for [viewer] (in the viewer's world).
@@ -54,7 +64,7 @@ class Cinematics private constructor(private val plugin: JavaPlugin) : Listener 
      */
     fun play(viewer: Player, scene: Scene, options: PlaybackOptions.() -> Unit = {}): Playback {
         playbacks[viewer.uniqueId]?.stop(FinishReason.STOPPED)
-        val playback = Playback(plugin, viewer, scene, PlaybackOptions().apply(options)) { ended ->
+        val playback = Playback(plugin, services, viewer, scene, PlaybackOptions().apply(options)) { ended ->
             if (playbacks[ended.viewer.uniqueId] === ended) playbacks.remove(ended.viewer.uniqueId)
         }
         playbacks[viewer.uniqueId] = playback
@@ -86,6 +96,9 @@ class Cinematics private constructor(private val plugin: JavaPlugin) : Listener 
         playbacks.values.toList().forEach { it.stop(FinishReason.STOPPED) }
         playbacks.clear()
         HandlerList.unregisterAll(this)
+        cleaner.stop()
+        runCatching { runBlocking { withTimeoutOrNull(2000) { services.npcs.shutdown() } } }
+        scope.cancel()
     }
 
     private fun input(player: Player) {
@@ -171,6 +184,7 @@ class Cinematics private constructor(private val plugin: JavaPlugin) : Listener 
         fun install(plugin: JavaPlugin): Cinematics {
             val cinematics = Cinematics(plugin)
             plugin.server.pluginManager.registerEvents(cinematics, plugin)
+            cinematics.cleaner.start()
             cinematics.task = plugin.server.scheduler.runTaskTimer(plugin, Runnable { cinematics.tick() }, 1L, 1L)
             Bukkit.getServicesManager().register(Cinematics::class.java, cinematics, plugin, ServicePriority.Normal)
             return cinematics

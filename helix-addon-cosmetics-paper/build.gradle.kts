@@ -22,6 +22,9 @@ dependencies {
     compileOnly(libs.paper.api)
     // packetevents is its own plugin on the servers (shipped by the guard addon); optional here
     compileOnly(libs.packetevents.spigot)
+    // cinematic stand-ins (HelixCinematic provides the library and INpc at runtime)
+    compileOnly(project(":helix-library-cinematic"))
+    compileOnly(files("../helix-addon-npc-paper/libs/inpc-1.0.0-SNAPSHOT.jar"))
     implementation(libs.kotlinx.serialization.json)
     implementation(rootProject.project("helix-wire"))
 }

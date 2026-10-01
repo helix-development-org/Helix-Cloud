@@ -8,9 +8,9 @@ import kotlinx.serialization.json.Json
  *
  * @property tasks tasks the camera is active on.
  * @property afkSeconds seconds without input before the camera starts.
- * @property shotSeconds length of one drone shot.
+ * @property shotSeconds length of the longest fly-in (shorter ones are random, from 3 s).
  * @property fade whether shots are separated by a fade to black.
- * @property nameCard whether the first shot shows the player's name.
+ * @property nameCard whether the first shot additionally shows the player's name as subtitle.
  * @property afkTag MiniMessage text above AFK players for others (blank: none).
  */
 @Serializable
@@ -19,7 +19,7 @@ data class CinematicSettings(
     val afkSeconds: Int = 30,
     val shotSeconds: Int = 8,
     val fade: Boolean = true,
-    val nameCard: Boolean = true,
+    val nameCard: Boolean = false,
     val afkTag: String = "<gray>AFK",
 ) {
     /**

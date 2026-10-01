@@ -33,6 +33,18 @@ class PlaybackOptions {
     /** Whether any input of the viewer (moving, looking, chat, clicks …) ends the playback. */
     var skipOnInput: Boolean = true
 
+    /**
+     * Whether the viewer becomes a spectator for the playback (invisible to others, no hotbar, crosshair or hand);
+     * game mode and position are restored afterwards.
+     */
+    var spectate: Boolean = false
+
+    /** Whether a look-alike NPC ([StandIn]) stands where the viewer stood – combine with [spectate]. */
+    var standIn: Boolean = false
+
+    /** Whether chat, action bar, boss bars and the sidebar are hidden for the playback. */
+    var cleanScreen: Boolean = false
+
     internal var finish: (FinishReason) -> Unit = {}
 
     /**
@@ -45,6 +57,13 @@ class PlaybackOptions {
     }
 }
 
+/** Shared runtime of the library handed to playbacks. */
+internal class Services(
+    val npcs: de.tytoss.inpc.INpc,
+    val scope: kotlinx.coroutines.CoroutineScope,
+    val cleaner: ScreenCleaner,
+)
+
 /**
  * A running [Scene] for one viewer; ticked by [Cinematics].
  *
@@ -53,6 +72,7 @@ class PlaybackOptions {
  */
 class Playback internal constructor(
     private val plugin: Plugin,
+    private val services: Services,
     val viewer: Player,
     val scene: Scene,
     internal val options: PlaybackOptions,
@@ -67,6 +87,13 @@ class Playback internal constructor(
     private var upcoming: Shot? = null
     private var fadeShown = false
     private var finished = false
+    private var entered = false
+    private var savedMode: org.bukkit.GameMode? = null
+    private var savedLocation: org.bukkit.Location? = null
+    private var standIn: StandIn? = null
+
+    /** The look-alike NPC of this playback, once the camera took over (see [PlaybackOptions.standIn]). */
+    val standInNpc: StandIn? get() = standIn
 
     /** Whether the playback is still running. */
     val running: Boolean get() = !finished
@@ -130,7 +157,31 @@ class Playback internal constructor(
         upcoming = scene.shot(index + 1)
         val pose = pose(next, 0.0) ?: return finish(FinishReason.TARGET_LOST)
         rig.jump(pose.first, pose.second)
+        if (!entered) enter()
         rig.activate()
+    }
+
+    /** First cut (the screen is black): spectator, stand-in, empty HUD. */
+    private fun enter() {
+        entered = true
+        if (options.standIn) standIn = StandIn(plugin, services.npcs, services.scope, viewer).also { it.spawn() }
+        if (options.spectate) {
+            savedMode = viewer.gameMode
+            savedLocation = viewer.location.clone()
+            viewer.gameMode = org.bukkit.GameMode.SPECTATOR
+        }
+        if (options.cleanScreen) services.cleaner.clear(viewer)
+    }
+
+    private fun exit() {
+        if (!entered) return
+        if (options.cleanScreen) services.cleaner.restore(viewer)
+        if (viewer.isOnline) {
+            savedMode?.let { viewer.gameMode = it }
+            savedLocation?.let { viewer.teleport(it) }
+        }
+        standIn?.remove()
+        standIn = null
     }
 
     private fun pose(shot: Shot, progress: Double): Pair<Vec3, Rotation>? {
@@ -144,6 +195,7 @@ class Playback internal constructor(
         if (finished) return
         finished = true
         rig.release()
+        exit()
         if (viewer.isOnline && reason != FinishReason.COMPLETED) viewer.resetTitle()
         runCatching { options.finish(reason) }.onFailure { plugin.logger.warning("cinematic ${scene.name}: onFinish failed: ${it.message}") }
         onEnded(this)

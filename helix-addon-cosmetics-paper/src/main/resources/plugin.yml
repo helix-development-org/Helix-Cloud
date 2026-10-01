@@ -3,4 +3,4 @@ version: 1.0.0
 main: org.helix.addons.cosmetics.paper.CosmeticsPlugin
 api-version: '1.21'
 description: Renders equipped cosmetics - headwear as fake helmet, wings as client-side mounted Blockbench models.
-softdepend: [packetevents]
+softdepend: [packetevents, HelixCinematic]

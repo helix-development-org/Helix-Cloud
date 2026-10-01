@@ -35,9 +35,10 @@ import kotlin.random.Random
  * HelixCinematic: installs and shares the cinematic library ([Cinematics], `helix-library-cinematic`) for the
  * whole server – other plugins use it with `depend: [HelixCinematic]` and [Cinematics.shared] – and runs its first
  * user, the **cinematic AFK camera** of the `helix.cinematic` addon: after [CinematicSettings.afkSeconds]
- * without input on a task listed in the settings, an endless scene of drone shots ([Shots.drone]) films the
- * player; the first shot shows their name, others see an AFK tag above them. Any input ends it (the library's
- * skip-on-input).
+ * without input on a task listed in the settings the player becomes the (spectating, invisible) camera, a
+ * look-alike NPC with name, subtitle and cosmetics stands in their place, the screen is emptied, and an endless
+ * scene of fly-ins ([Shots.flyIn]: straight at the NPC, slowly turning, faster or slower) separated by fades films
+ * it. Others see an AFK tag above it. Any input ends it (the library's skip-on-input) and restores everything.
  *
  * Settings and profile opt-outs come from the node's bridge values (`cinematic.config`, `cinematic.off.<player>`).
  */
@@ -112,6 +113,9 @@ class CinematicPlugin : JavaPlugin(), Listener {
 
     private fun startAfk(player: Player, current: CinematicSettings) {
         cinematics.play(player, afkScene(player, current)) {
+            spectate = true
+            standIn = true
+            cleanScreen = true
             onFinish {
                 afkTags.remove(player.uniqueId)?.remove()
                 lastInput[player.uniqueId] = System.currentTimeMillis()
@@ -136,7 +140,7 @@ class CinematicPlugin : JavaPlugin(), Listener {
             transition = if (current.fade) Transition.FADE else Transition.Cut
             endTransition = null
             generate { index ->
-                val drone = Shots.drone(player.world, target, current.shotSeconds * 20, random)
+                val drone = Shots.flyIn(player.world, target, minTicks = MIN_SHOT_TICKS, maxTicks = maxOf(MIN_SHOT_TICKS, current.shotSeconds * 20), random = random)
                 if (index == 0 && current.nameCard) {
                     drone.copy(events = listOf(NAME_CARD_TICK to { viewer: Player -> nameCard(viewer) }))
                 } else {
@@ -215,8 +219,11 @@ class CinematicPlugin : JavaPlugin(), Listener {
         /** The camera looks at the chest/head of the player. */
         const val TARGET_HEIGHT = 1.3
 
-        /** AFK tag height above the feet (above the name tag). */
-        const val TAG_HEIGHT = 2.45
+        /** AFK tag height above the feet (above the stand-in's name line). */
+        const val TAG_HEIGHT = 2.7
+
+        /** Shortest fly-in (the longest is the configured shot length). */
+        const val MIN_SHOT_TICKS = 60
 
         /** When the name card appears in the first shot. */
         const val NAME_CARD_TICK = 20

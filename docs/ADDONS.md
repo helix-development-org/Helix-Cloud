@@ -332,14 +332,15 @@ Referenz-Implementierungen in diesem Repo:
   Ein aktives Cosmetic gewinnt optisch gegen echte Rüstung im selben Slot
   (gedacht für Lobbys).
 - `helix-addon-cinematic` (+ `helix-addon-cinematic-paper` = Plugin
-  `HelixCinematic`, + Library `helix-library-cinematic`) — **Cinematic AFK**
-  wie in GTA: nach `afkSeconds` (Standard 30) ohne Eingabe fliegt die Kamera
-  Drohnen-Shots um den Spieler (Anflug, leichtes Kreisen, Blick auf den
-  Spieler, Schwarzblende zwischen den Shots, Namenskarte, „AFK“ über dem
-  Kopf für andere). Jede Eingabe beendet es. Kamera = unsichtbares
-  Item-Display + Vanilla-Kamera-Paket: der Spieler bleibt im Spielmodus,
-  sein Körper mit Rang/Name, Untertitel und Cosmetics ist im Bild, der
-  Client blendet Hotbar, Herzen und Hand selbst aus. Einstellungen
+  `HelixCinematic`, + Library `helix-library-cinematic`) — **Cinematic AFK**:
+  nach `afkSeconds` (Standard 30) ohne Eingabe wird der Spieler zur
+  unsichtbaren Kamera (Spectator, Bildschirm komplett leer: kein HUD, Chat,
+  Scoreboard, Bossbars), an seiner Stelle steht ein Doppelgänger-NPC mit
+  Skin, Rüstung, Name mit Rang, Untertitel und Cosmetics; die Kamera fliegt
+  in wechselnden Perspektiven gerade auf ihn zu, dreht sich dabei leicht,
+  mal schneller, mal langsamer, mit Schwarzblenden dazwischen. Andere sehen
+  „AFK“ über dem NPC. Jede Eingabe beendet es und stellt Spielmodus,
+  Position und HUD wieder her. Einstellungen
   (`cinematic.config`, `cinematic.set <tasks|afkSeconds|shotSeconds|fade|nameCard|afkTag> <wert>`,
   Recht `helix.cinematic.admin`, Dashboard-Panel „Cinematic AFK“), Standard
   nur auf dem Task `Lobby`; Spieler schalten es im Profil ab (`cinematic`).

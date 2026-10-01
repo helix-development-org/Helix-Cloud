@@ -28,6 +28,7 @@ class CosmeticsPlugin : JavaPlugin(), Listener {
     private lateinit var cosmetics: CosmeticEquipmentService
     private var wings: PassengerWings? = null
     private var wingTask: BukkitTask? = null
+    private var standIns: StandInCosmetics? = null
     private var fetchTask: BukkitTask? = null
     private var trackTask: BukkitTask? = null
     private var client: BridgeValuesClient? = null
@@ -57,6 +58,10 @@ class CosmeticsPlugin : JavaPlugin(), Listener {
         } else {
             logger.warning("packetevents missing – wings are shown on the elytra layer")
         }
+        // Cinematic-Stand-ins (AFK-Kamera) tragen dieselben Cosmetics
+        if (server.pluginManager.isPluginEnabled("HelixCinematic")) {
+            standIns = StandInCosmetics(cosmetics) { wings }.also { server.pluginManager.registerEvents(it, this) }
+        }
 
         fetchTask = server.scheduler.runTaskTimerAsynchronously(
             this,
@@ -73,6 +78,7 @@ class CosmeticsPlugin : JavaPlugin(), Listener {
         fetchTask?.cancel()
         trackTask?.cancel()
         wingTask?.cancel()
+        standIns?.shutdown()
         wings?.shutdown(server.onlinePlayers)
         wings = null
         if (::cosmetics.isInitialized) cosmetics.shutdown(server.onlinePlayers)

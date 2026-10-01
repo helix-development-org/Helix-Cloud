@@ -89,6 +89,31 @@ class PassengerWings {
 
     /**
      * @param uuid a player.
+     * @return the model name of the player's wings, or null.
+     */
+    fun wingsOf(uuid: UUID): String? = worn[uuid]?.name
+
+    /**
+     * Spawns non-moving wings on the back of a standing figure (a cinematic stand-in), resting flap, facing [location]'s yaw.
+     *
+     * @param name wings model name (`wings_<id>`).
+     * @param location where the figure stands (feet, with its facing).
+     * @return the two displays (the caller removes them).
+     */
+    fun staticWings(name: String, location: org.bukkit.Location): List<ItemDisplay> {
+        val seat = location.clone().apply { yaw = 0f; pitch = 0f }.add(0.0, STANDING_HEIGHT, 0.0)
+        return listOf("${name}_right" to -REST_FLAP, "${name}_left" to REST_FLAP).map { (model, flap) ->
+            seat.world.spawn(seat, ItemDisplay::class.java) { entity ->
+                entity.billboard = Display.Billboard.FIXED
+                entity.isPersistent = false
+                entity.setItemStack(ItemStack.of(Material.PAPER).apply { setData(DataComponentTypes.ITEM_MODEL, Key.key("helix_cosmetics", model)) })
+                entity.transformation = wingTransform(location.yaw, flap)
+            }
+        }
+    }
+
+    /**
+     * @param uuid a player.
      * @return whether the player wears wings.
      */
     fun wears(uuid: UUID): Boolean = worn.containsKey(uuid)
@@ -241,6 +266,12 @@ class PassengerWings {
         const val REMOUNT_TICKS = 10L
 
         val SHOWN_POSES = setOf(Pose.STANDING, Pose.SNEAKING)
+
+        /** Hitbox height of a standing player (the seat of [staticWings]). */
+        const val STANDING_HEIGHT = 1.8
+
+        /** Sweep of resting wings. */
+        const val REST_FLAP = 26f
 
         val HIDDEN = Transformation(Vector3f(), Quaternionf(), Vector3f(0f, 0f, 0f), Quaternionf())
 

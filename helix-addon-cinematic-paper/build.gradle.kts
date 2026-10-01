@@ -26,6 +26,9 @@ dependencies {
     implementation(rootProject.project("helix-wire"))
     // the cinematic library is installed and shared by this plugin (like Helix-GUIs does for IGui)
     implementation(project(":helix-library-cinematic"))
+    // the library's stand-in NPCs run on INpc (vendored jar) and coroutines
+    implementation(files("../helix-addon-npc-paper/libs/inpc-1.0.0-SNAPSHOT.jar"))
+    implementation(libs.kotlinx.coroutines.core)
 }
 
 tasks.withType<JavaCompile>().configureEach {

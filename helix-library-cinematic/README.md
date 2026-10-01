@@ -46,6 +46,9 @@ val intro = scene("arena-intro") {
 
 cinematics.play(player, intro) {
     skipOnInput = false                   // Standard: jede Eingabe bricht ab
+    spectate = true                       // Zuschauer = unsichtbare Kamera, keine Hotbar/Hand/Fadenkreuz
+    standIn = true                        // Doppelgänger-NPC bleibt an seiner Stelle stehen (Skin, Rüstung, Name mit Rang)
+    cleanScreen = true                    // Chat, Actionbar, Bossbars, Scoreboard ausblenden
     onFinish { reason -> if (reason == FinishReason.COMPLETED) startRound(player) }
 }
 ```
@@ -68,7 +71,8 @@ scene("showcase") {
 | `Easing` | `LINEAR`, `SMOOTH` (Standard), `IN`, `OUT`, `IN_OUT`, `SINE` – oder eigene Lambda |
 | `Transition` | `Cut`, `Fade(inTicks, holdTicks, outTicks)` (`FADE` = 8/4/10) |
 | Events | `title(tick, …)`, `sound(tick, …)`, `at(tick) { viewer -> … }` |
-| `Shots` | `drone(world, target, ticks)` – zufälliger Drohnen-Shot mit Kollisions- und Sichtprüfung, `clear(world, path, target)` |
+| `Shots` | `flyIn(world, target)` – gerader Anflug mit leichter Drehung, mal schnell, mal langsam; `drone(world, target, ticks)` – Drohnen-Orbit; beide mit Kollisions- und Sichtprüfung; `clear(world, path, target)` |
+| Stand-in | `PlaybackOptions.standIn` + `StandInSpawnEvent`/`StandInRemoveEvent` zum Dekorieren (Cosmetics machen das bereits), `StandIn.equip(slot, item)`, `StandIn.entityId` |
 
 ## Wie es funktioniert
 
@@ -78,5 +82,7 @@ scene("showcase") {
 - Bewegung als interpolierte Teleports alle 2 Ticks – der Client glättet dazwischen.
 - Blenden: Vollbild-Glyphe `helix_cinematic:fade` als Titel (der Titel-Fade ist die Blende); der Schnitt passiert,
   während das Bild schwarz ist.
+- Mit `spectate` wird der Zuschauer für die Dauer Spectator (für andere unsichtbar); Spielmodus und Position werden
+  danach wiederhergestellt. `standIn` stellt einen INpc-Doppelgänger hin, `cleanScreen` filtert HUD-Pakete.
 - Ein Spieler schaut höchstens eine Szene; `play` beendet eine laufende (`STOPPED`). Teleport, Weltwechsel und
   Verlassen beenden immer (`QUIT`), verlorene Ziele mit `TARGET_LOST`.

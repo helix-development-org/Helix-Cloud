@@ -21,6 +21,9 @@ dependencies {
     compileOnlyApi(libs.paper.api)
     // the camera packet; packetevents runs as its own plugin on every server (guard addon)
     compileOnly(libs.packetevents.spigot)
+    // stand-in NPCs (INpc, vendored jar of helix-addon-npc-paper) and its coroutines; HelixCinematic bundles both
+    compileOnly(files("../helix-addon-npc-paper/libs/inpc-1.0.0-SNAPSHOT.jar"))
+    compileOnly(libs.kotlinx.coroutines.core)
     testImplementation(libs.paper.api)
 }
 

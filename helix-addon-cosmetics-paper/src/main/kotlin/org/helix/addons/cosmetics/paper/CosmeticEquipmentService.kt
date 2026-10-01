@@ -74,6 +74,12 @@ class CosmeticEquipmentService(private val elytraWings: Boolean) {
 
     /**
      * @param uuid a player.
+     * @return the helmet item of the player's headwear, or null.
+     */
+    fun headwearItem(uuid: UUID): ItemStack? = headwear[uuid]?.let(::headItem)
+
+    /**
+     * @param uuid a player.
      * @return whether the player wears any cosmetic.
      */
     fun wears(uuid: UUID): Boolean = wings.containsKey(uuid) || headwear.containsKey(uuid)
