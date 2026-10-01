@@ -57,6 +57,9 @@ class CinematicPlugin : JavaPlugin(), Listener {
     private val lastInput = ConcurrentHashMap<UUID, Long>()
     private val afkTags = HashMap<UUID, TextDisplay>()
 
+    /** Players whose Helix LabyMod addon shows the AFK screen / cinematic itself. */
+    private val addonAfk = HashSet<UUID>()
+
     /** Players currently shown the AFK screen → tick of the last refresh. */
     private val screens = HashMap<UUID, Int>()
     private var ticks = 0
@@ -68,6 +71,7 @@ class CinematicPlugin : JavaPlugin(), Listener {
         val token = System.getenv("HELIX_CONTROL_TOKEN").orEmpty()
         val serviceId = System.getenv("HELIX_SERVICE_ID").orEmpty()
         server.pluginManager.registerEvents(this, this)
+        server.messenger.registerOutgoingPluginChannel(this, AFK_CHANNEL)
         if (controlUrl.isBlank() || token.isBlank() || serviceId.isBlank()) {
             logger.warning("No Helix node configured – the library is available, the AFK camera stays off")
             return
@@ -102,8 +106,14 @@ class CinematicPlugin : JavaPlugin(), Listener {
         val active = current.activeOn(task)
         val now = System.currentTimeMillis()
         if (!active || current.cinematic) screens.keys.toList().forEach { id -> server.getPlayer(id)?.let(::wake) }
+        if (!active) addonAfk.toList().forEach { id -> server.getPlayer(id)?.let(::wake) }
         server.onlinePlayers.forEach { player ->
             val id = player.uniqueId
+            if (id in addonAfk) {
+                if (player.name.lowercase() in optedOut) return@forEach wake(player)
+                afkTags[id]?.teleport(player.location.add(0.0, SCREEN_TAG_HEIGHT, 0.0).apply { yaw = 0f; pitch = 0f })
+                return@forEach
+            }
             screens[id]?.let { shownAt ->
                 if (player.name.lowercase() in optedOut) return@forEach wake(player)
                 if (ticks - shownAt >= AfkScreen.REFRESH_TICKS) {
@@ -122,7 +132,9 @@ class CinematicPlugin : JavaPlugin(), Listener {
             if (!active) return@forEach
             val idleMs = now - (lastInput[player.uniqueId] ?: now.also { lastInput[player.uniqueId] = it })
             if (idleMs < current.afkSeconds * 1000L || player.name.lowercase() in optedOut) return@forEach
-            if (!current.cinematic) {
+            if (AFK_CHANNEL in player.listeningPluginChannels && player.gameMode != GameMode.SPECTATOR && !player.isSleeping) {
+                startAddonAfk(player, current)
+            } else if (!current.cinematic) {
                 if (player.gameMode != GameMode.SPECTATOR && !player.isSleeping) showScreen(player, current)
             } else if (canStart(player)) {
                 startAfk(player, current)
@@ -138,8 +150,24 @@ class CinematicPlugin : JavaPlugin(), Listener {
         }
     }
 
+    /** The Helix LabyMod addon renders AFK itself (smoother, real camera flights): tell it to start. */
+    private fun startAddonAfk(player: Player, current: CinematicSettings) {
+        val mm = MiniMessage.miniMessage()
+        val gson = net.kyori.adventure.text.serializer.gson.GsonComponentSerializer.gson()
+        val message = """{"type":"start","mode":"${if (current.cinematic) "cinematic" else "screen"}",""" +
+            """"title":${gson.serialize(mm.deserialize(current.afkTitle))},"subtitle":${gson.serialize(mm.deserialize(current.afkSubtitle))}}"""
+        player.sendPluginMessage(this, AFK_CHANNEL, message.toByteArray(Charsets.UTF_8))
+        addonAfk += player.uniqueId
+        if (current.afkTag.isNotBlank()) afkTags[player.uniqueId] = spawnTag(player, current, SCREEN_TAG_HEIGHT)
+    }
+
     /** First input after AFK: the screen goes away. */
     private fun wake(player: Player) {
+        if (addonAfk.remove(player.uniqueId)) {
+            player.sendPluginMessage(this, AFK_CHANNEL, """{"type":"stop"}""".toByteArray(Charsets.UTF_8))
+            afkTags.remove(player.uniqueId)?.remove()
+            return
+        }
         if (screens.remove(player.uniqueId) == null) return
         AfkScreen.hide(player)
         afkTags.remove(player.uniqueId)?.remove()
@@ -203,7 +231,7 @@ class CinematicPlugin : JavaPlugin(), Listener {
 
     private fun input(player: Player) {
         lastInput[player.uniqueId] = System.currentTimeMillis()
-        if (player.uniqueId in screens) server.scheduler.runTask(this, Runnable { wake(player) })
+        if (player.uniqueId in screens || player.uniqueId in addonAfk) server.scheduler.runTask(this, Runnable { wake(player) })
     }
 
     /** Joining counts as input. */
@@ -215,6 +243,7 @@ class CinematicPlugin : JavaPlugin(), Listener {
     fun onQuit(event: PlayerQuitEvent) {
         lastInput.remove(event.player.uniqueId)
         screens.remove(event.player.uniqueId)
+        addonAfk.remove(event.player.uniqueId)
         afkTags.remove(event.player.uniqueId)?.remove()
     }
 
@@ -261,6 +290,9 @@ class CinematicPlugin : JavaPlugin(), Listener {
 
         /** The camera looks at the chest/head of the player. */
         const val TARGET_HEIGHT = 1.3
+
+        /** Channel of the Helix LabyMod addon's AFK handling. */
+        const val AFK_CHANNEL = "helix:afk"
 
         /** Period of the AFK watcher in ticks. */
         const val TICK_PERIOD = 5
