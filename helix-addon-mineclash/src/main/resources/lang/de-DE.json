@@ -408,5 +408,6 @@
   "war.encounter.joined": "<red>Du bist in einer Begegnungszone! Zerstöre den gegnerischen Turm – raus kommst du erst, wenn sie endet.",
   "war.encounter.no_escape": "<red>Die Kampfzone lässt dich nicht raus!",
   "war.card_mob.name": "Karten-Mob: {card}",
-  "war.card_mob.defeated": "<green>Karten-Mob besiegt: {card} – heb die Karte auf!"
+  "war.card_mob.defeated": "<green>Karten-Mob besiegt: {card} – heb die Karte auf!",
+  "laby.chests.ready": "{count} bereit"
 }

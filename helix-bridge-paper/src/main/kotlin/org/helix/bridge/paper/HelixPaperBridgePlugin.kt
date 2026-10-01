@@ -57,6 +57,8 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
 
     @Volatile
     private var bridgeValues: Map<String, String> = emptyMap()
+    private val labyHud = LabyHud(this)
+    private var labyHudTask: org.bukkit.scheduler.BukkitTask? = null
 
     @Volatile
     private var tablist: TablistData? = null
@@ -94,6 +96,11 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         api = nodeApi
         nodeApi.start()
         server.pluginManager.registerEvents(this, this)
+        // HUD-Widgets des Helix-LabyMod-Addons (nur Spieler mit Addon bekommen Pakete)
+        labyHud.start()
+        labyHudTask = server.scheduler.runTaskTimer(this, Runnable {
+            labyHud.update(server.onlinePlayers) { bridgeValues["economy.balance.${it.name.lowercase()}"] ?: "" }
+        }, 40L, 40L)
         heartbeatTask = server.scheduler.runTaskTimerAsynchronously(
             this,
             Runnable { pulse(loaded, nodeApi) },
@@ -149,6 +156,8 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
      * packets twice.
      */
     override fun onDisable() {
+        labyHudTask?.cancel()
+        labyHudTask = null
         heartbeatTask?.cancel()
         heartbeatTask = null
         animationTask?.cancel()
@@ -218,6 +227,7 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
      */
     @EventHandler
     fun onQuit(event: org.bukkit.event.player.PlayerQuitEvent) {
+        labyHud.forget(event.player)
         displayProfiles.remove(event.player.name.lowercase())
         nickNames.remove(event.player.uniqueId)
         removeDisplayTeam(event.player.name)

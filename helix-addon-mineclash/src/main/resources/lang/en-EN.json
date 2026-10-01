@@ -408,5 +408,6 @@
   "war.encounter.joined": "<red>You are in an encounter zone! Destroy the enemy tower – you can only leave once it ends.",
   "war.encounter.no_escape": "<red>The combat zone won't let you out!",
   "war.card_mob.name": "Card Mob: {card}",
-  "war.card_mob.defeated": "<green>Card mob defeated: {card} – pick up the card!"
+  "war.card_mob.defeated": "<green>Card mob defeated: {card} – pick up the card!",
+  "laby.chests.ready": "{count} ready"
 }
