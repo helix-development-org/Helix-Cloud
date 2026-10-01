@@ -29,6 +29,7 @@ class CosmeticsPlugin : JavaPlugin(), Listener {
     private var wings: PassengerWings? = null
     private var wingTask: BukkitTask? = null
     private var standIns: StandInCosmetics? = null
+    private val addonCosmetics = AddonCosmetics(this)
     private var fetchTask: BukkitTask? = null
     private var trackTask: BukkitTask? = null
     private var client: BridgeValuesClient? = null
@@ -48,9 +49,10 @@ class CosmeticsPlugin : JavaPlugin(), Listener {
         server.pluginManager.registerEvents(this, this)
         // Blockbench-Flügel als Fake-Passagiere brauchen packetevents; ohne fallen sie auf die Elytra-Ebene zurück
         val packets = server.pluginManager.isPluginEnabled("packetevents")
-        cosmetics = CosmeticEquipmentService(elytraWings = !packets)
+        addonCosmetics.start()
+        cosmetics = CosmeticEquipmentService(elytraWings = !packets, drawsItself = addonCosmetics::drawsItself)
         if (packets) {
-            wings = PassengerWings().also { w ->
+            wings = PassengerWings(this, addonCosmetics::drawsItself).also { w ->
                 w.start()
                 w.scheduleMountsWith { player -> server.scheduler.runTaskLater(this, Runnable { if (player.isOnline) w.mount(player) }, MOUNT_DELAY_TICKS) }
                 wingTask = server.scheduler.runTaskTimer(this, Runnable { w.tick(server.onlinePlayers) }, 1L, 1L)
@@ -143,6 +145,10 @@ class CosmeticsPlugin : JavaPlugin(), Listener {
         server.scheduler.runTask(
             this,
             Runnable {
+                addonCosmetics.update(server.onlinePlayers) { player ->
+                    val name = player.name.lowercase()
+                    wings[name]?.let(CosmeticModels::wings) to headwear[name]?.let(CosmeticModels::headwear)
+                }
                 server.onlinePlayers.forEach { player ->
                     val name = player.name.lowercase()
                     cosmetics.updateWings(player, wings[name])

@@ -27,8 +27,13 @@ import java.util.concurrent.ConcurrentHashMap
  * (cosmetics are meant for lobbies, not for game servers with armor).
  *
  * @property elytraWings whether wings are shown on the elytra layer (fallback without packetevents).
+ * @property drawsItself whether a viewer draws cosmetics itself (Helix LabyMod addon) – it gets empty slots instead
+ *  of the fake items (the cosmetic still wins over real armor).
  */
-class CosmeticEquipmentService(private val elytraWings: Boolean) {
+class CosmeticEquipmentService(
+    private val elytraWings: Boolean,
+    private val drawsItself: (Player) -> Boolean = { false },
+) {
     private val wings = ConcurrentHashMap<UUID, String>()
     private val headwear = ConcurrentHashMap<UUID, String>()
 
@@ -60,7 +65,8 @@ class CosmeticEquipmentService(private val elytraWings: Boolean) {
     fun refresh(wearer: Player, viewers: Collection<Player> = viewersOf(wearer)) {
         val items = cosmeticItems(wearer)
         if (items.isEmpty()) return
-        viewers.forEach { if (it.isOnline) it.sendEquipmentChange(wearer, items) }
+        val empty = items.mapValues { ItemStack.empty() }
+        viewers.forEach { if (it.isOnline) it.sendEquipmentChange(wearer, if (drawsItself(it)) empty else items) }
     }
 
     /**
@@ -77,6 +83,12 @@ class CosmeticEquipmentService(private val elytraWings: Boolean) {
      * @return the helmet item of the player's headwear, or null.
      */
     fun headwearItem(uuid: UUID): ItemStack? = headwear[uuid]?.let(::headItem)
+
+    /**
+     * @param uuid a player.
+     * @return the headwear model name of the player, or null.
+     */
+    fun headwearOf(uuid: UUID): String? = headwear[uuid]
 
     /**
      * @param uuid a player.

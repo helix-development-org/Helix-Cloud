@@ -39,8 +39,15 @@ import kotlin.math.sin
  *
  * Every outgoing `SET_PASSENGERS` of a wearer gets the wing ids added (the server's own packets would otherwise
  * dismount them); the mount is resent when a viewer starts tracking the wearer or a wing, and periodically.
+ * Viewers that draw cosmetics themselves (Helix LabyMod addon, [drawsItself]) do not see the displays at all.
+ *
+ * @property plugin owner of the entity visibility (hiding displays from addon viewers).
+ * @property drawsItself whether a viewer draws cosmetics itself.
  */
-class PassengerWings {
+class PassengerWings(
+    private val plugin: org.bukkit.plugin.Plugin? = null,
+    private val drawsItself: (Player) -> Boolean = { false },
+) {
     private data class Pair(val name: String, val right: ItemDisplay, val left: ItemDisplay)
 
     private val worn = ConcurrentHashMap<UUID, Pair>()
@@ -171,6 +178,12 @@ class PassengerWings {
             val seat = anchor(player)
             pair.right.teleport(seat)
             pair.left.teleport(seat)
+            if (plugin != null && tick % REMOUNT_TICKS == 0L) {
+                onlinePlayers.filter(drawsItself).forEach { viewer ->
+                    if (viewer.canSee(pair.right)) viewer.hideEntity(plugin, pair.right)
+                    if (viewer.canSee(pair.left)) viewer.hideEntity(plugin, pair.left)
+                }
+            }
             val show = visible(player)
             val flap = flapDegrees(player, tick)
             val body = bodies.getOrPut(uuid) { BodyYaw(player.location.yaw) }
