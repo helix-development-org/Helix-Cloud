@@ -543,3 +543,4 @@ Das lila Primary entfällt. Dunkelmodus (Holz) ist Standard, Hellmodus ist Perga
 - **§11 Energie**: Die Energie-Leiste ersetzt die XP-Leiste im gesamten Netzwerk-Pack (Diamant-Blau).
 - **§13 Truppen**: Mobs werden als Display-Rigs (Blockbench-Modelle, Teamteil per Dye-Tint) über einer unsichtbaren KI-Entität dargestellt.
 - **Farben**: Hautfarben der Villager (`#c99872`/`#b9835e`/`#e0b48e`) und einzelne Mob-Grundfarben stehen nicht in §3 — als Token „skin“ bzw. mob-eigene Grundfarbe (§13 erlaubt sie) zu führen.
+- **§13 Enderdrache** (Owner-Entscheidung 2026-10-04): Der Drache ist als einziger Mob realistischer statt Cartoon gestaltet – Proportionen am Vanilla-Drachen (langer Hals und Schwanz, schmaler Kopf, große Flügel), feine Schuppen- und Verlaufstexturen ohne harte Konturen.
