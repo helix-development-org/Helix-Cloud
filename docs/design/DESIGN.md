@@ -530,3 +530,9 @@ Das lila Primary entfällt. Dunkelmodus (Holz) ist Standard, Hellmodus ist Perga
 - [ ] Ob Villager-Rede im Chat erscheint oder nur als Hologramm über dem Villager
 - [ ] Eigene Ingame-Schrift für Titel (Version 2)
 - [ ] TTS-Werkzeug und Stimmen für Stufe 2 auswählen
+
+## Abweichungen
+
+- **Stufe A (Text/Chat)**: Solange die Wortmarke als Glyph fehlt, zeigen Tablist-Kopf und Scoreboard-Titel den Netzwerknamen fett in Gold (`<#ffcf4a><bold>{network}`). Der Netzwerkname ist Arbeitstitel „Kronland“ (`network.name` in `node.toml` bzw. Panel); der Prefix nutzt `{network}` und folgt dem Namen automatisch.
+- **Stufe A**: Die Befehle `/helix language` (Node) und `/helix link` (Discord-Bot) heißen technisch noch „helix“ und tauchen deshalb in Hinweistexten auf; ein Umbenennen der Befehle ist ein eigener Schritt.
+- **Stufe A**: Der Team-Chat (`[Team]`) zeigt noch keinen Rang-Tag des Absenders, weil das Addon dafür keinen Platzhalter hat.
