@@ -4,12 +4,15 @@ import com.github.retrooper.packetevents.PacketEvents
 import com.github.retrooper.packetevents.protocol.player.InteractionHand
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerOpenBook
 import de.tytoss.igui.IGui
-import de.tytoss.igui.display.DisplayBuilder
 import de.tytoss.igui.gui.GuiClickContext
 import de.tytoss.igui.gui.GuiDefinition
 import de.tytoss.igui.gui.GuiInputCancelledException
 import de.tytoss.igui.gui.GuiInputTimeoutException
-import de.tytoss.igui.texture.GuiTextureDefinition
+import de.tytoss.igui.screen.LedgerLayout
+import de.tytoss.igui.screen.LedgerLine
+import de.tytoss.igui.screen.LedgerRow
+import de.tytoss.igui.screen.LedgerScreen
+import de.tytoss.igui.screen.LedgerView
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.CoroutineContext
@@ -20,7 +23,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.Bukkit
@@ -35,7 +37,7 @@ import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.meta.BookMeta
 
-/** Per-viewer state for the chest translations editor. */
+/** Per-viewer state for the translations ledger. */
 private class Session {
     @Volatile var view: TranslationsView = TranslationsView()
 
@@ -47,13 +49,13 @@ private class Session {
     /** Search query (blank = none). */
     @Volatile var query: String = ""
 
-    /** Grid shows owner groups instead of keys. */
+    /** List shows owner groups instead of keys. */
     @Volatile var showGroups: Boolean = true
 
     /** Key selected for preview/editing (null = none). */
     @Volatile var selectedKey: String? = null
 
-    /** Current grid page. */
+    /** Current list page. */
     @Volatile var page: Int = 0
 
     /** Edited-but-unsaved value from the book editor (null = none). */
@@ -63,14 +65,14 @@ private class Session {
     @Volatile var confirmDelete: Boolean = false
 }
 
-/** One owner group in the browse grid. */
+/** One owner group in the browse list. */
 private data class Group(val owner: String, val count: Int, val edited: Int)
 
 /**
- * Translations editor Paper component: `/translationsmenu` opens a 6-row chest
- * with a full-window custom background (IGuard/BetterMSGs style). Chest rows
- * 0-1 are an embedded MiniMessage preview panel, rows 2-4 the key list, row 5
- * the action buttons. Values are edited in a writable book (multiline, long);
+ * Translations editor Paper component: `/translationsmenu` opens the medieval
+ * ledger ([LedgerScreen]) — owner groups, then keys, then one key's detail
+ * page with a plain preview (coloured in the row tooltips) and the actions
+ * edit/save/reset. Values are edited in a writable book (multiline, long);
  * search runs through a virtual anvil. Reads and writes travel to the node's
  * admin-gated `helix.translations.*` actions.
  */
@@ -81,6 +83,7 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
     private var igui: IGui? = null
     private var gui: GuiDefinition? = null
     private var client: NodeClient? = null
+    private val ledger = LedgerScreen()
     private lateinit var scope: CoroutineScope
 
     private val mainDispatcher = object : CoroutineDispatcher() {
@@ -91,7 +94,7 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
         }
     }
 
-    /** Boots the node client, installs the background texture and builds the chest GUI. */
+    /** Boots the node client and builds the ledger GUI. */
     override fun onEnable() {
         val nodeClient = NodeClient.fromEnvironment()
         if (nodeClient == null) {
@@ -104,12 +107,9 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
         server.pluginManager.registerEvents(this, this)
         scope.launch {
             val installed = de.tytoss.igui.awaitSharedIGui()
-            installed.saveTexture(
-                GuiTextureDefinition("translations.bg", GLYPH, Key.key("translations", "ui"), 176, 222, 177),
-            )
             igui = installed
             gui = buildGui(installed)
-            logger.info("Translations editor (chest) ready")
+            logger.info("Translations editor (ledger) ready")
         }
     }
 
@@ -197,79 +197,152 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
 
     private suspend fun buildGui(installed: IGui): GuiDefinition = installed.gui("translations") {
         rows = 6
+        playerInventory = true
         landingPage = "main"
         page("main") {
             permission = "helix.admin"
-            cancelAllInteractions = true
-            prepare { player -> loadView(player, session(player)) }
-            title { ctx -> drawTitle(this, ctx.player) }
-            for (i in 0 until LIST_COUNT) {
-                val slot = LIST_START + i
-                item(slot) { ctx -> listItem(session(ctx.player), i) }
-                onClick(slot) { ctx -> onListClick(ctx.player, i) }
+            prepare { player ->
+                val s = session(player)
+                loadView(player, s)
+                ledger.show(player, viewOf(s))
             }
-            for (b in 0 until BUTTON_COUNT) {
-                val slot = BUTTON_ROW + b
-                item(slot) { ctx -> buttonItem(session(ctx.player), b) }
-                onClick(slot) { ctx -> onButtonClick(ctx.player, ctx, b) }
-            }
+            ledger.install(
+                this,
+                onRow = { ctx, row -> onRowClick(ctx.player, row) },
+                onButton = { ctx, button -> onButtonClick(ctx.player, ctx, button) },
+                onPage = { ctx, step ->
+                    session(ctx.player).page += step
+                    refresh(ctx.player)
+                },
+            )
         }
-        onClose { ctx -> session(ctx.player).confirmDelete = false }
+        onClose { ctx ->
+            session(ctx.player).confirmDelete = false
+            ledger.forget(ctx.player)
+        }
     }
 
     private fun selectable(session: Session): Boolean = session.selectedKey != null && !session.showGroups
 
     private fun displayValue(session: Session): String = session.pending ?: currentValue(session)
 
-    private fun drawTitle(display: DisplayBuilder, player: Player) {
-        val s = session(player)
-        igui?.cachedTexture("translations.bg")?.let { bg ->
-            display.centeredTexture(bg)
-            display.toStart()
-        }
-        val header = when {
-            s.showGroups -> "Translations · ${s.language}"
-            s.selectedKey != null -> {
-                val mark = if (s.pending != null) " ·unsaved" else " ${statusOf(s)}"
-                ellipsize(s.selectedKey!!.removePrefix("helix.translations."), 20) + " ·" + s.language + mark
-            }
-            else -> "${s.owner ?: "Keys"} · ${s.language}"
-        }
-        display.centeredText(ellipsize(header, 34), 0, color = NamedTextColor.WHITE)
+    /** Builds the ledger page for the session's mode: owner groups, keys, or one key's detail. */
+    private fun viewOf(s: Session): LedgerView {
+        val language = s.language.uppercase()
+        val buttons = listOf(if (s.showGroups) "Search" else "Back", "Lang: $language")
         if (selectable(s)) {
-            val value = displayValue(s)
-            if (value.isEmpty()) line(display, "(empty)", 1, NamedTextColor.GRAY)
-            else drawPreview(display, value, listOf(1, 2), PREVIEW_MAX_CHARS)
-        } else {
-            line(display, if (s.query.isNotBlank()) "search: ${s.query}" else "pick a key to edit", 1, NamedTextColor.GRAY)
+            val key = s.selectedKey!!.removePrefix("helix.translations.")
+            return LedgerView(
+                title = "Translations",
+                subtitle = ellipsize(key, 40),
+                rows = detailRows(s),
+                left = info(s, "Key") + listOf(
+                    LedgerLine(statusOf(s).removePrefix("· ").ifEmpty { "-" }, LedgerScreen.FADED),
+                    LedgerLine(if (s.pending != null) "unsaved changes" else "", LedgerScreen.RED),
+                ),
+                right = help("Click the preview", "to see colours.", "Edit opens a book;", "then save it."),
+                buttons = buttons,
+            )
         }
-    }
-
-    private fun line(display: DisplayBuilder, text: String, row: Int, color: NamedTextColor) {
-        display.moveTo(PREVIEW_X)
-        display.styledText(text, row, color)
-        display.toStart()
-    }
-
-    private fun drawPreview(display: DisplayBuilder, value: String, rows: List<Int>, maxChars: Int) {
-        val lines = MiniPreview.linesOf(value)
-        lines.take(rows.size).forEachIndexed { i, runs ->
-            display.moveTo(PREVIEW_X)
-            var budget = maxChars
-            for (run in runs) {
-                if (budget <= 0) break
-                val t = if (run.text.length > budget) run.text.substring(0, budget) else run.text
-                budget -= t.length
-                if (t.isEmpty()) continue
-                display.styledText(
-                    t, rows[i], run.color ?: NamedTextColor.WHITE,
-                    run.bold, run.italic, run.obfuscated, run.underlined, run.strikethrough,
+        val size = listSize(s)
+        val pages = maxOf(1, (size + PAGE_SIZE - 1) / PAGE_SIZE)
+        s.page = s.page.coerceIn(0, pages - 1)
+        val rows = if (s.showGroups) {
+            pageWindow(groups(s), s.page).map { group ->
+                LedgerRow(
+                    label = group.owner,
+                    value = "${group.edited}/${group.count}",
+                    valueColor = if (group.edited > 0) LedgerScreen.GREEN else LedgerScreen.FADED,
+                    tooltip = listOf(
+                        Component.text(group.owner, NamedTextColor.GOLD),
+                        Component.text("${group.count} keys, ${group.edited} edited", NamedTextColor.GRAY),
+                    ),
                 )
             }
-            if (lines.size > rows.size && i == rows.size - 1) display.styledText("...", rows[i], NamedTextColor.GRAY)
-            display.toStart()
+        } else {
+            pageWindow(filteredEntries(s), s.page).map { keyRow(it, s) }
         }
+        val subtitle = when {
+            s.showGroups -> "$size groups"
+            s.query.isNotBlank() -> "Search: ${s.query}"
+            else -> s.owner ?: "All keys"
+        }
+        return LedgerView(
+            title = "Translations",
+            subtitle = subtitle,
+            rows = rows,
+            page = s.page,
+            pages = pages,
+            left = info(s, if (s.showGroups) "Groups" else "Keys"),
+            right = if (s.showGroups) {
+                help("Pick a group", "to list its keys.", "Search finds keys", "and values.")
+            } else {
+                help("Pick a key", "to preview and", "edit its value.", "Back: groups.")
+            },
+            buttons = buttons,
+        )
     }
+
+    private fun keyRow(entry: TranslationEntry, s: Session): LedgerRow {
+        val (status, color) = when {
+            entry.values.containsKey(s.language) -> "edited" to LedgerScreen.GREEN
+            entry.defaults[s.language] == null -> "missing" to LedgerScreen.RED
+            else -> "default" to LedgerScreen.FADED
+        }
+        val effective = entry.values[s.language]
+            ?: entry.defaults[s.language]
+            ?: entry.defaults[s.view.defaultLanguage]
+            ?: ""
+        return LedgerRow(
+            label = entry.key.removePrefix("helix.translations.").let { if (s.owner != null) it.removePrefix("${s.owner}.") else it },
+            value = status,
+            valueColor = color,
+            tooltip = listOf(
+                Component.text(entry.key.removePrefix("helix.translations."), NamedTextColor.GOLD),
+                MiniPreview.render(if (effective.isEmpty()) "<dark_gray>(empty)" else effective),
+            ),
+        )
+    }
+
+    /** Preview lines (rows 0..4) and the actions edit/save/reset (rows 5..7). */
+    private fun detailRows(s: Session): List<LedgerRow> {
+        val value = displayValue(s)
+        val rendered = value.split("\n").map { MiniPreview.render(it) }
+        val tooltip = listOf(Component.text("Preview (${s.language})", NamedTextColor.GOLD)) + rendered
+        val lines = MiniPreview.linesOf(value).map { runs -> runs.joinToString("") { it.text } }
+        val preview = (0 until PREVIEW_ROWS).map { i ->
+            val text = when {
+                value.isEmpty() && i == 0 -> "(empty)"
+                i == PREVIEW_ROWS - 1 && lines.size > PREVIEW_ROWS -> "..."
+                else -> lines.getOrNull(i) ?: ""
+            }
+            LedgerRow(label = text, labelColor = if (value.isEmpty()) LedgerScreen.FADED else LedgerScreen.INK, tooltip = tooltip)
+        }
+        val canSave = s.pending != null
+        return preview + listOf(
+            LedgerRow("Edit in book", "multiline", LedgerScreen.INK, LedgerScreen.FADED, ItemStack.of(Material.WRITABLE_BOOK)),
+            LedgerRow(
+                "Save",
+                if (canSave) "unsaved" else "",
+                if (canSave) LedgerScreen.GREEN else LedgerScreen.FADED,
+                LedgerScreen.RED,
+                ItemStack.of(if (canSave) Material.LIME_DYE else Material.GRAY_DYE),
+            ),
+            LedgerRow("Reset to default", "", LedgerScreen.RED, icon = ItemStack.of(Material.WATER_BUCKET)),
+        )
+    }
+
+    private fun info(s: Session, mode: String): List<LedgerLine> = listOf(
+        LedgerLine("Scriptorium", LedgerScreen.RED),
+        LedgerLine(""),
+        LedgerLine(mode),
+        LedgerLine("Language: ${s.language}", LedgerScreen.FADED),
+        LedgerLine("${s.view.entries.size} keys", LedgerScreen.FADED),
+        LedgerLine("${s.view.entries.count { it.values.containsKey(s.language) }} edited", LedgerScreen.FADED),
+    )
+
+    private fun help(vararg lines: String): List<LedgerLine> =
+        listOf(LedgerLine("Guide", LedgerScreen.RED), LedgerLine("")) + lines.map { LedgerLine(it) }
 
     private fun statusOf(session: Session): String {
         val entry = entryOf(session) ?: return ""
@@ -280,91 +353,40 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
         }
     }
 
-    // -------------------------------------------------------------- items --
-
-    private fun listItem(session: Session, index: Int): ItemStack? {
-        return if (session.showGroups) {
-            pageWindow(groups(session), session.page).getOrNull(index)?.let { groupItem(it) }
-        } else {
-            pageWindow(filteredEntries(session), session.page).getOrNull(index)?.let { keyItem(it, session) }
-        }
-    }
-
-    private fun buttonItem(s: Session, b: Int): ItemStack? = when (b) {
-        0 -> button(Material.ARROW, "<gray>‹ Previous")
-        1 -> button(Material.ARROW, "<gray>Next ›")
-        2 -> button(if (s.showGroups) Material.CHEST else Material.BOOK, if (s.showGroups) "<gold>Groups" else "<gray>Show groups")
-        3 -> button(Material.COMPASS, "<aqua>Search", if (s.query.isBlank()) "<dark_gray>—" else "<gray>${s.query}")
-        4 -> if (selectable(s)) button(Material.WRITABLE_BOOK, "<aqua>Edit in book", "<gray>multiline / long") else button(Material.GRAY_DYE, "<dark_gray>Edit")
-        5 -> if (selectable(s) && s.pending != null) button(Material.LIME_DYE, "<green>Save") else button(Material.GRAY_DYE, "<dark_gray>Save")
-        6 -> if (selectable(s)) button(Material.WATER_BUCKET, "<yellow>Reset") else button(Material.GRAY_DYE, "<dark_gray>Reset")
-        7 -> button(Material.PAPER, "<yellow>Language: <white>${s.language}", "<gray>click to cycle")
-        8 -> button(Material.BARRIER, "<red>Close")
-        else -> null
-    }
-
-    private fun groupItem(group: Group): ItemStack =
-        button(Material.WRITABLE_BOOK, "<white>${group.owner}", "<gray>${group.count} keys", "<yellow>${group.edited} edited")
-
-    private fun keyItem(entry: TranslationEntry, session: Session): ItemStack {
-        val shortKey = entry.key.removePrefix("helix.translations.")
-        val effective = entry.values[session.language]
-            ?: entry.defaults[session.language]
-            ?: entry.defaults[session.view.defaultLanguage]
-            ?: ""
-        val item = ItemStack.of(if (entry.key == session.selectedKey) Material.MAP else Material.PAPER)
-        item.editMeta { meta ->
-            meta.itemName(Component.text(ellipsize(shortKey, 40), NamedTextColor.WHITE))
-            val lore = mutableListOf(MiniPreview.render(if (effective.isEmpty()) "<dark_gray>(empty)" else effective))
-            when {
-                entry.values.containsKey(session.language) -> lore += MiniPreview.render("<yellow>edited")
-                entry.defaults[session.language] == null -> lore += MiniPreview.render("<gray>no value in ${session.language}")
-            }
-            meta.lore(lore)
-        }
-        return item
-    }
-
-    private fun button(material: Material, name: String, vararg lore: String): ItemStack {
-        val item = ItemStack.of(material)
-        item.editMeta { meta ->
-            meta.itemName(MiniPreview.render(name))
-            if (lore.isNotEmpty()) meta.lore(lore.map { MiniPreview.render(it) })
-        }
-        return item
-    }
-
     // ------------------------------------------------------------ actions --
 
-    private fun onListClick(player: Player, index: Int) {
+    private fun onRowClick(player: Player, index: Int) {
         val s = session(player)
-        if (s.showGroups) {
-            val group = pageWindow(groups(s), s.page).getOrNull(index) ?: return
-            s.owner = group.owner
-            s.showGroups = false
-            s.page = 0
-            refresh(player)
-        } else {
-            val entry = pageWindow(filteredEntries(s), s.page).getOrNull(index) ?: return
-            s.selectedKey = entry.key
-            s.pending = null
-            s.confirmDelete = false
-            refresh(player)
+        when {
+            selectable(s) -> when (index) {
+                PREVIEW_ROWS -> openBook(player)
+                PREVIEW_ROWS + 1 -> saveCurrent(player)
+                PREVIEW_ROWS + 2 -> resetCurrent(player)
+            }
+            s.showGroups -> {
+                val group = pageWindow(groups(s), s.page).getOrNull(index) ?: return
+                s.owner = group.owner
+                s.showGroups = false
+                s.page = 0
+                refresh(player)
+            }
+            else -> {
+                val entry = pageWindow(filteredEntries(s), s.page).getOrNull(index) ?: return
+                s.selectedKey = entry.key
+                s.pending = null
+                s.confirmDelete = false
+                refresh(player)
+            }
         }
     }
 
     private fun onButtonClick(player: Player, ctx: GuiClickContext, b: Int) {
         val s = session(player)
-        when (b) {
-            0 -> if (s.page > 0) { s.page--; refresh(player) }
-            1 -> if ((s.page + 1) * PAGE_SIZE < listSize(s)) { s.page++; refresh(player) }
-            2 -> { s.showGroups = !s.showGroups; s.owner = null; s.query = ""; s.selectedKey = null; s.page = 0; refresh(player) }
-            3 -> search(player, ctx)
-            4 -> openBook(player)
-            5 -> saveCurrent(player)
-            6 -> resetCurrent(player)
-            7 -> cycleLanguage(player)
-            8 -> scope.launch { gui?.close(player) }
+        when {
+            b == 1 -> cycleLanguage(player)
+            s.showGroups -> search(player, ctx)
+            selectable(s) -> { s.selectedKey = null; s.pending = null; refresh(player) }
+            else -> { s.showGroups = true; s.owner = null; s.query = ""; s.page = 0; refresh(player) }
         }
     }
 
@@ -511,23 +533,11 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
         if (text.length <= max) text else text.take((max - 3).coerceAtLeast(0)) + "..."
 
     private companion object {
-        /** Private-use glyph bound to the background; no char literal so file rewrites can't drop it. */
-        val GLYPH: String = String(Character.toChars(0xE000))
+        /** Keys or groups per ledger page. */
+        const val PAGE_SIZE = LedgerLayout.ROWS
 
-        /** First list slot (chest row 2); rows 0-1 are the preview panel. */
-        const val LIST_START = 18
-        const val LIST_COUNT = 27
-        const val PAGE_SIZE = 27
-
-        /** First button slot (chest row 5). */
-        const val BUTTON_ROW = 45
-        const val BUTTON_COUNT = 9
-
-        /** Left pixel of embedded preview text. */
-        const val PREVIEW_X = 10
-
-        /** Characters rendered per preview row before truncating. */
-        const val PREVIEW_MAX_CHARS = 30
+        /** Ledger rows used for the value preview on the detail page. */
+        const val PREVIEW_ROWS = 5
 
         /** Characters per writable-book page. */
         const val BOOK_PAGE_CHARS = 250

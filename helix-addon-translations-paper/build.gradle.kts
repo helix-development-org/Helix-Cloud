@@ -52,19 +52,3 @@ tasks.withType<Jar>().configureEach {
     })
     exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
 }
-
-// The translations editor resource pack (dirt background glyph + preview row
-// fonts) is generated deterministically at build time and bundled into the HXA.
-sourceSets {
-    create("pack")
-}
-
-val generatePack by tasks.registering(JavaExec::class) {
-    group = "build"
-    description = "Draws the dirt background texture and assembles pack.zip."
-    classpath = sourceSets["pack"].runtimeClasspath
-    mainClass.set("org.helix.addons.translations.pack.PackGeneratorKt")
-    val output = layout.buildDirectory.file("pack/pack.zip")
-    argumentProviders.add(CommandLineArgumentProvider { listOf(output.get().asFile.absolutePath) })
-    outputs.file(output)
-}

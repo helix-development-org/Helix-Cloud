@@ -1,9 +1,7 @@
 package org.helix.addons.translations.paper
 
-import de.tytoss.igui.display.DisplayBuilder
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.TextComponent
-import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.format.Style
 import net.kyori.adventure.text.format.TextColor
 import net.kyori.adventure.text.format.TextDecoration
@@ -12,15 +10,14 @@ import org.helix.api.message.LegacyToMini
 
 /**
  * Renders MiniMessage/legacy templates for the translations editor: to a
- * component (for item names and the live anvil preview) and, flattened into
- * styled runs, onto the dirt background via [DisplayBuilder].
+ * component (for item names, tooltips and the live anvil preview) and
+ * flattened into styled runs (plain preview lines of the ledger).
  *
  * Placeholders (`{name}`) and newlines are left raw — MiniMessage does not
  * treat `{}` specially, so they render verbatim; newlines split the preview
  * across rows. Colors, hex, gradients and rainbow render faithfully (each is
  * its own colored run); `<bold>`/`<italic>`/`<obfuscated>`/`<underlined>`/
- * `<strikethrough>` ride along as decorations, kept pixel-accurate by
- * [DisplayBuilder.styledText].
+ * `<strikethrough>` ride along as decorations.
  */
 object MiniPreview {
     private val mm = MiniMessage.miniMessage()
@@ -81,44 +78,6 @@ object MiniPreview {
             )
         }
         component.children().forEach { flatten(it, effective, out) }
-    }
-
-    /**
-     * Draws a rendered preview of [value] onto [display], starting at pixel
-     * [leftX], across text rows [firstRow]..[lastRow]. Newlines break rows;
-     * each row is truncated to [maxChars] characters with a `...` marker.
-     *
-     * @param display the title builder to append onto.
-     * @param value the template to preview.
-     * @param leftX left pixel of every rendered row.
-     * @param firstRow first text row (0..6).
-     * @param lastRow last text row (0..6).
-     * @param maxChars maximum characters rendered per row.
-     */
-    fun draw(display: DisplayBuilder, value: String, leftX: Int, firstRow: Int, lastRow: Int, maxChars: Int) {
-        val lines = splitLines(runs(value))
-        val rowCount = lastRow - firstRow + 1
-        lines.take(rowCount).forEachIndexed { index, lineRuns ->
-            val row = firstRow + index
-            display.moveTo(leftX)
-            var budget = maxChars
-            val overflowed = lineRuns.sumOf { it.text.length } > maxChars ||
-                (index == rowCount - 1 && lines.size > rowCount)
-            for (run in lineRuns) {
-                if (budget <= 0) break
-                val text = if (run.text.length > budget) run.text.substring(0, budget) else run.text
-                budget -= text.length
-                if (text.isEmpty()) continue
-                display.styledText(
-                    text, row, run.color ?: NamedTextColor.WHITE,
-                    run.bold, run.italic, run.obfuscated, run.underlined, run.strikethrough,
-                )
-            }
-            if (overflowed) {
-                display.styledText("...", row, NamedTextColor.GRAY)
-            }
-            display.toStart()
-        }
     }
 
     /**
