@@ -22,7 +22,7 @@ import kotlinx.serialization.Serializable
 data class BoardConfig(
     // Design concept §10: title = wordmark (gold network name until the glyph exists), labels wood-light,
     // values parchment, separators are empty lines.
-    val title: String = "<#ffcf4a><bold>{network}</bold>",
+    val title: String = "{wordmark}",
     val lines: List<String> = listOf(
         "",
         "<#7a4a24>Player » <#f1e2c2>{player}",

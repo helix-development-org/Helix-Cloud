@@ -29,6 +29,7 @@ fun main(args: Array<String>) {
     )
     entries.putAll(textRowFonts())
     entries.putAll(ledger(Path.of(args[1])))
+    entries.putAll(wordmark(Path.of(args[1]).resolveSibling("wordmark")))
     entries.putAll(sprites(NAMESPACE, Path.of(args[1]).resolveSibling("anim"), de.tytoss.igui.screen.LedgerLayout.SPRITES))
     entries["assets/$NAMESPACE/items/empty.json"] = """{"model":{"type":"minecraft:empty"}}""".toByteArray()
     // Text at any height for full-window screens (helix-gui `textAt`): one font per text top
@@ -205,5 +206,21 @@ private fun sounds(art: Path): Map<String, ByteArray> {
         json.append("""  "${dir.replace('/', '.')}": {"category":"$category","sounds":[$sounds]}$comma""").append('\n')
     }
     out["assets/${ns.NAMESPACE}/sounds.json"] = json.append("}\n").toString().toByteArray()
+    return out
+}
+
+/**
+ * The network wordmark (helix-api `Wordmark`): two Blockbench-painted glyphs in `helix_guis:wordmark`, sitting on
+ * the text line like a capital letter (large for titles, small for tablist/scoreboard).
+ */
+private fun wordmark(art: Path): Map<String, ByteArray> {
+    val out = linkedMapOf<String, ByteArray>()
+    val providers = listOf("wordmark_32" to Pair(0xE000, 20), "wordmark_16" to Pair(0xE001, 13)).map { (name, glyph) ->
+        val bytes = Files.readAllBytes(art.resolve("$name.png"))
+        out["assets/$NAMESPACE/textures/font/$name.png"] = bytes
+        val height = javax.imageio.ImageIO.read(art.resolve("$name.png").toFile()).height
+        """{"type":"bitmap","file":"$NAMESPACE:font/$name.png","height":$height,"ascent":${glyph.second},"chars":["\u%04X"]}""".format(glyph.first)
+    }
+    out["assets/$NAMESPACE/font/wordmark.json"] = """{"providers":[${providers.joinToString(",")}]}""".toByteArray()
     return out
 }

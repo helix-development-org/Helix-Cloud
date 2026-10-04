@@ -18,7 +18,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class TablistConfig(
-    val header: String = "\n<#ffcf4a><bold>{network}</bold></#ffcf4a>\n" +
+    val header: String = "\n{wordmark}\n" +
         "<#ffcf4a>{network}</#ffcf4a> <#7a4a24>·</#7a4a24> <#f1e2c2>{online}<#7a4a24>/</#7a4a24><#f1e2c2>{max} players\n",
     val footer: String = "\n<#7a4a24>Discord: /discord\n",
     val headerFrames: List<String> = emptyList(),

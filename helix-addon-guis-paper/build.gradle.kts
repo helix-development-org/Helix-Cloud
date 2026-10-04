@@ -82,6 +82,7 @@ val generatePack by tasks.registering(JavaExec::class) {
     inputs.dir(art)
     inputs.dir(layout.projectDirectory.dir("src/pack/resources/anim"))
     inputs.dir(layout.projectDirectory.dir("src/pack/resources/villagers"))
+    inputs.dir(layout.projectDirectory.dir("src/pack/resources/wordmark"))
     inputs.dir(layout.projectDirectory.dir("src/pack/resources/sounds"))
     outputs.file(output)
 }

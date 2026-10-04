@@ -412,6 +412,8 @@ class HelixNode(
         val prefix = networkMessages.raw("prefix").replace("{network}", name)
         GlobalPlaceholders.set("prefix", prefix)
         GlobalPlaceholders.set("network", name)
+        GlobalPlaceholders.set("wordmark", org.helix.api.design.Wordmark.SMALL_MINI)
+        GlobalPlaceholders.set("wordmark_large", org.helix.api.design.Wordmark.LARGE_MINI)
         bridgeValues.publish("network", "network.prefix", prefix)
         bridgeValues.publish("network", "network.name", name)
     }
