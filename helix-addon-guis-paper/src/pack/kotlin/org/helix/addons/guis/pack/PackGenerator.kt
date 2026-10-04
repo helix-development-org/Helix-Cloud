@@ -41,6 +41,7 @@ fun main(args: Array<String>) {
     val emptyInventoryLabel = """{"container.inventory": ""}""".toByteArray()
     entries["assets/minecraft/lang/en_us.json"] = emptyInventoryLabel
     entries["assets/minecraft/lang/de_de.json"] = emptyInventoryLabel
+    entries.putAll(sounds(Path.of(args[1]).resolveSibling("sounds")))
     ZipOutputStream(Files.newOutputStream(output)).use { zip ->
         entries.forEach { (name, bytes) ->
             val entry = ZipEntry(name)
@@ -171,5 +172,38 @@ private fun sprites(namespace: String, art: Path, sprites: List<de.tytoss.igui.s
         out["assets/$namespace/models/item/${sprite.model}.json"] = de.tytoss.igui.screen.ScreenSprites.modelJson(namespace, sprite).toByteArray()
         out["assets/$namespace/items/${sprite.model}.json"] = de.tytoss.igui.screen.ScreenSprites.itemJson(namespace, sprite).toByteArray()
     }
+    return out
+}
+
+/**
+ * The network's own sound pack (design §16): every directory under [art] holding OGG files becomes one sound
+ * event in the `reich` namespace — `ui/click/1.ogg` → event `reich:ui.click`, sound `reich:ui/click/1`, all
+ * files of a directory being random variants. Copies the OGGs to `assets/reich/sounds/` and writes
+ * `assets/reich/sounds.json`; every event must be registered in [de.tytoss.igui.sound.NetworkSounds] (and
+ * vice versa), so keys and pack can never drift apart. Audio is produced by `tools/sounds/synth.mjs`.
+ */
+private fun sounds(art: Path): Map<String, ByteArray> {
+    val ns = de.tytoss.igui.sound.NetworkSounds
+    val out = linkedMapOf<String, ByteArray>()
+    val files = Files.walk(art).use { s -> s.filter { it.toString().endsWith(".ogg") }.sorted().toList() }
+    val events = files.groupBy { art.relativize(it.parent).toString().replace('\\', '/') }.toSortedMap()
+    val keys = events.keys.map { "${ns.NAMESPACE}:${it.replace('/', '.')}" }.toSet()
+    require(keys == ns.ALL.toSet()) {
+        "Sound pack and NetworkSounds differ: missing files ${ns.ALL - keys}, unregistered ${keys - ns.ALL.toSet()}"
+    }
+    val json = StringBuilder("{\n")
+    events.entries.forEachIndexed { index, (dir, oggs) ->
+        val key = "${ns.NAMESPACE}:${dir.replace('/', '.')}"
+        val category = ns.category(key)
+        val sounds = oggs.joinToString(", ") { file ->
+            val name = "$dir/${file.fileName.toString().removeSuffix(".ogg")}"
+            out["assets/${ns.NAMESPACE}/sounds/$name.ogg"] = Files.readAllBytes(file)
+            val range = if (category == "voice") ""","attenuation_distance":${ns.VOICE_RANGE}""" else ""
+            """{"name":"${ns.NAMESPACE}:$name"$range}"""
+        }
+        val comma = if (index < events.size - 1) "," else ""
+        json.append("""  "${dir.replace('/', '.')}": {"category":"$category","sounds":[$sounds]}$comma""").append('\n')
+    }
+    out["assets/${ns.NAMESPACE}/sounds.json"] = json.append("}\n").toString().toByteArray()
     return out
 }
