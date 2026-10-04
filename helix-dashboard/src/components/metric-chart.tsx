@@ -45,7 +45,8 @@ export function MetricChart({
       className="w-full"
       animationDuration={700}
     >
-      <Area dataKey="v" fill={color} stroke={color} strokeWidth={1.6} fillOpacity={0.35} />
+      {/* §17: 2.5 px lines, no area gradients */}
+      <Area dataKey="v" fill={color} stroke={color} strokeWidth={2.5} fillOpacity={0} />
       <ChartTooltip
         showDatePill={false}
         dotSize={3}

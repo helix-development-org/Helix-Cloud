@@ -72,7 +72,7 @@ export function OverviewView() {
         <CardContent className="flex flex-col gap-6">
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             <TrendChart samples={metrics} dataKey="onlinePlayers" color="var(--chart-1)" label="Players online" />
-            <TrendChart samples={metrics} dataKey="avgTps" color="var(--chart-3)" label="Avg TPS" digits={1} />
+            <TrendChart samples={metrics} dataKey="avgTps" color="var(--chart-2)" label="Avg TPS" digits={1} />
           </div>
           <TaskDistributionChart services={data.services} />
         </CardContent>
@@ -90,9 +90,9 @@ export function OverviewView() {
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><HardDrive className="size-4" /> Services</CardTitle></CardHeader>
         <CardContent className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          <TrendChart samples={metrics} dataKey="servicesRunning" color="var(--chart-2)" label="Services running" />
-          <TrendChart samples={metrics} dataKey="servicesCpuPercent" color="var(--chart-4)" label="Services CPU" unit="%" digits={1} />
-          <TrendChart samples={metrics} dataKey="servicesMemoryUsedMb" color="var(--chart-5)" label="Services memory" unit="MB" />
+          <TrendChart samples={metrics} dataKey="servicesRunning" color="var(--chart-1)" label="Services running" />
+          <TrendChart samples={metrics} dataKey="servicesCpuPercent" color="var(--chart-2)" label="Services CPU" unit="%" digits={1} />
+          <TrendChart samples={metrics} dataKey="servicesMemoryUsedMb" color="var(--chart-3)" label="Services memory" unit="MB" />
         </CardContent>
       </Card>
 
@@ -108,7 +108,7 @@ export function OverviewView() {
               <Metric label="Total requests" value={apiStats.totalRequests.toLocaleString()} />
             </div>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              <TrendChart samples={metrics} dataKey="avgApiMs" color="var(--chart-4)" label="API response" unit="ms" digits={1} />
+              <TrendChart samples={metrics} dataKey="avgApiMs" color="var(--chart-1)" label="API response" unit="ms" digits={1} />
             </div>
           </CardContent>
         </Card>
@@ -148,12 +148,12 @@ function latestReal(samples: MetricSample[], key: keyof MetricSample): number | 
 
 function Tile({ label, value, sub, icon, accent }: { label: string; value: React.ReactNode; sub: string; icon: React.ReactNode; accent?: boolean }) {
   return (
-    <Card className={accent ? "border-primary/30" : ""}>
+    <Card className={accent ? "bg-[color-mix(in_srgb,var(--gold)_14%,var(--card))]" : ""}>
       <CardContent className="p-5">
         <div className="flex items-center justify-between text-muted-foreground">
-          <span className="text-sm">{label}</span>{icon}
+          <span className="text-sm font-bold">{label}</span>{icon}
         </div>
-        <div className="mt-2 text-2xl font-semibold">{value}</div>
+        <div className="mt-2 font-display text-[34px] leading-tight">{value}</div>
         <div className="text-xs text-muted-foreground">{sub}</div>
       </CardContent>
     </Card>
@@ -162,9 +162,9 @@ function Tile({ label, value, sub, icon, accent }: { label: string; value: React
 
 function Metric({ label, value, tone }: { label: string; value: string; tone?: "bad" }) {
   return (
-    <div className="rounded-lg border bg-secondary/30 p-3">
+    <div className="rounded-[14px] border border-border bg-muted p-3">
       <div className="text-xs text-muted-foreground">{label}</div>
-      <div className={"mt-1 text-xl font-semibold " + (tone === "bad" ? "text-destructive" : "")}>{value}</div>
+      <div className={"mt-1 font-display text-[22px] leading-tight " + (tone === "bad" ? "text-destructive" : "")}>{value}</div>
     </div>
   )
 }
@@ -173,9 +173,9 @@ function Metric({ label, value, tone }: { label: string; value: string; tone?: "
 function Stat({ label, value, sub, tone }: { label: string; value: React.ReactNode; sub?: string; tone?: "warn" | "bad" }) {
   const toneClass = tone === "bad" ? "text-destructive" : tone === "warn" ? "text-[var(--warning)]" : ""
   return (
-    <div className="rounded-lg border bg-secondary/30 p-3">
+    <div className="rounded-[14px] border border-border bg-muted p-3">
       <div className="text-xs text-muted-foreground">{label}</div>
-      <div className={"mt-1 text-lg font-semibold " + toneClass}>{value}</div>
+      <div className={"mt-1 font-display text-lg leading-tight " + toneClass}>{value}</div>
       {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
     </div>
   )
@@ -186,10 +186,10 @@ function HeapTile({ usedMb, maxMb, pct }: { usedMb: number; maxMb: number; pct: 
   const known = pct >= 0 && maxMb >= 0
   const tone = pct >= 90 ? "var(--destructive)" : pct >= 75 ? "var(--warning)" : "var(--success)"
   return (
-    <div className="rounded-lg border bg-secondary/30 p-3">
+    <div className="rounded-[14px] border border-border bg-muted p-3">
       <div className="text-xs text-muted-foreground">Heap</div>
-      <div className="mt-1 text-lg font-semibold">{known ? `${usedMb} / ${maxMb} MB` : "—"}</div>
-      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-border">
+      <div className="mt-1 font-display text-lg leading-tight">{known ? `${usedMb} / ${maxMb} MB` : "—"}</div>
+      <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full border border-border bg-card">
         <div className="h-full rounded-full" style={{ width: `${known ? Math.min(100, Math.max(0, pct)) : 0}%`, background: tone }} />
       </div>
       <div className="mt-1 text-xs text-muted-foreground">{known ? `${pct.toFixed(0)}% used` : "no data"}</div>
@@ -209,17 +209,17 @@ function TrendChart({ samples, dataKey, color, label, unit, digits = 0 }: {
   const latest = latestReal(samples, dataKey)
   if (latest == null) {
     return (
-      <div className="rounded-lg border bg-secondary/30 p-3">
+      <div className="rounded-[14px] border border-border bg-muted p-3">
         <div className="mb-1 text-sm text-muted-foreground">{label}</div>
         <div className="flex h-16 items-center justify-center text-xs text-muted-foreground">no data yet</div>
       </div>
     )
   }
   return (
-    <div className="rounded-lg border bg-secondary/30 p-3">
+    <div className="rounded-[14px] border border-border bg-muted p-3">
       <div className="mb-1 flex items-baseline justify-between">
         <span className="text-sm text-muted-foreground">{label}</span>
-        <span className="text-lg font-semibold"><CountUp value={latest} digits={digits} unit={unit} /></span>
+        <span className="font-display text-lg"><CountUp value={latest} digits={digits} unit={unit} /></span>
       </div>
       <MetricChart samples={samples} dataKey={dataKey} color={color} unit={unit} digits={digits} />
     </div>

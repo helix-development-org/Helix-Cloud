@@ -30,17 +30,26 @@ export function duration(ms?: number | null): string {
   return d + "d " + (h % 24) + "h"
 }
 
-/** Maps a service/addon state to a badge variant. */
-export function stateVariant(state: string): "default" | "success" | "warning" | "destructive" | "secondary" {
+/**
+ * Maps a service/addon state to a status pill (DESIGN.md §17): running/online = success, starting = info,
+ * paused/stopping = warning, error/stopped = destructive; anything else (prepared, disabled, …) stays neutral.
+ */
+export function stateVariant(state: string): "default" | "success" | "info" | "warning" | "destructive" | "secondary" {
   switch (state.toUpperCase()) {
     case "RUNNING":
+    case "ONLINE":
     case "ENABLED":
       return "success"
     case "STARTING":
+    case "PREPARING":
+      return "info"
+    case "PAUSED":
     case "STOPPING":
       return "warning"
     case "FAILED":
     case "CRASHED":
+    case "ERROR":
+    case "STOPPED":
       return "destructive"
     default:
       return "secondary"

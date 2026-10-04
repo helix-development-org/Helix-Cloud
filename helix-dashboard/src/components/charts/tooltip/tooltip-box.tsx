@@ -176,11 +176,11 @@ function TooltipBoxInner({
   const transformOrigin = isFlipped ? "right top" : "left top";
 
   const panelClassName = cn(
-    "min-w-[140px] overflow-hidden rounded-lg text-chart-tooltip-foreground shadow-lg",
+    "min-w-[140px] overflow-hidden rounded-[12px] border-2 border-[var(--ink-lo)] text-chart-tooltip-foreground shadow-[0_3px_0_var(--ink-lo)]",
     panelStyle?.backgroundColor === undefined &&
       backgroundColor === chartCssVars.tooltipBackground &&
       "bg-chart-tooltip-background",
-    panelStyle?.backdropFilter === undefined && "backdrop-blur-md"
+    false
   );
   const panelStyleResolved = {
     transformOrigin,

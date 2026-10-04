@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { NETWORK_NAME } from "@/lib/brand"
 import { toast } from "sonner"
 import { api, token, type Identity } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
@@ -23,7 +24,7 @@ export function SettingsView({ identity, version }: { identity: Identity; versio
       <Card>
         <CardHeader><CardTitle>Bearer token</CardTitle></CardHeader>
         <CardContent className="flex items-center gap-3">
-          <code className="flex-1 truncate rounded-md bg-secondary px-3 py-2 font-mono text-xs">{token.slice(0, 12)}…{token.slice(-6)}</code>
+          <code className="flex-1 truncate rounded-[12px] border border-border bg-muted px-3 py-2 font-mono text-xs">{token.slice(0, 12)}…{token.slice(-6)}</code>
           <Button size="sm" variant="outline" onClick={() => { navigator.clipboard?.writeText(token); toast.success("Token copied") }}>Copy</Button>
         </CardContent>
       </Card>
@@ -66,8 +67,8 @@ function NetworkPrefixCard() {
       <CardHeader>
         <CardTitle>Network</CardTitle>
         <div className="text-sm text-muted-foreground">
-          Available as <code className="rounded bg-secondary px-1">{"{network}"}</code> and{" "}
-          <code className="rounded bg-secondary px-1">{"{prefix}"}</code> in every configurable message,
+          Available as <code className="rounded-[6px] bg-muted px-1">{"{network}"}</code> and{" "}
+          <code className="rounded-[6px] bg-muted px-1">{"{prefix}"}</code> in every configurable message,
           MOTD, tablist and disconnect screen. MiniMessage and &amp; codes supported; changes apply instantly.
         </div>
       </CardHeader>
@@ -84,7 +85,7 @@ function NetworkPrefixCard() {
           <Input className="font-mono text-xs" value={values.prefix}
             onChange={(e) => setValues({ ...values, prefix: e.target.value })}
             onKeyDown={(e) => e.key === "Enter" && save("prefix")}
-            placeholder="<gradient:#8b5cf6:#38bdf8><bold>Helix</bold></gradient> »" />
+            placeholder={`<gradient:#ffcf4a:#d8382e><bold>${NETWORK_NAME}</bold></gradient> »`} />
           <Button size="sm" onClick={() => save("prefix")}>Save</Button>
         </div>
       </CardContent>

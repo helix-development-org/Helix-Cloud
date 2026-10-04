@@ -35,7 +35,7 @@ const highlightStyle = HighlightStyle.define([
 
 const theme = EditorView.theme({
   "&": { height: "100%", backgroundColor: "transparent", color: "var(--color-foreground)" },
-  ".cm-scroller": { overflow: "auto", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: "12px", lineHeight: "1.6" },
+  ".cm-scroller": { overflow: "auto", fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: "12.5px", lineHeight: "1.6" },
   ".cm-content": { caretColor: "var(--color-foreground)" },
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--color-foreground)" },
   "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": {
@@ -131,7 +131,7 @@ export function CodeEditor({ value, onChange, language, readOnly, className, aut
   return (
     <div
       ref={host}
-      className={cn("overflow-hidden rounded-md border border-input bg-transparent focus-within:ring-2 focus-within:ring-ring", className)}
+      className={cn("kl-field overflow-hidden rounded-[12px] border border-border focus-within:ring-[3px] focus-within:ring-ring", className)}
     />
   )
 }

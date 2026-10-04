@@ -108,7 +108,7 @@ function SourceFields({ raw }: { raw: string }) {
 function PlayerLookupCard({ lookup }: { lookup: PlayerLookupView }) {
   const sourceEntries = Object.entries(lookup.sources)
   return (
-    <div className="rounded-md border p-4">
+    <div className="rounded-[14px] border border-border bg-muted p-4">
       <div className="mb-3 flex items-center gap-2">
         <span className="font-medium">{lookup.name}</span>
         <Badge variant={lookup.online ? "success" : "secondary"}>{lookup.online ? "Online" : "Offline"}</Badge>

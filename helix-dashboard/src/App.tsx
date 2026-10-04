@@ -3,6 +3,8 @@ import { api, setToken, setUnauthorizedHandler, type Identity, type Overview, ty
 import { useViewReveal } from "@/lib/anim"
 import { AppShell } from "@/components/app-shell"
 import { Toaster } from "@/components/ui/sonner"
+import { Wordmark } from "@/components/brand/wordmark"
+import { NETWORK_NAME } from "@/lib/brand"
 import { LoginView } from "@/views/login"
 import { OverviewView } from "@/views/overview"
 import { ServicesView } from "@/views/services"
@@ -76,7 +78,11 @@ export function App() {
     setIdentity(null)
   }
 
-  if (booting) return ingame ? null : <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">Loading…</div>
+  if (booting) return ingame ? null : (
+    <div className="theme-wood kl-planks grid min-h-screen place-items-center text-foreground">
+      <div className="flex flex-col items-center gap-3"><Wordmark size={40} /><span className="font-bold text-muted-foreground">Loading…</span></div>
+    </div>
+  )
   if (!identity && ingame) return <IngameSignedOut />
   if (!identity) return (<><LoginView establish={establish} /><Toaster /></>)
   if (ingame && !fullDashboard) {
@@ -87,7 +93,7 @@ export function App() {
 
   const allowed = (v: string) => v.startsWith("panel:") ? panels.some((p) => p.id === v.slice(6)) : identity.admin || identity.views.includes(v)
   const current = allowed(view) ? view : (identity.admin ? "overview" : identity.views[0] ?? (panels[0] ? "panel:" + panels[0].id : "overview"))
-  const title = current.startsWith("panel:") ? panels.find((p) => p.id === current.slice(6))?.title ?? "Extension" : TITLES[current] ?? "Helix"
+  const title = current.startsWith("panel:") ? panels.find((p) => p.id === current.slice(6))?.title ?? "Extension" : TITLES[current] ?? NETWORK_NAME
 
   return (
     <>
@@ -114,7 +120,7 @@ export function App() {
       </AppShell>
       {ingame && (
         <button onClick={backToMenu}
-          className="fixed bottom-4 right-4 z-50 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg">
+          className="kl-raised kl-press fixed bottom-4 right-4 z-50 rounded-full border-[3px] border-border bg-[var(--gold)] px-4 pt-2 pb-2.5 font-display text-sm text-[var(--ink)] [--bevel-hi:var(--gold-hi)] [--bevel-lo:var(--gold-lo)]">
           ← In-game menu
         </button>
       )}
@@ -130,7 +136,7 @@ export function App() {
 function IngameSignedOut() {
   useEffect(() => { reportExpired() }, [])
   return (
-    <div className="dark fixed left-4 top-4 w-[400px] rounded-xl border border-border bg-background/95 p-4 text-sm text-foreground shadow-2xl">
+    <div className="theme-wood kl-panel fixed left-4 top-4 w-[400px] rounded-[var(--radius-panel)] border-[3px] border-border bg-card p-4 pb-5 text-sm font-bold text-foreground">
       Session expired – press Right Shift again.
     </div>
   )

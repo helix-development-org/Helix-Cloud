@@ -59,7 +59,7 @@ export function AddonsView() {
                   </TableRow>
                   {open && (
                     <TableRow>
-                      <TableCell colSpan={6} className="bg-secondary/20 p-4">
+                      <TableCell colSpan={6} className="bg-muted p-4">
                         <div className="flex flex-col gap-3">
                           {runnable.map((action) => <ActionRunner key={action.name} action={action} />)}
                         </div>
@@ -105,11 +105,11 @@ function ActionRunner({ action }: { action: AddonAction }) {
   }
 
   return (
-    <div className="rounded-lg border bg-background p-3">
+    <div className="rounded-[14px] border border-border bg-background p-3">
       <div className="flex items-baseline justify-between gap-3">
         <div>
           <span className="font-mono text-sm">{action.name}</span>
-          {action.permission && <span className="ml-2 rounded bg-secondary px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">{action.permission}</span>}
+          {action.permission && <span className="ml-2 rounded-full border border-border bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">{action.permission}</span>}
           <div className="text-xs text-muted-foreground">{action.description}</div>
         </div>
       </div>
@@ -124,7 +124,7 @@ function ActionRunner({ action }: { action: AddonAction }) {
         <Button size="sm" disabled={busy} onClick={run}><Play className="size-4" /> Run</Button>
       </div>
       {result && (
-        <div className={"mt-2 rounded-md border p-2 font-mono text-xs " + (result.success ? "" : "border-destructive/50 text-destructive")}>
+        <div className={"mt-2 rounded-[12px] border border-border p-2 font-mono text-xs " + (result.success ? "" : "border-destructive text-destructive")}>
           {result.lines.length ? result.lines.map((line, index) => <div key={index}>{line}</div>) : (result.success ? "ok" : "failed")}
         </div>
       )}

@@ -6,6 +6,7 @@ import { usePoll } from "@/lib/use-poll"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Wordmark } from "@/components/brand/wordmark"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 /** One online player as reported by the `helix.admin` addon (`admin.players`). */
@@ -140,10 +141,10 @@ export function IngameMenuView({ identity, onOpenDashboard }: { identity: Identi
   useMenuNav(root, tab, setTab)
   return (
     <div className="dark pointer-events-none fixed inset-0 text-foreground">
-      <div ref={root} className="pointer-events-auto absolute left-4 top-4 bottom-4 flex w-[400px] flex-col overflow-hidden rounded-xl border border-border bg-background/95 shadow-2xl backdrop-blur">
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+      <div ref={root} className="pointer-events-auto absolute left-4 top-4 bottom-4 flex w-[400px] flex-col overflow-hidden rounded-[var(--radius-panel)] border-[3px] border-border bg-background shadow-[inset_0_4px_0_var(--card-hi),0_6px_0_var(--border)]">
+        <div className="flex items-center justify-between border-b-[3px] border-border bg-card px-4 py-2.5">
           <div>
-            <div className="text-sm font-semibold">Helix Admin</div>
+            <div className="flex items-baseline gap-2"><Wordmark size={24} /><span className="font-display text-sm text-gold">Admin</span></div>
             <div className="text-xs text-muted-foreground">{identity.name}</div>
           </div>
           <Button size="sm" variant="ghost" onClick={closeOverlay}>✕</Button>
@@ -163,11 +164,11 @@ export function IngameMenuView({ identity, onOpenDashboard }: { identity: Identi
         <div data-nav-scope className="border-t border-border p-3">
           <Button className="w-full" onClick={onOpenDashboard}>Open dashboard</Button>
           {mode === "hud" && (
-            <div className="mt-2 text-center text-[11px] text-muted-foreground">
+            <div className="mt-2 text-center text-xs text-muted-foreground">
               ↑↓ select · ←→ tab · Enter use · ⌫ back · Right Alt mouse
             </div>
           )}
-          {mode === "mouse" && <div className="mt-2 text-center text-[11px] text-muted-foreground">Esc – back to walking</div>}
+          {mode === "mouse" && <div className="mt-2 text-center text-xs text-muted-foreground">Esc – back to walking</div>}
         </div>
       </div>
     </div>
@@ -254,7 +255,7 @@ function PlayersTab() {
       <div className="flex flex-col gap-1">
         {players.map((p) => (
           <button key={p.name} onClick={() => setSelected(p.name)}
-            className="flex items-center justify-between rounded-md px-3 py-2 text-left hover:bg-accent">
+            className="flex items-center justify-between rounded-[12px] px-3 py-2 text-left transition-colors duration-150 ease-out hover:bg-[color-mix(in_srgb,var(--gold)_15%,transparent)]">
             <div>
               <div className="text-sm font-medium">{p.name}</div>
               <div className="text-xs text-muted-foreground">{p.service} · {p.world}</div>
@@ -340,7 +341,7 @@ function ServerTab() {
       <Section title="Network">
         <div className="flex flex-col gap-1">
           {(servers ?? []).map((s) => (
-            <div key={s.service} className="flex items-center justify-between rounded-md px-3 py-2 hover:bg-accent">
+            <div key={s.service} className="flex items-center justify-between rounded-[12px] px-3 py-2 transition-colors duration-150 ease-out hover:bg-[color-mix(in_srgb,var(--gold)_15%,transparent)]">
               <div>
                 <div className="text-sm font-medium">{s.service}</div>
                 <div className="text-xs text-muted-foreground">{s.players} players · {s.tps} TPS</div>
@@ -356,7 +357,7 @@ function ServerTab() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-muted/50 px-3 py-2">
+    <div className="rounded-[12px] border border-border bg-muted px-3 py-2">
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className="truncate">{value}</div>
     </div>

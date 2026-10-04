@@ -90,13 +90,13 @@ export function LogsView() {
   useEffect(() => { box.current?.scrollTo(0, box.current.scrollHeight) }, [lines])
   return (
     <Card><CardContent className="p-0">
-      <div ref={box} className="h-[64vh] overflow-y-auto rounded-t-xl bg-black/40 p-4 font-mono text-xs leading-relaxed">
+      <div ref={box} className="kl-console h-[64vh] overflow-y-auto rounded-t-[17px] p-4 font-mono text-xs leading-relaxed">
         {lines.map((l, i) => (
           <div key={i} className={l.startsWith("> ") ? "text-foreground" : l.includes("ERROR") ? "text-destructive" : l.includes("WARN") ? "text-[var(--warning)]" : "text-muted-foreground"}>{l}</div>
         ))}
       </div>
       <form
-        className="flex items-center gap-2 border-t border-border bg-black/60 p-2"
+        className="kl-console flex items-center gap-2 rounded-b-[17px] border-t-[3px] border-border p-2 pb-3"
         onSubmit={(e) => { e.preventDefault(); run() }}
       >
         <span className="pl-2 font-mono text-xs text-muted-foreground">&gt;</span>
@@ -105,7 +105,7 @@ export function LogsView() {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKey}
           placeholder={busy ? "running…" : "action ausführen — z. B. service.list, task.pause Lobby stop, actions.list"}
-          className="h-8 border-0 bg-transparent font-mono text-xs shadow-none focus-visible:ring-0"
+          className="h-8 border-0 bg-transparent font-mono text-xs text-[var(--parchment)] shadow-none focus-visible:ring-0"
         />
       </form>
     </CardContent></Card>

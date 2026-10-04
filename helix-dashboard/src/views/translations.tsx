@@ -162,9 +162,9 @@ function TranslationRow({ entry, language, onSave, onReset, onDelete }: {
       <div className="pt-2">
         <div className="break-all font-mono text-xs text-muted-foreground">{entry.key}</div>
         <div className="mt-1 flex gap-1">
-          {custom !== undefined && <Badge variant="secondary" className="text-[10px]">edited</Badge>}
+          {custom !== undefined && <Badge variant="secondary" className="text-xs">edited</Badge>}
           {custom === undefined && entry.defaults[language] === undefined && (
-            <Badge variant="outline" className="text-[10px]">no {language} value</Badge>
+            <Badge variant="outline" className="text-xs">no {language} value</Badge>
           )}
         </div>
       </div>
@@ -175,7 +175,7 @@ function TranslationRow({ entry, language, onSave, onReset, onDelete }: {
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="min-h-[2.25rem] w-full whitespace-pre-wrap break-words rounded-md border border-input bg-transparent px-3 py-2 text-left font-mono text-xs leading-relaxed hover:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
+            className="min-h-[2.25rem] w-full whitespace-pre-wrap break-words kl-field rounded-[12px] border border-border px-3 py-2 text-left font-mono text-xs leading-relaxed hover:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
           >
             {current || <span className="text-muted-foreground">Click to edit…</span>}
           </button>

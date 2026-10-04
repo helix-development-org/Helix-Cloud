@@ -117,7 +117,7 @@ function ConsoleDialog({ id, onClose }: { id: string; onClose: () => void }) {
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-3xl">
         <DialogHeader><DialogTitle>Console — {id}</DialogTitle></DialogHeader>
-        <div ref={boxRef} className="h-[55vh] overflow-y-auto rounded-md border bg-black/40 p-3 font-mono text-xs leading-relaxed">
+        <div ref={boxRef} className="kl-console h-[55vh] overflow-y-auto rounded-[14px] border border-border p-3 font-mono text-xs leading-relaxed">
           {lines.length ? lines.map((l, i) => (
             <div key={i} className={l.includes("ERROR") ? "text-destructive" : l.includes("WARN") ? "text-[var(--warning)]" : "text-muted-foreground"}>{l}</div>
           )) : <div className="text-muted-foreground">(no output)</div>}

@@ -1,143 +1,185 @@
 @import "tailwindcss";
 
+/* Bundled fonts (DESIGN.md §5): Lilita One for display, Nunito for text, JetBrains Mono for code. */
+@import "@fontsource/lilita-one/400.css";
+@import "@fontsource/nunito/500.css";
+@import "@fontsource/nunito/700.css";
+@import "@fontsource/nunito/800.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/700.css";
+
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Network design concept (docs/design/DESIGN.md §3, §4, §17).
+ * Palette: every material/accent in three stages — hi (top highlight), base (surface), lo (bottom edge/shadow).
+ * Mode-independent; the semantic shadcn tokens below map onto it.
+ */
 :root {
-  --radius: 0.65rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.141 0.005 285.823);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.141 0.005 285.823);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
-  --primary: oklch(0.606 0.25 292.717);
-  --primary-foreground: oklch(0.969 0.016 293.756);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.21 0.006 285.885);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.606 0.25 292.717);
-  --success: oklch(0.596 0.145 163.225);
-  --warning: oklch(0.769 0.15 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-primary: oklch(0.606 0.25 292.717);
-  --sidebar-primary-foreground: oklch(0.969 0.016 293.756);
-  --sidebar-accent: oklch(0.967 0.001 286.375);
-  --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.606 0.25 292.717);
-  --chart-1: oklch(0.606 0.25 292.717);
-  --chart-2: oklch(0.596 0.145 163.225);
-  --chart-3: oklch(0.769 0.15 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --chart-background: oklch(1 0 0);
-  --chart-foreground: oklch(0.145 0.004 285);
-  --chart-foreground-muted: oklch(0.55 0.014 260);
-  --chart-line-primary: var(--chart-1);
-  --chart-line-secondary: var(--chart-2);
-  --chart-crosshair: oklch(0.4 0.1828 274.34);
-  --chart-grid: oklch(0.9 0 0);
-  --chart-brush-border: var(--chart-grid);
-  --chart-tooltip-background: oklch(0.21 0.006 285 / 0.8);
-  --chart-tooltip-foreground: oklch(0.985 0 0);
-  --chart-tooltip-muted: oklch(0.65 0.01 260);
-  --chart-marker-background: oklch(0.97 0.005 260);
-  --chart-marker-border: oklch(0.85 0.01 260);
-  --chart-marker-foreground: oklch(0.3 0.01 260);
-  --chart-label: oklch(0.45 0.01 260);
-  --chart-scale-01: oklch(0.98 0.003 106);
-  --chart-scale-02: oklch(0.92 0.008 106);
-  --chart-scale-03: oklch(0.82 0.015 106);
-  --chart-scale-04: oklch(0.68 0.02 106);
-  --chart-scale-05: oklch(0.55 0.025 106);
-  --chart-scale-pattern-color: oklch(0.96 0.005 106);
-  --syntax-keyword: #7c3aed;
-  --syntax-string: #15803d;
-  --syntax-number: #b45309;
-  --syntax-atom: #0e7490;
-  --syntax-property: #0369a1;
-  --syntax-comment: #6b7280;
-  --syntax-tag: #be185d;
-  --syntax-attribute: #9333ea;
-  --syntax-variable: #a16207;
-  --syntax-type: #0e7490;
-  --syntax-punct: #64748b;
-  --syntax-escape: #be185d;
-  --syntax-meta: #6b7280;
+  --wood-hi: #7a4a24;      --wood: #5a3418;      --wood-lo: #3b2617;   --wood-deep: #2a1a10;
+  --parchment-hi: #fffaf0; --parchment: #f1e2c2; --parchment-lo: #d8c08e;
+  --ink-hi: #4a2e1c;       --ink: #2a160a;       --ink-lo: #1a0e06;
+  --iron-hi: #d6dae0;      --iron: #a8adb6;      --iron-lo: #6e737c;
+  --ribbon-hi: #ff7a6a;    --ribbon: #d8382e;    --ribbon-lo: #9a2018;
+  --gold-hi: #fff0a8;      --gold: #ffcf4a;      --gold-lo: #e0a420;
+  --emerald-hi: #8cf09a;   --emerald: #4ac85e;   --emerald-lo: #2a8a3e;
+  --diamond-hi: #a8dcff;   --diamond: #5ab4ff;   --diamond-lo: #2f7ad0;
+  --rose-hi: #ffb0c0;      --rose: #ff6a8a;      --rose-lo: #c8385a;
+  --warn-hi: #ffe08a;      --warn: #ffb43a;      --warn-lo: #c87a10;
+  --error-hi: #ff9a8a;     --error: #ff5a4a;     --error-lo: #b8261a;
+  --disabled-hi: #c8bca8;  --disabled: #a89a84;  --disabled-lo: #6e6252;
+  --elite-hi: #d2a8ff;     --elite: #a05ae8;     --elite-lo: #6a2ab0;
+
+  /* Web form rules (§4): outlines, radii, highlight / bottom edge, hard drop shadow, motion (§16). */
+  --outline-heavy: 3px;
+  --outline-thin: 1px;
+  --radius-button: 13px;
+  --radius-panel: 20px;
+  --radius-pill: 999px;
+  --edge-hi: 4px;
+  --edge-lo: 6px;
+  --motion-fast: 120ms;
+  --motion: 160ms;
+  --ease-out-kl: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.dark {
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.21 0.006 285.885);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.21 0.006 285.885);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.541 0.281 293.009);
-  --primary-foreground: oklch(0.969 0.016 293.756);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.541 0.281 293.009);
-  --success: oklch(0.696 0.17 162.48);
-  --warning: oklch(0.828 0.189 84.429);
-  --sidebar: oklch(0.21 0.006 285.885);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.541 0.281 293.009);
-  --sidebar-primary-foreground: oklch(0.969 0.016 293.756);
-  --sidebar-accent: oklch(0.274 0.006 286.033);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.541 0.281 293.009);
-  --chart-1: oklch(0.541 0.281 293.009);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.828 0.189 84.429);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --chart-background: oklch(0.145 0 0);
-  --chart-foreground: oklch(0.45 0 0);
-  --chart-foreground-muted: oklch(0.65 0.01 260);
-  --chart-crosshair: oklch(0.45 0 0);
-  --chart-grid: oklch(0.25 0 0);
+/* Light mode: parchment. Also usable as a local scope (e.g. the login card on wood). */
+:root,
+.theme-parchment {
+  color-scheme: light;
+  --background: #f1e2c2;  --foreground: #2a160a;
+  --card: #fff8e6;        --card-foreground: #2a160a;
+  --popover: #fff8e6;     --popover-foreground: #2a160a;
+  --primary: #d8382e;     --primary-foreground: #ffffff;
+  --secondary: #ffcf4a;   --secondary-foreground: #2a160a;
+  --accent: #4ac85e;      --accent-foreground: #ffffff;
+  --muted: #e6d2a8;       --muted-foreground: #5a3418;
+  --destructive: #ff5a4a; --destructive-foreground: #ffffff;
+  --border: #2a160a;      --input: #d8c08e;            --ring: #ffcf4a;
+  --success: #4ac85e;     --success-foreground: #ffffff;
+  --warning: #ffb43a;     --warning-foreground: #2a160a;
+  --info: #5ab4ff;        --info-foreground: #ffffff;
+  --radius: 0.875rem;
+  --font-display: "Lilita One"; --font-sans: "Nunito"; --font-mono: "JetBrains Mono";
+
+  /* Stage colours for the highlight (hi) and bottom edge (lo) of each surface. */
+  --primary-hi: var(--ribbon-hi);     --primary-lo: var(--ribbon-lo);
+  --secondary-hi: var(--gold-hi);     --secondary-lo: var(--gold-lo);
+  --accent-hi: var(--emerald-hi);     --accent-lo: var(--emerald-lo);
+  --destructive-hi: var(--error-hi);  --destructive-lo: var(--error-lo);
+  --success-hi: var(--emerald-hi);    --success-lo: var(--emerald-lo);
+  --card-hi: var(--parchment-hi);     --card-lo: var(--parchment-lo);
+  --muted-hi: var(--parchment);       --muted-lo: var(--parchment-lo);
+  --field: var(--parchment-hi);
+  --table-head: var(--ink);
+  --zebra: #f6ead0;
+  --primary-text-shadow: 0 1px 0 var(--border);
+
+  --chart-background: var(--card);
+  --chart-foreground: var(--ink);
+  --chart-foreground-muted: var(--wood);
+  --chart-label: var(--wood);
+  --chart-grid: color-mix(in srgb, var(--ink) 16%, transparent);
+  --chart-crosshair: var(--ink);
+  --chart-marker-background: var(--parchment-hi);
+  --chart-marker-border: var(--ink);
+  --chart-marker-foreground: var(--ink);
+  --chart-scale-01: #fffaf0;
+  --chart-scale-02: #f1e2c2;
+  --chart-scale-03: #d8c08e;
+  --chart-scale-04: #7a4a24;
+  --chart-scale-05: #5a3418;
+  --chart-scale-pattern-color: var(--parchment-hi);
+
+  --syntax-keyword: #9a2018;
+  --syntax-string: #2a8a3e;
+  --syntax-number: #c87a10;
+  --syntax-atom: #2f7ad0;
+  --syntax-property: #2f7ad0;
+  --syntax-comment: #6e6252;
+  --syntax-tag: #c8385a;
+  --syntax-attribute: #6a2ab0;
+  --syntax-variable: #5a3418;
+  --syntax-type: #2f7ad0;
+  --syntax-punct: #5a3418;
+  --syntax-escape: #c8385a;
+  --syntax-meta: #6e6252;
+}
+
+/* Dark mode: wood (default). Also usable as a local scope (sidebar, consoles). */
+.dark,
+.theme-wood {
+  color-scheme: dark;
+  --background: #2a1a10;  --foreground: #f1e2c2;
+  --card: #3b2617;        --card-foreground: #f1e2c2;
+  --popover: #3b2617;     --popover-foreground: #f1e2c2;
+  --primary: #ffcf4a;     --primary-foreground: #2a160a;
+  --secondary: #5a3418;   --secondary-foreground: #f1e2c2;
+  --accent: #d8382e;      --accent-foreground: #ffffff;
+  --muted: #4a3020;       --muted-foreground: #c9b89a;
+  --destructive: #ff5a4a; --destructive-foreground: #ffffff;
+  --border: #1a0e06;      --input: #5a3418;            --ring: #ffcf4a;
+
+  --primary-hi: var(--gold-hi);       --primary-lo: var(--gold-lo);
+  --secondary-hi: var(--wood-hi);     --secondary-lo: var(--wood-lo);
+  --accent-hi: var(--ribbon-hi);      --accent-lo: var(--ribbon-lo);
+  --card-hi: var(--wood);             --card-lo: var(--wood-deep);
+  --muted-hi: var(--wood);            --muted-lo: var(--wood-deep);
+  --field: var(--wood-deep);
+  --table-head: var(--ink-lo);
+  --zebra: #422b1b;
+  --primary-text-shadow: none;
+
+  --chart-background: var(--card);
+  --chart-foreground: var(--parchment);
+  --chart-foreground-muted: #c9b89a;
+  --chart-label: #c9b89a;
+  --chart-grid: color-mix(in srgb, var(--parchment) 14%, transparent);
+  --chart-crosshair: var(--parchment);
+  --chart-marker-background: var(--wood-lo);
+  --chart-marker-border: var(--ink-lo);
+  --chart-marker-foreground: var(--parchment);
+  --chart-scale-01: #4a3020;
+  --chart-scale-02: #5a3418;
+  --chart-scale-03: #7a4a24;
+  --chart-scale-04: #d8c08e;
+  --chart-scale-05: #f1e2c2;
+  --chart-scale-pattern-color: var(--wood-lo);
+
+  --syntax-keyword: #ff7a6a;
+  --syntax-string: #8cf09a;
+  --syntax-number: #ffe08a;
+  --syntax-atom: #a8dcff;
+  --syntax-property: #a8dcff;
+  --syntax-comment: #a89a84;
+  --syntax-tag: #ffb0c0;
+  --syntax-attribute: #d2a8ff;
+  --syntax-variable: #ffcf4a;
+  --syntax-type: #a8dcff;
+  --syntax-punct: #c9b89a;
+  --syntax-escape: #ffb0c0;
+  --syntax-meta: #a89a84;
+}
+
+/* Mode-independent: charts (§17 order), sidebar (wood in both modes), tooltips. */
+:root {
+  --chart-1: #d8382e; --chart-2: #ffcf4a; --chart-3: #4ac85e; --chart-4: #5ab4ff; --chart-5: #a05ae8;
+  --chart-line-primary: var(--chart-1);
+  --chart-line-secondary: var(--chart-2);
   --chart-brush-border: var(--chart-grid);
-  --chart-marker-background: oklch(0.25 0.01 260);
-  --chart-marker-border: oklch(0.4 0.01 260);
-  --chart-marker-foreground: oklch(0.9 0 0);
-  --chart-label: oklch(0.75 0.01 260);
-  --chart-scale-01: oklch(0.28 0.03 270);
-  --chart-scale-02: oklch(0.38 0.04 270);
-  --chart-scale-03: oklch(0.48 0.05 270);
-  --chart-scale-04: oklch(0.58 0.06 270);
-  --chart-scale-05: oklch(0.68 0.07 270);
-  --chart-scale-pattern-color: oklch(0.145 0 0);
-  --syntax-keyword: #c4b5fd;
-  --syntax-string: #86efac;
-  --syntax-number: #fdba74;
-  --syntax-atom: #67e8f9;
-  --syntax-property: #7dd3fc;
-  --syntax-comment: #9ca3af;
-  --syntax-tag: #f9a8d4;
-  --syntax-attribute: #d8b4fe;
-  --syntax-variable: #fde68a;
-  --syntax-type: #67e8f9;
-  --syntax-punct: #94a3b8;
-  --syntax-escape: #f9a8d4;
-  --syntax-meta: #9ca3af;
+  --chart-tooltip-background: var(--ink);
+  --chart-tooltip-foreground: var(--parchment);
+  --chart-tooltip-muted: #c9b89a;
+  --chart-stroke-width: 2.5px;
+
+  --sidebar: #3b2617;
+  --sidebar-foreground: #f1e2c2;
+  --sidebar-primary: #ffcf4a;
+  --sidebar-primary-foreground: #2a160a;
+  --sidebar-accent: #5a3418;
+  --sidebar-accent-foreground: #f1e2c2;
+  --sidebar-border: #1a0e06;
+  --sidebar-ring: #ffcf4a;
 }
 
 @theme inline {
@@ -145,6 +187,9 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --font-display: "Lilita One", "Nunito", ui-rounded, system-ui, sans-serif;
+  --font-sans: "Nunito", ui-rounded, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -165,7 +210,15 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-gold: var(--gold);
+  --color-ink: var(--ink);
+  --color-parchment: var(--parchment);
+  --color-wood: var(--wood);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -179,38 +232,182 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --color-chart-scale-pattern-color: var(----chart-scale-pattern-color);
-  --color-chart-scale-05: var(----chart-scale-05);
-  --color-chart-scale-04: var(----chart-scale-04);
-  --color-chart-scale-03: var(----chart-scale-03);
-  --color-chart-scale-02: var(----chart-scale-02);
-  --color-chart-scale-01: var(----chart-scale-01);
-  --color-chart-label: var(----chart-label);
-  --color-chart-marker-foreground: var(----chart-marker-foreground);
-  --color-chart-marker-border: var(----chart-marker-border);
-  --color-chart-marker-background: var(----chart-marker-background);
-  --color-chart-tooltip-muted: var(----chart-tooltip-muted);
-  --color-chart-tooltip-foreground: var(----chart-tooltip-foreground);
-  --color-chart-tooltip-background: var(----chart-tooltip-background);
-  --chart-brush-border: var(----chart-brush-border);
-  --color-chart-grid: var(----chart-grid);
-  --color-chart-crosshair: var(----chart-crosshair);
-  --chart-line-secondary: var(----chart-line-secondary);
-  --chart-line-primary: var(----chart-line-primary);
-  --color-chart-foreground-muted: var(----chart-foreground-muted);
-  --color-chart-foreground: var(----chart-foreground);
-  --color-chart-background: var(----chart-background);
+  --color-chart-scale-pattern-color: var(--chart-scale-pattern-color);
+  --color-chart-scale-05: var(--chart-scale-05);
+  --color-chart-scale-04: var(--chart-scale-04);
+  --color-chart-scale-03: var(--chart-scale-03);
+  --color-chart-scale-02: var(--chart-scale-02);
+  --color-chart-scale-01: var(--chart-scale-01);
+  --color-chart-label: var(--chart-label);
+  --color-chart-marker-foreground: var(--chart-marker-foreground);
+  --color-chart-marker-border: var(--chart-marker-border);
+  --color-chart-marker-background: var(--chart-marker-background);
+  --color-chart-tooltip-muted: var(--chart-tooltip-muted);
+  --color-chart-tooltip-foreground: var(--chart-tooltip-foreground);
+  --color-chart-tooltip-background: var(--chart-tooltip-background);
+  --color-chart-grid: var(--chart-grid);
+  --color-chart-crosshair: var(--chart-crosshair);
+  --color-chart-foreground-muted: var(--chart-foreground-muted);
+  --color-chart-foreground: var(--chart-foreground);
+  --color-chart-background: var(--chart-background);
 }
 
 @layer base {
   * {
     border-color: var(--color-border);
   }
+  html {
+    font-synthesis: none;
+  }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family: var(--font-sans), ui-rounded, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-weight: 500;
+    font-size: 15px;
+    line-height: 1.55;
     -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 {
+    font-family: var(--font-display), "Nunito", ui-rounded, system-ui, sans-serif;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+  }
+  code, kbd, pre, samp {
+    font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  ::selection {
+    background: var(--gold);
+    color: var(--ink);
+  }
+  * {
+    scrollbar-color: var(--wood-hi) transparent;
+  }
+}
+
+@layer components {
+  /*
+   * Raised surface (§4): top highlight, bottom edge, hard ink drop shadow — never blurred.
+   * Surfaces set --bevel-hi / --bevel-lo to the hi/lo stage of their own colour.
+   */
+  .kl-raised {
+    --bevel-hi: var(--card-hi);
+    --bevel-lo: var(--card-lo);
+    --drop: 4px;
+    box-shadow:
+      inset 0 var(--edge-hi) 0 var(--bevel-hi),
+      inset 0 calc(var(--edge-lo) * -1) 0 var(--bevel-lo),
+      0 var(--drop) 0 var(--border);
+  }
+  /* Panels: same rules, slightly deeper shadow and a calmer bottom edge. */
+  .kl-panel {
+    --bevel-hi: var(--card-hi);
+    --bevel-lo: var(--card-lo);
+    box-shadow:
+      inset 0 var(--edge-hi) 0 var(--bevel-hi),
+      inset 0 calc(var(--edge-lo) * -1) 0 var(--bevel-lo),
+      0 6px 0 var(--border);
+  }
+  /* Press feedback (§4/§16): content drops 2 px, bottom edge and drop shadow halve. */
+  .kl-press {
+    transition:
+      transform var(--motion-fast) var(--ease-out-kl),
+      box-shadow var(--motion-fast) var(--ease-out-kl),
+      background-color var(--motion) var(--ease-out-kl),
+      color var(--motion) var(--ease-out-kl),
+      filter var(--motion) var(--ease-out-kl);
+  }
+  .kl-press:hover:not(:disabled) {
+    filter: brightness(1.06);
+  }
+  .kl-press:active:not(:disabled) {
+    transform: translateY(2px);
+  }
+  .kl-raised.kl-press:active:not(:disabled) {
+    box-shadow:
+      inset 0 var(--edge-hi) 0 var(--bevel-hi),
+      inset 0 calc(var(--edge-lo) * -0.5) 0 var(--bevel-lo),
+      0 calc(var(--drop) - 2px) 0 var(--border);
+  }
+  /* Recessed input field: a thin darker band at the top reads as "pressed into the surface". */
+  .kl-field {
+    background-color: var(--field);
+    box-shadow: inset 0 3px 0 color-mix(in srgb, var(--input) 70%, transparent);
+  }
+
+  /* Page / display titles (§5): Lilita One, 2 px ink stroke, 4 px hard shadow. */
+  .kl-title {
+    font-family: var(--font-display), "Nunito", ui-rounded, system-ui, sans-serif;
+    font-weight: 400;
+    color: var(--gold);
+    -webkit-text-stroke: 4px var(--ink);
+    paint-order: stroke fill;
+    text-shadow: 0 4px 0 var(--ink);
+    letter-spacing: 0.02em;
+  }
+
+  /* Tables (§17): ink header with gold text, zebra card/muted, hover gold 15 %. */
+  .kl-table thead tr {
+    background-color: var(--table-head);
+    border-bottom: 0;
+  }
+  .kl-table thead th {
+    color: var(--gold);
+    font-family: var(--font-display), "Nunito", ui-rounded, system-ui, sans-serif;
+    font-weight: 400;
+    letter-spacing: 0.03em;
+  }
+  .kl-table tbody tr {
+    background-color: var(--card);
+  }
+  .kl-table tbody tr:nth-child(even) {
+    background-color: var(--zebra);
+  }
+  .kl-table tbody tr:hover {
+    background-color: color-mix(in srgb, var(--gold) 15%, var(--card));
+  }
+
+  /* Log and console output: ink paper in both modes, parchment text. */
+  .kl-console {
+    --foreground: #f1e2c2;
+    --muted-foreground: #c9b89a;
+    background-color: var(--ink-lo);
+    color: var(--foreground);
+  }
+
+  /* Wooden planks with hard seams (no soft gradient) — login backdrop. */
+  .kl-planks {
+    background-color: var(--wood-lo);
+    background-image: repeating-linear-gradient(
+      180deg,
+      transparent 0 58px,
+      var(--wood-deep) 58px 62px,
+      color-mix(in srgb, var(--wood) 55%, transparent) 62px 64px
+    );
+  }
+}
+
+/* Panels fade in with a 6 px lift (§16). */
+@keyframes kl-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.kl-rise {
+  animation: kl-rise var(--motion) var(--ease-out-kl) both;
+}
+
+/* Respect "reduced motion" everywhere (§16). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .kl-press:active:not(:disabled) {
+    transform: none;
   }
 }
 
