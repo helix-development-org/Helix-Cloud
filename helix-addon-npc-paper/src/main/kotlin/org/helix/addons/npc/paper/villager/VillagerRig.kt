@@ -18,11 +18,8 @@ import org.bukkit.entity.ItemDisplay
 import org.bukkit.entity.Player
 import org.bukkit.entity.TextDisplay
 import org.bukkit.inventory.ItemStack
-import org.bukkit.util.Transformation
-import org.joml.Quaternionf
-import org.joml.Vector3f
+import org.helix.addons.npc.paper.rig.DisplayPose
 import java.util.UUID
-import kotlin.math.abs
 import kotlin.random.Random
 
 /**
@@ -35,18 +32,22 @@ import kotlin.random.Random
  *
  * @property character the villager.
  * @property spec the villager's rig.
- * @property location NPC location (feet centre, yaw = facing).
+ * @param start NPC location (feet centre, yaw = facing).
  * @property hologramLines extra MiniMessage lines shown above the name.
  * @property follow whether the head follows the nearest player (NPC look mode `nearest`/`player`).
  */
 class VillagerRig(
     val character: VillagerCharacter,
     private val spec: RigSpec,
-    val location: Location,
+    start: Location,
     private val hologramLines: List<String> = emptyList(),
     private val follow: Boolean = true,
 ) {
     private val mini = MiniMessage.miniMessage()
+
+    /** NPC location (feet centre, yaw = facing); see [moveTo]. */
+    var location: Location = start.clone()
+        private set
     private val animator = VillagerAnimator(character.lidRest)
     private val speech = SpeechQueue(character.ticksPerLetter)
     private val parts = LinkedHashMap<String, ItemDisplay>()
@@ -88,7 +89,7 @@ class VillagerRig(
                 display.teleportDuration = 0
                 display.shadowRadius = 0f
                 pose[part.name]?.let {
-                    display.transformation = it.toBukkit()
+                    display.transformation = DisplayPose.toBukkit(it)
                     sent[part.name] = it
                 }
             }
@@ -107,6 +108,17 @@ class VillagerRig(
             tag.backgroundColor = Color.fromARGB(0, 0, 0, 0)
             tag.text(nameText())
         }
+    }
+
+    /**
+     * Moves the villager: its entities are respawned at [target].
+     *
+     * @param target new feet position, yaw = facing.
+     */
+    fun moveTo(target: Location) {
+        location = target.clone()
+        remove()
+        spawn()
     }
 
     /** Removes every entity of the rig. */
@@ -141,17 +153,8 @@ class VillagerRig(
         val look = if (follow) lookTarget() else null
         val pose = Kinematics.solve(spec, animator.frame(now, look, speech.speaking))
         delayToggle = !delayToggle
-        pose.forEach { (name, transform) ->
-            val display = parts[name] ?: return@forEach
-            val last = sent[name]
-            if (last != null && close(last, transform)) return@forEach
-            display.transformation = transform.toBukkit()
-            // The client only restarts interpolation when the delay value is re-sent, and unchanged values are not
-            // re-sent: alternate 0/-1 so every update starts a fresh interpolation.
-            display.interpolationDelay = if (delayToggle) 0 else -1
-            display.interpolationDuration = INTERPOLATION_TICKS
-            sent[name] = transform
-        }
+        // The client only restarts interpolation when the delay value is re-sent: DisplayPose alternates it.
+        DisplayPose.send(pose, parts, sent, delayToggle, INTERPOLATION_TICKS)
     }
 
     /**
@@ -216,22 +219,6 @@ class VillagerRig(
         editMeta { it.itemModel = NamespacedKey(RigBundle.NAMESPACE, "${character.id}/$part") }
     }
 
-    private fun close(a: PartTransform, b: PartTransform): Boolean =
-        near(a.translation.x, b.translation.x) && near(a.translation.y, b.translation.y) &&
-            near(a.translation.z, b.translation.z) && near(a.rotation.x, b.rotation.x) &&
-            near(a.rotation.y, b.rotation.y) && near(a.rotation.z, b.rotation.z) &&
-            near(a.rotation.w, b.rotation.w) && near(a.scale.x, b.scale.x) && near(a.scale.y, b.scale.y) &&
-            near(a.scale.z, b.scale.z)
-
-    private fun near(a: Double, b: Double): Boolean = abs(a - b) < EPSILON
-
-    private fun PartTransform.toBukkit(): Transformation = Transformation(
-        Vector3f(translation.x.toFloat(), translation.y.toFloat(), translation.z.toFloat()),
-        Quaternionf(rotation.x.toFloat(), rotation.y.toFloat(), rotation.z.toFloat(), rotation.w.toFloat()),
-        Vector3f(scale.x.toFloat(), scale.y.toFloat(), scale.z.toFloat()),
-        Quaternionf(),
-    )
-
     /** Tuning constants. */
     companion object {
         /** Ticks between pose updates (§12: update every 2 ticks). */
@@ -263,8 +250,5 @@ class VillagerRig(
 
         /** Babble pitch jitter range. */
         const val BABBLE_PITCH_MAX = 1.1f
-
-        /** Changes below this are not re-sent. */
-        const val EPSILON = 1e-4
     }
 }

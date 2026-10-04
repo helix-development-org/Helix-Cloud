@@ -14,6 +14,7 @@ import kotlinx.serialization.json.Json
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.Bukkit
+import org.bukkit.Location
 import org.bukkit.command.Command
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Interaction
@@ -21,9 +22,19 @@ import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerInteractEntityEvent
+import org.bukkit.event.server.PluginDisableEvent
 import org.bukkit.inventory.EquipmentSlot
+import org.bukkit.plugin.Plugin
+import org.bukkit.plugin.ServicePriority
 import org.bukkit.plugin.java.JavaPlugin
+import org.helix.addons.npc.paper.api.HelixNpcApi
+import org.helix.addons.npc.paper.api.RigHandle
+import org.helix.addons.npc.paper.api.VillagerHandle
+import org.helix.addons.npc.paper.rig.ModelRig
+import org.helix.addons.npc.paper.rig.RigSpecs
+import org.helix.addons.npc.paper.villager.ApiVillager
 import org.helix.addons.npc.paper.villager.RigBundle
+import org.helix.addons.npc.paper.villager.RigSpec
 import org.helix.addons.npc.paper.villager.VillagerCast
 import org.helix.addons.npc.paper.villager.VillagerCharacter
 import org.helix.addons.npc.paper.villager.VillagerRig
@@ -43,8 +54,11 @@ import kotlin.coroutines.CoroutineContext
  *
  * NPCs with a `villager` model are rendered as animated [VillagerRig]s (display entities driven by this plugin)
  * instead of INpc player NPCs; see [villager] for the speech API.
+ *
+ * Other plugins use the public [HelixNpcApi] (registered with the Bukkit services manager): villagers in their own
+ * worlds ([spawnVillager]) and generic display rigs of their own models ([spawnRig]), both ticked and cleaned up here.
  */
-class NpcPlugin : JavaPlugin(), Listener {
+class NpcPlugin : JavaPlugin(), Listener, HelixNpcApi {
     private val json = Json { ignoreUnknownKeys = true }
     private val mini = MiniMessage.miniMessage()
 
@@ -56,6 +70,15 @@ class NpcPlugin : JavaPlugin(), Listener {
 
     /** Live villager rigs by NPC id, mutated only on the main thread. */
     private val rigs = ConcurrentHashMap<String, VillagerRig>()
+
+    /** Villagers spawned through the public API, by key; main thread only. */
+    private val apiVillagers = LinkedHashMap<String, ApiVillager>()
+
+    /** Generic rigs spawned through the public API; main thread only. */
+    private val modelRigs = ArrayList<ModelRig>()
+
+    /** Parsed rig descriptions by their JSON text (the API is called with the same strings over and over). */
+    private val specCache = HashMap<String, RigSpec>()
 
     /** Last click per player uuid + NPC id (ms), debouncing the double interaction events. */
     private val lastClick = HashMap<String, Long>()
@@ -103,7 +126,8 @@ class NpcPlugin : JavaPlugin(), Listener {
         npcs = INpc.install(this)
         rigBundle = loadRigs()
         server.pluginManager.registerEvents(this, this)
-        server.scheduler.runTaskTimer(this, Runnable { rigs.values.forEach { it.tick() } }, 1L, 1L)
+        server.scheduler.runTaskTimer(this, Runnable { tickRigs() }, 1L, 1L)
+        server.servicesManager.register(HelixNpcApi::class.java, this, this, ServicePriority.Normal)
         logger.info("Helix-NPC installed for task '$task'.")
         // First sync shortly after start (worlds must be loaded), then poll.
         server.scheduler.runTaskTimerAsynchronously(this, Runnable { syncTick() }, 40L, SYNC_TICKS)
@@ -119,6 +143,11 @@ class NpcPlugin : JavaPlugin(), Listener {
         }
         rigs.values.forEach { it.remove() }
         rigs.clear()
+        apiVillagers.values.forEach { it.remove() }
+        apiVillagers.clear()
+        modelRigs.forEach { it.remove() }
+        modelRigs.clear()
+        server.servicesManager.unregisterAll(this)
         spawned.clear()
         known.clear()
         client?.close()
@@ -249,16 +278,80 @@ class NpcPlugin : JavaPlugin(), Listener {
     fun onVillagerClick(event: PlayerInteractEntityEvent) {
         val entity = event.rightClicked as? Interaction ?: return
         if (event.hand != EquipmentSlot.HAND) return
+        apiVillagers.values.firstOrNull { it.owns(entity) }?.let { villager ->
+            event.isCancelled = true
+            if (debounced(event.player, villager.key)) villager.click(event.player)
+            return
+        }
         val (id, rig) = rigs.entries.firstOrNull { it.value.owns(entity) }?.toPair() ?: return
         event.isCancelled = true
-        val key = "${event.player.uniqueId}:$id"
-        val now = System.currentTimeMillis()
-        if (now - (lastClick[key] ?: 0L) < CLICK_COOLDOWN_MS) return
-        lastClick[key] = now
-        if (lastClick.size > 512) lastClick.entries.removeIf { now - it.value > CLICK_COOLDOWN_MS }
+        if (!debounced(event.player, id)) return
         rig.raiseBrow()
         known[id]?.interactAction?.let { runInteract(event.player, it) }
         reportInteraction(id, event.player.name)
+    }
+
+    /** @return `true` when this click of [player] on [id] is not a duplicate of the previous one. */
+    private fun debounced(player: Player, id: String): Boolean {
+        val key = "${player.uniqueId}:$id"
+        val now = System.currentTimeMillis()
+        if (now - (lastClick[key] ?: 0L) < CLICK_COOLDOWN_MS) return false
+        lastClick[key] = now
+        if (lastClick.size > 512) lastClick.entries.removeIf { now - it.value > CLICK_COOLDOWN_MS }
+        return true
+    }
+
+    /** Ticks node-defined villagers, API villagers and API rigs; drops what was removed. */
+    private fun tickRigs() {
+        rigs.values.forEach { it.tick() }
+        if (apiVillagers.isNotEmpty()) {
+            apiVillagers.values.removeIf { !it.isValid() }
+            apiVillagers.values.toList().forEach { villager -> runCatching { villager.rig.tick() } }
+        }
+        if (modelRigs.isNotEmpty()) {
+            modelRigs.toList().forEach { rig -> if (!runCatching { rig.tick() }.getOrDefault(false)) modelRigs.remove(rig) }
+        }
+    }
+
+    /**
+     * Removes everything a disabling plugin spawned through the API.
+     *
+     * @param event the plugin disable.
+     */
+    @EventHandler
+    fun onOwnerDisable(event: PluginDisableEvent) {
+        val owner = event.plugin
+        if (owner == this) return
+        apiVillagers.values.filter { it.owner == owner }.forEach { it.remove() }
+        apiVillagers.values.removeIf { !it.isValid() }
+        modelRigs.filter { it.owner == owner }.forEach { it.remove() }
+        modelRigs.removeIf { !it.isValid() }
+    }
+
+    // -------------------------------------------------------------- public API --
+
+    override fun villagerIds(): List<String> = rigBundle.villagers.keys.sorted()
+
+    override fun spawnVillager(owner: Plugin, villagerId: String, location: Location, followPlayers: Boolean): VillagerHandle? {
+        val id = villagerId.lowercase()
+        val spec = rigBundle.villagers[id] ?: return null
+        val character = VillagerCast.get(id) ?: VillagerCharacter(id, id, "", VillagerCast.PARCHMENT)
+        val rig = VillagerRig(character, spec, location.clone(), emptyList(), followPlayers)
+        rig.spawn()
+        val villager = ApiVillager(owner, "api:${owner.name}:${java.util.UUID.randomUUID()}", rig)
+        apiVillagers[villager.key] = villager
+        return villager
+    }
+
+    override fun spawnRig(owner: Plugin, namespace: String, modelId: String, rigJson: String, location: Location): RigHandle? {
+        val spec = specCache[rigJson] ?: runCatching { RigSpecs.parse(rigJson) }
+            .onFailure { logger.warning("${owner.name}: rig '$namespace:$modelId' rejected: ${it.message}") }
+            .getOrNull()?.also { if (specCache.size < SPEC_CACHE_LIMIT) specCache[rigJson] = it }
+            ?: return null
+        // entities appear on the next rig tick, after the caller set its initial pose
+        val rig = ModelRig(owner, namespace, modelId, spec, location)
+        modelRigs += rig
+        return rig
     }
 
     /** Reads the generated rig bundle from the jar, or an empty one. */
@@ -501,5 +594,8 @@ class NpcPlugin : JavaPlugin(), Listener {
 
         /** Minimum time between two handled clicks of one player on one villager. */
         const val CLICK_COOLDOWN_MS = 400L
+
+        /** Upper bound of cached rig descriptions. */
+        const val SPEC_CACHE_LIMIT = 256
     }
 }
