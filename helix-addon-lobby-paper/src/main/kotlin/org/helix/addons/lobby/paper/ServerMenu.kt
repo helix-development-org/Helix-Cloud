@@ -8,6 +8,8 @@ import de.tytoss.igui.layout.GuiArea
 import de.tytoss.igui.layout.GuiGrid
 import de.tytoss.igui.screen.ScreenFonts
 import de.tytoss.igui.screen.VillagerHeads
+import de.tytoss.igui.sound.NetworkSounds
+import de.tytoss.igui.sound.SoundPlayer
 import de.tytoss.igui.screen.TextAlign
 import de.tytoss.igui.screen.fit
 import de.tytoss.igui.screen.glyphAt
@@ -123,8 +125,11 @@ class ServerMenu(
                     val spot = spotAt(ctx.player, index)
                     val group = spot?.group
                     if (group != null && spot.state != PlaceState.MAINTENANCE) {
+                        SoundPlayer.play(ctx.player, NetworkSounds.UI_PAGE)
                         connect(ctx.player, group.bestServiceId)
                         ctx.close()
+                    } else {
+                        SoundPlayer.play(ctx.player, NetworkSounds.UI_ERROR)
                     }
                 }
                 onClick(area) { ctx -> click(ctx) }

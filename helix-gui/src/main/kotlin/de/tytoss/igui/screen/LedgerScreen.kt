@@ -5,6 +5,8 @@ import de.tytoss.igui.gui.GuiClickContext
 import de.tytoss.igui.gui.GuiPageBuilder
 import de.tytoss.igui.layout.GuiArea
 import de.tytoss.igui.layout.GuiGrid
+import de.tytoss.igui.sound.NetworkSounds
+import de.tytoss.igui.sound.SoundPlayer
 import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.TextColor
@@ -278,26 +280,45 @@ class LedgerScreen {
                 }
             }
             page.onClick(GuiArea(0, gridRow, GuiGrid.COLUMNS, 1)) { ctx ->
-                if (views[ctx.player.uniqueId]?.rows?.getOrNull(index) != null) onRow(ctx, index)
+                if (views[ctx.player.uniqueId]?.rows?.getOrNull(index) != null) {
+                    SoundPlayer.play(ctx.player, NetworkSounds.UI_CLICK)
+                    onRow(ctx, index)
+                }
             }
         }
         LedgerLayout.BUTTON_COLUMNS.forEachIndexed { b, columns ->
             page.onClick(GuiArea(columns.first, LedgerLayout.FOOTER_ROW, columns.count(), 1)) { ctx ->
                 val view = views[ctx.player.uniqueId] ?: return@onClick
                 val button = if (b == 0) view.shownLeft else view.shownRight
-                if (button != null && button.style != ButtonStyle.DISABLED) onButton(ctx, b)
+                when {
+                    button == null -> Unit
+                    button.style == ButtonStyle.DISABLED -> SoundPlayer.play(ctx.player, NetworkSounds.UI_ERROR)
+                    else -> {
+                        SoundPlayer.play(ctx.player, NetworkSounds.UI_CLICK)
+                        onButton(ctx, b)
+                    }
+                }
             }
         }
         page.onClick(grid.slot(LedgerLayout.BACK_COLUMN, LedgerLayout.FOOTER_ROW)) { ctx ->
-            if (views[ctx.player.uniqueId]?.back == true) onBack(ctx)
+            if (views[ctx.player.uniqueId]?.back == true) {
+                SoundPlayer.play(ctx.player, NetworkSounds.UI_PAGE)
+                onBack(ctx)
+            }
         }
         page.onClick(grid.slot(LedgerLayout.PREV_COLUMN, LedgerLayout.FOOTER_ROW)) { ctx ->
             val view = views[ctx.player.uniqueId] ?: return@onClick
-            if (view.page > 0) onPage(ctx, -1)
+            if (view.page > 0) {
+                SoundPlayer.play(ctx.player, NetworkSounds.UI_PAGE)
+                onPage(ctx, -1)
+            }
         }
         page.onClick(grid.slot(LedgerLayout.NEXT_COLUMN, LedgerLayout.FOOTER_ROW)) { ctx ->
             val view = views[ctx.player.uniqueId] ?: return@onClick
-            if (view.page < view.pages - 1) onPage(ctx, 1)
+            if (view.page < view.pages - 1) {
+                SoundPlayer.play(ctx.player, NetworkSounds.UI_PAGE)
+                onPage(ctx, 1)
+            }
         }
     }
 
