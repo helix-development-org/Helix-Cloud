@@ -12,15 +12,16 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class MotdConfig(
     val normal: MotdProfile = MotdProfile(
-        line1 = "<gradient:#8b5cf6:#38bdf8><bold>{network}</bold></gradient>",
-        line2 = "<gray>Welcome — <white>{online}<gray>/<white>{max}<gray> players online",
+        line1 = "<#ffcf4a><bold>{network}</bold></#ffcf4a> <#7a4a24>·</#7a4a24> <#f1e2c2>The arena awaits you",
+        line2 = "<#d8382e>»</#d8382e> <#f1e2c2>Cards, villages and tournaments <#7a4a24>·</#7a4a24> " +
+            "<#ffcf4a>{online}</#ffcf4a><#7a4a24>/</#7a4a24><#ffcf4a>{max}</#ffcf4a> <#f1e2c2>online",
     ),
     val maintenance: MotdProfile = MotdProfile(
-        line1 = "<red><bold>{network}</bold> <dark_gray>» <red>Maintenance",
-        line2 = "<gray>We are working on the network — check back soon.",
+        line1 = "<#ffcf4a><bold>{network}</bold></#ffcf4a> <#7a4a24>·</#7a4a24> <#ffb43a>Maintenance",
+        line2 = "<#ffb43a>The villagers are rebuilding the kingdom <#7a4a24>—</#7a4a24> <#ffb43a>check back soon.",
         onlinePlayers = 0,
         maxPlayers = 0,
-        versionText = "&cMaintenance",
+        versionText = "&6Maintenance",
     ),
 ) {
     /**

@@ -24,9 +24,9 @@ data class CinematicConfig(
     val shotSeconds: Int = 8,
     val fade: Boolean = true,
     val nameCard: Boolean = false,
-    val afkTag: String = "<gray>AFK",
-    val afkTitle: String = "<white><bold>Du bist AFK",
-    val afkSubtitle: String = "<gray>Klicke oder bewege dich, um weiterzuspielen",
+    val afkTag: String = "<#a89a84>AFK",
+    val afkTitle: String = "<#ffcf4a><bold>Du bist AFK",
+    val afkSubtitle: String = "<#f1e2c2>Klick oder beweg dich, um weiterzuspielen",
 ) {
     /**
      * A copy with [key] set from text (`tasks` comma separated), validated.

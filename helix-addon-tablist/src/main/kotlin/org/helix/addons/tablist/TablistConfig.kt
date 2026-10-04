@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
  * [intervalMs] milliseconds. [header]/[footer] remain the first frame for
  * backward compatibility.
  *
- * @property header header text of the first frame, `&` colors, `\n` breaks.
+ * @property header header text of the first frame, MiniMessage or `&` colors, `\n` breaks.
  * @property footer footer text of the first frame.
  * @property headerFrames all header frames; empty means `[header]`.
  * @property footerFrames all footer frames; empty means `[footer]`.
@@ -18,8 +18,9 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class TablistConfig(
-    val header: String = "&6Helix-Cloud",
-    val footer: String = "&7{online}&8/&7{max} players",
+    val header: String = "\n<#ffcf4a><bold>{network}</bold></#ffcf4a>\n" +
+        "<#ffcf4a>{network}</#ffcf4a> <#7a4a24>·</#7a4a24> <#f1e2c2>{online}<#7a4a24>/</#7a4a24><#f1e2c2>{max} players\n",
+    val footer: String = "\n<#7a4a24>Discord: /discord\n",
     val headerFrames: List<String> = emptyList(),
     val footerFrames: List<String> = emptyList(),
     val intervalMs: Long = 1000,

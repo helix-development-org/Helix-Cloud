@@ -20,14 +20,15 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class BoardConfig(
-    val title: String = "&6&lHELIX-CLOUD",
+    // Design concept §10: title = wordmark (gold network name until the glyph exists), labels wood-light,
+    // values parchment, separators are empty lines.
+    val title: String = "<#ffcf4a><bold>{network}</bold>",
     val lines: List<String> = listOf(
-        "&7&m                    ",
-        "&fPlayer: &e{player}",
-        "&fServer: &a{server}",
-        "&fOnline: &a{online}",
-        "&7&m                    ",
-        "&eplay.helix-cloud.net",
+        "",
+        "<#7a4a24>Player » <#f1e2c2>{player}",
+        "<#7a4a24>Server » <#f1e2c2>{server}",
+        "<#7a4a24>Online » <#f1e2c2>{online}",
+        "",
     ),
     val enabled: Boolean = true,
     val updateIntervalTicks: Int = 20,

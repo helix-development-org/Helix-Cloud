@@ -6,6 +6,7 @@ import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
 import org.helix.api.action.ActionSource
 import org.helix.api.addon.PlayerDataProvider
+import org.helix.api.design.StaffRanks
 
 /**
  * Permission system addon.
@@ -31,7 +32,7 @@ class PermissionsAddon : AddonBase() {
         store = PermissionStore(context.storage(), resolveUuid = context::resolvePlayerUuid)
         catalog = PermissionCatalog(context)
         if (store.group("default") == null) {
-            store.saveGroup(PermissionGroup(name = "default", default = true))
+            seedDefaultGroups(fresh = store.allGroups().isEmpty())
         }
         context.registerPermissionResolver { request -> store.has(request.name, request.permission, request.uuid) }
         // Group prefixes are DISPLAY state, deliberately decoupled from permission nodes: the
@@ -223,6 +224,27 @@ class PermissionsAddon : AddonBase() {
     }
 
     // The perm.* actions answer in plain lines (also used by CLI/panel/Discord).
+    // Default groups follow the staff ranks of the design concept (DESIGN.md §9): the default
+    // group shows as [Spieler]; on a fresh store the staff groups are created too (display only,
+    // without permissions — operators grant those). Existing groups are never touched.
+    private fun seedDefaultGroups(fresh: Boolean) {
+        StaffRanks.ALL.forEach { rank ->
+            val name = rank.tag.trim('[', ']').lowercase()
+            val isDefault = rank.weight == 0
+            if (!isDefault && !fresh) return@forEach
+            val color = "<#%06x>".format(rank.color)
+            store.saveGroup(
+                PermissionGroup(
+                    name = if (isDefault) "default" else name,
+                    weight = rank.weight,
+                    default = isDefault,
+                    prefix = "$color${rank.tag}</#%06x> ".format(rank.color),
+                    color = color,
+                ),
+            )
+        }
+    }
+
     // On the in-game /permissions path each line is prefixed with the literal
     // {prefix}, which the proxy bridge fills, so staff see the network prefix
     // like every other player message — without prefixing the admin channels.
