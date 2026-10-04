@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { CodeInput } from "@/components/code-input"
+import { Wordmark } from "@/components/brand/wordmark"
+import { Knoepfchen } from "@/components/brand/knoepfchen"
 
 /** Two-step Minecraft-account login with an admin-token fallback. */
 export function LoginView({ establish }: { establish: (token: string) => Promise<void> }) {
@@ -55,55 +58,74 @@ export function LoginView({ establish }: { establish: (token: string) => Promise
     }
   }
 
+  const lines: Record<typeof mode, string> = {
+    name: "Staff only! Tell me your Minecraft name. I write everything down. Mostly.",
+    code: "I sent you a code in-game. Six digits, I counted twice.",
+    token: "The secret control token? I am not supposed to look. I am not looking.",
+  }
+
   return (
-    <div className="grid min-h-screen place-items-center bg-gradient-to-b from-primary/10 to-background p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="items-center text-center">
-          <div className="mb-2 grid size-11 place-items-center rounded-xl bg-primary font-bold text-primary-foreground">H</div>
-          <CardTitle className="text-lg">Welcome to Helix</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          {mode === "name" && (
-            <>
-              <p className="text-center text-sm text-muted-foreground">Sign in with your Minecraft account</p>
-              <div className="grid gap-1.5">
-                <Label htmlFor="l-name">Minecraft name</Label>
-                <Input id="l-name" value={name} autoFocus onChange={(e) => setName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && requestCode()} placeholder="Steve" />
+    // Parchment card on wood (§17): the backdrop keeps the wood token set, the card the parchment one.
+    <div className="theme-wood kl-planks flex min-h-screen flex-col items-center justify-center gap-6 p-4 text-foreground">
+      <Wordmark size={52} />
+      <div className="kl-rise relative w-full max-w-[440px]">
+        <Card className="theme-parchment">
+          <CardHeader className="items-center gap-3 pb-4 text-center">
+            <div className="flex w-full items-end gap-3">
+              <Knoepfchen className="h-32 w-auto shrink-0 -ml-1" />
+              <div className="relative mb-6 flex-1 rounded-[14px] border-2 border-border bg-[var(--parchment-hi)] px-3 py-2 text-left text-sm font-bold leading-snug shadow-[0_3px_0_var(--border)]">
+                {lines[mode]}
+                <span aria-hidden className="absolute -left-[9px] bottom-3 size-4 rotate-45 border-b-2 border-l-2 border-border bg-[var(--parchment-hi)]" />
               </div>
-              <Button disabled={busy} onClick={requestCode}>Send login code</Button>
-            </>
-          )}
-          {mode === "code" && (
-            <>
-              <p className="text-center text-sm text-muted-foreground">Enter the code sent to <b>{name}</b> in-game</p>
-              <div className="grid gap-1.5">
-                <Label htmlFor="l-code">Code</Label>
-                <Input id="l-code" value={code} autoFocus inputMode="numeric" onChange={(e) => setCode(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && verify()} placeholder="6-digit code" />
-              </div>
-              <Button disabled={busy} onClick={verify}>Sign in</Button>
-              <Button variant="ghost" size="sm" onClick={() => { setCode(""); setMode("name") }}>Use a different name</Button>
-            </>
-          )}
-          {mode === "token" && (
-            <>
-              <p className="text-center text-sm text-muted-foreground">Sign in with the admin control token</p>
-              <div className="grid gap-1.5">
-                <Label htmlFor="l-token">Control token</Label>
-                <Input id="l-token" type="password" value={tokenInput} autoFocus onChange={(e) => setTokenInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && adminLogin()} placeholder="Control token" />
-              </div>
-              <Button disabled={busy} onClick={adminLogin}>Sign in</Button>
-            </>
-          )}
-          {error && <p className="text-center text-sm text-destructive">{error}</p>}
-          <button className="mt-1 text-center text-xs text-muted-foreground hover:text-foreground"
-            onClick={() => { setError(""); setMode(mode === "token" ? "name" : "token") }}>
-            {mode === "token" ? "Use Minecraft account instead" : "Use admin token instead"}
-          </button>
-        </CardContent>
-      </Card>
+            </div>
+            <CardTitle className="text-[22px]">Staff sign-in</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            {mode === "name" && (
+              <>
+                <p className="text-center text-sm text-muted-foreground">Sign in with your Minecraft account</p>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="l-name">Minecraft name</Label>
+                  <Input id="l-name" value={name} autoFocus onChange={(e) => setName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && requestCode()} placeholder="Steve" />
+                </div>
+                <Button disabled={busy} onClick={requestCode}>Send login code</Button>
+              </>
+            )}
+            {mode === "code" && (
+              <>
+                <p className="text-center text-sm text-muted-foreground">Enter the code sent to <b className="text-foreground">{name}</b> in-game</p>
+                <div className="grid gap-2">
+                  <Label htmlFor="l-code" className="text-center">Code</Label>
+                  <CodeInput idPrefix="l-code" value={code} autoFocus disabled={busy} onChange={setCode} onSubmit={verify} />
+                </div>
+                <Button disabled={busy} onClick={verify}>Sign in</Button>
+                <Button variant="ghost" size="sm" onClick={() => { setCode(""); setMode("name") }}>Use a different name</Button>
+              </>
+            )}
+            {mode === "token" && (
+              <>
+                <p className="text-center text-sm text-muted-foreground">Sign in with the admin control token</p>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="l-token">Control token</Label>
+                  <Input id="l-token" type="password" value={tokenInput} autoFocus onChange={(e) => setTokenInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && adminLogin()} placeholder="Control token" />
+                </div>
+                <Button disabled={busy} onClick={adminLogin}>Sign in</Button>
+              </>
+            )}
+            {error && (
+              <p className="rounded-[12px] border-2 border-border bg-destructive px-3 py-1.5 text-center text-sm font-bold text-destructive-foreground [text-shadow:0_1px_0_var(--border)]">
+                {error}
+              </p>
+            )}
+            <button className="mt-1 text-center text-sm font-bold text-muted-foreground underline decoration-[var(--gold-lo)] decoration-2 underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring rounded"
+              onClick={() => { setError(""); setMode(mode === "token" ? "name" : "token") }}>
+              {mode === "token" ? "Use Minecraft account instead" : "Use admin token instead"}
+            </button>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
