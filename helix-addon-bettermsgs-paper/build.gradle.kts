@@ -47,19 +47,3 @@ tasks.withType<Jar>().configureEach {
     })
     exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
 }
-
-// The BetterMSGs resource pack (self-drawn phone/chat textures + fonts) is
-// generated deterministically at build time and bundled into the HXA.
-sourceSets {
-    create("pack")
-}
-
-val generatePack by tasks.registering(JavaExec::class) {
-    group = "build"
-    description = "Draws the BetterMSGs textures and assembles pack.zip."
-    classpath = sourceSets["pack"].runtimeClasspath
-    mainClass.set("org.helix.addons.bettermsgs.pack.PackGeneratorKt")
-    val output = layout.buildDirectory.file("pack/pack.zip")
-    argumentProviders.add(CommandLineArgumentProvider { listOf(output.get().asFile.absolutePath) })
-    outputs.file(output)
-}

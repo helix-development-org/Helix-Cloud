@@ -12,11 +12,11 @@ class ChatMathTest {
     }
 
     @Test
-    fun `thumb sits at the bottom for the newest window and at the top for the oldest`() {
-        assertEquals(7, ChatMath.thumbIndex(0, 5))
-        assertEquals(7, ChatMath.thumbIndex(0, 100))
-        assertEquals(0, ChatMath.thumbIndex(100 - ChatMath.WINDOW, 100))
-        assertEquals(4, ChatMath.thumbIndex((100 - ChatMath.WINDOW) / 2, 100))
+    fun `pages put the newest window last and the oldest first`() {
+        assertEquals(0 to 1, ChatMath.pages(0, 5))
+        assertEquals(2 to 3, ChatMath.pages(0, 20))
+        assertEquals(0 to 3, ChatMath.pages(20 - ChatMath.WINDOW, 20))
+        assertEquals(1 to 3, ChatMath.pages(ChatMath.WINDOW, 20))
     }
 
     @Test
