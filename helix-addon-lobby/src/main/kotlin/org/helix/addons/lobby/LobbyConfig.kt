@@ -160,7 +160,7 @@ data class ProtectionSettings(
  */
 @Serializable
 data class ServerMenuSettings(
-    val title: String = "Navigator",
+    val title: String = "Karte des Reichs",
     val excludeLobbyTasks: Boolean = true,
     val modes: List<NavigatorMode> = emptyList(),
 )
@@ -171,12 +171,21 @@ data class ServerMenuSettings(
  * @property task task name the mode connects to.
  * @property name display name on the coat of arms (empty: the task name).
  * @property emblem emblem id (`castle`, `swords`, `banner`, `compass`, `crown`).
+ * @property place place on the map (`ankerplatz`, `kesseldorf`, `rosenarena`, `grenzlande`, `nebelland`, `reserve`;
+ *   empty: guessed from the task name).
+ * @property villager villager id whose head stands beside the place (empty: the place's default).
+ * @property lore one sentence of lore in the tooltip (empty: the place's default text).
+ * @property maintenance whether the place is shown under maintenance (grey, not clickable).
  */
 @Serializable
 data class NavigatorMode(
     val task: String,
     val name: String = "",
     val emblem: String = "compass",
+    val place: String = "",
+    val villager: String = "",
+    val lore: String = "",
+    val maintenance: Boolean = false,
 )
 
 

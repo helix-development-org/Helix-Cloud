@@ -4,5 +4,16 @@
   "message.menu-starting": "<#ffb43a>Achtung: Die Lobby startet noch — versuch es gleich nochmal.",
   "menu.entry.players": "<#f1e2c2>Spieler: <#ffcf4a>{players}/{max}",
   "menu.entry.connect": "<#ffcf4a>Klick: Verbinden",
-  "navigator.count": "{players} Spieler"
+  "navigator.count": "{players} Spieler",
+  "navigator.tooltip.players": "<#a89a84>{players} Spieler",
+  "navigator.tooltip.travel": "<#ffcf4a>Klick: Reisen",
+  "navigator.tooltip.full": "<#ff5a4a>Voll. Versuch es gleich nochmal.",
+  "navigator.tooltip.maintenance": "<#ffb43a>Achtung: Hier wird gerade gebaut.",
+  "navigator.tooltip.soon": "<#ffb43a>Hinter dem Nebel wartet bald etwas Neues.",
+  "navigator.lore.ankerplatz": "Hier kommt jeder an. Knöpfchen erklärt dir alles. Fast alles.",
+  "navigator.lore.kesseldorf": "Dein Dorf, deine Karten, deine Truhen. Bertold hat den Brunnen eröffnet.",
+  "navigator.lore.rosenarena": "Eins gegen eins um Rosen. Gorm hält deine Rosen.",
+  "navigator.lore.grenzlande": "Jenseits der Mauern streifen ungebundene Mobs. Clans ziehen in den Krieg.",
+  "navigator.lore.nebelland": "Prof. Funkel forscht noch. Es riecht leicht angebrannt.",
+  "navigator.lore.reserve": "Eine stille Lichtung. Elsa notiert hier ihre Taktiken."
 }

@@ -66,17 +66,21 @@ data class ProtectionSettings(
 /** The navigator (server selector). */
 @Serializable
 data class ServerMenuSettings(
-    val title: String = "Navigator",
+    val title: String = "Karte des Reichs",
     val excludeLobbyTasks: Boolean = true,
     val modes: List<NavigatorMode> = emptyList(),
 )
 
-/** One game mode of the navigator: task, display name, emblem id. */
+/** One game mode of the navigator: task, display name, emblem id, place on the map, villager, lore, maintenance. */
 @Serializable
 data class NavigatorMode(
     val task: String,
     val name: String = "",
     val emblem: String = "compass",
+    val place: String = "",
+    val villager: String = "",
+    val lore: String = "",
+    val maintenance: Boolean = false,
 )
 
 /** A joinable backend returned by the `lobby.servers` action. */

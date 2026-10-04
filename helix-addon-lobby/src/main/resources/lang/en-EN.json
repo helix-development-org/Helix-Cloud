@@ -4,5 +4,16 @@
   "message.menu-starting": "<#ffb43a>Warning: The lobby is still starting up — try again in a moment.",
   "menu.entry.players": "<#f1e2c2>Players: <#ffcf4a>{players}/{max}",
   "menu.entry.connect": "<#ffcf4a>Click: Connect",
-  "navigator.count": "{players} players"
+  "navigator.count": "{players} players",
+  "navigator.tooltip.players": "<#a89a84>{players} players",
+  "navigator.tooltip.travel": "<#ffcf4a>Click: Travel",
+  "navigator.tooltip.full": "<#ff5a4a>Full. Try again in a moment.",
+  "navigator.tooltip.maintenance": "<#ffb43a>Warning: under construction.",
+  "navigator.tooltip.soon": "<#ffb43a>Something new awaits behind the fog.",
+  "navigator.lore.ankerplatz": "Everyone arrives here. Knöpfchen explains everything. Almost.",
+  "navigator.lore.kesseldorf": "Your village, your cards, your chests. Bertold opened the fountain.",
+  "navigator.lore.rosenarena": "One against one for roses. Gorm holds your roses.",
+  "navigator.lore.grenzlande": "Beyond the walls roam unbound mobs. Clans go to war.",
+  "navigator.lore.nebelland": "Prof. Funkel is still researching. It smells slightly burnt.",
+  "navigator.lore.reserve": "A quiet clearing. Elsa writes down her tactics here."
 }
