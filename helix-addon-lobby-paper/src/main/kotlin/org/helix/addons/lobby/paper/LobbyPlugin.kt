@@ -134,22 +134,9 @@ class LobbyPlugin : JavaPlugin(), Listener {
         if (protection.clearInventoryOnJoin) {
             player.inventory.clear()
         }
-        val phone = config.phone
-        if (phone.enabled) {
-            // Phone mode: a single item that opens the phone, which hosts everything.
-            val item = LobbyItem(
-                slot = phone.slot,
-                material = phone.material,
-                name = phone.name,
-                action = ItemAction.RUN_COMMAND,
-                command = "phone",
-            )
-            player.inventory.setItem(phone.slot.coerceIn(0, 8), items.build(item))
-        } else {
-            config.layoutFor(task).items.forEach { item ->
-                if (item.permission.isNotBlank() && !player.hasPermission(item.permission)) return@forEach
-                player.inventory.setItem(item.slot.coerceIn(0, 8), items.build(item))
-            }
+        config.layoutFor(task).items.forEach { item ->
+            if (item.permission.isNotBlank() && !player.hasPermission(item.permission)) return@forEach
+            player.inventory.setItem(item.slot.coerceIn(0, 8), items.build(item))
         }
         if (protection.preventHunger) {
             player.foodLevel = MAX_FOOD
