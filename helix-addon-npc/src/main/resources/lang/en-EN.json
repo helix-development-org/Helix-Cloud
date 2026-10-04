@@ -1,6 +1,6 @@
 {
   "admin.denied": "<#ff5a4a>You lack the permission to manage NPCs.",
-  "usage": "<#ffcf4a>/npc <create|delete|list|tp|skin|hologram|look|interact|reload></#ffcf4a>",
+  "usage": "<#ffcf4a>/npc <create|delete|list|tp|skin|hologram|look|interact|villager|say|reload></#ffcf4a>",
   "resync": "<#f1e2c2>Re-syncing NPCs from the node…",
   "create.players-only": "<#ff5a4a>Only players can place NPCs.",
   "create.usage": "<#ffcf4a>/npc create <id> [skin|self]</#ffcf4a>",
@@ -19,5 +19,9 @@
   "interact.usage": "<#ffcf4a>/npc interact <id> <command…|-></#ffcf4a>",
   "edit.unknown": "<#ff5a4a>Unknown NPC <#ffcf4a>{id}</#ffcf4a>. Check the list with <#ffcf4a>/npc list</#ffcf4a>.",
   "updated": "<#4ac85e>Updated NPC <#ffcf4a>{id}</#ffcf4a>.",
-  "rejected": "<#ff5a4a>The node rejected the NPC (check limits/validation)."
+  "rejected": "<#ff5a4a>The node rejected the NPC (check limits/validation).",
+  "villager.usage": "<#ffcf4a>/npc villager <id> <villager|none></#ffcf4a>",
+  "villager.unknown": "<#ff5a4a>Unknown villager model <#ffcf4a>{villager}</#ffcf4a>. Available: <#ffcf4a>{known}</#ffcf4a>.",
+  "say.usage": "<#ffcf4a>/npc say <id> <text…></#ffcf4a>",
+  "say.not-villager": "<#ff5a4a>NPC <#ffcf4a>{id}</#ffcf4a> is no villager on this server (or its speech queue is full). Turn it into one with <#ffcf4a>/npc villager</#ffcf4a>."
 }

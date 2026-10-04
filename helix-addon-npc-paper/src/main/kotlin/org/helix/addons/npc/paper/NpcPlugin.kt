@@ -16,8 +16,17 @@ import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.Bukkit
 import org.bukkit.command.Command
 import org.bukkit.command.CommandSender
+import org.bukkit.entity.Interaction
 import org.bukkit.entity.Player
+import org.bukkit.event.EventHandler
+import org.bukkit.event.Listener
+import org.bukkit.event.player.PlayerInteractEntityEvent
+import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.plugin.java.JavaPlugin
+import org.helix.addons.npc.paper.villager.RigBundle
+import org.helix.addons.npc.paper.villager.VillagerCast
+import org.helix.addons.npc.paper.villager.VillagerCharacter
+import org.helix.addons.npc.paper.villager.VillagerRig
 import org.helix.api.i18n.NodeTranslations
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.CoroutineContext
@@ -31,8 +40,11 @@ import kotlin.coroutines.CoroutineContext
  * every [SYNC_TICKS] ticks so NPCs created, edited or deleted on any server
  * of the task appear network-wide. The `/npc` admin command edits the same
  * node-owned definitions, so every change persists and propagates.
+ *
+ * NPCs with a `villager` model are rendered as animated [VillagerRig]s (display entities driven by this plugin)
+ * instead of INpc player NPCs; see [villager] for the speech API.
  */
-class NpcPlugin : JavaPlugin() {
+class NpcPlugin : JavaPlugin(), Listener {
     private val json = Json { ignoreUnknownKeys = true }
     private val mini = MiniMessage.miniMessage()
 
@@ -41,6 +53,15 @@ class NpcPlugin : JavaPlugin() {
 
     /** Last-applied definition by id, used to detect edits during sync. */
     private val known = ConcurrentHashMap<String, NpcDef>()
+
+    /** Live villager rigs by NPC id, mutated only on the main thread. */
+    private val rigs = ConcurrentHashMap<String, VillagerRig>()
+
+    /** Last click per player uuid + NPC id (ms), debouncing the double interaction events. */
+    private val lastClick = HashMap<String, Long>()
+
+    /** Rig descriptions generated from the Blockbench models (bundled resource). */
+    private var rigBundle = RigBundle()
 
     private var npcs: INpc? = null
     private var client: NodeClient? = null
@@ -80,6 +101,9 @@ class NpcPlugin : JavaPlugin() {
         translations = NodeTranslations(nodeClient.controlUrl, System.getenv("HELIX_CONTROL_TOKEN").orEmpty(), "helix.npc")
         server.scheduler.runTaskTimerAsynchronously(this, Runnable { translations.sync() }, 1L, TRANSLATION_SYNC_TICKS)
         npcs = INpc.install(this)
+        rigBundle = loadRigs()
+        server.pluginManager.registerEvents(this, this)
+        server.scheduler.runTaskTimer(this, Runnable { rigs.values.forEach { it.tick() } }, 1L, 1L)
         logger.info("Helix-NPC installed for task '$task'.")
         // First sync shortly after start (worlds must be loaded), then poll.
         server.scheduler.runTaskTimerAsynchronously(this, Runnable { syncTick() }, 40L, SYNC_TICKS)
@@ -93,6 +117,8 @@ class NpcPlugin : JavaPlugin() {
             npcs?.let { runBlocking { it.shutdown() } }
             scope.cancel()
         }
+        rigs.values.forEach { it.remove() }
+        rigs.clear()
         spawned.clear()
         known.clear()
         client?.close()
@@ -131,6 +157,8 @@ class NpcPlugin : JavaPlugin() {
                 val raw = args.drop(2).joinToString(" ").trim()
                 def.copy(interactAction = raw.takeIf { it.isNotEmpty() && it != "-" })
             }
+            "villager" -> setVillager(sender, args)
+            "say" -> say(sender, args)
             "reload" -> {
                 sender.sendMessage(chat(sender, "resync"))
                 server.scheduler.runTaskAsynchronously(this, Runnable { syncTick() })
@@ -169,6 +197,81 @@ class NpcPlugin : JavaPlugin() {
         save(sender, def, "created")
     }
 
+    private fun setVillager(sender: CommandSender, args: Array<out String>) {
+        val model = args.getOrNull(2)?.lowercase()
+        if (model != null && model != "none" && model !in rigBundle.villagers) {
+            sender.sendMessage(
+                chat(sender, "villager.unknown", "villager" to model, "known" to rigBundle.villagers.keys.sorted().joinToString(", ")),
+            )
+            return
+        }
+        edit(sender, args, "villager.usage") { def ->
+            val villager = model?.takeIf { it != "none" }
+            // the auto-created id hologram would sit above the villager's own name tag
+            val lines = if (villager != null && def.hologramLines == listOf(def.id)) emptyList() else def.hologramLines
+            def.copy(villager = villager, hologramLines = lines)
+        }
+    }
+
+    private fun say(sender: CommandSender, args: Array<out String>) {
+        val id = args.getOrNull(1)?.lowercase()
+        val text = args.drop(2).joinToString(" ").trim()
+        if (id == null || text.isEmpty()) {
+            sender.sendMessage(chat(sender, "say.usage"))
+            return
+        }
+        var queued = false
+        if (!villager(id) { queued = it.say(text) } || !queued) {
+            sender.sendMessage(chat(sender, "say.not-villager", "id" to id))
+        }
+    }
+
+    /**
+     * Runs [action] on the live villager rig of an NPC (speech: [VillagerRig.say]; reactions: `raiseBrow`, `cheer`,
+     * `sulk`, `sleep`). Main thread only.
+     *
+     * @param npcId NPC id.
+     * @param action what to do with the rig.
+     * @return `false` when the NPC is not a spawned villager on this server.
+     */
+    fun villager(npcId: String, action: (VillagerRig) -> Unit): Boolean {
+        val rig = rigs[npcId.lowercase()] ?: return false
+        action(rig)
+        return true
+    }
+
+    /**
+     * Right-clicks on a villager's hitbox: brow raise, interact command and click report, like a player NPC.
+     *
+     * @param event the interaction.
+     */
+    @EventHandler(ignoreCancelled = true)
+    fun onVillagerClick(event: PlayerInteractEntityEvent) {
+        val entity = event.rightClicked as? Interaction ?: return
+        if (event.hand != EquipmentSlot.HAND) return
+        val (id, rig) = rigs.entries.firstOrNull { it.value.owns(entity) }?.toPair() ?: return
+        event.isCancelled = true
+        val key = "${event.player.uniqueId}:$id"
+        val now = System.currentTimeMillis()
+        if (now - (lastClick[key] ?: 0L) < CLICK_COOLDOWN_MS) return
+        lastClick[key] = now
+        if (lastClick.size > 512) lastClick.entries.removeIf { now - it.value > CLICK_COOLDOWN_MS }
+        rig.raiseBrow()
+        known[id]?.interactAction?.let { runInteract(event.player, it) }
+        reportInteraction(id, event.player.name)
+    }
+
+    /** Reads the generated rig bundle from the jar, or an empty one. */
+    private fun loadRigs(): RigBundle {
+        val bundle = getResource(RigBundle.RESOURCE)?.use { input ->
+            runCatching { json.decodeFromString<RigBundle>(input.readBytes().decodeToString()) }
+                .onFailure { logger.warning("Villager rigs unreadable: ${it.message}") }
+                .getOrNull()
+        } ?: RigBundle()
+        logger.info("Villager rigs loaded: ${bundle.villagers.keys.sorted()}")
+        return bundle
+    }
+
     private fun delete(sender: CommandSender, args: Array<out String>) {
         val id = args.getOrNull(1)?.lowercase() ?: run {
             sender.sendMessage(chat(sender, "delete.usage"))
@@ -193,7 +296,7 @@ class NpcPlugin : JavaPlugin() {
         sender.sendMessage(chat(sender, "list.header", "task" to task))
         known.values.sortedBy { it.id }.forEach { def ->
             sender.sendMessage(
-                chat(sender, "list.entry", "id" to def.id, "skin" to def.skin, "look" to def.lookMode),
+                chat(sender, "list.entry", "id" to def.id, "skin" to (def.villager?.let { "villager $it" } ?: def.skin), "look" to def.lookMode),
             )
         }
     }
@@ -295,6 +398,20 @@ class NpcPlugin : JavaPlugin() {
             logger.warning("NPC '${def.id}' references unknown world '${def.world}' — skipped.")
             return
         }
+        val model = def.villager
+        if (model != null) {
+            val spec = rigBundle.villagers[model]
+            if (spec != null) {
+                val character = VillagerCast.get(model) ?: VillagerCharacter(model, model, "", VillagerCast.PARCHMENT)
+                val location = org.bukkit.Location(world, def.x, def.y, def.z, def.yaw, 0f)
+                val rig = VillagerRig(character, spec, location, def.hologramLines, def.lookMode != "none")
+                rig.spawn()
+                rigs[def.id] = rig
+                known[def.id] = def
+                return
+            }
+            logger.warning("NPC '${def.id}': no villager model '$model' in this build — rendered as player NPC.")
+        }
         val definition = runtime.npc(def.id) {
             location(world, def.x, def.y, def.z, def.yaw, def.pitch)
             if (def.skin.equals("self", ignoreCase = true)) {
@@ -355,6 +472,7 @@ class NpcPlugin : JavaPlugin() {
     }
 
     private suspend fun despawn(id: String) {
+        rigs.remove(id)?.remove()
         spawned.remove(id)?.remove()
     }
 
@@ -380,5 +498,8 @@ class NpcPlugin : JavaPlugin() {
 
         /** How often the translation snapshot re-syncs from the node. */
         const val TRANSLATION_SYNC_TICKS = 100L
+
+        /** Minimum time between two handled clicks of one player on one villager. */
+        const val CLICK_COOLDOWN_MS = 400L
     }
 }

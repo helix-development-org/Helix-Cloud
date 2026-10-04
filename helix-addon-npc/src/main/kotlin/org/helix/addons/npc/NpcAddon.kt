@@ -123,6 +123,11 @@ class NpcAddon : AddonBase() {
         require(interact == null || interact.length <= MAX_INTERACT) {
             "interactAction too long (max $MAX_INTERACT)"
         }
+        val villager = def.villager?.trim()?.lowercase()?.takeIf { it.isNotEmpty() && it != "none" }
+        require(villager == null || villager.length <= MAX_VILLAGER) { "villager id too long (max $MAX_VILLAGER)" }
+        require(villager == null || villager.all { it in 'a'..'z' || it in '0'..'9' || it == '_' }) {
+            "villager id may only contain a-z, 0-9 and '_'"
+        }
         return def.copy(
             id = id,
             task = task,
@@ -130,6 +135,7 @@ class NpcAddon : AddonBase() {
             skin = skin,
             lookMode = lookMode,
             interactAction = interact,
+            villager = villager,
         )
     }
 
@@ -154,6 +160,9 @@ class NpcAddon : AddonBase() {
 
         /** Maximum interact-action length. */
         const val MAX_INTERACT = 128
+
+        /** Maximum villager model id length. */
+        const val MAX_VILLAGER = 32
 
         /** Accepted head-behaviour modes. */
         val LOOK_MODES = setOf("none", "nearest", "player")

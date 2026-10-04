@@ -46,6 +46,17 @@ class NpcAddonTest {
     }
 
     @Test
+    fun `villager field round-trips, is lowercased and none clears it`() {
+        save(sample("v").copy(villager = " Mira "))
+        assertEquals("mira", json.decodeFromString<NpcDef>(context.run("npc.get", "v").lines.single()).villager)
+
+        save(sample("v").copy(villager = "none"))
+        assertNull(json.decodeFromString<NpcDef>(context.run("npc.get", "v").lines.single()).villager)
+
+        assertFalse(save(sample("w").copy(villager = "bad id!")).success)
+    }
+
+    @Test
     fun `save upserts in place rather than duplicating`() {
         save(sample("g"))
         save(sample("g").copy(skin = "jeb_"))

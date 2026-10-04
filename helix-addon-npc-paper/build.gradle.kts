@@ -60,3 +60,36 @@ tasks.withType<Jar>().configureEach {
     })
     exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
 }
+
+// Villager resource pack: the Blockbench models in src/pack/resources/villagers are converted at build time into
+// item models per rig part (pack.zip, bundled into the HXA) plus a rig description bundled into the plugin jar.
+sourceSets {
+    create("pack")
+}
+
+dependencies {
+    "packImplementation"(sourceSets.main.get().output)
+    "packImplementation"(libs.kotlinx.serialization.json)
+    testImplementation(sourceSets["pack"].output)
+}
+
+val generatePack by tasks.registering(JavaExec::class) {
+    group = "build"
+    description = "Assembles pack.zip with the villager models and the rig description."
+    classpath = sourceSets["pack"].runtimeClasspath
+    mainClass.set("org.helix.addons.npc.pack.PackGeneratorKt")
+    val output = layout.buildDirectory.file("pack/pack.zip")
+    val rigs = layout.buildDirectory.file("pack/rigs/helix_villager/rigs.json")
+    val models = layout.projectDirectory.dir("src/pack/resources/villagers")
+    argumentProviders.add(CommandLineArgumentProvider {
+        listOf(output.get().asFile.absolutePath, rigs.get().asFile.absolutePath, models.asFile.absolutePath)
+    })
+    inputs.files(fileTree(models))
+    outputs.file(output)
+    outputs.file(rigs)
+}
+
+tasks.named<Jar>("jar") {
+    dependsOn(generatePack)
+    from(layout.buildDirectory.dir("pack/rigs"))
+}

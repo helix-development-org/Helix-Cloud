@@ -26,6 +26,8 @@ import kotlinx.serialization.Serializable
  *   latter two both turn toward the closest player).
  * @property interactAction optional command the clicking player runs on
  *   right-click (for example `server Lobby`); `null` disables interaction.
+ * @property villager id of a custom animated villager model (for example
+ *   `mira`) rendered instead of the player NPC, or `null` for a player NPC.
  */
 @Serializable
 data class NpcDef(
@@ -41,6 +43,7 @@ data class NpcDef(
     val hologramLines: List<String> = emptyList(),
     val lookMode: String = "none",
     val interactAction: String? = null,
+    val villager: String? = null,
 )
 
 /**

@@ -13,12 +13,12 @@ dependencies {
  * persistence and `npc.*` actions) plus the Helix-NPC Paper component
  * (paper.jar), built from the sibling `helix-addon-npc-paper` module. The
  * Paper jar bundles the vendored INpc framework, so a Paper server needs
- * nothing else installed. No Velocity component and no resource pack — NPCs
- * are packet-based and skinned from Mojang.
+ * nothing else installed. The resource pack (pack.zip) carries the custom
+ * villager models; player NPCs are packet-based and skinned from Mojang.
  */
 val packageHxa by tasks.registering(Zip::class) {
     group = "distribution"
-    description = "Packages Helix-NPC as .hxa (addon.json + addon.jar + paper.jar)."
+    description = "Packages Helix-NPC as .hxa (addon.json + addon.jar + paper.jar + pack.zip)."
     dependsOn(tasks.named<Jar>("jar"))
     archiveFileName.set("helix-npc-$version.hxa")
     destinationDirectory.set(layout.buildDirectory.dir("distributions"))
@@ -28,5 +28,8 @@ val packageHxa by tasks.registering(Zip::class) {
     }
     from(project(":helix-addon-npc-paper").tasks.named<Jar>("jar").flatMap { it.archiveFile }) {
         rename { "paper.jar" }
+    }
+    from(project(":helix-addon-npc-paper").tasks.named("generatePack")) {
+        include("pack.zip")
     }
 }

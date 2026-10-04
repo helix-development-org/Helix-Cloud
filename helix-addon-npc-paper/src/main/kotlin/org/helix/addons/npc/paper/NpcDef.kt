@@ -23,6 +23,8 @@ import kotlinx.serialization.Serializable
  * @property lookMode head behaviour: `none`, `nearest` or `player`.
  * @property interactAction command the clicking player runs on right-click,
  *   or `null` for a non-interactive NPC.
+ * @property villager id of a custom animated villager model (for example
+ *   `mira`) rendered instead of the player NPC, or `null` for a player NPC.
  */
 @Serializable
 data class NpcDef(
@@ -38,4 +40,5 @@ data class NpcDef(
     val hologramLines: List<String> = emptyList(),
     val lookMode: String = "none",
     val interactAction: String? = null,
+    val villager: String? = null,
 )

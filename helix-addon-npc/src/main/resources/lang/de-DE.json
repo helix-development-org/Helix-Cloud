@@ -1,6 +1,6 @@
 {
   "admin.denied": "<#ff5a4a>Dir fehlt die Berechtigung, NPCs zu verwalten.",
-  "usage": "<#ffcf4a>/npc <create|delete|list|tp|skin|hologram|look|interact|reload></#ffcf4a>",
+  "usage": "<#ffcf4a>/npc <create|delete|list|tp|skin|hologram|look|interact|villager|say|reload></#ffcf4a>",
   "resync": "<#f1e2c2>Synchronisiere NPCs neu vom Node…",
   "create.players-only": "<#ff5a4a>Nur Spieler können NPCs platzieren.",
   "create.usage": "<#ffcf4a>/npc create <id> [skin|self]</#ffcf4a>",
@@ -19,5 +19,9 @@
   "interact.usage": "<#ffcf4a>/npc interact <id> <befehl…|-></#ffcf4a>",
   "edit.unknown": "<#ff5a4a>Unbekannter NPC <#ffcf4a>{id}</#ffcf4a>. Prüfe die Liste mit <#ffcf4a>/npc list</#ffcf4a>.",
   "updated": "<#4ac85e>NPC <#ffcf4a>{id}</#ffcf4a> aktualisiert.",
-  "rejected": "<#ff5a4a>Der Node hat den NPC abgelehnt (prüfe Limits/Validierung)."
+  "rejected": "<#ff5a4a>Der Node hat den NPC abgelehnt (prüfe Limits/Validierung).",
+  "villager.usage": "<#ffcf4a>/npc villager <id> <villager|none></#ffcf4a>",
+  "villager.unknown": "<#ff5a4a>Unbekanntes Villager-Modell <#ffcf4a>{villager}</#ffcf4a>. Verfügbar: <#ffcf4a>{known}</#ffcf4a>.",
+  "say.usage": "<#ffcf4a>/npc say <id> <Text…></#ffcf4a>",
+  "say.not-villager": "<#ff5a4a>NPC <#ffcf4a>{id}</#ffcf4a> ist auf diesem Server kein Villager (oder seine Sprechwarteschlange ist voll). Mach ihn mit <#ffcf4a>/npc villager</#ffcf4a> zu einem."
 }

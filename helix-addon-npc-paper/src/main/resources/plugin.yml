@@ -7,7 +7,7 @@ description: Renders the network's INpc NPCs for this server's task and offers t
 commands:
   npc:
     description: Create, edit and delete network-wide NPCs.
-    usage: /npc <create|delete|list|tp|skin|hologram|look|interact|reload>
+    usage: /npc <create|delete|list|tp|skin|hologram|look|interact|villager|say|reload>
 permissions:
   helix.npc.admin:
     description: Manage NPCs with /npc.
