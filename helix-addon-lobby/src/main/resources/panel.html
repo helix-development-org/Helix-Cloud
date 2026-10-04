@@ -34,13 +34,15 @@
 </div>
 
 <div class="card">
-  <div class="card-head"><h2>Server selector</h2><div class="sub">the GUI opened by an <b>OPEN_SERVER_MENU</b> item</div></div>
-  <div class="card-body"><div class="grid c2">
-    <div class="field"><label>Title (MiniMessage)</label><input class="mono" id="sm-title"></div>
-    <div class="field"><label>Rows (1–6)</label><input type="number" id="sm-rows" min="1" max="6"></div>
-    <div class="field"><label>Entry material</label><input class="mono" id="sm-material" placeholder="PAPER"></div>
-    <label class="checkbox" style="align-self:end"><input type="checkbox" id="sm-exclude"> hide lobby tasks from the list</label>
-  </div></div>
+  <div class="card-head"><h2>Navigator</h2><div class="sub">the medieval server board opened by an <b>OPEN_SERVER_MENU</b> item · one coat of arms per game mode (max. 6)</div></div>
+  <div class="card-body">
+    <div class="grid c2">
+      <div class="field"><label>Headline</label><input id="sm-title"></div>
+      <label class="checkbox" style="align-self:end"><input type="checkbox" id="sm-exclude"> hide lobby tasks</label>
+    </div>
+    <table class="table" style="margin-top:10px"><thead><tr><th>Task</th><th>Name</th><th>Emblem</th><th></th></tr></thead><tbody id="sm-modes"></tbody></table>
+    <button class="btn sm subtle" id="sm-add" style="margin-top:6px">+ Mode</button>
+  </div>
 </div>
 
 <div class="row" style="margin:4px 0 20px"><button class="btn" id="save-bottom">Save</button></div>
@@ -138,16 +140,13 @@ function renderProtection() {
 
 function renderServerMenu() {
   document.getElementById("sm-title").value = cfg.serverMenu.title || "";
-  document.getElementById("sm-rows").value = cfg.serverMenu.rows || 3;
-  document.getElementById("sm-material").value = cfg.serverMenu.entryMaterial || "PAPER";
+  renderModes();
   document.getElementById("sm-exclude").checked = cfg.serverMenu.excludeLobbyTasks !== false;
 }
 
 function collect() {
   cfg.protection.voidTeleportY = parseInt(document.getElementById("voidY").value) || 0;
   cfg.serverMenu.title = document.getElementById("sm-title").value;
-  cfg.serverMenu.rows = Math.max(1, Math.min(6, parseInt(document.getElementById("sm-rows").value) || 3));
-  cfg.serverMenu.entryMaterial = document.getElementById("sm-material").value || "PAPER";
   cfg.serverMenu.excludeLobbyTasks = document.getElementById("sm-exclude").checked;
   // drop empty layouts except the default so the map stays tidy
   for (const k of Object.keys(cfg.layouts)) if (k !== "*" && (!cfg.layouts[k].items || !cfg.layouts[k].items.length)) delete cfg.layouts[k];
@@ -174,7 +173,8 @@ function normalize(c) {
   c.layouts = c.layouts && typeof c.layouts === "object" ? c.layouts : { "*": { items: [] } };
   if (!c.layouts["*"]) c.layouts["*"] = { items: [] };
   c.protection = Object.assign({ adventureMode: true, clearInventoryOnJoin: true, preventBlockBreak: true, preventBlockPlace: true, preventItemDrop: true, preventItemMove: true, preventDamage: true, preventHunger: true, voidTeleport: true, voidTeleportY: 0 }, c.protection || {});
-  c.serverMenu = Object.assign({ title: "<dark_gray>Server selector", rows: 3, excludeLobbyTasks: true, entryMaterial: "PAPER" }, c.serverMenu || {});
+  c.serverMenu = Object.assign({ title: "Navigator", excludeLobbyTasks: true, modes: [] }, c.serverMenu || {});
+  c.serverMenu.modes = c.serverMenu.modes || [];
   return c;
 }
 
@@ -187,4 +187,20 @@ async function load() {
   renderTasks(); renderLayoutSelect(); renderItems(); renderProtection(); renderServerMenu();
 }
 Helix.ready(load);
+
+const EMBLEMS = ["castle", "swords", "banner", "compass", "crown"];
+function renderModes() {
+  const body = document.getElementById("sm-modes");
+  body.innerHTML = "";
+  cfg.serverMenu.modes.forEach((m, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td><input class="mono" data-m="task" value="${m.task || ""}"></td><td><input data-m="name" value="${m.name || ""}"></td>` +
+      `<td><select data-m="emblem">${EMBLEMS.map(e => `<option ${e === m.emblem ? "selected" : ""}>${e}</option>`).join("")}</select></td>` +
+      `<td><button class="btn sm danger">×</button></td>`;
+    tr.querySelectorAll("[data-m]").forEach(el => el.onchange = () => { m[el.dataset.m] = el.value; });
+    tr.querySelector("button").onclick = () => { cfg.serverMenu.modes.splice(i, 1); renderModes(); };
+    body.appendChild(tr);
+  });
+}
+document.getElementById("sm-add").onclick = () => { if (cfg.serverMenu.modes.length < 6) { cfg.serverMenu.modes.push({ task: "", name: "", emblem: "compass" }); renderModes(); } };
 </script>

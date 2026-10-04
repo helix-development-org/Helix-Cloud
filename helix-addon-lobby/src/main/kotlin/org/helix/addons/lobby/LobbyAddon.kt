@@ -82,7 +82,7 @@ class LobbyAddon : AddonBase() {
 
     /**
      * Clamps values that would break the paper side: slots into 0..8, server
-     * menu rows into 1..6 and drops empty task names.
+     * navigator modes without a task and drops empty task names.
      *
      * @param raw the imported config.
      * @return the sanitized config.
@@ -92,7 +92,7 @@ class LobbyAddon : AddonBase() {
         layouts = raw.layouts.mapValues { (_, layout) ->
             layout.copy(items = layout.items.filter { it.slot in 0..8 })
         },
-        serverMenu = raw.serverMenu.copy(rows = raw.serverMenu.rows.coerceIn(1, 6)),
+        serverMenu = raw.serverMenu.copy(modes = raw.serverMenu.modes.filter { it.task.isNotBlank() }),
     )
 
     /**

@@ -63,13 +63,20 @@ data class ProtectionSettings(
 )
 
 
-/** The built-in server selector's appearance. */
+/** The navigator (server selector). */
 @Serializable
 data class ServerMenuSettings(
-    val title: String = "<dark_gray>Server selector",
-    val rows: Int = 3,
+    val title: String = "Navigator",
     val excludeLobbyTasks: Boolean = true,
-    val entryMaterial: String = "PAPER",
+    val modes: List<NavigatorMode> = emptyList(),
+)
+
+/** One game mode of the navigator: task, display name, emblem id. */
+@Serializable
+data class NavigatorMode(
+    val task: String,
+    val name: String = "",
+    val emblem: String = "compass",
 )
 
 /** A joinable backend returned by the `lobby.servers` action. */

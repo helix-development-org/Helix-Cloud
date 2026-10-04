@@ -43,3 +43,26 @@ tasks.withType<Jar>().configureEach {
     })
     exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
 }
+
+// The lobby resource pack (navigator art painted in Blockbench, src/pack/resources/navigator) is
+// assembled deterministically at build time and bundled into the HXA.
+sourceSets {
+    create("pack")
+}
+
+dependencies {
+    "packImplementation"(project(":helix-gui"))
+    "packImplementation"(sourceSets.main.get().output)
+}
+
+val generatePack by tasks.registering(JavaExec::class) {
+    group = "build"
+    description = "Assembles pack.zip with the navigator art."
+    classpath = sourceSets["pack"].runtimeClasspath
+    mainClass.set("org.helix.addons.lobby.pack.PackGeneratorKt")
+    val output = layout.buildDirectory.file("pack/pack.zip")
+    val art = layout.projectDirectory.dir("src/pack/resources/navigator")
+    argumentProviders.add(CommandLineArgumentProvider { listOf(output.get().asFile.absolutePath, art.asFile.absolutePath) })
+    inputs.dir(art)
+    outputs.file(output)
+}

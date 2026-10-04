@@ -3,5 +3,6 @@
   "message.connecting": "<gray>Connecting to <yellow>{server}</yellow>…",
   "message.menu-starting": "<gray>The lobby is still starting up — try again in a moment.",
   "menu.entry.players": "<gray>Players: <white>{players}/{max}",
-  "menu.entry.connect": "<green>Click to connect"
+  "menu.entry.connect": "<green>Click to connect",
+  "navigator.count": "{players} players"
 }

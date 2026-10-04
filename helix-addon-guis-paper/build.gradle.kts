@@ -66,6 +66,11 @@ sourceSets {
     create("pack")
 }
 
+dependencies {
+    // pure screen helpers (fonts, ascents) shared with the GUI library
+    "packImplementation"(project(":helix-gui"))
+}
+
 val generatePack by tasks.registering(JavaExec::class) {
     group = "build"
     description = "Assembles the shared IGui font resource pack (pack.zip)."

@@ -151,21 +151,32 @@ data class ProtectionSettings(
 )
 
 /**
- * The built-in server selector GUI's appearance. Its content is dynamic —
- * the paper side asks the node for the live, joinable backends grouped by
- * task and connects the player through the proxy on click.
+ * The navigator (server selector): a full-screen medieval board with one coat of arms per game mode.
  *
- * @property title the GUI title as MiniMessage.
- * @property rows chest rows (1..6).
- * @property excludeLobbyTasks hides lobby tasks from the selector.
- * @property entryMaterial the material used for each server entry.
+ * @property title headline on the board's ribbon (plain text).
+ * @property excludeLobbyTasks whether lobby tasks are left out.
+ * @property modes how game modes appear (name, emblem, order); tasks without an entry get their task name and an
+ *   emblem guessed from the name.
  */
 @Serializable
 data class ServerMenuSettings(
-    val title: String = "<dark_gray>Server selector",
-    val rows: Int = 3,
+    val title: String = "Navigator",
     val excludeLobbyTasks: Boolean = true,
-    val entryMaterial: String = "PAPER",
+    val modes: List<NavigatorMode> = emptyList(),
+)
+
+/**
+ * One game mode of the navigator.
+ *
+ * @property task task name the mode connects to.
+ * @property name display name on the coat of arms (empty: the task name).
+ * @property emblem emblem id (`castle`, `swords`, `banner`, `compass`, `crown`).
+ */
+@Serializable
+data class NavigatorMode(
+    val task: String,
+    val name: String = "",
+    val emblem: String = "compass",
 )
 
 

@@ -28,6 +28,11 @@ fun main(args: Array<String>) {
         "assets/$NAMESPACE/font/spaces.json" to spacesFont(),
     )
     entries.putAll(textRowFonts())
+    // Text at any height for full-window screens (helix-gui `textAt`): one font per text top
+    de.tytoss.igui.screen.ScreenFonts.TEXT_TOPS.forEach { top ->
+        val key = de.tytoss.igui.screen.ScreenFonts.textFont(top).substringAfter(':')
+        entries["assets/$NAMESPACE/font/$key.json"] = de.tytoss.igui.screen.ScreenFonts.textFontJson(top).toByteArray()
+    }
     // Full-window GUIs (drawn over the player inventory, see helix-gui `playerInventory`) need the vanilla
     // container "Inventory" label hidden; provided once here for every addon instead of per addon.
     val emptyInventoryLabel = """{"container.inventory": ""}""".toByteArray()
