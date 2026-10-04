@@ -1,5 +1,5 @@
 {
-  "cmd.helix": "Helix-Netzwerksteuerung",
+  "cmd.helix": "Netzwerk-Steuerung",
   "cmd.status": "Zeigt die Plattform-Übersicht.",
   "cmd.panel": "Postet oder aktualisiert Control-Panel und Status-Board.",
   "cmd.setup": "Konfiguriert die Bot-Kanäle.",
@@ -11,7 +11,7 @@
   "cmd.run.args": "Argumente, durch Leerzeichen getrennt.",
   "cmd.whois": "Helix: Profil",
 
-  "ui.panel.title": "Helix Netzwerk-Steuerung",
+  "ui.panel.title": "Netzwerk-Steuerung",
   "ui.panel.intro": "Volle Netzwerkkontrolle — jeder Button wird gegen deinen verknüpften Minecraft-Account geprüft, destruktive Aktionen brauchen einen zweiten Klick.",
   "ui.module.services": "Services",
   "ui.module.tasks": "Tasks",
@@ -120,7 +120,7 @@
   "link.none": "Du hast keine Verknüpfung.",
   "link.unlinked": "Verknüpfung zu **{player}** entfernt.",
 
-  "whois.title": "Helix-Profil von {user}",
+  "whois.title": "Netzwerk-Profil von {user}",
   "whois.notlinked": "Kein verknüpfter Minecraft-Account.",
   "whois.player": "Minecraft-Account: **{player}**",
   "whois.linkedby": "Verknüpft über: {via}",
@@ -138,7 +138,7 @@
   "setup.nothing": "Noch nichts ausgewählt.",
   "setup.panelposted": "Control-Panel und Status-Board gepostet.",
 
-  "status.title": "Helix Netzwerk-Status",
+  "status.title": "Netzwerk-Status",
   "status.updated": "aktualisiert {time}",
 
   "audit.actor.panel": "Panel",
@@ -175,11 +175,11 @@
   "modal.crit.title": "Kritische Aktion",
   "modal.crit.text": "Tippe {expected} zur Bestätigung",
 
-  "game.code": "Dein Discord-Link-Code: <white>{code}</white> — löse ihn innerhalb von {minutes} Minuten auf Discord mit <white>/helix link</white> ein.",
-  "game.linked": "Mit Discord-Account <white>{discord}</white> verknüpft.",
-  "game.unlinked": "Deine Discord-Verknüpfung wurde entfernt.",
-  "game.nolink": "<red>Du hast keine Discord-Verknüpfung.</red>",
-  "game.already": "<red>Einer der Accounts ist bereits verknüpft.</red>",
-  "game.invalidcode": "<red>Unbekannter oder abgelaufener Code.</red>",
-  "game.error": "<red>Dein Account konnte nicht aufgelöst werden, versuche es später erneut.</red>"
+  "game.code": "<#f1e2c2>Dein Discord-Link-Code: <#ffcf4a>{code}</#ffcf4a> <#7a4a24>—</#7a4a24> löse ihn innerhalb von <#ffcf4a>{minutes}</#ffcf4a> Minuten auf Discord mit <#ffcf4a>/helix link</#ffcf4a> ein.",
+  "game.linked": "<#4ac85e>Mit Discord-Account <#ffcf4a>{discord}</#ffcf4a> verknüpft.",
+  "game.unlinked": "<#4ac85e>Deine Discord-Verknüpfung wurde entfernt.",
+  "game.nolink": "<#ff5a4a>Du hast keine Discord-Verknüpfung. Erstelle eine mit <#ffcf4a>/discord</#ffcf4a>.</#ff5a4a>",
+  "game.already": "<#ff5a4a>Einer der Accounts ist bereits verknüpft. Entferne die alte Verknüpfung mit <#ffcf4a>/discord unlink</#ffcf4a>.</#ff5a4a>",
+  "game.invalidcode": "<#ff5a4a>Unbekannter oder abgelaufener Code. Hol dir auf Discord einen neuen Code.</#ff5a4a>",
+  "game.error": "<#ff5a4a>Dein Account konnte nicht aufgelöst werden, versuche es später erneut.</#ff5a4a>"
 }

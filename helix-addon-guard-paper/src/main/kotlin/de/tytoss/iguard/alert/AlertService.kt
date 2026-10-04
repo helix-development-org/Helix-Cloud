@@ -5,7 +5,7 @@ import de.tytoss.iguard.model.ViolationRecord
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.event.ClickEvent
 import net.kyori.adventure.text.event.HoverEvent
-import net.kyori.adventure.text.format.NamedTextColor
+import net.kyori.adventure.text.format.TextColor
 import net.kyori.adventure.text.format.TextDecoration
 import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.Bukkit
@@ -91,9 +91,9 @@ class AlertService(
     private fun richAlert(recipient: Player, record: ViolationRecord, count: Int): Component {
         val confPct = (record.confidence * 100.0).toInt()
         val confTag = when {
-            confPct >= 80 -> "<red>"
-            confPct >= 50 -> "<gold>"
-            else -> "<yellow>"
+            confPct >= 80 -> "<#ff5a4a>"
+            confPct >= 50 -> "<#ffb43a>"
+            else -> "<#ffcf4a>"
         }
         val actionLine = record.shadowAction?.let {
             screen(recipient, "alert.hover.action", "action" to it)
@@ -113,9 +113,9 @@ class AlertService(
                 ),
             ),
         )
-        val countTag = if (count > 1) "<dark_gray> x$count</dark_gray>" else ""
+        val countTag = if (count > 1) "<#a89a84> x$count</#a89a84>" else ""
         val prefix = render(screen(recipient, "alert.prefix"))
-        val head = Component.text(record.playerName, NamedTextColor.WHITE)
+        val head = Component.text(record.playerName, TextColor.color(0xFFCF4A))
             .hoverEvent(hover)
             .clickEvent(ClickEvent.runCommand("/iguard panel ${record.playerName}"))
         val body = render(
@@ -133,15 +133,15 @@ class AlertService(
 
     private fun actions(recipient: Player, player: String): Component {
         /** Renders one clickable action button; the hover tip is resolved prefix-free. */
-        fun button(label: String, color: NamedTextColor, command: String, tipKey: String) =
+        fun button(label: String, color: TextColor, command: String, tipKey: String) =
             Component.text(label, color)
                 .clickEvent(ClickEvent.runCommand(command))
                 .hoverEvent(HoverEvent.showText(render(screen(recipient, tipKey, "player" to player))))
-        return button("[$EYE]", NamedTextColor.AQUA, "/iguard spectate $player", "alert.button.spectate")
+        return button("[$EYE]", TextColor.color(0x5AB4FF), "/iguard spectate $player", "alert.button.spectate")
             .append(Component.text(" "))
-            .append(button("[$PANEL]", NamedTextColor.GREEN, "/iguard panel $player", "alert.button.panel"))
+            .append(button("[$PANEL]", TextColor.color(0x4AC85E), "/iguard panel $player", "alert.button.panel"))
             .append(Component.text(" "))
-            .append(button("[$BAN]", NamedTextColor.RED, "/iguard ban $player", "alert.button.ban"))
+            .append(button("[$BAN]", TextColor.color(0xFF5A4A), "/iguard ban $player", "alert.button.ban"))
     }
 
     private fun locale(player: Player): String = player.locale().language
@@ -155,8 +155,8 @@ class AlertService(
 
     private fun consoleLine(record: ViolationRecord, count: Int): Component {
         val details = record.evidence.entries.joinToString(" ") { "${it.key}=${it.value}" } + if (count > 1) " x$count" else ""
-        return Component.text("[IGuard] ", NamedTextColor.RED)
-            .append(Component.text("${record.playerName} failed ${record.checkId} (VL %.2f, %d%%) %s".format(record.violationLevel, (record.confidence * 100).toInt(), details), NamedTextColor.GRAY))
+        return Component.text("[IGuard] ", TextColor.color(0xFF5A4A))
+            .append(Component.text("${record.playerName} failed ${record.checkId} (VL %.2f, %d%%) %s".format(record.violationLevel, (record.confidence * 100).toInt(), details), TextColor.color(0xF1E2C2)))
     }
 
     private companion object {

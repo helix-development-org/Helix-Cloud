@@ -17,7 +17,6 @@ import de.tytoss.igui.screen.LedgerView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.format.TextColor
 import net.kyori.adventure.text.format.TextDecoration
 import net.kyori.adventure.text.minimessage.MiniMessage
@@ -294,7 +293,7 @@ class GuiService(
             valueColor = LedgerScreen.FADED,
             icon = head(ban.playerName),
             tooltip = listOf(
-                plain(ban.playerName, NamedTextColor.RED),
+                plain(ban.playerName, TextColor.color(0xFF5A4A)),
                 screen(admin, "panel.ban.until", "until" to until),
                 screen(admin, "panel.ban.reason", "reason" to ban.reason),
                 screen(admin, "panel.ban.click-unban"),
@@ -370,9 +369,9 @@ class GuiService(
 
     private fun alertTooltip(player: Player, snap: IncidentSnapshot): List<Component> {
         val confPct = (snap.confidence * 100).toInt()
-        val colorTag = if (confPct >= 80) "<red>" else if (confPct >= 50) "<gold>" else "<yellow>"
+        val colorTag = if (confPct >= 80) "<#ff5a4a>" else if (confPct >= 50) "<#ffb43a>" else "<#ffcf4a>"
         return listOf(
-            plain(snap.playerName, NamedTextColor.WHITE),
+            plain(snap.playerName, TextColor.color(0xFFCF4A)),
             screen(player, "panel.head.confidence", "color" to colorTag, "value" to "$confPct"),
             screen(player, "panel.head.families", "families" to snap.families.joinToString()),
             if (snap.shadowAction != null) screen(player, "panel.head.action", "action" to snap.shadowAction)
@@ -389,7 +388,7 @@ class GuiService(
         editMeta { meta -> (meta as? SkullMeta)?.let { s -> Bukkit.getPlayerExact(name)?.let { s.owningPlayer = it } } }
     }
 
-    private fun plain(text: String, color: NamedTextColor): Component =
+    private fun plain(text: String, color: TextColor): Component =
         Component.text(text, color).decoration(TextDecoration.ITALIC, false)
 
     private fun locale(player: Player): String = player.locale().language

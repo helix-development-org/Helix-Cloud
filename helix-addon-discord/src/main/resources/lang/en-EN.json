@@ -1,5 +1,5 @@
 {
-  "cmd.helix": "Helix network control",
+  "cmd.helix": "Network control",
   "cmd.status": "Shows the platform overview.",
   "cmd.panel": "Posts or refreshes the control panel and status board.",
   "cmd.setup": "Configures the bot channels.",
@@ -11,7 +11,7 @@
   "cmd.run.args": "Arguments, space separated.",
   "cmd.whois": "Helix: Profile",
 
-  "ui.panel.title": "Helix Network Control",
+  "ui.panel.title": "Network Control",
   "ui.panel.intro": "Full network control — every button is permission-checked against your linked Minecraft account, destructive actions need a second click.",
   "ui.module.services": "Services",
   "ui.module.tasks": "Tasks",
@@ -120,7 +120,7 @@
   "link.none": "You have no linked account.",
   "link.unlinked": "Link to **{player}** removed.",
 
-  "whois.title": "Helix profile of {user}",
+  "whois.title": "Network profile of {user}",
   "whois.notlinked": "No linked Minecraft account.",
   "whois.player": "Minecraft account: **{player}**",
   "whois.linkedby": "Linked via: {via}",
@@ -138,7 +138,7 @@
   "setup.nothing": "Nothing selected yet.",
   "setup.panelposted": "Control panel and status board posted.",
 
-  "status.title": "Helix Network Status",
+  "status.title": "Network Status",
   "status.updated": "updated {time}",
 
   "audit.actor.panel": "Panel",
@@ -175,11 +175,11 @@
   "modal.crit.title": "Critical action",
   "modal.crit.text": "Type {expected} to confirm",
 
-  "game.code": "Your Discord link code: <white>{code}</white> — redeem it on Discord with <white>/helix link</white> within {minutes} minutes.",
-  "game.linked": "Linked with Discord account <white>{discord}</white>.",
-  "game.unlinked": "Your Discord link was removed.",
-  "game.nolink": "<red>You have no Discord link.</red>",
-  "game.already": "<red>One of the accounts is already linked.</red>",
-  "game.invalidcode": "<red>Unknown or expired code.</red>",
-  "game.error": "<red>Your account could not be resolved, try again later.</red>"
+  "game.code": "<#f1e2c2>Your Discord link code: <#ffcf4a>{code}</#ffcf4a> <#7a4a24>—</#7a4a24> redeem it on Discord with <#ffcf4a>/helix link</#ffcf4a> within <#ffcf4a>{minutes}</#ffcf4a> minutes.",
+  "game.linked": "<#4ac85e>Linked with Discord account <#ffcf4a>{discord}</#ffcf4a>.",
+  "game.unlinked": "<#4ac85e>Your Discord link was removed.",
+  "game.nolink": "<#ff5a4a>You have no Discord link. Create one with <#ffcf4a>/discord</#ffcf4a>.</#ff5a4a>",
+  "game.already": "<#ff5a4a>One of the accounts is already linked. Remove the old link with <#ffcf4a>/discord unlink</#ffcf4a>.</#ff5a4a>",
+  "game.invalidcode": "<#ff5a4a>Unknown or expired code. Get a new code on Discord.</#ff5a4a>",
+  "game.error": "<#ff5a4a>Your account could not be resolved, try again later.</#ff5a4a>"
 }

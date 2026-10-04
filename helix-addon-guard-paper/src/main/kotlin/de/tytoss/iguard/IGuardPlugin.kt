@@ -112,7 +112,7 @@ class IGuardPlugin : JavaPlugin(), Listener {
         val until = ban.expiresAt?.let { java.time.Instant.ofEpochMilli(it).toString() } ?: permanent
         // Prefer the node-localized direct-join screen; fall back to plain text if translations are unavailable.
         val screen = i18n?.screen(event.name, null, "ban.screen.direct", "reason" to ban.reason, "until" to until)
-            ?: "IGuard: ${ban.reason}\nUntil: $until"
+            ?: "Banned: ${ban.reason}\nUntil: $until"
         event.disallow(
             org.bukkit.event.player.AsyncPlayerPreLoginEvent.Result.KICK_BANNED,
             net.kyori.adventure.text.Component.text(screen),
