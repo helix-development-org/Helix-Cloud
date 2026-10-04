@@ -51,7 +51,7 @@ database = "helix"     # Datenbankname (mongodb)
 poolSize = 8
 
 [network]
-name = "our network"   # Startwert des Anzeigenamens ({network}); danach im Panel editierbar
+name = "Kronland"      # Startwert des Anzeigenamens ({network}); danach im Panel editierbar
 
 [audit]
 retentionDays = 180    # harte Aufbewahrungsgrenze des Audit-Logs; 0 = unbegrenzt

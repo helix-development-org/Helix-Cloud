@@ -24,11 +24,17 @@ data class NodeConfig(
     /**
      * Network-wide display settings.
      *
-     * @property name display name used in disconnect screens (`{network}`).
+     * @property name display name of the network (`{network}`): prefix, disconnect screens, MOTD, tablist.
      */
     data class NetworkSettings(
-        val name: String = "our network",
-    )
+        val name: String = DEFAULT_NAME,
+    ) {
+        /** Defaults of the network settings. */
+        companion object {
+            /** Working title of the network (design concept "Kronland"); the one place to change the default. */
+            const val DEFAULT_NAME: String = "Kronland"
+        }
+    }
 
     /**
      * Control API settings.

@@ -7,6 +7,7 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
+import net.kyori.adventure.text.format.TextColor
 import net.kyori.adventure.text.minimessage.MiniMessage
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.entity.Player
@@ -382,12 +383,12 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         )
         val player = server.getPlayerExact(playerName) ?: return
         if (result == null) {
-            player.sendMessage(colored(prefixed("<red>This chat channel is currently unavailable.")))
+            player.sendMessage(colored(prefixed("<#ff5a4a>This chat channel is currently unavailable. Please try again later.")))
             return
         }
         result.lines.forEach { line -> player.sendMessage(colored(line)) }
         if (!result.success && result.lines.isEmpty()) {
-            player.sendMessage(colored(prefixed("<red>This chat channel is not available to you.")))
+            player.sendMessage(colored(prefixed("<#ff5a4a>This chat channel is not available to you. Write in the normal chat instead.")))
         }
     }
 
@@ -827,12 +828,16 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         DISPLAY_TEAM_PREFIX + Integer.toHexString(playerName.lowercase().hashCode())
 
     /**
-     * Maps a legacy `&`-color code to a named colour for scoreboard teams.
+     * Maps a legacy `&`-color code (or a MiniMessage hex tag such as `<#ffb43a>`, mapped to the
+     * nearest named colour) to a named colour for scoreboard teams.
      *
-     * @param code a color string such as `&c`, or empty.
+     * @param code a color string such as `&c` or `<#ffb43a>`, or empty.
      * @return the matching colour, or `null` when none applies.
      */
     private fun namedColor(code: String): NamedTextColor? {
+        HEX_COLOR.find(code)?.let { match ->
+            return NamedTextColor.nearestTo(TextColor.color(match.groupValues[1].toInt(16)))
+        }
         val ch = code.trim().removePrefix("&").removePrefix("§").firstOrNull()?.lowercaseChar() ?: return null
         return when (ch) {
             '0' -> NamedTextColor.BLACK
@@ -873,6 +878,9 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         miniMessage.deserialize(LegacyToMini.translate(text))
 
     private companion object {
+        /** A `#rrggbb` hex colour inside a colour string (`<#ffb43a>`, `&#ffb43a`). */
+        val HEX_COLOR = Regex("#([0-9a-fA-F]{6})")
+
         /** Ticks before the first sync (1 second). */
         const val INITIAL_DELAY_TICKS = 20L
 

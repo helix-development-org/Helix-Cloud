@@ -11,6 +11,7 @@ import org.helix.node.actions.PlayerCommandService
 import org.helix.node.addons.AddonManager
 import org.helix.node.audit.AuditLog
 import org.helix.node.backup.BackupService
+import org.helix.node.config.NodeConfig
 import org.helix.node.control.auth.PanelAuthService
 import org.helix.node.control.auth.ServiceTokenRegistry
 import org.helix.node.dashboard.DashboardPanelRegistry
@@ -119,7 +120,7 @@ data class ControlDependencies(
     val sessionTtlSeconds: Long = 86_400,
     val idleTimeoutSeconds: Long = PanelAuthService.DEFAULT_IDLE_TTL_MS / 1000,
     val loginMessage: String = "§b§lHelix §r§7» §fYour panel login code is §b{code}§7.",
-    val networkName: () -> String = { "our network" },
+    val networkName: () -> String = { NodeConfig.NetworkSettings.DEFAULT_NAME },
     val proxyScreens: Messages = MapMessages(emptyMap()),
     val languages: LanguageRegistry = LanguageRegistry(InMemoryAddonStorage()),
     val identityRegistry: IdentityRegistry = IdentityRegistry(InMemoryAddonStorage()),

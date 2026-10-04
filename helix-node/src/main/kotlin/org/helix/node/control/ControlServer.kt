@@ -43,6 +43,7 @@ import org.helix.api.bridge.HeartbeatReport
 import org.helix.api.bridge.NetworkPackInfo
 import org.helix.api.display.DisplayBulkRequest
 import org.helix.api.i18n.TranslationsSnapshot
+import org.helix.api.message.GlobalPlaceholders
 import org.helix.api.player.PlayerEvent
 import org.helix.api.player.PlayerLocaleReport
 import org.helix.api.player.PlayerPermissionsReport
@@ -1276,7 +1277,11 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
                 defaultLanguage = dependencies.languages.defaultLanguage(),
                 languages = languageList,
                 playerLanguages = dependencies.languages.playerLanguages().filterKeys { it in online },
-                values = dependencies.messages.effectiveTables(languageList),
+                // Global placeholders ({network}, {prefix}) are filled here, so backend plugins
+                // rendering straight from this snapshot show the configured network name.
+                values = dependencies.messages.effectiveTables(languageList).mapValues { (_, table) ->
+                    table.mapValues { (_, template) -> GlobalPlaceholders.apply(template) }
+                },
             ),
         )
     }

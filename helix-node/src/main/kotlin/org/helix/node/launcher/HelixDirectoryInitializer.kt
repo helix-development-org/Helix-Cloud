@@ -1,5 +1,6 @@
 package org.helix.node.launcher
 
+import org.helix.node.config.NodeConfig
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.SecureRandom
@@ -70,7 +71,7 @@ class HelixDirectoryInitializer(private val root: Path) {
             poolSize = 8
 
             [network]
-            name = "our network"                   # initial display name ({network}); editable in the panel afterwards
+            name = "${NodeConfig.NetworkSettings.DEFAULT_NAME}"                      # initial display name ({network}); editable in the panel afterwards
 
             [proxy]
             forwardingSecret = "${generateToken()}" # shared secret for Velocity modern player-info forwarding — freshly generated, keep it secret
