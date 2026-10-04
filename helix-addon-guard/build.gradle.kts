@@ -58,7 +58,4 @@ val packageHxa by tasks.registering(Zip::class) {
     from(packetEventsJar) {
         into("paper")
     }
-    from(project(":helix-addon-guard-paper").tasks.named("generatePack")) {
-        rename { "pack.zip" }
-    }
 }

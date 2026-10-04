@@ -4,7 +4,6 @@
   "ban.screen.direct": "IGuard: {reason}\nBis: {until}",
   "ban.expiry.never": "nie",
   "ban.expiry.permanent": "dauerhaft",
-
   "value.none": "keine",
   "value.unknown": "unbekannt",
   "value.never": "nie",
@@ -12,7 +11,6 @@
   "value.waiting-packets": "warte auf Pakete",
   "value.available": "verfügbar",
   "value.unavailable": "nicht verfügbar",
-
   "alert.prefix": "<dark_gray>[</dark_gray><red>IGuard</red><dark_gray>] </dark_gray>",
   "alert.hover": "<white>⚠ {check}</white>\n<gray>Spieler: </gray><white>{player}</white>\n<gray>VL: </gray><white>{vl}</white><gray>   Konfidenz: </gray>{confcolor}{conf}%\n{action}<gray>Beweise:</gray>\n<dark_gray>{evidence}</dark_gray>",
   "alert.hover.action": "<light_purple>Aktion: {action}</light_purple>\n",
@@ -20,7 +18,6 @@
   "alert.button.spectate": "<gray>{player} beobachten</gray>",
   "alert.button.panel": "<gray>{player} im Admin-Panel öffnen</gray>",
   "alert.button.ban": "<gray>{player} bannen</gray>",
-
   "panel.title.alerts": "IGuard  Live-Alerts",
   "panel.title.ban": "{player} bannen",
   "panel.title.bans": "Aktive Banns",
@@ -62,7 +59,6 @@
   "panel.case.no-incident": "<gray>Kein aktiver Vorfall</gray>",
   "panel.case.vls-header": "<white>Verstoß-Level:</white>",
   "panel.case.vl-entry": "<dark_gray>  {check}: {value}</dark_gray>",
-
   "cmd.usage": "<yellow>/iguard <panel|spectate|alerts|clients|info|history|cases|case|replay|confidence|ban|unban|bans|banhistory|status|reload></yellow>",
   "cmd.no-permission": "<red>Du hast dazu keine Berechtigung",
   "cmd.not-online": "<red>Der Spieler ist nicht online",
@@ -127,11 +123,9 @@
   "cmd.banhistory.header": "<gold>IGuard-Strafverlauf für {player} ({count})",
   "cmd.banhistory.empty": "<gray>Keine Strafen aufgezeichnet",
   "cmd.banhistory.entry": "{color}{time} {type}{dur} von {actor} — {reason}",
-
   "spectate.started": "<gray>Du beobachtest jetzt </gray><aqua>{name}</aqua><dark_gray> — </dark_gray><click:run_command:'/iguard unspectate'><red>[{stop}]</red></click><dark_gray> (freie Kamera)</dark_gray>",
   "spectate.stop-button": "Stopp",
   "spectate.stopped": "<gray>Du beobachtest nicht mehr.",
-
   "replay.no-data": "<red>Keine Replay-Daten für diesen Fall.",
   "replay.world-unavailable": "<red>Replay-Welt nicht verfügbar.",
   "replay.building": "<gray>Baue Replay aus {frames} Frames...",
@@ -148,5 +142,29 @@
   "replay.follow-off": "<gray>Verfolgungskamera aus",
   "replay.trail-on": "<gray>Pfadspur an",
   "replay.trail-off": "<gray>Pfadspur aus",
-  "replay.scrubber": "<white>  {elapsed}s / {total}s  {speed}x</white>"
+  "replay.scrubber": "<white>  {elapsed}s / {total}s  {speed}x</white>",
+  "panel.empty": "Keine markierten Spieler",
+  "panel.subtitle.alerts": "{count} markierte Spieler",
+  "panel.subtitle.server": "Server: {server}",
+  "panel.subtitle.case": "Fall von {player}",
+  "panel.subtitle.ban": "Wähle eine Bann-Vorlage",
+  "panel.subtitle.bans": "{count} aktive Banns",
+  "panel.bans.empty": "Keine aktiven Banns",
+  "panel.help.title": "Anleitung",
+  "panel.help.main.1": "Wähle einen Spieler,",
+  "panel.help.main.2": "um seinen Fall",
+  "panel.help.main.3": "zu öffnen. Rot:",
+  "panel.help.main.4": "hohe Konfidenz.",
+  "panel.help.case.1": "Beobachten, Tele-",
+  "panel.help.case.2": "portieren, Ausnehmen,",
+  "panel.help.case.3": "Bannen oder das",
+  "panel.help.case.4": "Replay ansehen.",
+  "panel.help.ban.1": "Eine Vorlage",
+  "panel.help.ban.2": "bannt den Spieler",
+  "panel.help.ban.3": "sofort für die",
+  "panel.help.ban.4": "angegebene Dauer.",
+  "panel.help.bans.1": "Klicke einen",
+  "panel.help.bans.2": "Eintrag, um den",
+  "panel.help.bans.3": "Spieler wieder",
+  "panel.help.bans.4": "zu entbannen."
 }
