@@ -5,6 +5,7 @@ import de.tytoss.igui.awaitSharedIGui
 import de.tytoss.igui.gui.GuiDefinition
 import de.tytoss.igui.display.DisplayBuilder
 import de.tytoss.igui.layout.GuiArea
+import de.tytoss.igui.layout.GuiGrid
 import de.tytoss.igui.screen.ScreenFonts
 import de.tytoss.igui.screen.TextAlign
 import de.tytoss.igui.screen.fit
@@ -104,8 +105,13 @@ class ServerMenu(
                 val (column, row) = NavigatorGlyphs.cardCell(card)
                 val area = GuiArea(column, row, 3, 5)
                 // unsichtbare Items: Tooltip beim Überfahren der ganzen Karte
+                // the emblem cell carries the animated emblem (same tooltip)
+                val emblemSlot = NavigatorGlyphs.emblemSprite(0, row / 5, column / 3).let { GuiGrid(6, true).slot(it.column, it.row) }
                 area.slots().forEach { slot ->
-                    item(slot) { ctx -> shown[ctx.player.uniqueId]?.getOrNull(card)?.let { tooltip(ctx.player, it) } }
+                    item(slot) { ctx ->
+                        val group = shown[ctx.player.uniqueId]?.getOrNull(card) ?: return@item null
+                        if (slot == emblemSlot) emblemItem(ctx.player, group, column / 3, row / 5) else tooltip(ctx.player, group)
+                    }
                 }
                 onClick(area) { ctx ->
                     val group = shown[ctx.player.uniqueId]?.getOrNull(card) ?: return@onClick
@@ -128,8 +134,6 @@ class ServerMenu(
             val row = card / NavigatorGlyphs.COLUMNS
             val cx = NavigatorGlyphs.cardCenter(column)
             glyphAt(cx - NavigatorGlyphs.SHIELD_W / 2, font, NavigatorGlyphs.SHIELD + row, NavigatorGlyphs.SHIELD_W + 1)
-            val emblem = NavigatorGlyphs.EMBLEMS.indexOf(group.emblem).coerceAtLeast(0)
-            glyphAt(cx - NavigatorGlyphs.EMBLEM_SIZE / 2, font, NavigatorGlyphs.emblem(emblem, row), NavigatorGlyphs.EMBLEM_SIZE + 1)
             textAt(fit(group.name, NAME_WIDTH), cx, NavigatorGlyphs.nameTop(row), INK, TextAlign.CENTER)
             val count = plain.serialize(render(player, "navigator.count", "players" to group.players.toString()))
             textAt(count, cx, NavigatorGlyphs.countTop(row), if (group.players > 0) GREEN_INK else FADED_INK, TextAlign.CENTER)
@@ -138,6 +142,12 @@ class ServerMenu(
             textAt(plain.serialize(render(player, "message.no-servers")), NavigatorGlyphs.CENTER_X, 100, INK, TextAlign.CENTER)
         }
         textAt(fit(settings.title, TITLE_WIDTH), NavigatorGlyphs.CENTER_X, NavigatorGlyphs.TITLE_TOP, GOLD, TextAlign.CENTER)
+    }
+
+    private fun emblemItem(player: Player, group: ServerGroup, column: Int, row: Int): ItemStack {
+        val emblem = NavigatorGlyphs.EMBLEMS.indexOf(group.emblem).coerceAtLeast(0)
+        val sprite = NavigatorGlyphs.emblemSprite(emblem, row, column)
+        return tooltip(player, group).apply { editMeta { it.setItemModel(NamespacedKey(NavigatorGlyphs.SPRITE_NAMESPACE, sprite.model)) } }
     }
 
     private fun tooltip(player: Player, group: ServerGroup): ItemStack = ItemStack(Material.PAPER).apply {

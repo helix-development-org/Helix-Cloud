@@ -33,6 +33,7 @@ data class LedgerLine(val text: String, val color: TextColor = LedgerScreen.INK)
  * @property valueColor colour of the value.
  * @property icon an item shown in the row's first cell (e.g. a player head), or null.
  * @property tooltip tooltip lines when hovering the row (first line = title).
+ * @property badge an animated badge in the row's last cell (the value moves left of it), or null.
  */
 data class LedgerRow(
     val label: String,
@@ -41,7 +42,27 @@ data class LedgerRow(
     val valueColor: TextColor = LedgerScreen.INK,
     val icon: ItemStack? = null,
     val tooltip: List<Component> = emptyList(),
+    val badge: LedgerBadge? = null,
 )
+
+/**
+ * Animated badges for a row's last cell.
+ *
+ * @property sprite the sprite drawn.
+ */
+enum class LedgerBadge(val sprite: ScreenSprite) {
+    /** Pulsing red wax seal (unread). */
+    SEAL(LedgerLayout.SEAL),
+
+    /** Glowing green gem (on). */
+    GEM_ON(LedgerLayout.GEM_ON),
+
+    /** Dull red gem (off). */
+    GEM_OFF(LedgerLayout.GEM_OFF),
+
+    /** Pulsing warning rune (danger). */
+    RUNE(LedgerLayout.RUNE),
+}
 
 /**
  * What a ledger shows to one player.
@@ -54,6 +75,7 @@ data class LedgerRow(
  * @property left lines of the left note.
  * @property right lines of the right note.
  * @property buttons labels of the two footer buttons (null: none).
+ * @property quill whether a quill writes on the right note (e.g. letters).
  */
 data class LedgerView(
     val title: String,
@@ -64,6 +86,7 @@ data class LedgerView(
     val left: List<LedgerLine> = emptyList(),
     val right: List<LedgerLine> = emptyList(),
     val buttons: List<String?> = listOf(null, null),
+    val quill: Boolean = false,
 )
 
 /**
@@ -124,12 +147,26 @@ class LedgerScreen {
         val grid = GuiGrid(6, true)
         page.cancelAllInteractions = true
         page.title { ctx -> views[ctx.player.uniqueId]?.let { draw(it) } }
+        // animated decoration in the header row: torches on the posts, candles by the ribbon, the quill
+        listOf(LedgerLayout.TORCH_LEFT, LedgerLayout.TORCH_RIGHT, LedgerLayout.CANDLE_LEFT, LedgerLayout.CANDLE_RIGHT).forEach { sprite ->
+            val item = SpriteItems.of(LedgerLayout.SPRITE_NAMESPACE, sprite)
+            page.item(grid.slot(sprite.column, sprite.row)) { item.clone() }
+        }
+        val quill = SpriteItems.of(LedgerLayout.SPRITE_NAMESPACE, LedgerLayout.QUILL)
+        page.item(grid.slot(LedgerLayout.QUILL.column, LedgerLayout.QUILL.row)) { ctx ->
+            if (views[ctx.player.uniqueId]?.quill == true) quill.clone() else null
+        }
         for (index in 0 until LedgerLayout.ROWS) {
             val gridRow = LedgerLayout.FIRST_ROW + index
             for (column in 0 until GuiGrid.COLUMNS) {
                 page.item(grid.slot(column, gridRow)) { ctx ->
                     val row = views[ctx.player.uniqueId]?.rows?.getOrNull(index) ?: return@item null
-                    if (column == 0 && row.icon != null) withTooltip(row.icon.clone(), row.tooltip) else tooltipItem(row.tooltip)
+                    when {
+                        column == 0 && row.icon != null -> withTooltip(row.icon.clone(), row.tooltip)
+                        column == GuiGrid.COLUMNS - 1 && row.badge != null ->
+                            SpriteItems.of(LedgerLayout.SPRITE_NAMESPACE, row.badge.sprite, row.tooltip)
+                        else -> tooltipItem(row.tooltip)
+                    }
                 }
             }
             page.onClick(GuiArea(0, gridRow, GuiGrid.COLUMNS, 1)) { ctx ->
@@ -170,9 +207,10 @@ class LedgerScreen {
         view.rows.take(LedgerLayout.ROWS).forEachIndexed { i, row ->
             val top = LedgerLayout.rowTop(i) + LedgerLayout.ROW_TEXT_OFFSET
             val labelX = if (row.icon != null) LedgerLayout.LABEL_X else LedgerLayout.LABEL_X_NO_ICON
+            val valueRight = if (row.badge != null) LedgerLayout.VALUE_RIGHT_BADGE else LedgerLayout.VALUE_RIGHT
             val valueWidth = if (row.value.isEmpty()) 0 else measure(row.value) + 4
-            textAt(fit(row.label, LedgerLayout.VALUE_RIGHT - labelX - valueWidth), labelX, top, row.labelColor)
-            if (row.value.isNotEmpty()) textAt(fit(row.value, VALUE_MAX), LedgerLayout.VALUE_RIGHT, top, row.valueColor, TextAlign.RIGHT)
+            textAt(fit(row.label, valueRight - labelX - valueWidth), labelX, top, row.labelColor)
+            if (row.value.isNotEmpty()) textAt(fit(row.value, VALUE_MAX), valueRight, top, row.valueColor, TextAlign.RIGHT)
         }
         note(view.left, LedgerLayout.LEFT_X)
         note(view.right, LedgerLayout.RIGHT_X)

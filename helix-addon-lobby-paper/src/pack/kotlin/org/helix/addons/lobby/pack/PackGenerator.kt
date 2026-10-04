@@ -1,6 +1,7 @@
 package org.helix.addons.lobby.pack
 
 import de.tytoss.igui.screen.ScreenFonts
+import de.tytoss.igui.screen.ScreenSprites
 import org.helix.addons.lobby.paper.NavigatorGlyphs
 import java.io.ByteArrayOutputStream
 import java.nio.file.Files
@@ -13,8 +14,8 @@ private const val NAMESPACE = "helix_lobby"
 
 /**
  * Resource pack of the lobby: the navigator art (Blockbench-painted PNGs in `src/pack/resources/navigator`) as
- * glyphs of `helix_lobby:navigator`, positioned by [NavigatorGlyphs] (board tiles, shields per card row, emblems
- * per card row).
+ * glyphs of `helix_lobby:navigator`, positioned by [NavigatorGlyphs] (board tiles, shields per card row), and the
+ * animated emblems as shifted item models.
  *
  * @param args `[0]` output path of the pack zip, `[1]` the art directory.
  */
@@ -38,10 +39,15 @@ fun main(args: Array<String>) {
     for (row in 0 until NavigatorGlyphs.ROWS) {
         providers += ScreenFonts.bitmap("$NAMESPACE:gui/navigator/shield.png", NavigatorGlyphs.shieldTop(row), NavigatorGlyphs.SHIELD_H, NavigatorGlyphs.SHIELD + row)
     }
+    // emblems: animated items (Blockbench frame strips + .mcmeta), one shifted model per emblem and card row
     NavigatorGlyphs.EMBLEMS.forEachIndexed { e, id ->
-        entries["$textures/emblem_$id.png"] = Files.readAllBytes(art.resolve("emblems/$id.png"))
+        val texture = "assets/$NAMESPACE/textures/item/navigator/emblem_$id.png"
+        entries[texture] = Files.readAllBytes(art.resolve("emblems_anim/$id.png"))
+        entries["$texture.mcmeta"] = Files.readAllBytes(art.resolve("emblems_anim/$id.png.mcmeta"))
         for (row in 0 until NavigatorGlyphs.ROWS) {
-            providers += ScreenFonts.bitmap("$NAMESPACE:gui/navigator/emblem_$id.png", NavigatorGlyphs.emblemTop(row), NavigatorGlyphs.EMBLEM_SIZE, NavigatorGlyphs.emblem(e, row))
+            val sprite = NavigatorGlyphs.emblemSprite(e, row)
+            entries["assets/$NAMESPACE/models/item/${sprite.model}.json"] = ScreenSprites.modelJson(NAMESPACE, sprite).toByteArray()
+            entries["assets/$NAMESPACE/items/${sprite.model}.json"] = ScreenSprites.itemJson(NAMESPACE, sprite).toByteArray()
         }
     }
     // unsichtbares Item für die Tooltips über den Karten

@@ -65,4 +65,30 @@ object LedgerLayout {
         val gridRow = FIRST_ROW + index
         return if (gridRow < 6) 18 + gridRow * 18 else 139 + (gridRow - 6) * 18
     }
+
+    /** Namespace of the ledger sprites. */
+    const val SPRITE_NAMESPACE = "helix_guis"
+
+    /** Wall torches on the posts between the boards (header slots 0 and 7). */
+    val TORCH_LEFT = ScreenSprite("anim/torch_left", "anim/torch", 32, column = 0, row = 0, centerX = -10, centerY = 103)
+    val TORCH_RIGHT = ScreenSprite("anim/torch_right", "anim/torch", 32, column = 7, row = 0, centerX = 186, centerY = 103)
+
+    /** Candles on the top beam beside the ribbon (header slots 1 and 6). */
+    val CANDLE_LEFT = ScreenSprite("anim/candle_left", "anim/candle", 32, column = 1, row = 0, centerX = 8, centerY = -4)
+    val CANDLE_RIGHT = ScreenSprite("anim/candle_right", "anim/candle", 32, column = 6, row = 0, centerX = 168, centerY = -4)
+
+    /** A quill writing on the right note, below its text (header slot 8). */
+    val QUILL = ScreenSprite("anim/quill", "anim/quill", 32, column = 8, row = 0, centerX = 226, centerY = 106)
+
+    /** Badges drawn in a row's last cell (column 8, no shift). */
+    val SEAL = ScreenSprite("anim/seal", "anim/seal", 16, column = 8, row = 1)
+    val GEM_ON = ScreenSprite("anim/gem_on", "anim/gem_on", 16, column = 8, row = 1)
+    val GEM_OFF = ScreenSprite("anim/gem_off", "anim/gem_off", 16, column = 8, row = 1)
+    val RUNE = ScreenSprite("anim/rune", "anim/rune", 16, column = 8, row = 1)
+
+    /** Every ledger sprite (for the pack generator). */
+    val SPRITES = listOf(TORCH_LEFT, TORCH_RIGHT, CANDLE_LEFT, CANDLE_RIGHT, QUILL, SEAL, GEM_ON, GEM_OFF, RUNE)
+
+    /** Right edge of a row's value when the row has a badge in column 8. */
+    const val VALUE_RIGHT_BADGE = 147
 }

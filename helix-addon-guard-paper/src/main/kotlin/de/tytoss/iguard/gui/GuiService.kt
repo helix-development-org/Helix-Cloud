@@ -8,6 +8,7 @@ import de.tytoss.igui.IGui
 import de.tytoss.igui.awaitSharedIGui
 import de.tytoss.igui.gui.GuiClickContext
 import de.tytoss.igui.gui.GuiDefinition
+import de.tytoss.igui.screen.LedgerBadge
 import de.tytoss.igui.screen.LedgerLayout
 import de.tytoss.igui.screen.LedgerLine
 import de.tytoss.igui.screen.LedgerRow
@@ -278,6 +279,7 @@ class GuiService(
             value = "$confPct%",
             valueColor = color,
             icon = head(snap.playerName),
+            badge = if (confPct >= 80) LedgerBadge.RUNE else null,
             tooltip = alertTooltip(admin, snap),
         )
     }

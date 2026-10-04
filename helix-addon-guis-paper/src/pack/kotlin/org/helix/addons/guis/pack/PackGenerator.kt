@@ -29,6 +29,7 @@ fun main(args: Array<String>) {
     )
     entries.putAll(textRowFonts())
     entries.putAll(ledger(Path.of(args[1])))
+    entries.putAll(sprites(NAMESPACE, Path.of(args[1]).resolveSibling("anim"), de.tytoss.igui.screen.LedgerLayout.SPRITES))
     entries["assets/$NAMESPACE/items/empty.json"] = """{"model":{"type":"minecraft:empty"}}""".toByteArray()
     // Text at any height for full-window screens (helix-gui `textAt`): one font per text top
     de.tytoss.igui.screen.ScreenFonts.TEXT_TOPS.forEach { top ->
@@ -122,5 +123,22 @@ private fun ledger(art: Path): Map<String, ByteArray> {
         providers += F.bitmap("$NAMESPACE:gui/ledger/$name.png", L.FOOTER_TOP, height, code)
     }
     out["assets/$NAMESPACE/font/ledger.json"] = """{"providers":[${providers.joinToString(",")}]}""".toByteArray()
+    return out
+}
+
+/**
+ * Animated ledger sprites (helix-gui `ScreenSprite`): the Blockbench-painted frame strips with their `.mcmeta` from
+ * `src/pack/resources/anim`, one shifted `item/generated` model and item definition per placement.
+ */
+private fun sprites(namespace: String, art: Path, sprites: List<de.tytoss.igui.screen.ScreenSprite>): Map<String, ByteArray> {
+    val out = linkedMapOf<String, ByteArray>()
+    sprites.forEach { sprite ->
+        val name = sprite.texture.substringAfterLast('/')
+        val texture = "assets/$namespace/textures/item/${sprite.texture}.png"
+        out[texture] = Files.readAllBytes(art.resolve("$name.png"))
+        out["$texture.mcmeta"] = Files.readAllBytes(art.resolve("$name.png.mcmeta"))
+        out["assets/$namespace/models/item/${sprite.model}.json"] = de.tytoss.igui.screen.ScreenSprites.modelJson(namespace, sprite).toByteArray()
+        out["assets/$namespace/items/${sprite.model}.json"] = de.tytoss.igui.screen.ScreenSprites.itemJson(namespace, sprite).toByteArray()
+    }
     return out
 }

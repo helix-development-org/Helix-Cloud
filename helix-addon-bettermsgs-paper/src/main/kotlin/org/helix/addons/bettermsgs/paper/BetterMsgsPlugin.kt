@@ -3,6 +3,7 @@ package org.helix.addons.bettermsgs.paper
 import de.tytoss.igui.IGui
 import de.tytoss.igui.awaitSharedIGui
 import de.tytoss.igui.gui.GuiDefinition
+import de.tytoss.igui.screen.LedgerBadge
 import de.tytoss.igui.screen.LedgerLayout
 import de.tytoss.igui.screen.LedgerLine
 import de.tytoss.igui.screen.LedgerRow
@@ -387,6 +388,7 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                 value = value,
                 valueColor = color,
                 icon = head(contact.name),
+                badge = if (contact.unread > 0) LedgerBadge.SEAL else null,
                 tooltip = listOfNotNull(
                     Component.text(contact.name, NamedTextColor.GOLD),
                     Component.text(status, if (contact.online) NamedTextColor.GREEN else NamedTextColor.GRAY),
@@ -451,6 +453,7 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
             ),
             right = help(player, "chat"),
             buttons = listOf(screen(player, "screen.back"), screen(player, "screen.write")),
+            quill = true,
         )
     }
 

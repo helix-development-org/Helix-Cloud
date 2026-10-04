@@ -242,6 +242,7 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                 ),
                 right = help("Click the preview", "to see colours.", "Edit opens a book;", "then save it."),
                 buttons = buttons,
+                quill = true,
             )
         }
         val size = listSize(s)

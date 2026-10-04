@@ -6,6 +6,7 @@ import de.tytoss.igui.gui.GuiClickContext
 import de.tytoss.igui.gui.GuiDefinition
 import de.tytoss.igui.gui.GuiInputCancelledException
 import de.tytoss.igui.gui.GuiInputTimeoutException
+import de.tytoss.igui.screen.LedgerBadge
 import de.tytoss.igui.screen.LedgerLayout
 import de.tytoss.igui.screen.LedgerLine
 import de.tytoss.igui.screen.LedgerRow
@@ -166,6 +167,11 @@ class ProfileGuiService(
             value = value,
             valueColor = color,
             icon = settingItem(player, setting),
+            badge = if (setting.descriptor.type is ProfileSettingType.Toggle) {
+                if (setting.current == "true") LedgerBadge.GEM_ON else LedgerBadge.GEM_OFF
+            } else {
+                null
+            },
             tooltip = listOf(
                 plain(setting.descriptor.label, NamedTextColor.GOLD),
                 render(translations.screen(player.name, locale(player), "menu.current", "value" to value)),

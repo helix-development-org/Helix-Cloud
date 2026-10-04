@@ -1,5 +1,7 @@
 package org.helix.addons.lobby.paper
 
+import de.tytoss.igui.screen.ScreenSprite
+
 /**
  * Layout of the navigator screen in container pixels (pure; shared with the pack generator so art and clicks
  * line up): a 384×256 board (dark wood, parchment map, ribbon, two banners) centred on the container, and six coats
@@ -24,8 +26,7 @@ object NavigatorGlyphs {
     const val SHIELD_W = 48
     const val SHIELD_H = 58
 
-    /** Emblems (32×32) inside the shield, glyph per emblem and card row. */
-    const val EMBLEM = 0xE020
+    /** Emblems (32×32, animated items) inside the shield. */
     const val EMBLEM_SIZE = 32
 
     /** Emblem ids, in glyph order. */
@@ -58,12 +59,30 @@ object NavigatorGlyphs {
     /** Player-count text top per card row. */
     fun countTop(row: Int): Int = if (row == 0) 92 else 185
 
+    /** Namespace of the animated emblem sprites. */
+    const val SPRITE_NAMESPACE = "helix_lobby"
+
     /**
+     * The animated emblem of a card: an item in the card's middle column (slot row 1 or 6) shifted onto the shield,
+     * drawn 1:1 from the Blockbench frame strip `emblems_anim/<id>.png`.
+     *
      * @param emblem index in [EMBLEMS].
      * @param row card row.
-     * @return the emblem glyph for that row.
+     * @param column card column (only the slot differs; the model is shared per emblem and row).
+     * @return the sprite placement.
      */
-    fun emblem(emblem: Int, row: Int): Int = EMBLEM + emblem * ROWS + row
+    fun emblemSprite(emblem: Int, row: Int, column: Int = 0): ScreenSprite {
+        val id = EMBLEMS[emblem]
+        return ScreenSprite(
+            model = "navigator/emblem_${id}_$row",
+            texture = "navigator/emblem_$id",
+            size = EMBLEM_SIZE,
+            column = column * 3 + 1,
+            row = if (row == 0) 1 else 6,
+            centerX = cardCenter(column),
+            centerY = emblemTop(row) + EMBLEM_SIZE / 2,
+        )
+    }
 
     /** Card [index] (0..5) → its first slot cell (column, row) in the 9×10 grid. */
     fun cardCell(index: Int): Pair<Int, Int> = (index % COLUMNS) * 3 to (index / COLUMNS) * 5
