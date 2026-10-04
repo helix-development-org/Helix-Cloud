@@ -8,11 +8,17 @@ import de.tytoss.igui.gui.GuiClickContext
 import de.tytoss.igui.gui.GuiDefinition
 import de.tytoss.igui.gui.GuiInputCancelledException
 import de.tytoss.igui.gui.GuiInputTimeoutException
+import de.tytoss.igui.screen.ButtonStyle
+import de.tytoss.igui.screen.LedgerButton
+import de.tytoss.igui.screen.LedgerEmpty
 import de.tytoss.igui.screen.LedgerLayout
 import de.tytoss.igui.screen.LedgerLine
+import de.tytoss.igui.screen.LedgerPill
 import de.tytoss.igui.screen.LedgerRow
 import de.tytoss.igui.screen.LedgerScreen
 import de.tytoss.igui.screen.LedgerView
+import de.tytoss.igui.screen.LifeSign
+import de.tytoss.igui.screen.PillColor
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.CoroutineContext
@@ -24,7 +30,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.format.TextColor
 import org.bukkit.Bukkit
 import org.bukkit.Material
@@ -62,8 +67,14 @@ private class Session {
     /** Edited-but-unsaved value from the book editor (null = none). */
     @Volatile var pending: String? = null
 
-    /** Whether the next delete click confirms. */
-    @Volatile var confirmDelete: Boolean = false
+    /** Whether the next reset click confirms (the reset button asks back once). */
+    @Volatile var confirmReset: Boolean = false
+
+    /** Key opened last (highlighted in the key list after going back). */
+    @Volatile var lastKey: String? = null
+
+    /** Owner group opened last (highlighted in the group list after going back). */
+    @Volatile var lastOwner: String? = null
 }
 
 /** One owner group in the browse list. */
@@ -180,6 +191,9 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
             s.selectedKey = null
             s.pending = null
             s.page = 0
+            s.confirmReset = false
+            s.lastKey = null
+            s.lastOwner = null
             loadView(player, s)
             ready.open(player, "main")
         }
@@ -215,10 +229,11 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                     session(ctx.player).page += step
                     refresh(ctx.player)
                 },
+                onBack = { ctx -> onBack(ctx.player) },
             )
         }
         onClose { ctx ->
-            session(ctx.player).confirmDelete = false
+            session(ctx.player).confirmReset = false
             ledger.forget(ctx.player)
         }
     }
@@ -227,25 +242,12 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
 
     private fun displayValue(session: Session): String = session.pending ?: currentValue(session)
 
+    /** Whether the selected key has an own value in the session language (only then reset does something). */
+    private fun resettable(session: Session): Boolean = entryOf(session)?.values?.containsKey(session.language) == true
+
     /** Builds the ledger page for the session's mode: owner groups, keys, or one key's detail. */
     private fun viewOf(s: Session): LedgerView {
-        val language = s.language.uppercase()
-        val buttons = listOf(if (s.showGroups) "Search" else "Back", "Lang: $language")
-        if (selectable(s)) {
-            val key = s.selectedKey!!.removePrefix("helix.translations.")
-            return LedgerView(
-                title = "Translations",
-                subtitle = ellipsize(key, 40),
-                rows = detailRows(s),
-                left = info(s, "Key") + listOf(
-                    LedgerLine(statusOf(s).removePrefix("· ").ifEmpty { "-" }, LedgerScreen.FADED),
-                    LedgerLine(if (s.pending != null) "unsaved changes" else "", LedgerScreen.RED),
-                ),
-                right = help("Click the preview", "to see colours.", "Edit opens a book;", "then save it."),
-                buttons = buttons,
-                quill = true,
-            )
-        }
+        if (selectable(s)) return detailView(s)
         val size = listSize(s)
         val pages = maxOf(1, (size + PAGE_SIZE - 1) / PAGE_SIZE)
         s.page = s.page.coerceIn(0, pages - 1)
@@ -255,9 +257,12 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                     label = group.owner,
                     value = "${group.edited}/${group.count}",
                     valueColor = if (group.edited > 0) LedgerScreen.GREEN else LedgerScreen.FADED,
+                    selected = group.owner == s.lastOwner,
                     tooltip = listOf(
-                        Component.text(group.owner, TextColor.color(0xFFCF4A)),
-                        Component.text("${group.count} keys, ${group.edited} edited", NamedTextColor.GRAY),
+                        Component.text(group.owner, GOLD),
+                        Component.text("Group", GREY),
+                        Component.text("${group.count} keys, ${group.edited} edited", PARCHMENT),
+                        Component.text("Click: Show keys", GOLD),
                     ),
                 )
             }
@@ -269,27 +274,68 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
             s.query.isNotBlank() -> "Search: ${s.query}"
             else -> s.owner ?: "All keys"
         }
+        val empty = when {
+            s.view.entries.isEmpty() -> "Not a single text in the archive. An empty book is merely one nobody has written yet."
+            else -> "Nothing found. Check the spelling: typos cause most failed searches. Statistically speaking."
+        }
         return LedgerView(
-            title = "Translations",
+            title = TITLE,
             subtitle = subtitle,
             rows = rows,
             page = s.page,
             pages = pages,
-            left = info(s, if (s.showGroups) "Groups" else "Keys"),
-            right = if (s.showGroups) {
-                help("Pick a group", "to list its keys.", "Search finds keys", "and values.")
-            } else {
-                help("Pick a key", "to preview and", "edit its value.", "Back: groups.")
+            detail = info(s, if (s.showGroups) "Groups" else if (s.query.isNotBlank()) "Search" else "Keys") +
+                if (s.showGroups) help("Pick a group", "for its keys.", "Find: search", "keys + values.") else help("Pick a key", "to edit it.", "Back: groups."),
+            back = !s.showGroups,
+            leftButton = LedgerButton("Find"),
+            rightButton = LedgerButton("Lang: ${s.language.uppercase()}"),
+            lifeSign = LifeSign.QUILL,
+            empty = LedgerEmpty(listOf(empty), ELSA),
+        )
+    }
+
+    /** One key: its preview (click opens the book), edit and language rows; reset (danger, asks back) and save. */
+    private fun detailView(s: Session): LedgerView {
+        val key = s.selectedKey!!.removePrefix("helix.translations.")
+        val (status, statusColor) = statusOf(s)
+        val canSave = s.pending != null
+        val canReset = resettable(s)
+        val detail = buildList {
+            add(LedgerLine("Scriptorium", LedgerScreen.RED))
+            add(LedgerLine(""))
+            add(LedgerLine(key.substringAfterLast('.')))
+            add(LedgerLine("Language: ${s.language}", LedgerScreen.FADED))
+            add(LedgerLine(status, statusColor))
+            if (canSave) add(LedgerLine("Unsaved!", LedgerScreen.RED))
+            add(LedgerLine(""))
+            when {
+                s.confirmReset -> addAll(listOf(LedgerLine("Sure? resets", LedgerScreen.RED), LedgerLine("to the default.", LedgerScreen.RED)))
+                else -> addAll(listOf(LedgerLine("Click the text"), LedgerLine("to edit it."), LedgerLine("Then: Save.")))
+            }
+            if (!canSave) addAll(listOf(LedgerLine(""), LedgerLine("Save is off:", LedgerScreen.FADED), LedgerLine("nothing new.", LedgerScreen.FADED)))
+            if (!canReset) addAll(listOf(LedgerLine(""), LedgerLine("Reset is off:", LedgerScreen.FADED), LedgerLine("no own value.", LedgerScreen.FADED)))
+        }
+        return LedgerView(
+            title = TITLE,
+            subtitle = ellipsize(key, 40),
+            rows = detailRows(s),
+            detail = detail,
+            back = true,
+            leftButton = when {
+                !canReset -> LedgerButton("Reset", ButtonStyle.DISABLED)
+                s.confirmReset -> LedgerButton("Sure?", ButtonStyle.DANGER)
+                else -> LedgerButton("Reset", ButtonStyle.DANGER)
             },
-            buttons = buttons,
+            rightButton = LedgerButton("Save", if (canSave) ButtonStyle.PRIMARY else ButtonStyle.DISABLED),
+            lifeSign = LifeSign.QUILL,
         )
     }
 
     private fun keyRow(entry: TranslationEntry, s: Session): LedgerRow {
         val (status, color) = when {
-            entry.values.containsKey(s.language) -> "edited" to LedgerScreen.GREEN
-            entry.defaults[s.language] == null -> "missing" to LedgerScreen.RED
-            else -> "default" to LedgerScreen.FADED
+            entry.values.containsKey(s.language) -> "edited" to PillColor.GREEN
+            entry.defaults[s.language] == null -> "missing" to PillColor.RED
+            else -> "default" to PillColor.GREY
         }
         val effective = entry.values[s.language]
             ?: entry.defaults[s.language]
@@ -297,20 +343,23 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
             ?: ""
         return LedgerRow(
             label = entry.key.removePrefix("helix.translations.").let { if (s.owner != null) it.removePrefix("${s.owner}.") else it },
-            value = status,
-            valueColor = color,
+            pill = LedgerPill(status, color),
+            selected = entry.key == s.lastKey,
             tooltip = listOf(
-                Component.text(entry.key.removePrefix("helix.translations."), TextColor.color(0xFFCF4A)),
+                Component.text(entry.key.removePrefix("helix.translations."), GOLD),
+                Component.text("Key · $status (${s.language})", GREY),
                 MiniPreview.render(if (effective.isEmpty()) "<#a89a84>(empty)" else effective),
+                Component.text("Click: Open", GOLD),
             ),
         )
     }
 
-    /** Preview lines (rows 0..4) and the actions edit/save/reset (rows 5..7). */
+    /** Preview lines (rows 0..5, click opens the book), the book row (6) and the language row (7). */
     private fun detailRows(s: Session): List<LedgerRow> {
         val value = displayValue(s)
         val rendered = value.split("\n").map { MiniPreview.render(it) }
-        val tooltip = listOf(Component.text("Preview (${s.language})", TextColor.color(0xFFCF4A))) + rendered
+        val tooltip = listOf(Component.text("Preview", GOLD), Component.text("Language: ${s.language}", GREY)) +
+            rendered + Component.text("Click: Edit in book", GOLD)
         val lines = MiniPreview.linesOf(value).map { runs -> runs.joinToString("") { it.text } }
         val preview = (0 until PREVIEW_ROWS).map { i ->
             val text = when {
@@ -320,17 +369,32 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
             }
             LedgerRow(label = text, labelColor = if (value.isEmpty()) LedgerScreen.FADED else LedgerScreen.INK, tooltip = tooltip)
         }
-        val canSave = s.pending != null
+        val languages = s.view.languages.joinToString(", ")
         return preview + listOf(
-            LedgerRow("Edit in book", "multiline", LedgerScreen.INK, LedgerScreen.FADED, ItemStack.of(Material.WRITABLE_BOOK)),
             LedgerRow(
-                "Save",
-                if (canSave) "unsaved" else "",
-                if (canSave) LedgerScreen.GREEN else LedgerScreen.FADED,
-                LedgerScreen.RED,
-                ItemStack.of(if (canSave) Material.LIME_DYE else Material.GRAY_DYE),
+                "Edit in book",
+                "multiline",
+                LedgerScreen.INK,
+                LedgerScreen.FADED,
+                ItemStack.of(Material.WRITABLE_BOOK),
+                tooltip = listOf(
+                    Component.text("Edit in book", GOLD),
+                    Component.text("Action", GREY),
+                    Component.text("Long and multiline values", PARCHMENT),
+                    Component.text("Click: Open the book", GOLD),
+                ),
             ),
-            LedgerRow("Reset to default", "", LedgerScreen.RED, icon = ItemStack.of(Material.WATER_BUCKET)),
+            LedgerRow(
+                "Language",
+                icon = ItemStack.of(Material.BOOKSHELF),
+                pill = LedgerPill(s.language.uppercase(), PillColor.GOLD),
+                tooltip = listOf(
+                    Component.text("Language", GOLD),
+                    Component.text("Setting", GREY),
+                    Component.text("Available: $languages", PARCHMENT),
+                    Component.text("Click: Next language", GOLD),
+                ),
+            ),
         )
     }
 
@@ -343,15 +407,14 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
         LedgerLine("${s.view.entries.count { it.values.containsKey(s.language) }} edited", LedgerScreen.FADED),
     )
 
-    private fun help(vararg lines: String): List<LedgerLine> =
-        listOf(LedgerLine("Guide", LedgerScreen.RED), LedgerLine("")) + lines.map { LedgerLine(it) }
+    private fun help(vararg lines: String): List<LedgerLine> = listOf(LedgerLine("")) + lines.map { LedgerLine(it) }
 
-    private fun statusOf(session: Session): String {
-        val entry = entryOf(session) ?: return ""
+    private fun statusOf(session: Session): Pair<String, TextColor> {
+        val entry = entryOf(session) ?: return "-" to LedgerScreen.FADED
         return when {
-            entry.values.containsKey(session.language) -> "· edited"
-            entry.defaults[session.language] == null -> "· no value"
-            else -> "· default"
+            entry.values.containsKey(session.language) -> "edited" to LedgerScreen.GREEN
+            entry.defaults[session.language] == null -> "no value" to LedgerScreen.RED
+            else -> "default" to LedgerScreen.FADED
         }
     }
 
@@ -361,13 +424,13 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
         val s = session(player)
         when {
             selectable(s) -> when (index) {
-                PREVIEW_ROWS -> openBook(player)
-                PREVIEW_ROWS + 1 -> saveCurrent(player)
-                PREVIEW_ROWS + 2 -> resetCurrent(player)
+                in 0..PREVIEW_ROWS -> openBook(player)
+                PREVIEW_ROWS + 1 -> cycleLanguage(player)
             }
             s.showGroups -> {
                 val group = pageWindow(groups(s), s.page).getOrNull(index) ?: return
                 s.owner = group.owner
+                s.lastOwner = group.owner
                 s.showGroups = false
                 s.page = 0
                 refresh(player)
@@ -375,8 +438,9 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
             else -> {
                 val entry = pageWindow(filteredEntries(s), s.page).getOrNull(index) ?: return
                 s.selectedKey = entry.key
+                s.lastKey = entry.key
                 s.pending = null
-                s.confirmDelete = false
+                s.confirmReset = false
                 refresh(player)
             }
         }
@@ -385,11 +449,22 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
     private fun onButtonClick(player: Player, ctx: GuiClickContext, b: Int) {
         val s = session(player)
         when {
-            b == 1 -> cycleLanguage(player)
-            s.showGroups -> search(player, ctx)
-            selectable(s) -> { s.selectedKey = null; s.pending = null; refresh(player) }
-            else -> { s.showGroups = true; s.owner = null; s.query = ""; s.page = 0; refresh(player) }
+            selectable(s) && b == 0 -> if (s.confirmReset) resetCurrent(player) else { s.confirmReset = true; refresh(player) }
+            selectable(s) -> saveCurrent(player)
+            b == 0 -> search(player, ctx)
+            else -> cycleLanguage(player)
         }
+    }
+
+    /** Back arrow: detail → key list (keeping its page), key list → groups. */
+    private fun onBack(player: Player) {
+        val s = session(player)
+        when {
+            selectable(s) -> { s.selectedKey = null; s.pending = null; s.confirmReset = false }
+            !s.showGroups -> { s.showGroups = true; s.owner = null; s.query = ""; s.page = 0 }
+            else -> return
+        }
+        refresh(player)
     }
 
     private fun refresh(player: Player) {
@@ -469,6 +544,7 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
             val ok = withContext(Dispatchers.IO) { nodeClient.reset(player.name, key, s.language) }
             feedback(player, ok, "Reset ${key.removePrefix("helix.translations.")} (${s.language})", "Nothing to reset")
             s.pending = null
+            s.confirmReset = false
             loadView(player, s)
             gui?.refresh(player)
         }
@@ -482,6 +558,7 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
             s.language = languages[(index + 1) % languages.size]
         }
         s.pending = null
+        s.confirmReset = false
         refresh(player)
     }
 
@@ -539,7 +616,22 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
         const val PAGE_SIZE = LedgerLayout.ROWS
 
         /** Ledger rows used for the value preview on the detail page. */
-        const val PREVIEW_ROWS = 5
+        const val PREVIEW_ROWS = 6
+
+        /** Ribbon title of every page. */
+        const val TITLE = "Translations"
+
+        /** Speaker of the empty states: Elsa Blatt, the factual card master. */
+        const val ELSA = "elsa"
+
+        /** Tooltip names and actions (`gold` base). */
+        val GOLD: TextColor = TextColor.color(0xFFCF4A)
+
+        /** Tooltip categories (`disabled` base). */
+        val GREY: TextColor = TextColor.color(0xA89A84)
+
+        /** Tooltip values (`parchment` base). */
+        val PARCHMENT: TextColor = TextColor.color(0xF1E2C2)
 
         /** Characters per writable-book page. */
         const val BOOK_PAGE_CHARS = 250

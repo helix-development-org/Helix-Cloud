@@ -15,15 +15,13 @@
   "menu.on": "On",
   "menu.off": "Off",
   "menu.empty": "–",
-  "menu.page": "Page {page}/{pages}",
   "menu.hint.toggle": "<#ffcf4a>Click: Toggle",
   "menu.hint.choice": "<#ffcf4a>Click: Next option",
   "menu.hint.text": "<#ffcf4a>Click: Edit",
   "menu.note.title": "Your crest",
-  "menu.help.title": "How to",
-  "menu.help.1": "Click a row",
-  "menu.help.2": "to change it.",
-  "menu.help.3": "The arrows below",
-  "menu.help.4": "turn the page.",
-  "menu.none": "No settings."
+  "menu.help": "Click: change",
+  "menu.kind.toggle": "Toggle",
+  "menu.kind.choice": "Choice",
+  "menu.kind.text": "Free text",
+  "menu.empty-state": "Nothing to set up here. I already set everything up. I think."
 }

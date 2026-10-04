@@ -3,12 +3,19 @@ package org.helix.addons.bettermsgs.paper
 import de.tytoss.igui.IGui
 import de.tytoss.igui.awaitSharedIGui
 import de.tytoss.igui.gui.GuiDefinition
+import de.tytoss.igui.screen.ButtonStyle
 import de.tytoss.igui.screen.LedgerBadge
+import de.tytoss.igui.screen.LedgerButton
+import de.tytoss.igui.screen.LedgerEmpty
 import de.tytoss.igui.screen.LedgerLayout
 import de.tytoss.igui.screen.LedgerLine
+import de.tytoss.igui.screen.LedgerPill
 import de.tytoss.igui.screen.LedgerRow
 import de.tytoss.igui.screen.LedgerScreen
 import de.tytoss.igui.screen.LedgerView
+import de.tytoss.igui.screen.LifeSign
+import de.tytoss.igui.screen.PillColor
+import de.tytoss.igui.screen.Villagers
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -24,7 +31,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.format.TextColor
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.Bukkit
@@ -316,16 +322,8 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                     ctx.gui.refresh(ctx.player)
                 },
                 onButton = { ctx, button ->
-                    val state = chats[ctx.player.uniqueId]
-                    when {
-                        state == null -> ctx.close()
-                        button == 0 -> {
-                            chats.remove(ctx.player.uniqueId)
-                            clearFocus(ctx.player.name)
-                            ctx.gui.refresh(ctx.player)
-                        }
-                        else -> startInput(ctx.player, state)
-                    }
+                    val state = chats[ctx.player.uniqueId] ?: return@install
+                    if (button == 1) startInput(ctx.player, state)
                 },
                 onPage = { ctx, step ->
                     val state = chats[ctx.player.uniqueId]
@@ -336,6 +334,12 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                         state.offset = ChatMath.clampOffset(state.offset - step * ChatMath.WINDOW, state.total)
                     }
                     ctx.gui.refresh(ctx.player)
+                },
+                onBack = { ctx ->
+                    if (chats.remove(ctx.player.uniqueId) != null) {
+                        clearFocus(ctx.player.name)
+                        ctx.gui.refresh(ctx.player)
+                    }
                 },
             )
         }
@@ -372,54 +376,64 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
         }
     }
 
+    /** The contact list: unread contacts with a red pill and a seal, others with their online status. */
     private fun contactsView(player: Player, list: List<Contact>): LedgerView {
         val pageCount = maxOf(1, (list.size + LedgerLayout.ROWS - 1) / LedgerLayout.ROWS)
         val page = (contactPages[player.uniqueId] ?: 0).coerceIn(0, pageCount - 1)
             .also { contactPages[player.uniqueId] = it }
         val rows = list.drop(page * LedgerLayout.ROWS).take(LedgerLayout.ROWS).map { contact ->
             val status = screen(player, if (contact.online) "note.online" else "note.offline")
-            val (value, color) = when {
-                contact.unread > 0 -> screen(player, "screen.unread", "count" to contact.unread.toString()) to LedgerScreen.RED
-                contact.online -> status to LedgerScreen.GREEN
-                else -> status to LedgerScreen.FADED
+            val pill = when {
+                contact.unread > 0 -> LedgerPill(screen(player, "screen.unread", "count" to contact.unread.toString()), PillColor.RED)
+                contact.online -> LedgerPill(status, PillColor.GREEN)
+                else -> LedgerPill(status, PillColor.GREY)
             }
             LedgerRow(
                 label = contact.name,
-                value = value,
-                valueColor = color,
                 icon = head(contact.name),
                 badge = if (contact.unread > 0) LedgerBadge.SEAL else null,
+                pill = pill,
                 tooltip = listOfNotNull(
-                    Component.text(contact.name, TextColor.color(0xFFCF4A)),
-                    Component.text(status, if (contact.online) TextColor.color(0x4AC85E) else TextColor.color(0xA89A84)),
+                    Component.text(contact.name, GOLD),
+                    Component.text(screen(player, "screen.kind.contact"), GREY),
+                    Component.text(status, if (contact.online) GREEN else GREY),
+                    contact.unread.takeIf { it > 0 }
+                        ?.let { Component.text(screen(player, "screen.unread", "count" to it.toString()), ERROR) },
                     contact.lastEpochMs.takeIf { it > 0 }
-                        ?.let { Component.text(screen(player, "screen.last", "time" to dateOf(it)), NamedTextColor.GRAY) },
-                    Component.text(screen(player, "screen.hint.open"), TextColor.color(0xFFCF4A)),
+                        ?.let { Component.text(screen(player, "screen.last", "time" to dateOf(it)), PARCHMENT) },
+                    Component.text(screen(player, "screen.hint.open"), GOLD),
                 ),
             )
         }
         val unread = list.sumOf { it.unread }
         return LedgerView(
             title = screen(player, "screen.title"),
-            subtitle = screen(player, if (list.isEmpty()) "screen.contacts.none" else "screen.contacts.subtitle"),
+            subtitle = screen(player, "screen.contacts.subtitle"),
             rows = rows,
             page = page,
             pages = pageCount,
-            left = listOf(
-                LedgerLine(screen(player, "screen.post"), LedgerScreen.RED),
-                LedgerLine(""),
-                LedgerLine(player.name),
-                LedgerLine(screen(player, "screen.contacts.count", "count" to list.size.toString()), LedgerScreen.FADED),
-                LedgerLine(
-                    screen(player, "screen.unread.total", "count" to unread.toString()),
-                    if (unread > 0) LedgerScreen.RED else LedgerScreen.FADED,
-                ),
-            ),
-            right = help(player, "contacts"),
-            buttons = listOf(null, screen(player, "screen.close")),
+            detail = buildList {
+                add(LedgerLine(screen(player, "screen.post"), LedgerScreen.RED))
+                add(LedgerLine(""))
+                add(LedgerLine(player.name))
+                add(LedgerLine(screen(player, "screen.contacts.count", "count" to list.size.toString()), LedgerScreen.FADED))
+                add(
+                    LedgerLine(
+                        screen(player, "screen.unread.total", "count" to unread.toString()),
+                        if (unread > 0) LedgerScreen.RED else LedgerScreen.FADED,
+                    ),
+                )
+                if (list.isNotEmpty()) {
+                    add(LedgerLine(""))
+                    addAll(help(player, "contacts", 3))
+                }
+            },
+            lifeSign = LifeSign.QUILL,
+            empty = LedgerEmpty(listOf(screen(player, "screen.empty.contacts")), Villagers.NARRATOR),
         )
     }
 
+    /** One correspondence: eight letters per page (arrows scroll older/newer), back to the contacts, write a letter. */
     private fun chatView(player: Player, state: ChatState): LedgerView {
         val rows = state.messages.takeLast(LedgerLayout.ROWS).map { message ->
             val own = message.from.equals(player.name, ignoreCase = true)
@@ -430,8 +444,9 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                 valueColor = LedgerScreen.FADED,
                 icon = head(message.from),
                 tooltip = buildList {
-                    add(Component.text("${message.from} · ${dateOf(message.epochMs)}", TextColor.color(0xFFCF4A)))
-                    ChatMath.wrap(message.text).forEach { add(Component.text(it, TextColor.color(0xF1E2C2))) }
+                    add(Component.text(message.from, GOLD))
+                    add(Component.text(screen(player, "screen.kind.letter", "time" to dateOf(message.epochMs)), GREY))
+                    ChatMath.wrap(message.text).forEach { add(Component.text(it, PARCHMENT)) }
                 },
             )
         }
@@ -440,28 +455,28 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
             contacts[player.uniqueId]?.firstOrNull { it.name == state.peer }?.online == true
         return LedgerView(
             title = state.peer,
-            subtitle = screen(player, if (rows.isEmpty()) "note.empty" else "screen.chat.subtitle", "peer" to state.peer),
+            subtitle = screen(player, "screen.chat.subtitle", "peer" to state.peer),
             rows = rows,
             page = page,
             pages = pages,
-            left = listOf(
-                LedgerLine(screen(player, "screen.post"), LedgerScreen.RED),
-                LedgerLine(""),
-                LedgerLine(state.peer),
-                LedgerLine(screen(player, if (online) "note.online" else "note.offline"), if (online) LedgerScreen.GREEN else LedgerScreen.FADED),
-                LedgerLine(screen(player, "screen.letters", "count" to state.total.toString()), LedgerScreen.FADED),
-            ),
-            right = help(player, "chat"),
-            buttons = listOf(screen(player, "screen.back"), screen(player, "screen.write")),
-            quill = true,
+            detail = buildList {
+                add(LedgerLine(screen(player, "screen.post"), LedgerScreen.RED))
+                add(LedgerLine(""))
+                add(LedgerLine(state.peer))
+                add(LedgerLine(screen(player, if (online) "note.online" else "note.offline"), if (online) LedgerScreen.GREEN else LedgerScreen.FADED))
+                add(LedgerLine(screen(player, "screen.letters", "count" to state.total.toString()), LedgerScreen.FADED))
+                add(LedgerLine(""))
+                addAll(help(player, "chat", 4))
+            },
+            back = true,
+            rightButton = LedgerButton(screen(player, "screen.write"), ButtonStyle.PRIMARY),
+            lifeSign = LifeSign.QUILL,
+            empty = LedgerEmpty(listOf(screen(player, "screen.empty.chat")), Villagers.NARRATOR),
         )
     }
 
-    private fun help(player: Player, mode: String): List<LedgerLine> = buildList {
-        add(LedgerLine(screen(player, "screen.help.title"), LedgerScreen.RED))
-        add(LedgerLine(""))
-        (1..4).forEach { add(LedgerLine(screen(player, "screen.help.$mode.$it"))) }
-    }
+    private fun help(player: Player, mode: String, lines: Int): List<LedgerLine> =
+        (1..lines).map { LedgerLine(screen(player, "screen.help.$mode.$it")) }
 
     private fun head(name: String): ItemStack = ItemStack(Material.PLAYER_HEAD).apply {
         editMeta(SkullMeta::class.java) { it.owningPlayer = Bukkit.getOfflinePlayer(name) }
@@ -479,8 +494,23 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
         .withZone(ZoneId.systemDefault())
         .format(Instant.ofEpochMilli(epochMs))
 
-    /** Ink of the viewer's own letters. */
+    /** Ink of the viewer's own letters and the tooltip token colours. */
     private companion object {
         val OWN_INK: TextColor = TextColor.color(0x1F3F6B)
+
+        /** Tooltip names and actions (`gold` base). */
+        val GOLD: TextColor = TextColor.color(0xFFCF4A)
+
+        /** Tooltip categories and offline (`disabled` base). */
+        val GREY: TextColor = TextColor.color(0xA89A84)
+
+        /** Tooltip values (`parchment` base). */
+        val PARCHMENT: TextColor = TextColor.color(0xF1E2C2)
+
+        /** Online (`success` base). */
+        val GREEN: TextColor = TextColor.color(0x4AC85E)
+
+        /** Unread count (`error` base). */
+        val ERROR: TextColor = TextColor.color(0xFF5A4A)
     }
 }

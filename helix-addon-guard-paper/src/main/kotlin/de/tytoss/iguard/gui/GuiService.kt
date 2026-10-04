@@ -8,12 +8,17 @@ import de.tytoss.igui.IGui
 import de.tytoss.igui.awaitSharedIGui
 import de.tytoss.igui.gui.GuiClickContext
 import de.tytoss.igui.gui.GuiDefinition
+import de.tytoss.igui.screen.ButtonStyle
 import de.tytoss.igui.screen.LedgerBadge
+import de.tytoss.igui.screen.LedgerButton
+import de.tytoss.igui.screen.LedgerEmpty
 import de.tytoss.igui.screen.LedgerLayout
 import de.tytoss.igui.screen.LedgerLine
+import de.tytoss.igui.screen.LedgerPill
 import de.tytoss.igui.screen.LedgerRow
 import de.tytoss.igui.screen.LedgerScreen
 import de.tytoss.igui.screen.LedgerView
+import de.tytoss.igui.screen.PillColor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import net.kyori.adventure.text.Component
@@ -62,6 +67,10 @@ class GuiService(
         var bans: List<de.tytoss.iguard.storage.BanRow> = emptyList(),
         var mode: Mode = if (selected != null) Mode.CASE else Mode.ALERTS,
         var page: Int = 0,
+        /** Chosen ban template (index into the templates), confirmed with the ban button. */
+        var template: Int? = null,
+        /** Chosen active ban, lifted with the unban button. */
+        var selectedBan: UUID? = null,
     )
 
     // Ban reason/duration templates shown in the panel's ban submenu (label key; hours; 8760 = 1y ≈
@@ -131,6 +140,7 @@ class GuiService(
                     state[ctx.player.uniqueId]?.let { it.page += step }
                     ctx.gui.refresh(ctx.player)
                 },
+                onBack = { ctx -> onBack(ctx) },
             )
         }
         onClose { ctx ->
@@ -140,7 +150,7 @@ class GuiService(
     }
 
     private suspend fun show(ctx: GuiClickContext, mode: Mode) {
-        state[ctx.player.uniqueId]?.let { it.mode = mode; it.page = 0 }
+        state[ctx.player.uniqueId]?.let { it.mode = mode; it.page = 0; it.template = null; it.selectedBan = null }
         ctx.gui.refresh(ctx.player)
     }
 
@@ -169,17 +179,14 @@ class GuiService(
                 }
             }
             Mode.TEMPLATES -> {
-                val (_, hours, reason) = banTemplates.getOrNull(row) ?: return
-                if (!ctx.player.hasPermission("iguard.ban")) return
-                val name = data.selected ?: return
-                Bukkit.getPlayerExact(name)?.let { bans.ban(it.uniqueId, name, hours, "$reason (panel template)", ctx.player.name) }
-                    ?: ctx.player.sendMessage(chat(ctx.player, "panel.not-online", "player" to name))
-                ctx.close()
+                if (row !in banTemplates.indices) return
+                data.template = row
+                ctx.gui.refresh(ctx.player)
             }
             Mode.BANS -> {
-                if (!ctx.player.hasPermission("iguard.ban")) return
                 val ban = data.bans.getOrNull(data.page * LedgerLayout.ROWS + row) ?: return
-                unbanFromGui(ctx.player, ban) { loadBans(ctx.player) { ctx.gui.refresh(ctx.player) } }
+                data.selectedBan = ban.playerId
+                ctx.gui.refresh(ctx.player)
             }
         }
     }
@@ -192,73 +199,144 @@ class GuiService(
             } else {
                 ctx.gui.refresh(ctx.player)
             }
-            Mode.CASE -> if (button == 0) show(ctx, Mode.ALERTS) else ctx.gui.refresh(ctx.player)
-            Mode.TEMPLATES -> show(ctx, Mode.CASE)
-            Mode.BANS -> if (button == 0) show(ctx, Mode.ALERTS) else loadBans(ctx.player) { ctx.gui.refresh(ctx.player) }
+            Mode.CASE -> ctx.gui.refresh(ctx.player)
+            Mode.TEMPLATES -> if (button == 1) confirmBan(ctx, data)
+            Mode.BANS -> if (button == 0) {
+                loadBans(ctx.player) { ctx.gui.refresh(ctx.player) }
+            } else {
+                if (!ctx.player.hasPermission("iguard.ban")) return
+                val ban = data.bans.firstOrNull { it.playerId == data.selectedBan } ?: return
+                data.selectedBan = null
+                unbanFromGui(ctx.player, ban) { loadBans(ctx.player) { ctx.gui.refresh(ctx.player) } }
+            }
         }
+    }
+
+    /** Back arrow: case → alerts, templates → case, bans → alerts. */
+    private suspend fun onBack(ctx: GuiClickContext) {
+        val data = state[ctx.player.uniqueId] ?: return
+        when (data.mode) {
+            Mode.ALERTS -> Unit
+            Mode.CASE, Mode.BANS -> show(ctx, Mode.ALERTS)
+            Mode.TEMPLATES -> show(ctx, Mode.CASE)
+        }
+    }
+
+    /** Bans the case's player with the chosen template (the second step after choosing it). */
+    private suspend fun confirmBan(ctx: GuiClickContext, data: PanelData) {
+        if (!ctx.player.hasPermission("iguard.ban")) return
+        val (_, hours, reason) = data.template?.let { banTemplates.getOrNull(it) } ?: return
+        val name = data.selected ?: return
+        Bukkit.getPlayerExact(name)?.let { bans.ban(it.uniqueId, name, hours, "$reason (panel template)", ctx.player.name) }
+            ?: ctx.player.sendMessage(chat(ctx.player, "panel.not-online", "player" to name))
+        ctx.close()
     }
 
     /** The ledger page of the admin's current mode. */
     private fun viewOf(admin: Player, data: PanelData): LedgerView {
-        val refresh = flat(admin, "panel.button.refresh")
-        val back = flat(admin, "panel.button.back")
+        val refresh = LedgerButton(flat(admin, "panel.button.refresh"))
+        val canBan = admin.hasPermission("iguard.ban")
         return when (data.mode) {
             Mode.ALERTS -> paged(
                 data,
-                data.flagged.map { alertRow(admin, it) },
+                data.flagged.map { alertRow(admin, it, it.playerName == data.selected) },
                 LedgerView(
                     title = flat(admin, "panel.title.alerts"),
-                    subtitle = if (data.flagged.isEmpty()) flat(admin, "panel.empty")
-                    else flat(admin, "panel.subtitle.alerts", "count" to "${data.flagged.size}"),
-                    left = note(admin, listOf("panel.subtitle.server" to arrayOf("server" to serverId))),
-                    right = help(admin, "main"),
-                    buttons = listOf(flat(admin, "panel.button.active-bans"), refresh),
+                    subtitle = flat(admin, "panel.subtitle.alerts", "count" to "${data.flagged.size}"),
+                    detail = note(admin) + listOf(
+                        LedgerLine(flat(admin, "panel.subtitle.server", "server" to serverId), LedgerScreen.FADED),
+                        LedgerLine(flat(admin, "panel.note.flagged", "count" to "${data.flagged.size}"), LedgerScreen.FADED),
+                    ) + help(admin, "main", 3) + if (canBan) emptyList() else help(admin, "no-ban", 2, LedgerScreen.FADED),
+                    leftButton = LedgerButton(flat(admin, "panel.button.bans"), if (canBan) ButtonStyle.SECONDARY else ButtonStyle.DISABLED),
+                    rightButton = refresh,
+                    empty = LedgerEmpty(listOf(flat(admin, "panel.empty.alerts")), GORM),
                 ),
             )
             Mode.CASE -> {
                 val name = data.selected ?: ""
+                val replayable = data.selectedIncident != null
                 LedgerView(
                     title = name.ifEmpty { flat(admin, "panel.title.case") },
                     subtitle = flat(admin, "panel.subtitle.case", "player" to name),
                     rows = listOf(
-                        action(admin, Material.ENDER_EYE, "panel.action.spectate", LedgerScreen.INK),
-                        action(admin, Material.ENDER_PEARL, "panel.action.teleport", LedgerScreen.INK),
-                        action(admin, Material.CLOCK, "panel.action.exempt", LedgerScreen.INK),
-                        action(admin, Material.BARRIER, "panel.action.ban", LedgerScreen.RED),
-                        action(admin, Material.FILLED_MAP, "panel.action.replay", LedgerScreen.INK),
+                        action(admin, Material.ENDER_EYE, "panel.action.spectate"),
+                        action(admin, Material.ENDER_PEARL, "panel.action.teleport"),
+                        action(admin, Material.CLOCK, "panel.action.exempt"),
+                        action(admin, Material.BARRIER, "panel.action.ban", LedgerScreen.RED, if (canBan) null else "panel.action.ban.denied"),
+                        action(admin, Material.FILLED_MAP, "panel.action.replay", locked = if (replayable) null else "panel.action.replay.missing"),
                     ),
-                    left = caseNote(admin, name),
-                    right = help(admin, "case"),
-                    buttons = listOf(back, refresh),
+                    detail = caseNote(admin, name) + help(admin, "case", 2),
+                    back = true,
+                    rightButton = refresh,
                 )
             }
-            Mode.TEMPLATES -> LedgerView(
-                title = flat(admin, "panel.title.ban", "player" to (data.selected ?: "")),
-                subtitle = flat(admin, "panel.subtitle.ban"),
-                rows = banTemplates.map { (labelKey, hours, reason) ->
-                    LedgerRow(
-                        label = flat(admin, labelKey),
-                        value = "${hours}h",
-                        labelColor = LedgerScreen.RED,
-                        valueColor = LedgerScreen.FADED,
-                        icon = ItemStack(Material.RED_DYE),
-                        tooltip = listOf(screen(admin, labelKey), screen(admin, "panel.template.tip", "reason" to reason, "hours" to "$hours")),
-                    )
-                },
-                left = caseNote(admin, data.selected ?: ""),
-                right = help(admin, "ban"),
-                buttons = listOf(back, null),
-            )
+            Mode.TEMPLATES -> {
+                val name = data.selected ?: ""
+                val online = Bukkit.getPlayerExact(name) != null
+                val chosen = data.template != null
+                val step = when {
+                    !online -> "ban.offline"
+                    chosen -> "ban.confirm"
+                    else -> "ban.pick"
+                }
+                LedgerView(
+                    title = flat(admin, "panel.title.ban", "player" to name),
+                    subtitle = flat(admin, "panel.subtitle.ban"),
+                    rows = banTemplates.mapIndexed { index, (labelKey, hours, reason) ->
+                        LedgerRow(
+                            label = flat(admin, labelKey),
+                            value = "${hours}h",
+                            labelColor = LedgerScreen.RED,
+                            valueColor = LedgerScreen.FADED,
+                            icon = ItemStack(Material.RED_DYE),
+                            selected = index == data.template,
+                            tooltip = listOf(
+                                screen(admin, labelKey),
+                                plain(flat(admin, "panel.kind.template"), GREY),
+                                screen(admin, "panel.template.tip", "reason" to reason, "hours" to "$hours"),
+                                screen(admin, "panel.click.select"),
+                            ),
+                        )
+                    },
+                    detail = buildList {
+                        add(LedgerLine(flat(admin, "panel.title.case"), LedgerScreen.RED))
+                        add(LedgerLine(""))
+                        add(LedgerLine(name))
+                        add(
+                            LedgerLine(
+                                flat(admin, if (online) "panel.note.online" else "panel.note.offline"),
+                                if (online) LedgerScreen.GREEN else LedgerScreen.FADED,
+                            ),
+                        )
+                        addAll(help(admin, step, 2, if (online) LedgerScreen.INK else LedgerScreen.RED))
+                    },
+                    back = true,
+                    rightButton = LedgerButton(
+                        flat(admin, "panel.button.ban"),
+                        if (chosen && online && canBan) ButtonStyle.DANGER else ButtonStyle.DISABLED,
+                    ),
+                )
+            }
             Mode.BANS -> paged(
                 data,
-                data.bans.map { banRow(admin, it) },
+                data.bans.map { banRow(admin, it, it.playerId == data.selectedBan) },
                 LedgerView(
                     title = flat(admin, "panel.title.bans"),
-                    subtitle = if (data.bans.isEmpty()) flat(admin, "panel.bans.empty")
-                    else flat(admin, "panel.subtitle.bans", "count" to "${data.bans.size}"),
-                    left = note(admin, emptyList()),
-                    right = help(admin, "bans"),
-                    buttons = listOf(back, refresh),
+                    subtitle = flat(admin, "panel.subtitle.bans", "count" to "${data.bans.size}"),
+                    detail = note(admin) +
+                        LedgerLine(flat(admin, "panel.note.bans", "count" to "${data.bans.size}"), LedgerScreen.FADED) +
+                        if (data.bans.isEmpty()) emptyList() else help(admin, "bans", 3),
+                    back = true,
+                    leftButton = refresh,
+                    rightButton = if (data.bans.isEmpty()) {
+                        null
+                    } else {
+                        LedgerButton(
+                            flat(admin, "panel.button.unban"),
+                            if (data.bans.any { it.playerId == data.selectedBan }) ButtonStyle.PRIMARY else ButtonStyle.DISABLED,
+                        )
+                    },
+                    empty = LedgerEmpty(listOf(flat(admin, "panel.empty.bans")), GORM),
                 ),
             )
         }
@@ -270,20 +348,20 @@ class GuiService(
         return base.copy(rows = all.drop(data.page * LedgerLayout.ROWS).take(LedgerLayout.ROWS), page = data.page, pages = pages)
     }
 
-    private fun alertRow(admin: Player, snap: IncidentSnapshot): LedgerRow {
+    private fun alertRow(admin: Player, snap: IncidentSnapshot, selected: Boolean): LedgerRow {
         val confPct = (snap.confidence * 100).toInt()
-        val color = if (confPct >= 80) LedgerScreen.RED else if (confPct >= 50) ORANGE else LedgerScreen.INK
+        val color = if (confPct >= 80) PillColor.RED else if (confPct >= 50) PillColor.GOLD else PillColor.GREY
         return LedgerRow(
             label = snap.playerName,
-            value = "$confPct%",
-            valueColor = color,
             icon = head(snap.playerName),
             badge = if (confPct >= 80) LedgerBadge.RUNE else null,
+            pill = LedgerPill("$confPct%", color),
+            selected = selected,
             tooltip = alertTooltip(admin, snap),
         )
     }
 
-    private fun banRow(admin: Player, ban: de.tytoss.iguard.storage.BanRow): LedgerRow {
+    private fun banRow(admin: Player, ban: de.tytoss.iguard.storage.BanRow, selected: Boolean): LedgerRow {
         val until = ban.expiresAt?.let { DATE.format(java.time.Instant.ofEpochMilli(it)) }
             ?: screenText(admin, "ban.expiry.permanent")
         return LedgerRow(
@@ -292,31 +370,38 @@ class GuiService(
             labelColor = LedgerScreen.RED,
             valueColor = LedgerScreen.FADED,
             icon = head(ban.playerName),
+            selected = selected,
             tooltip = listOf(
                 plain(ban.playerName, TextColor.color(0xFF5A4A)),
+                plain(flat(admin, "panel.kind.ban"), GREY),
                 screen(admin, "panel.ban.until", "until" to until),
                 screen(admin, "panel.ban.reason", "reason" to ban.reason),
-                screen(admin, "panel.ban.click-unban"),
+                screen(admin, "panel.click.select"),
             ),
         )
     }
 
-    private fun action(admin: Player, material: Material, key: String, color: TextColor): LedgerRow =
+    /** A case action row; [locked] names the tooltip line explaining why it is unavailable (greyed out). */
+    private fun action(admin: Player, material: Material, key: String, color: TextColor = LedgerScreen.INK, locked: String? = null): LedgerRow =
         LedgerRow(
             label = flat(admin, key),
-            labelColor = color,
+            labelColor = if (locked != null) LedgerScreen.DISABLED_TEXT else color,
             icon = ItemStack(material),
-            tooltip = listOf(screen(admin, key), screen(admin, "$key.tip")),
+            tooltip = listOf(
+                screen(admin, key),
+                plain(flat(admin, "panel.kind.action"), GREY),
+                screen(admin, locked ?: "$key.tip"),
+            ),
         )
 
-    private fun note(admin: Player, extra: List<Pair<String, Array<Pair<String, String>>>>): List<LedgerLine> = buildList {
-        add(LedgerLine("IGuard", LedgerScreen.RED))
-        add(LedgerLine(""))
-        add(LedgerLine(admin.name))
-        extra.forEach { (key, params) -> add(LedgerLine(flat(admin, key, *params), LedgerScreen.FADED)) }
-    }
+    /** Head of the alerts and bans notes: title, blank line, the admin. */
+    private fun note(admin: Player): List<LedgerLine> = listOf(
+        LedgerLine(flat(admin, "panel.note.title"), LedgerScreen.RED),
+        LedgerLine(""),
+        LedgerLine(admin.name),
+    )
 
-    /** Left note of a case: confidence, families, evidence, action and the top violation levels. */
+    /** Case note: confidence, families, evidence, action and the top violation levels. */
     private fun caseNote(admin: Player, name: String): List<LedgerLine> = buildList {
         add(LedgerLine(flat(admin, "panel.title.case"), LedgerScreen.RED))
         add(LedgerLine(""))
@@ -326,7 +411,7 @@ class GuiService(
         if (snap != null) {
             val confPct = (snap.confidence * 100).toInt()
             add(LedgerLine(flat(admin, "panel.case.confidence", "value" to "$confPct"), if (confPct >= 80) LedgerScreen.RED else LedgerScreen.INK))
-            snap.families.forEach { add(LedgerLine(it.toString().lowercase(), LedgerScreen.FADED)) }
+            if (snap.families.isNotEmpty()) add(LedgerLine(snap.families.joinToString { it.toString().lowercase() }, LedgerScreen.FADED))
             add(LedgerLine(flat(admin, "panel.case.evidence", "count" to "${snap.evidenceCount}"), LedgerScreen.FADED))
             add(LedgerLine(flat(admin, "panel.case.action", "action" to (snap.shadowAction ?: screenText(admin, "value.none"))), LedgerScreen.FADED))
         } else {
@@ -336,17 +421,15 @@ class GuiService(
         if (vls.isNotEmpty()) {
             add(LedgerLine(""))
             add(LedgerLine(flat(admin, "panel.case.vls-header")))
-            vls.entries.sortedByDescending { it.value }.take(4).forEach {
+            vls.entries.sortedByDescending { it.value }.take(3).forEach {
                 add(LedgerLine("${it.key}: ${"%.1f".format(it.value)}", LedgerScreen.FADED))
             }
         }
     }
 
-    private fun help(admin: Player, mode: String): List<LedgerLine> = buildList {
-        add(LedgerLine(flat(admin, "panel.help.title"), LedgerScreen.RED))
-        add(LedgerLine(""))
-        (1..4).forEach { add(LedgerLine(flat(admin, "panel.help.$mode.$it"))) }
-    }
+    /** A blank line and [lines] help lines `panel.help.<mode>.<n>`. */
+    private fun help(admin: Player, mode: String, lines: Int, color: TextColor = LedgerScreen.INK): List<LedgerLine> =
+        listOf(LedgerLine("")) + (1..lines).map { LedgerLine(flat(admin, "panel.help.$mode.$it"), color) }
 
     private fun target(ctx: GuiClickContext): Player? =
         state[ctx.player.uniqueId]?.selected?.let { Bukkit.getPlayerExact(it) }
@@ -372,6 +455,7 @@ class GuiService(
         val colorTag = if (confPct >= 80) "<#ff5a4a>" else if (confPct >= 50) "<#ffb43a>" else "<#ffcf4a>"
         return listOf(
             plain(snap.playerName, TextColor.color(0xFFCF4A)),
+            plain(flat(player, "panel.kind.alert"), GREY),
             screen(player, "panel.head.confidence", "color" to colorTag, "value" to "$confPct"),
             screen(player, "panel.head.families", "families" to snap.families.joinToString()),
             if (snap.shadowAction != null) screen(player, "panel.head.action", "action" to snap.shadowAction)
@@ -415,8 +499,11 @@ class GuiService(
         miniMessage.deserialize(LegacyToMini.translate(text)).decoration(TextDecoration.ITALIC, false)
 
     private companion object {
-        /** Ink for medium confidence. */
-        val ORANGE: TextColor = TextColor.color(0x9A5A12)
+        /** Tooltip category colour (`disabled` base). */
+        val GREY: TextColor = TextColor.color(0xA89A84)
+
+        /** Speaker of the empty states: Gorm Faust, the fight master. */
+        const val GORM = "gorm"
 
         val DATE: java.time.format.DateTimeFormatter =
             java.time.format.DateTimeFormatter.ofPattern("dd.MM.yy HH:mm").withZone(java.time.ZoneId.systemDefault())

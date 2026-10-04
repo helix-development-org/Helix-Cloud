@@ -15,15 +15,13 @@
   "menu.on": "An",
   "menu.off": "Aus",
   "menu.empty": "–",
-  "menu.page": "Seite {page}/{pages}",
   "menu.hint.toggle": "<#ffcf4a>Klick: Umschalten",
   "menu.hint.choice": "<#ffcf4a>Klick: Nächste Option",
   "menu.hint.text": "<#ffcf4a>Klick: Bearbeiten",
   "menu.note.title": "Dein Wappen",
-  "menu.help.title": "Anleitung",
-  "menu.help.1": "Klicke eine Zeile,",
-  "menu.help.2": "um sie zu ändern.",
-  "menu.help.3": "Pfeile unten",
-  "menu.help.4": "blättern weiter.",
-  "menu.none": "Keine Einstellungen."
+  "menu.help": "Klick: ändern",
+  "menu.kind.toggle": "Schalter",
+  "menu.kind.choice": "Auswahl",
+  "menu.kind.text": "Freitext",
+  "menu.empty-state": "Hier gibt's nichts einzustellen. Ich hab schon alles eingestellt. Glaube ich."
 }

@@ -7,11 +7,16 @@ import de.tytoss.igui.gui.GuiDefinition
 import de.tytoss.igui.gui.GuiInputCancelledException
 import de.tytoss.igui.gui.GuiInputTimeoutException
 import de.tytoss.igui.screen.LedgerBadge
+import de.tytoss.igui.screen.LedgerEmpty
 import de.tytoss.igui.screen.LedgerLayout
 import de.tytoss.igui.screen.LedgerLine
+import de.tytoss.igui.screen.LedgerPill
 import de.tytoss.igui.screen.LedgerRow
 import de.tytoss.igui.screen.LedgerScreen
 import de.tytoss.igui.screen.LedgerView
+import de.tytoss.igui.screen.LifeSign
+import de.tytoss.igui.screen.PillColor
+import de.tytoss.igui.screen.Villagers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -119,62 +124,62 @@ class ProfileGuiService(
         }
     }
 
-    /** Puts the current profile page into the ledger: one row per setting, crest note left, help right. */
+    /** Puts the current profile page into the ledger: one row per setting, the crest note with a short help on the right. */
     private fun showLedger(player: Player) {
         val view = views[player.uniqueId] ?: return
         val settings = view.settings
         val pageCount = maxOf(1, (settings.size + LedgerLayout.ROWS - 1) / LedgerLayout.ROWS)
         val page = (pages[player.uniqueId] ?: 0).coerceIn(0, pageCount - 1).also { pages[player.uniqueId] = it }
         val rows = settings.drop(page * LedgerLayout.ROWS).take(LedgerLayout.ROWS).map { row(player, it) }
-        val left = buildList {
+        val detail = buildList {
             add(LedgerLine(screenText(player, "menu.note.title"), LedgerScreen.RED))
             add(LedgerLine(""))
             add(LedgerLine(player.name))
-            view.info.values.flatten().take(10).forEach { add(LedgerLine("${it.label}: ${it.value}", LedgerScreen.FADED)) }
-        }
-        val right = buildList {
-            add(LedgerLine(screenText(player, "menu.help.title"), LedgerScreen.RED))
-            add(LedgerLine(""))
-            (1..4).forEach { add(LedgerLine(screenText(player, "menu.help.$it"))) }
+            view.info.values.flatten().take(INFO_LINES).forEach { add(LedgerLine("${it.label}: ${it.value}", LedgerScreen.FADED)) }
+            if (settings.isNotEmpty()) {
+                add(LedgerLine(""))
+                add(LedgerLine(screenText(player, "menu.help")))
+            }
         }
         ledger.show(
             player,
             LedgerView(
                 title = screenText(player, "menu.title"),
-                subtitle = if (settings.isEmpty()) screenText(player, "menu.none") else screenText(player, "menu.subtitle", "player" to player.name),
+                subtitle = screenText(player, "menu.subtitle", "player" to player.name),
                 rows = rows,
                 page = page,
                 pages = pageCount,
-                left = left,
-                right = right,
+                detail = detail,
+                lifeSign = LifeSign.CANDLE,
+                empty = LedgerEmpty(listOf(screenText(player, "menu.empty-state")), Villagers.NARRATOR),
             ),
         )
     }
 
     private fun row(player: Player, setting: ResolvedSetting): LedgerRow {
+        val on = setting.current == "true"
         val (value, color) = when (val type = setting.descriptor.type) {
             is ProfileSettingType.Toggle ->
-                if (setting.current == "true") screenText(player, "menu.on") to LedgerScreen.GREEN else screenText(player, "menu.off") to LedgerScreen.RED
+                if (on) screenText(player, "menu.on") to LedgerScreen.GREEN else screenText(player, "menu.off") to LedgerScreen.RED
             is ProfileSettingType.Choice -> (type.options.find { it.id == setting.current }?.label ?: setting.current) to LedgerScreen.INK
             is ProfileSettingType.FreeText -> setting.current.ifBlank { screenText(player, "menu.empty") } to LedgerScreen.FADED
         }
-        val hint = when (setting.descriptor.type) {
-            is ProfileSettingType.Toggle -> "menu.hint.toggle"
-            is ProfileSettingType.Choice -> "menu.hint.choice"
-            is ProfileSettingType.FreeText -> "menu.hint.text"
+        val (kind, hint) = when (setting.descriptor.type) {
+            is ProfileSettingType.Toggle -> "menu.kind.toggle" to "menu.hint.toggle"
+            is ProfileSettingType.Choice -> "menu.kind.choice" to "menu.hint.choice"
+            is ProfileSettingType.FreeText -> "menu.kind.text" to "menu.hint.text"
         }
+        val toggle = setting.descriptor.type is ProfileSettingType.Toggle
         return LedgerRow(
             label = setting.descriptor.label,
             value = value,
             valueColor = color,
-            icon = settingItem(player, setting),
-            badge = if (setting.descriptor.type is ProfileSettingType.Toggle) {
-                if (setting.current == "true") LedgerBadge.GEM_ON else LedgerBadge.GEM_OFF
-            } else {
-                null
-            },
+            icon = settingItem(setting),
+            badge = if (toggle) (if (on) LedgerBadge.GEM_ON else LedgerBadge.GEM_OFF) else null,
+            pill = if (toggle) LedgerPill(value, if (on) PillColor.GREEN else PillColor.GREY) else null,
             tooltip = listOf(
-                plain(setting.descriptor.label, TextColor.color(0xFFCF4A)),
+                plain(setting.descriptor.label, GOLD),
+                plain(screenText(player, kind), GREY),
                 render(translations.screen(player.name, locale(player), "menu.current", "value" to value)),
                 render(translations.screen(player.name, locale(player), hint)),
             ),
@@ -217,23 +222,15 @@ class ProfileGuiService(
         showLedger(player)
     }
 
-    private fun settingItem(player: Player, setting: ResolvedSetting): ItemStack {
+    /** The row icon of a setting (the ledger puts the row tooltip on it). */
+    private fun settingItem(setting: ResolvedSetting): ItemStack {
         val material = when (val type = setting.descriptor.type) {
             is ProfileSettingType.Toggle -> if (setting.current == "true") Material.LIME_DYE else Material.GRAY_DYE
             is ProfileSettingType.Choice ->
                 type.options.find { it.id == setting.current }?.icon?.let(::materialOrNull) ?: Material.NAME_TAG
             is ProfileSettingType.FreeText -> Material.WRITABLE_BOOK
         }
-        val currentLabel = when (val type = setting.descriptor.type) {
-            is ProfileSettingType.Choice -> type.options.find { it.id == setting.current }?.label ?: setting.current
-            else -> setting.current
-        }
-        return ItemStack(material).apply {
-            editMeta { meta ->
-                meta.displayName(plain(setting.descriptor.label, TextColor.color(0xFFCF4A)))
-                meta.lore(listOf(render(translations.screen(player.name, locale(player), "menu.current", "value" to currentLabel))))
-            }
-        }
+        return ItemStack(material)
     }
 
     private fun materialOrNull(name: String): Material? = runCatching { Material.valueOf(name.uppercase()) }.getOrNull()
@@ -254,5 +251,14 @@ class ProfileGuiService(
     private fun plain(text: String, color: TextColor): Component =
         Component.text(text, color).decoration(TextDecoration.ITALIC, false)
 
+    private companion object {
+        /** Tooltip name and action colour (`gold` base). */
+        val GOLD: TextColor = TextColor.color(0xFFCF4A)
 
+        /** Tooltip category colour (`disabled` base). */
+        val GREY: TextColor = TextColor.color(0xA89A84)
+
+        /** Profile info lines on the note (the note holds 16 lines). */
+        const val INFO_LINES = 10
+    }
 }
