@@ -10,5 +10,20 @@
   "menu.title": "Your Profile",
   "menu.starting": "<red>The profile menu is still starting, try again in a moment.",
   "menu.no-options": "<red>You have no unlocked options for this setting.",
-  "menu.current": "<gray>Current: <white>{value}</white>"
+  "menu.current": "<gray>Current: <white>{value}</white>",
+  "menu.subtitle": "Settings of {player}",
+  "menu.on": "On",
+  "menu.off": "Off",
+  "menu.empty": "–",
+  "menu.page": "Page {page}/{pages}",
+  "menu.hint.toggle": "<gray>Click to toggle",
+  "menu.hint.choice": "<gray>Click for the next option",
+  "menu.hint.text": "<gray>Click to edit",
+  "menu.note.title": "Your crest",
+  "menu.help.title": "How to",
+  "menu.help.1": "Click a row",
+  "menu.help.2": "to change it.",
+  "menu.help.3": "The arrows below",
+  "menu.help.4": "turn the page.",
+  "menu.none": "No settings."
 }

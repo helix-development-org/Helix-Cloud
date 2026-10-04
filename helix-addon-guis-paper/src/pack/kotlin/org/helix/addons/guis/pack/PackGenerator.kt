@@ -28,6 +28,8 @@ fun main(args: Array<String>) {
         "assets/$NAMESPACE/font/spaces.json" to spacesFont(),
     )
     entries.putAll(textRowFonts())
+    entries.putAll(ledger(Path.of(args[1])))
+    entries["assets/$NAMESPACE/items/empty.json"] = """{"model":{"type":"minecraft:empty"}}""".toByteArray()
     // Text at any height for full-window screens (helix-gui `textAt`): one font per text top
     de.tytoss.igui.screen.ScreenFonts.TEXT_TOPS.forEach { top ->
         val key = de.tytoss.igui.screen.ScreenFonts.textFont(top).substringAfter(':')
@@ -97,4 +99,28 @@ private val ASCII_GRID: String = buildString {
         "\\u2261\\u00b1\\u2265\\u2264\\u2320\\u2321\\u00f7\\u2248\\u00b0\\u2219\\u00b7\\u221a\\u207f\\u00b2\\u25a0\\u0000",
     )
     append(rows.joinToString(",\n") { "\"$it\"" })
+}
+
+/**
+ * The shared ledger screen (helix-gui `LedgerScreen`): Blockbench art from `src/pack/resources/ledger` as glyphs of
+ * `helix_guis:ledger`, positioned by `LedgerLayout`.
+ */
+private fun ledger(art: Path): Map<String, ByteArray> {
+    val L = de.tytoss.igui.screen.LedgerLayout
+    val F = de.tytoss.igui.screen.ScreenFonts
+    val out = linkedMapOf<String, ByteArray>()
+    val providers = mutableListOf<String>()
+    val bg = javax.imageio.ImageIO.read(art.resolve("background.png").toFile())
+    F.tiles(bg.width, bg.height).forEachIndexed { i, tile ->
+        val bytes = java.io.ByteArrayOutputStream().also { javax.imageio.ImageIO.write(bg.getSubimage(tile.x, tile.y, tile.width, tile.height), "png", it) }.toByteArray()
+        out["assets/$NAMESPACE/textures/gui/ledger/background_$i.png"] = bytes
+        providers += F.bitmap("$NAMESPACE:gui/ledger/background_$i.png", L.BG_Y + tile.y, tile.height, L.BG_TILE + i)
+    }
+    listOf("arrow_left" to L.ARROW_LEFT, "arrow_right" to L.ARROW_RIGHT, "button" to L.BUTTON).forEach { (name, code) ->
+        out["assets/$NAMESPACE/textures/gui/ledger/$name.png"] = Files.readAllBytes(art.resolve("$name.png"))
+        val height = if (name == "button") L.BUTTON_H else L.ARROW_SIZE
+        providers += F.bitmap("$NAMESPACE:gui/ledger/$name.png", L.FOOTER_TOP, height, code)
+    }
+    out["assets/$NAMESPACE/font/ledger.json"] = """{"providers":[${providers.joinToString(",")}]}""".toByteArray()
+    return out
 }

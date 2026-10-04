@@ -77,6 +77,8 @@ val generatePack by tasks.registering(JavaExec::class) {
     classpath = sourceSets["pack"].runtimeClasspath
     mainClass.set("org.helix.addons.guis.pack.PackGeneratorKt")
     val output = layout.buildDirectory.file("pack/pack.zip")
-    argumentProviders.add(CommandLineArgumentProvider { listOf(output.get().asFile.absolutePath) })
+    val art = layout.projectDirectory.dir("src/pack/resources/ledger")
+    argumentProviders.add(CommandLineArgumentProvider { listOf(output.get().asFile.absolutePath, art.asFile.absolutePath) })
+    inputs.dir(art)
     outputs.file(output)
 }

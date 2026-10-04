@@ -10,5 +10,20 @@
   "menu.title": "Dein Profil",
   "menu.starting": "<red>Das Profilmenü startet noch, versuch es gleich nochmal.",
   "menu.no-options": "<red>Du hast keine freigeschalteten Optionen für diese Einstellung.",
-  "menu.current": "<gray>Aktuell: <white>{value}</white>"
+  "menu.current": "<gray>Aktuell: <white>{value}</white>",
+  "menu.subtitle": "Einstellungen von {player}",
+  "menu.on": "An",
+  "menu.off": "Aus",
+  "menu.empty": "–",
+  "menu.page": "Seite {page}/{pages}",
+  "menu.hint.toggle": "<gray>Klicken zum Umschalten",
+  "menu.hint.choice": "<gray>Klicken für die nächste Option",
+  "menu.hint.text": "<gray>Klicken zum Bearbeiten",
+  "menu.note.title": "Dein Wappen",
+  "menu.help.title": "Anleitung",
+  "menu.help.1": "Klicke eine Zeile,",
+  "menu.help.2": "um sie zu ändern.",
+  "menu.help.3": "Pfeile unten",
+  "menu.help.4": "blättern weiter.",
+  "menu.none": "Keine Einstellungen."
 }

@@ -6,6 +6,11 @@ import de.tytoss.igui.gui.GuiClickContext
 import de.tytoss.igui.gui.GuiDefinition
 import de.tytoss.igui.gui.GuiInputCancelledException
 import de.tytoss.igui.gui.GuiInputTimeoutException
+import de.tytoss.igui.screen.LedgerLayout
+import de.tytoss.igui.screen.LedgerLine
+import de.tytoss.igui.screen.LedgerRow
+import de.tytoss.igui.screen.LedgerScreen
+import de.tytoss.igui.screen.LedgerView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -28,8 +33,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * The `/profilemenu` GUI, built on the shared Helix-GUIs plugin's IGui
- * instance: one item per setting the profile addon aggregates across every
- * contributing addon. Clicking a toggle flips it, clicking a choice cycles
+ * instance as a medieval ledger (helix-gui [LedgerScreen]): one row per setting the profile addon aggregates across
+ * every contributing addon, eight per page. Clicking a toggle flips it, clicking a choice cycles
  * to the next unlocked option, clicking free text opens an anvil prompt —
  * every change round-trips through the node's `profile.setting.set` action,
  * so this plugin holds no settings state of its own. All player-facing text
@@ -51,6 +56,8 @@ class ProfileGuiService(
 
     @Volatile private var menu: GuiDefinition? = null
     private val views = ConcurrentHashMap<UUID, ProfileView>()
+    private val pages = ConcurrentHashMap<UUID, Int>()
+    private val ledger = LedgerScreen()
     private val miniMessage = MiniMessage.miniMessage()
 
     /** Awaits the shared Helix-GUIs instance and builds the menu definition; safe to call once on enable. */
@@ -88,23 +95,83 @@ class ProfileGuiService(
     }
 
     private suspend fun buildMenu(gui: IGui): GuiDefinition = gui.gui("profile-menu") {
-        rows = 3
+        rows = 6
+        playerInventory = true
         landingPage = "main"
-
+        onClose { ctx -> ledger.forget(ctx.player); pages.remove(ctx.player.uniqueId) }
         page("main") {
-            cancelAllInteractions = true
-            title { ctx -> centeredText(screenText(ctx.player, "menu.title"), 0, color = NamedTextColor.WHITE) }
             prepare { player -> refreshView(player) }
-            for (index in 0 until MAX_SETTINGS) {
-                item(index) { ctx ->
-                    views[ctx.player.uniqueId]?.settings?.getOrNull(index)?.let { settingItem(ctx.player, it) }
-                }
-                onClick(index) { ctx ->
-                    val setting = views[ctx.player.uniqueId]?.settings?.getOrNull(index) ?: return@onClick
+            ledger.install(
+                this,
+                onRow = { ctx, row ->
+                    val index = (pages[ctx.player.uniqueId] ?: 0) * LedgerLayout.ROWS + row
+                    val setting = views[ctx.player.uniqueId]?.settings?.getOrNull(index) ?: return@install
                     handleClick(ctx, setting)
-                }
-            }
+                },
+                onPage = { ctx, step ->
+                    pages.merge(ctx.player.uniqueId, step, Int::plus)
+                    showLedger(ctx.player)
+                    ctx.gui.refresh(ctx.player)
+                },
+            )
         }
+    }
+
+    /** Puts the current profile page into the ledger: one row per setting, crest note left, help right. */
+    private fun showLedger(player: Player) {
+        val view = views[player.uniqueId] ?: return
+        val settings = view.settings
+        val pageCount = maxOf(1, (settings.size + LedgerLayout.ROWS - 1) / LedgerLayout.ROWS)
+        val page = (pages[player.uniqueId] ?: 0).coerceIn(0, pageCount - 1).also { pages[player.uniqueId] = it }
+        val rows = settings.drop(page * LedgerLayout.ROWS).take(LedgerLayout.ROWS).map { row(player, it) }
+        val left = buildList {
+            add(LedgerLine(screenText(player, "menu.note.title"), LedgerScreen.RED))
+            add(LedgerLine(""))
+            add(LedgerLine(player.name))
+            view.info.values.flatten().take(10).forEach { add(LedgerLine("${it.label}: ${it.value}", LedgerScreen.FADED)) }
+        }
+        val right = buildList {
+            add(LedgerLine(screenText(player, "menu.help.title"), LedgerScreen.RED))
+            add(LedgerLine(""))
+            (1..4).forEach { add(LedgerLine(screenText(player, "menu.help.$it"))) }
+        }
+        ledger.show(
+            player,
+            LedgerView(
+                title = screenText(player, "menu.title"),
+                subtitle = if (settings.isEmpty()) screenText(player, "menu.none") else screenText(player, "menu.subtitle", "player" to player.name),
+                rows = rows,
+                page = page,
+                pages = pageCount,
+                left = left,
+                right = right,
+            ),
+        )
+    }
+
+    private fun row(player: Player, setting: ResolvedSetting): LedgerRow {
+        val (value, color) = when (val type = setting.descriptor.type) {
+            is ProfileSettingType.Toggle ->
+                if (setting.current == "true") screenText(player, "menu.on") to LedgerScreen.GREEN else screenText(player, "menu.off") to LedgerScreen.RED
+            is ProfileSettingType.Choice -> (type.options.find { it.id == setting.current }?.label ?: setting.current) to LedgerScreen.INK
+            is ProfileSettingType.FreeText -> setting.current.ifBlank { screenText(player, "menu.empty") } to LedgerScreen.FADED
+        }
+        val hint = when (setting.descriptor.type) {
+            is ProfileSettingType.Toggle -> "menu.hint.toggle"
+            is ProfileSettingType.Choice -> "menu.hint.choice"
+            is ProfileSettingType.FreeText -> "menu.hint.text"
+        }
+        return LedgerRow(
+            label = setting.descriptor.label,
+            value = value,
+            valueColor = color,
+            icon = settingItem(player, setting),
+            tooltip = listOf(
+                plain(setting.descriptor.label, NamedTextColor.GOLD),
+                render(translations.screen(player.name, locale(player), "menu.current", "value" to value)),
+                render(translations.screen(player.name, locale(player), hint)),
+            ),
+        )
     }
 
     private suspend fun handleClick(ctx: GuiClickContext, setting: ResolvedSetting) {
@@ -140,6 +207,7 @@ class ProfileGuiService(
 
     private suspend fun refreshView(player: Player) {
         withContext(Dispatchers.IO) { client.view(player.name) }?.let { views[player.uniqueId] = it }
+        showLedger(player)
     }
 
     private fun settingItem(player: Player, setting: ResolvedSetting): ItemStack {
@@ -168,8 +236,8 @@ class ProfileGuiService(
         render(translations.text(player.name, locale(player), key, *params))
 
     /** Prefix-free screen/GUI text resolved in the player's language, as plain text for the pixel font. */
-    private fun screenText(player: Player, key: String): String =
-        translations.screen(player.name, locale(player), key)
+    private fun screenText(player: Player, key: String, vararg params: Pair<String, String>): String =
+        translations.screen(player.name, locale(player), key, *params)
 
     private fun locale(player: Player): String = player.locale().language
 
@@ -179,8 +247,5 @@ class ProfileGuiService(
     private fun plain(text: String, color: NamedTextColor): Component =
         Component.text(text, color).decoration(TextDecoration.ITALIC, false)
 
-    private companion object {
-        /** Settings shown per menu page; pagination is a later improvement. */
-        const val MAX_SETTINGS = 9
-    }
+
 }
