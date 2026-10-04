@@ -1,9 +1,9 @@
 {
-  "balance": "<gold>Your balance: <white>{balance} coins</white>",
-  "pay.sent": "<gold>You sent <white>{amount} coins</white> to <white>{target}</white>.",
-  "pay.received": "<gold><white>{sender}</white> sent you <white>{amount} coins</white>.",
-  "error.self": "<red>You cannot pay yourself.",
-  "error.funds": "<red>You do not have enough coins.",
-  "error.usage": "<red>Usage: <white>/pay \\<player> \\<amount></white>",
-  "error.unknown": "<red>No such player has ever joined this network."
+  "balance": "<#f1e2c2>Your balance: <#ffcf4a>{balance} coins</#ffcf4a>",
+  "pay.sent": "<#4ac85e>You sent <#ffcf4a>{amount} coins</#ffcf4a> to <#ffcf4a>{target}</#ffcf4a>.",
+  "pay.received": "<#f1e2c2><#ffcf4a>{sender}</#ffcf4a> sent you <#ffcf4a>{amount} coins</#ffcf4a>.",
+  "error.self": "<#ff5a4a>You cannot pay yourself. Choose another player.",
+  "error.funds": "<#ff5a4a>You do not have enough coins. Check your balance with <#ffcf4a>/balance</#ffcf4a>.",
+  "error.usage": "<#ff5a4a>Usage: <#ffcf4a>/pay \\<player> \\<amount></#ffcf4a>",
+  "error.unknown": "<#ff5a4a>No such player has ever joined this network. Check the spelling."
 }

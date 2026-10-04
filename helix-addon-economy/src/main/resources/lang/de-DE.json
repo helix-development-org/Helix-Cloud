@@ -1,9 +1,9 @@
 {
-  "balance": "<gold>Dein Kontostand: <white>{balance} Coins</white>",
-  "pay.sent": "<gold>Du hast <white>{amount} Coins</white> an <white>{target}</white> gesendet.",
-  "pay.received": "<gold><white>{sender}</white> hat dir <white>{amount} Coins</white> gesendet.",
-  "error.self": "<red>Du kannst dir nicht selbst Coins senden.",
-  "error.funds": "<red>Du hast nicht genug Coins.",
-  "error.usage": "<red>Benutzung: <white>/pay \\<player> \\<amount></white>",
-  "error.unknown": "<red>Dieser Spieler war noch nie auf diesem Netzwerk."
+  "balance": "<#f1e2c2>Dein Kontostand: <#ffcf4a>{balance} Coins</#ffcf4a>",
+  "pay.sent": "<#4ac85e>Du hast <#ffcf4a>{amount} Coins</#ffcf4a> an <#ffcf4a>{target}</#ffcf4a> gesendet.",
+  "pay.received": "<#f1e2c2><#ffcf4a>{sender}</#ffcf4a> hat dir <#ffcf4a>{amount} Coins</#ffcf4a> gesendet.",
+  "error.self": "<#ff5a4a>Du kannst dir nicht selbst Coins senden. Wähle einen anderen Spieler.",
+  "error.funds": "<#ff5a4a>Du hast nicht genug Coins. Prüfe deinen Kontostand mit <#ffcf4a>/balance</#ffcf4a>.",
+  "error.usage": "<#ff5a4a>Benutzung: <#ffcf4a>/pay \\<player> \\<amount></#ffcf4a>",
+  "error.unknown": "<#ff5a4a>Dieser Spieler war noch nie auf diesem Netzwerk. Prüfe die Schreibweise."
 }

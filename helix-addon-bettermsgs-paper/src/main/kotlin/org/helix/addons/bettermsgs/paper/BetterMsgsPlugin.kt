@@ -188,7 +188,7 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                 client?.action("bettermsgs.send", player.name, args[0], text)
                 withContext(mainDispatcher) {
                     player.sendMessage(
-                        translations.chatComponent(player, "sent", "<gray>To <white>{target}</white>: {text}",
+                        translations.chatComponent(player, "sent", "<#f1e2c2>To <#ffcf4a>{target}</#ffcf4a><#7a4a24>:</#7a4a24> {text}",
                             "target" to args[0], "text" to text),
                     )
                 }
@@ -262,7 +262,7 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                 translations.chatComponent(
                     player,
                     "prompt.message",
-                    "<gray>Type your message in chat (or <white>cancel</white>):",
+                    "<#f1e2c2>Type your message in chat (or <#ffcf4a>cancel</#ffcf4a>):",
                 ),
             )
         }
@@ -390,11 +390,11 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                 icon = head(contact.name),
                 badge = if (contact.unread > 0) LedgerBadge.SEAL else null,
                 tooltip = listOfNotNull(
-                    Component.text(contact.name, NamedTextColor.GOLD),
-                    Component.text(status, if (contact.online) NamedTextColor.GREEN else NamedTextColor.GRAY),
+                    Component.text(contact.name, TextColor.color(0xFFCF4A)),
+                    Component.text(status, if (contact.online) TextColor.color(0x4AC85E) else TextColor.color(0xA89A84)),
                     contact.lastEpochMs.takeIf { it > 0 }
                         ?.let { Component.text(screen(player, "screen.last", "time" to dateOf(it)), NamedTextColor.GRAY) },
-                    Component.text(screen(player, "screen.hint.open"), NamedTextColor.YELLOW),
+                    Component.text(screen(player, "screen.hint.open"), TextColor.color(0xFFCF4A)),
                 ),
             )
         }
@@ -430,8 +430,8 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                 valueColor = LedgerScreen.FADED,
                 icon = head(message.from),
                 tooltip = buildList {
-                    add(Component.text("${message.from} · ${dateOf(message.epochMs)}", NamedTextColor.GOLD))
-                    ChatMath.wrap(message.text).forEach { add(Component.text(it, NamedTextColor.WHITE)) }
+                    add(Component.text("${message.from} · ${dateOf(message.epochMs)}", TextColor.color(0xFFCF4A)))
+                    ChatMath.wrap(message.text).forEach { add(Component.text(it, TextColor.color(0xF1E2C2))) }
                 },
             )
         }

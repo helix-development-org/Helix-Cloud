@@ -1,8 +1,8 @@
 {
-  "message.no-servers": "<red>No servers are available right now.",
-  "message.connecting": "<gray>Connecting to <yellow>{server}</yellow>…",
-  "message.menu-starting": "<gray>The lobby is still starting up — try again in a moment.",
-  "menu.entry.players": "<gray>Players: <white>{players}/{max}",
-  "menu.entry.connect": "<green>Click to connect",
+  "message.no-servers": "<#ff5a4a>No servers are available right now. Try again in a moment.",
+  "message.connecting": "<#f1e2c2>Connecting to <#ffcf4a>{server}</#ffcf4a>…",
+  "message.menu-starting": "<#ffb43a>Warning: The lobby is still starting up — try again in a moment.",
+  "menu.entry.players": "<#f1e2c2>Players: <#ffcf4a>{players}/{max}",
+  "menu.entry.connect": "<#ffcf4a>Click: Connect",
   "navigator.count": "{players} players"
 }

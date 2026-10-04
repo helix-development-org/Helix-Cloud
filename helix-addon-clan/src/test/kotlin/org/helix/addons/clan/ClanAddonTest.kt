@@ -268,7 +268,7 @@ class ClanAddonTest {
 
         assertNull(resolver.resolve("Steve"), "unverified tags stay invisible")
         assertTrue(context.run("clan.verify", "STV").success)
-        assertEquals(" &8[&bSTV&8]", resolver.resolve("Steve")?.suffix)
+        assertEquals(" &7[STV]", resolver.resolve("Steve")?.suffix)
         assertNull(resolver.resolve("Nobody"))
     }
 

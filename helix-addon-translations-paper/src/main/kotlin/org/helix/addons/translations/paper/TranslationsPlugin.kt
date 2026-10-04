@@ -25,6 +25,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
+import net.kyori.adventure.text.format.TextColor
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.command.Command
@@ -162,13 +163,13 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
             return true
         }
         if (!player.hasPermission("helix.admin")) {
-            player.sendMessage(MiniPreview.render("<red>You do not have permission to edit translations."))
+            player.sendMessage(MiniPreview.render("<#ff5a4a>You do not have permission to edit translations."))
             return true
         }
         restoreBook(player) // recover a stray book from an aborted edit
         bookEditing.remove(player.uniqueId)
         val ready = gui ?: run {
-            player.sendMessage(MiniPreview.render("<gray>Translations editor is still starting up…"))
+            player.sendMessage(MiniPreview.render("<#ffb43a>Warning: The translations editor is still starting up — try again in a moment."))
             return true
         }
         scope.launch {
@@ -255,7 +256,7 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                     value = "${group.edited}/${group.count}",
                     valueColor = if (group.edited > 0) LedgerScreen.GREEN else LedgerScreen.FADED,
                     tooltip = listOf(
-                        Component.text(group.owner, NamedTextColor.GOLD),
+                        Component.text(group.owner, TextColor.color(0xFFCF4A)),
                         Component.text("${group.count} keys, ${group.edited} edited", NamedTextColor.GRAY),
                     ),
                 )
@@ -299,8 +300,8 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
             value = status,
             valueColor = color,
             tooltip = listOf(
-                Component.text(entry.key.removePrefix("helix.translations."), NamedTextColor.GOLD),
-                MiniPreview.render(if (effective.isEmpty()) "<dark_gray>(empty)" else effective),
+                Component.text(entry.key.removePrefix("helix.translations."), TextColor.color(0xFFCF4A)),
+                MiniPreview.render(if (effective.isEmpty()) "<#a89a84>(empty)" else effective),
             ),
         )
     }
@@ -309,7 +310,7 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
     private fun detailRows(s: Session): List<LedgerRow> {
         val value = displayValue(s)
         val rendered = value.split("\n").map { MiniPreview.render(it) }
-        val tooltip = listOf(Component.text("Preview (${s.language})", NamedTextColor.GOLD)) + rendered
+        val tooltip = listOf(Component.text("Preview (${s.language})", TextColor.color(0xFFCF4A))) + rendered
         val lines = MiniPreview.linesOf(value).map { runs -> runs.joinToString("") { it.text } }
         val preview = (0 until PREVIEW_ROWS).map { i ->
             val text = when {
@@ -527,7 +528,7 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
     }
 
     private fun feedback(player: Player, ok: Boolean, success: String, failure: String) {
-        player.sendMessage(MiniPreview.render(if (ok) "<green>$success" else "<red>$failure"))
+        player.sendMessage(MiniPreview.render(if (ok) "<#4ac85e>$success" else "<#ff5a4a>$failure"))
     }
 
     private fun ellipsize(text: String, max: Int): String =

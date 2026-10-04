@@ -1,12 +1,12 @@
 {
-  "banned": "<red><bold>Du bist gebannt</bold>\n<gray>von {network}\n \n<gray>Grund: <white>{reason}",
-  "banned.temp": "<red><bold>Du bist vorübergehend gebannt</bold>\n<gray>von {network}\n \n<gray>Grund: <white>{reason}\n<gray>Verbleibende Zeit: <yellow>{remaining}\n<gray>Läuft ab: <white>{expiry}",
-  "notify.set": "<white>{player}</white> <gray>wurde gebannt: {reason} <dark_gray>({expiry})</dark_gray>",
-  "notify.pardon": "<white>{player}</white> <green>wurde entbannt.",
-  "help.header": "<aqua><bold>Ban-Befehle:</bold></aqua>",
-  "help.set": "<white>/bans set <player> [duration] [reason...]</white> <dark_gray>—</dark_gray> <gray>30m, 12h, 7d oder permanent",
-  "help.pardon": "<white>/bans pardon <player></white>",
-  "help.check": "<white>/bans check <player></white>",
-  "help.list": "<white>/bans list</white>",
-  "help.history": "<white>/bans history <player></white>"
+  "banned": "<#ff5a4a><bold>Du bist gebannt</bold>\n<#f1e2c2>von <#ffcf4a>{network}</#ffcf4a>\n \n<#f1e2c2>Grund: <#ffcf4a>{reason}",
+  "banned.temp": "<#ff5a4a><bold>Du bist vorübergehend gebannt</bold>\n<#f1e2c2>von <#ffcf4a>{network}</#ffcf4a>\n \n<#f1e2c2>Grund: <#ffcf4a>{reason}\n<#f1e2c2>Verbleibende Zeit: <#ffcf4a>{remaining}\n<#f1e2c2>Läuft ab: <#ffcf4a>{expiry}",
+  "notify.set": "<#ffcf4a>{player}</#ffcf4a> <#f1e2c2>wurde gebannt: {reason} <#7a4a24>({expiry})</#7a4a24>",
+  "notify.pardon": "<#ffcf4a>{player}</#ffcf4a> <#4ac85e>wurde entbannt.",
+  "help.header": "<#ffcf4a><bold>Ban-Befehle:</bold></#ffcf4a>",
+  "help.set": "<#ffcf4a>/bans set <player> [duration] [reason...]</#ffcf4a> <#7a4a24>—</#7a4a24> <#f1e2c2>30m, 12h, 7d oder permanent",
+  "help.pardon": "<#ffcf4a>/bans pardon <player></#ffcf4a>",
+  "help.check": "<#ffcf4a>/bans check <player></#ffcf4a>",
+  "help.list": "<#ffcf4a>/bans list</#ffcf4a>",
+  "help.history": "<#ffcf4a>/bans history <player></#ffcf4a>"
 }

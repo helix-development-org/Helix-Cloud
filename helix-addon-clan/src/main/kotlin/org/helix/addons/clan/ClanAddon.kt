@@ -40,7 +40,7 @@ class ClanAddon : AddonBase() {
         // Only VERIFIED tags are displayed — a fresh or renamed tag stays invisible to other
         // players until an admin approves it (clan.verify / panel).
         context.registerDisplayResolver { name ->
-            store.clanOf(name)?.takeIf { it.verified }?.let { DisplayProfile(suffix = " &8[&b${it.tag}&8]") }
+            store.clanOf(name)?.takeIf { it.verified }?.let { DisplayProfile(suffix = " &7[${it.tag}]") }
         }
         // Expose each player's clan tag as a bridge value for the sidebar {clan}
         // placeholder; refreshed on join and after every clan command.

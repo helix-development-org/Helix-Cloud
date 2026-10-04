@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
+import net.kyori.adventure.text.format.TextColor
 import net.kyori.adventure.text.format.TextDecoration
 import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.Material
@@ -173,7 +174,7 @@ class ProfileGuiService(
                 null
             },
             tooltip = listOf(
-                plain(setting.descriptor.label, NamedTextColor.GOLD),
+                plain(setting.descriptor.label, TextColor.color(0xFFCF4A)),
                 render(translations.screen(player.name, locale(player), "menu.current", "value" to value)),
                 render(translations.screen(player.name, locale(player), hint)),
             ),
@@ -191,7 +192,7 @@ class ProfileGuiService(
             client.set(ctx.player.name, setting.owner, setting.descriptor.key, value)
         }
         if (rejection != null) {
-            ctx.player.sendMessage(render("<red>$rejection"))
+            ctx.player.sendMessage(render("<#ff5a4a>$rejection"))
         }
         refreshView(ctx.player)
         ctx.gui.refresh(ctx.player)
@@ -229,7 +230,7 @@ class ProfileGuiService(
         }
         return ItemStack(material).apply {
             editMeta { meta ->
-                meta.displayName(plain(setting.descriptor.label, NamedTextColor.AQUA))
+                meta.displayName(plain(setting.descriptor.label, TextColor.color(0xFFCF4A)))
                 meta.lore(listOf(render(translations.screen(player.name, locale(player), "menu.current", "value" to currentLabel))))
             }
         }
@@ -250,7 +251,7 @@ class ProfileGuiService(
     private fun render(text: String): Component =
         miniMessage.deserialize(LegacyToMini.translate(text)).decoration(TextDecoration.ITALIC, false)
 
-    private fun plain(text: String, color: NamedTextColor): Component =
+    private fun plain(text: String, color: TextColor): Component =
         Component.text(text, color).decoration(TextDecoration.ITALIC, false)
 
 

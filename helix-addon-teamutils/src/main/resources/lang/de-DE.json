@@ -1,9 +1,9 @@
 {
-  "chat": "<white>{sender}<gray>: <white>{message}",
-  "empty": "<gray>Keine Teammitglieder online.",
-  "list": "<aqua>Team online: <white>{members}</white>",
-  "notify": "<white>{text}",
-  "join": "<white>{player} <gray>ist jetzt <green>online<gray>.",
-  "leave": "<white>{player} <gray>ist jetzt <dark_gray>offline<gray>.",
-  "usage.tc": "<red>Verwendung: <white>/tc <nachricht...></white> <dark_gray>— <gray>oder schreibe <white>@team <nachricht></white> <gray>in den Chat"
+  "chat": "<#d8382e>[Team]</#d8382e> <#ffcf4a>{sender}</#ffcf4a> <#7a4a24>»</#7a4a24> <#f1e2c2>{message}",
+  "empty": "<#f1e2c2>Keine Teammitglieder online.",
+  "list": "<#f1e2c2>Team online: <#ffcf4a>{members}</#ffcf4a>",
+  "notify": "<#d8382e>[Team]</#d8382e> <#f1e2c2>{text}",
+  "join": "<#d8382e>[Team]</#d8382e> <#ffcf4a>{player}</#ffcf4a> <#f1e2c2>ist jetzt <#4ac85e>online<#f1e2c2>.",
+  "leave": "<#d8382e>[Team]</#d8382e> <#ffcf4a>{player}</#ffcf4a> <#f1e2c2>ist jetzt <#a89a84>offline<#f1e2c2>.",
+  "usage.tc": "<#ff5a4a>Verwendung: <#ffcf4a>/tc <nachricht...></#ffcf4a> <#7a4a24>—</#7a4a24> <#f1e2c2>oder schreibe <#ffcf4a>@team <nachricht></#ffcf4a> <#f1e2c2>in den Chat"
 }
