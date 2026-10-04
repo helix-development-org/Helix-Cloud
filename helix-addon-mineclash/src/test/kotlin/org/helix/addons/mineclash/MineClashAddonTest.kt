@@ -7,6 +7,7 @@ import org.helix.addon.sdk.testing.RecordingAddonContext
 import org.helix.addons.mineclash.profile.DocumentProfileRepository
 import org.helix.addons.mineclash.profile.MatchRecord
 import org.helix.addons.mineclash.profile.PlayerProfile
+import org.helix.addons.mineclash.profile.ShopSold
 import org.helix.api.action.ActionDescriptor
 import org.helix.api.action.ActionResult
 import org.helix.api.storage.InMemoryAddonStorage
@@ -54,12 +55,14 @@ class MineClashAddonTest {
         assertEquals(8, profile.cards.size)
         assertEquals(0L, profile.wallet["ROSEN"])
 
-        val changed = profile.copy(wallet = profile.wallet + ("ROSEN" to 30L), wins = 1)
+        assertEquals(ShopSold(), profile.shopSold)
+        val changed = profile.copy(wallet = profile.wallet + ("ROSEN" to 30L), wins = 1, shopSold = ShopSold(20365, listOf("zombie")))
         assertTrue(context.run("mineclash.profile.save", profile.uuid, Json.encodeToString(changed)).success)
         assertFalse(context.run("mineclash.profile.save", "other", Json.encodeToString(changed)).success)
         val reloaded = json.decodeFromString<PlayerProfile>(context.run("mineclash.profile.load", profile.uuid, "Alice").lines.single())
         assertEquals(30L, reloaded.roses)
         assertEquals(1, reloaded.wins)
+        assertEquals(ShopSold(20365, listOf("zombie")), reloaded.shopSold)
 
         assertTrue(context.run("mineclash.match.record", Json.encodeToString(MatchRecord("1V1", 0, listOf(listOf(profile.uuid), listOf("b")), mapOf(profile.uuid to 30)))).success)
         assertTrue(context.run("mineclash.top", "5").lines.single().contains("Alice"))
@@ -94,6 +97,8 @@ class MineClashAddonTest {
         val repo = DocumentProfileRepository(InMemoryAddonStorage())
         repo.save(PlayerProfile("a", "A", wallet = mapOf("ROSEN" to 10)))
         repo.save(PlayerProfile("b", "B", wallet = mapOf("ROSEN" to 50)))
+        // profiles written before the shopSold field existed still load with its default
+        assertEquals(ShopSold(), json.decodeFromString<PlayerProfile>("{\"uuid\":\"c\",\"name\":\"C\"}").shopSold)
         assertEquals(listOf("b", "a"), repo.topByRoses(5).map { it.first })
         assertNull(repo.load("c"))
     }

@@ -12,6 +12,15 @@ import kotlinx.serialization.Serializable
 data class ChestSlot(val rarity: String, val openingStarted: Long = -1)
 
 /**
+ * Village shop offers a player already bought on one day (each daily offer sells once per day).
+ *
+ * @property day epoch day (`LocalDate.toEpochDay()` of the game server) the purchases belong to; `0` = none yet.
+ * @property cards card ids of the daily offers bought on [day].
+ */
+@Serializable
+data class ShopSold(val day: Long = 0, val cards: List<String> = emptyList())
+
+/**
  * Persistent MineClash profile of one player — wallet, card collection, deck, chests, village
  * progress and tutorial state. This is the exact JSON shape exchanged with the Paper servers.
  *
@@ -30,6 +39,7 @@ data class ChestSlot(val rarity: String, val openingStarted: Long = -1)
  * @property perks perk key to level.
  * @property tutorialStep current tutorial step.
  * @property tutorialStarted whether the tutorial was started.
+ * @property shopSold daily shop offers already bought today (sold-out stamps survive server restarts).
  * @property updatedAt epoch millis of the last save.
  */
 @Serializable
@@ -49,6 +59,7 @@ data class PlayerProfile(
     val perks: Map<String, Int> = emptyMap(),
     val tutorialStep: Int = 0,
     val tutorialStarted: Boolean = false,
+    val shopSold: ShopSold = ShopSold(),
     val updatedAt: Long = 0,
 ) {
     /** Roses balance, the ranking currency. */
