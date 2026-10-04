@@ -104,23 +104,54 @@ private val ASCII_GRID: String = buildString {
 
 /**
  * The shared ledger screen (helix-gui `LedgerScreen`): Blockbench art from `src/pack/resources/ledger` as glyphs of
- * `helix_guis:ledger`, positioned by `LedgerLayout`.
+ * `helix_guis:ledger`, positioned by `LedgerLayout` – board tiles, arrows, buttons, the selected-row strip and the
+ * badge pills per row, the empty-state speaker heads from `src/pack/resources/villagers`.
  */
 private fun ledger(art: Path): Map<String, ByteArray> {
     val L = de.tytoss.igui.screen.LedgerLayout
     val F = de.tytoss.igui.screen.ScreenFonts
     val out = linkedMapOf<String, ByteArray>()
     val providers = mutableListOf<String>()
+    val tex = "assets/$NAMESPACE/textures/gui/ledger"
+    fun copy(name: String) { out["$tex/$name.png"] = Files.readAllBytes(art.resolve("$name.png")) }
     val bg = javax.imageio.ImageIO.read(art.resolve("background.png").toFile())
     F.tiles(bg.width, bg.height).forEachIndexed { i, tile ->
         val bytes = java.io.ByteArrayOutputStream().also { javax.imageio.ImageIO.write(bg.getSubimage(tile.x, tile.y, tile.width, tile.height), "png", it) }.toByteArray()
-        out["assets/$NAMESPACE/textures/gui/ledger/background_$i.png"] = bytes
+        out["$tex/background_$i.png"] = bytes
         providers += F.bitmap("$NAMESPACE:gui/ledger/background_$i.png", L.BG_Y + tile.y, tile.height, L.BG_TILE + i)
     }
-    listOf("arrow_left" to L.ARROW_LEFT, "arrow_right" to L.ARROW_RIGHT, "button" to L.BUTTON).forEach { (name, code) ->
-        out["assets/$NAMESPACE/textures/gui/ledger/$name.png"] = Files.readAllBytes(art.resolve("$name.png"))
-        val height = if (name == "button") L.BUTTON_H else L.ARROW_SIZE
-        providers += F.bitmap("$NAMESPACE:gui/ledger/$name.png", L.FOOTER_TOP, height, code)
+    listOf("arrow_back" to L.ARROW_BACK, "arrow_left" to L.ARROW_LEFT, "arrow_right" to L.ARROW_RIGHT,
+        "arrow_left_off" to L.ARROW_LEFT_OFF, "arrow_right_off" to L.ARROW_RIGHT_OFF).forEach { (name, code) ->
+        copy(name)
+        providers += F.bitmap("$NAMESPACE:gui/ledger/$name.png", L.FOOTER_TOP, L.ARROW_SIZE, code)
+    }
+    L.BUTTON_FILES.forEachIndexed { style, file ->
+        listOf(L.BUTTON_SMALL_W to L.BUTTON_SMALL, L.BUTTON_WIDE_W to L.BUTTON_WIDE).forEach { (width, base) ->
+            val name = "button_${file}_$width"
+            copy(name)
+            providers += F.bitmap("$NAMESPACE:gui/ledger/$name.png", L.FOOTER_TOP, L.BUTTON_H, base + style)
+        }
+    }
+    copy("row_selected")
+    val pieces = listOf("l", "r") + L.PILL_PIECES.map { it.toString() }
+    L.PILL_FILES.forEach { color -> pieces.forEach { copy("pill_${color}_$it") } }
+    for (row in 0 until L.ROWS) {
+        providers += F.bitmap("$NAMESPACE:gui/ledger/row_selected.png", L.rowTop(row) - 1, 19, L.ROW_SELECTED + row)
+        val pillTop = L.rowTop(row) + L.ROW_TEXT_OFFSET - 1
+        L.PILL_FILES.forEachIndexed { color, file ->
+            pieces.forEachIndexed { part, piece ->
+                providers += F.bitmap("$NAMESPACE:gui/ledger/pill_${file}_$piece.png", pillTop, L.PILL_H, L.PILL + row * 32 + color * 8 + part)
+            }
+        }
+    }
+    val villagers = art.resolveSibling("villagers")
+    de.tytoss.igui.screen.Villagers.IDS.forEachIndexed { i, id ->
+        out["$tex/speaker_$id.png"] = Files.readAllBytes(villagers.resolve("${id}_32.png"))
+        providers += F.bitmap("$NAMESPACE:gui/ledger/speaker_$id.png", L.EMPTY_HEAD_TOP, L.EMPTY_HEAD_SIZE, L.EMPTY_HEAD + i)
+        val model = de.tytoss.igui.screen.Villagers.headModel(id)
+        out["assets/$NAMESPACE/textures/item/$model.png"] = Files.readAllBytes(villagers.resolve("${id}_16.png"))
+        out["assets/$NAMESPACE/models/item/$model.json"] = """{"parent":"minecraft:item/generated","textures":{"layer0":"$NAMESPACE:item/$model"}}""".toByteArray()
+        out["assets/$NAMESPACE/items/$model.json"] = """{"model":{"type":"minecraft:model","model":"$NAMESPACE:item/$model"}}""".toByteArray()
     }
     out["assets/$NAMESPACE/font/ledger.json"] = """{"providers":[${providers.joinToString(",")}]}""".toByteArray()
     return out

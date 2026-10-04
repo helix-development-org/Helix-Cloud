@@ -40,6 +40,7 @@ fun DisplayBuilder.glyphAt(containerX: Int, font: Key, codePoint: Int, advance: 
  * @param top text top in container pixels.
  * @param color text colour.
  * @param align how the text sits relative to [containerX].
+ * @param shadow colour of a 1 px drop shadow (down right; design concept: white text always with an ink shadow), or null.
  */
 fun DisplayBuilder.textAt(
     value: String,
@@ -47,6 +48,7 @@ fun DisplayBuilder.textAt(
     top: Int,
     color: TextColor = NamedTextColor.WHITE,
     align: TextAlign = TextAlign.LEFT,
+    shadow: TextColor? = null,
 ) {
     if (value.isEmpty()) return
     val width = measure(value)
@@ -54,6 +56,10 @@ fun DisplayBuilder.textAt(
         TextAlign.LEFT -> containerX
         TextAlign.CENTER -> containerX - width / 2
         TextAlign.RIGHT -> containerX - width
+    }
+    if (shadow != null) {
+        moveTo(ScreenFonts.titleX(left + 1))
+        text(value, 0, shadow, Key.key(ScreenFonts.textFont(top + 1)))
     }
     moveTo(ScreenFonts.titleX(left))
     text(value, 0, color, Key.key(ScreenFonts.textFont(top)))

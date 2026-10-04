@@ -31,3 +31,14 @@ object SpriteItems {
         return item
     }
 }
+
+/** Head items of the villager cast ([Villagers]). */
+object VillagerHeads {
+    /**
+     * @param id villager id.
+     * @param tooltip tooltip lines (first = title); empty hides the tooltip.
+     * @return an item showing the villager's 16×16 head icon.
+     */
+    fun item(id: String, tooltip: List<Component> = emptyList()): ItemStack =
+        SpriteItems.of(Villagers.NAMESPACE, ScreenSprite(Villagers.headModel(Villagers.IDS[Villagers.index(id)]), "", 16, 0, 0), tooltip)
+}

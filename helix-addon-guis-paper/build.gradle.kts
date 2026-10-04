@@ -81,5 +81,6 @@ val generatePack by tasks.registering(JavaExec::class) {
     argumentProviders.add(CommandLineArgumentProvider { listOf(output.get().asFile.absolutePath, art.asFile.absolutePath) })
     inputs.dir(art)
     inputs.dir(layout.projectDirectory.dir("src/pack/resources/anim"))
+    inputs.dir(layout.projectDirectory.dir("src/pack/resources/villagers"))
     outputs.file(output)
 }

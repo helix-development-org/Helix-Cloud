@@ -26,7 +26,8 @@ class ScreenSpritesTest {
 
     @Test
     fun `sprites in the header row use distinct slots`() {
-        val header = LedgerLayout.SPRITES.filter { it.row == 0 }
+        // the life signs share the desk slot on purpose (one per menu)
+        val header = LedgerLayout.SPRITES.filter { it.row == 0 && it != LedgerLayout.QUILL }
         assertEquals(header.size, header.map { it.column }.toSet().size)
     }
 
@@ -36,5 +37,11 @@ class ScreenSpritesTest {
         assertTrue(json.contains(""""translation":[-10,20,0]"""))
         assertTrue(json.contains(""""scale":[2.0,2.0,2.0]"""))
         assertTrue(json.contains(""""layer0":"ns:item/anim/t""""))
+    }
+
+    @Test
+    fun `art file order matches the style enums`() {
+        assertEquals(LedgerLayout.BUTTON_FILES, ButtonStyle.entries.map { it.file })
+        assertEquals(LedgerLayout.PILL_FILES, PillColor.entries.map { it.file })
     }
 }
