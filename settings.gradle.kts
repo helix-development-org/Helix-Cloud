@@ -55,5 +55,6 @@ include(
     "helix-addon-admin-paper",
     "helix-addon-lobby",
     "helix-addon-lobby-paper",
-    "helix-addon-mineclash"
+    "helix-addon-mineclash",
+    "helix-addon-mobs"
 )

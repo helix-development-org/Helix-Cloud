@@ -1,0 +1,7 @@
+{
+  "id": "helix.mobs",
+  "name": "Mobs",
+  "version": "1.0.0",
+  "main": "org.helix.addons.mobs.MobsAddon",
+  "description": "Network-wide mob redesign: restyled mob textures plus cartoon Custom Entity Models (OptiFine / Fabric Entity Model Features), shipped via the network resource pack. Tells players once which client mods show the new models."
+}

@@ -95,6 +95,7 @@ val addonModules = listOf(
     "helix-addon-admin",
     "helix-addon-lobby",
     "helix-addon-mineclash",
+    "helix-addon-mobs",
 )
 
 tasks.register("releaseBundle") {
