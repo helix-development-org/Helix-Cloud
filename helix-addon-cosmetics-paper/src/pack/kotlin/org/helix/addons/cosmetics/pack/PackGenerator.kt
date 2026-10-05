@@ -150,7 +150,7 @@ private fun packMeta(): ByteArray =
     {
       "pack": {
         "pack_format": 46,
-        "supported_formats": {"min_inclusive": 46, "max_inclusive": 999},
+        "supported_formats": {"min_inclusive": 46, "max_inclusive": 999}, "min_format": 46, "max_format": 999,
         "description": "Helix Cosmetics"
       }
     }

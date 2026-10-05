@@ -29,7 +29,7 @@ fun main(args: Array<String>) {
     }
     val dimPng = ByteArrayOutputStream().also { ImageIO.write(dim, "png", it) }.toByteArray()
     val entries = linkedMapOf(
-        "pack.mcmeta" to """{"pack": {"pack_format": 46, "supported_formats": {"min_inclusive": 46, "max_inclusive": 999}, "description": "Helix Cinematic"}}""".toByteArray(),
+        "pack.mcmeta" to """{"pack": {"pack_format": 46, "supported_formats": {"min_inclusive": 46, "max_inclusive": 999}, "min_format": 46, "max_format": 999, "description": "Helix Cinematic"}}""".toByteArray(),
         "assets/helix_cinematic/textures/font/black.png" to png,
         "assets/helix_cinematic/textures/font/dim.png" to dimPng,
         "assets/helix_cinematic/font/afk.json" to """

@@ -34,7 +34,7 @@ fun main(args: Array<String>) {
     VillagerCast.IDS.filter { it !in found }.forEach { println("WARNING: villager model '$it.bbmodel' missing — skipped") }
 
     val entries = linkedMapOf<String, ByteArray>()
-    entries["pack.mcmeta"] = """{"pack":{"pack_format":46,"supported_formats":{"min_inclusive":46,"max_inclusive":999},"description":"Villagers"}}""".toByteArray()
+    entries["pack.mcmeta"] = """{"pack":{"pack_format":46,"supported_formats":{"min_inclusive":46,"max_inclusive":999}, "min_format": 46, "max_format": 999,"description":"Villagers"}}""".toByteArray()
     val rigs = linkedMapOf<String, org.helix.addons.npc.paper.villager.RigSpec>()
     files.forEach { file ->
         val id = BbModelConverter.sanitize(file.nameWithoutExtension)

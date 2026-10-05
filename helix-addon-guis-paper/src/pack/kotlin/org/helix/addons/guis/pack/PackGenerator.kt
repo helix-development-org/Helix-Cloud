@@ -56,7 +56,7 @@ fun main(args: Array<String>) {
 }
 
 private fun packMeta(): ByteArray =
-    """{"pack": {"pack_format": 46, "supported_formats": {"min_inclusive": 34, "max_inclusive": 999}, "description": "Helix-GUIs shared fonts"}}""".toByteArray()
+    """{"pack": {"pack_format": 46, "supported_formats": {"min_inclusive": 34, "max_inclusive": 999}, "min_format": 34, "max_format": 999, "description": "Helix-GUIs shared fonts"}}""".toByteArray()
 
 /** IGui's SpacingRenderer glyphs: powers of two, positive and negative. */
 private fun spacesFont(): ByteArray {

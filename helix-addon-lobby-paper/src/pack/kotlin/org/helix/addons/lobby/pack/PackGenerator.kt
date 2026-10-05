@@ -24,7 +24,7 @@ fun main(args: Array<String>) {
     val art = Path.of(args[1])
     Files.createDirectories(output.parent)
     val entries = linkedMapOf<String, ByteArray>()
-    entries["pack.mcmeta"] = """{"pack":{"pack_format":46,"supported_formats":{"min_inclusive":46,"max_inclusive":999},"description":"Lobby"}}""".toByteArray()
+    entries["pack.mcmeta"] = """{"pack":{"pack_format":46,"supported_formats":{"min_inclusive":46,"max_inclusive":999}, "min_format": 46, "max_format": 999,"description":"Lobby"}}""".toByteArray()
     val providers = mutableListOf<String>()
     val textures = "assets/$NAMESPACE/textures/gui/navigator"
 
