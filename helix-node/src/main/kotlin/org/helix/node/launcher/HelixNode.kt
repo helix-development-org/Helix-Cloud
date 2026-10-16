@@ -414,6 +414,7 @@ class HelixNode(
         GlobalPlaceholders.set("network", name)
         GlobalPlaceholders.set("wordmark", org.helix.api.design.Wordmark.SMALL_MINI)
         GlobalPlaceholders.set("wordmark_large", org.helix.api.design.Wordmark.LARGE_MINI)
+        GlobalPlaceholders.set("crown", org.helix.api.design.Crown.MINI)
         bridgeValues.publish("network", "network.prefix", prefix)
         bridgeValues.publish("network", "network.name", name)
     }

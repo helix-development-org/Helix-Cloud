@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Neu: Netzwerkwährung „Kronen“ (`helix.economy` 2.0)
+
+- **Kronen ersetzen Coins**: alle Spielertexte, Vault-Name „Krone/Kronen“,
+  Dashboard-Panel „Kronen“, Kronen-Glyph `{crown}` (Font `helix_guis:icons`, U+E000).
+- **Konten pro UUID** in PostgreSQL (Schema `economy`: `accounts`, `ledger`,
+  `daily_counters`), atomar mit Zeilensperren; im json-Modus Dokument-Fallback.
+  Das alte namensbasierte `balances`-Dokument wird beim Start einmalig migriert,
+  nicht auflösbare Namen werden beim nächsten Join übernommen.
+- **Maschinen-API** (bridgeInvocable): `eco.api.deposit|withdraw` mit Grund,
+  Referenz und optionalem Tageslimit, `eco.api.transfer` (atomar, Gebühr in
+  Promille als Geld-Senke, JSON-Beleg), `eco.api.history`, `eco.api.limit`.
+  Alte Zwei-Argument-Aufrufe funktionieren weiter.
+- **`/kronen [verlauf]`**: Kontostand bzw. die letzten 20 Buchungen.
+
 ### Neu: MineClash-Addon (`mineclash`)
 
 - **Node-Seite des Kartenkampfspiels MineClash**: Die gesamte Spielkonfiguration

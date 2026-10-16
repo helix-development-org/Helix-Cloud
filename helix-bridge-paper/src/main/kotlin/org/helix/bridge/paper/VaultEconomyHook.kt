@@ -7,7 +7,7 @@ import org.bukkit.plugin.ServicePriority
 import org.bukkit.plugin.java.JavaPlugin
 
 /**
- * Registers the Helix coin economy as the server's Vault economy provider,
+ * Registers the network crown economy („Kronen“) as the server's Vault economy provider,
  * so Vault-consuming plugins (shops, jobs, …) read and change the same
  * network-wide balances the `eco.*` actions manage.
  *
@@ -39,7 +39,7 @@ object VaultEconomyHook {
  * Reads resolve from the synced `economy.balance.<name>` bridge values when
  * available (online players, no round-trip) and otherwise ask the node's
  * `eco.api.balance`. Deposits and withdrawals go through the
- * `eco.api.deposit`/`eco.api.withdraw` actions; amounts are whole coins, so
+ * `eco.api.deposit`/`eco.api.withdraw` actions (booked with reason `vault`); amounts are whole crowns, so
  * fractional digits are truncated. Banks are not supported.
  *
  * @property actions node action channel.
@@ -58,14 +58,14 @@ class HelixVaultEconomy(
     /** Helix has no bank accounts. */
     override fun hasBankSupport(): Boolean = false
 
-    /** Coins are whole numbers. */
+    /** Crowns are whole numbers. */
     override fun fractionalDigits(): Int = 0
 
     /**
      * Formats an amount for display.
      *
      * @param amount the amount.
-     * @return the formatted text, for example `12 coins`.
+     * @return the formatted text, for example `12 Kronen`.
      */
     override fun format(amount: Double): String {
         val whole = amount.toLong()
@@ -73,10 +73,10 @@ class HelixVaultEconomy(
     }
 
     /** Plural currency name. */
-    override fun currencyNamePlural(): String = "coins"
+    override fun currencyNamePlural(): String = "Kronen"
 
     /** Singular currency name. */
-    override fun currencyNameSingular(): String = "coin"
+    override fun currencyNameSingular(): String = "Krone"
 
     /** Every known player implicitly has an account (starting balance). */
     override fun hasAccount(playerName: String): Boolean = true
@@ -94,7 +94,7 @@ class HelixVaultEconomy(
      * A player's balance, from the synced bridge value or the node.
      *
      * @param playerName the player name.
-     * @return the balance in whole coins.
+     * @return the balance in whole crowns.
      */
     override fun getBalance(playerName: String): Double {
         val synced = bridgeValues()["economy.balance.${playerName.lowercase()}"]?.toDoubleOrNull()
@@ -131,7 +131,7 @@ class HelixVaultEconomy(
     override fun has(player: OfflinePlayer, worldName: String, amount: Double): Boolean = has(player, amount)
 
     /**
-     * Withdraws whole coins through the node.
+     * Withdraws whole crowns through the node.
      *
      * @param playerName the player name.
      * @param amount the amount; fractions are truncated.
@@ -142,7 +142,7 @@ class HelixVaultEconomy(
 
     /** Withdraw by [OfflinePlayer]. */
     override fun withdrawPlayer(player: OfflinePlayer, amount: Double): EconomyResponse =
-        withdrawPlayer(player.name ?: "", amount)
+        withdrawPlayer(player.uniqueId.toString(), amount)
 
     /** World-agnostic: same as [withdrawPlayer]. */
     override fun withdrawPlayer(playerName: String, worldName: String, amount: Double): EconomyResponse =
@@ -153,7 +153,7 @@ class HelixVaultEconomy(
         withdrawPlayer(player, amount)
 
     /**
-     * Deposits whole coins through the node.
+     * Deposits whole crowns through the node.
      *
      * @param playerName the player name.
      * @param amount the amount; fractions are truncated.
@@ -164,7 +164,7 @@ class HelixVaultEconomy(
 
     /** Deposit by [OfflinePlayer]. */
     override fun depositPlayer(player: OfflinePlayer, amount: Double): EconomyResponse =
-        depositPlayer(player.name ?: "", amount)
+        depositPlayer(player.uniqueId.toString(), amount)
 
     /** World-agnostic: same as [depositPlayer]. */
     override fun depositPlayer(playerName: String, worldName: String, amount: Double): EconomyResponse =
@@ -227,7 +227,7 @@ class HelixVaultEconomy(
             return EconomyResponse(0.0, getBalance(playerName), EconomyResponse.ResponseType.FAILURE, "invalid request")
         }
         val whole = amount.toLong()
-        val result = actions.invoke(action, listOf(playerName, whole.toString()))
+        val result = actions.invoke(action, listOf(playerName, whole.toString(), REASON))
             ?: return EconomyResponse(
                 0.0,
                 getBalance(playerName),
@@ -248,4 +248,9 @@ class HelixVaultEconomy(
 
     private fun noBanks(): EconomyResponse =
         EconomyResponse(0.0, 0.0, EconomyResponse.ResponseType.NOT_IMPLEMENTED, "Helix has no bank support")
+
+    private companion object {
+        /** Ledger reason of bookings made through Vault. */
+        const val REASON = "vault"
+    }
 }

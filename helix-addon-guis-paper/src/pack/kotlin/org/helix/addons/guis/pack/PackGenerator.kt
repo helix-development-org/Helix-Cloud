@@ -30,6 +30,7 @@ fun main(args: Array<String>) {
     entries.putAll(textRowFonts())
     entries.putAll(ledger(Path.of(args[1])))
     entries.putAll(wordmark(Path.of(args[1]).resolveSibling("wordmark")))
+    entries.putAll(icons(Path.of(args[1]).resolveSibling("icons")))
     entries.putAll(sprites(NAMESPACE, Path.of(args[1]).resolveSibling("anim"), de.tytoss.igui.screen.LedgerLayout.SPRITES))
     entries["assets/$NAMESPACE/items/empty.json"] = """{"model":{"type":"minecraft:empty"}}""".toByteArray()
     // Text at any height for full-window screens (helix-gui `textAt`): one font per text top
@@ -222,5 +223,19 @@ private fun wordmark(art: Path): Map<String, ByteArray> {
         """{"type":"bitmap","file":"$NAMESPACE:font/$name.png","height":$height,"ascent":${glyph.second},"chars":["\u%04X"]}""".format(glyph.first)
     }
     out["assets/$NAMESPACE/font/wordmark.json"] = """{"providers":[${providers.joinToString(",")}]}""".toByteArray()
+    return out
+}
+
+/**
+ * Inline icons of the shared font `helix_guis:icons` (helix-api `Crown`): 16×16 art shown at half size on the text
+ * line (height 8, ascent 7), like the game-mode currency icons. Codepoints must match `Crown.GLYPH`.
+ */
+private fun icons(art: Path): Map<String, ByteArray> {
+    val out = linkedMapOf<String, ByteArray>()
+    val providers = listOf("crown" to 0xE000).map { (name, glyph) ->
+        out["assets/$NAMESPACE/textures/font/icon_$name.png"] = Files.readAllBytes(art.resolve("$name.png"))
+        """{"type":"bitmap","file":"$NAMESPACE:font/icon_$name.png","height":8,"ascent":7,"chars":["\u%04X"]}""".format(glyph)
+    }
+    out["assets/$NAMESPACE/font/icons.json"] = """{"providers":[${providers.joinToString(",")}]}""".toByteArray()
     return out
 }
