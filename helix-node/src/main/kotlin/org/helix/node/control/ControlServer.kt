@@ -1254,7 +1254,8 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
     post("/internal/action") {
         if (!requireBridge(dependencies)) return@post
         val invocation = call.receive<ActionInvocation>()
-        call.respond(dependencies.bridgeActions.invoke(invocation))
+        val caller = call.principal<PanelPrincipal>()?.takeUnless { it.admin }?.serviceId
+        call.respond(dependencies.bridgeActions.invoke(invocation, caller))
     }
     post("/internal/display") {
         if (!requireBridge(dependencies)) return@post

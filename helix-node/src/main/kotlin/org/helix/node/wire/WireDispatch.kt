@@ -101,8 +101,8 @@ class WireDispatch(private val dependencies: ControlDependencies) {
         server.handle("player-command") { _, payload ->
             respond(dependencies.playerCommands.execute(WireCodec.decode<PlayerCommandRequest>(payload)))
         }
-        server.handle("action") { _, payload ->
-            respond(dependencies.bridgeActions.invoke(WireCodec.decode<ActionInvocation>(payload)))
+        server.handle("action") { serviceId, payload ->
+            respond(dependencies.bridgeActions.invoke(WireCodec.decode<ActionInvocation>(payload), serviceId))
         }
         server.handle("display") { _, payload ->
             respond(dependencies.displayResolvers.resolve(WireCodec.decode<JoinRequest>(payload).name))

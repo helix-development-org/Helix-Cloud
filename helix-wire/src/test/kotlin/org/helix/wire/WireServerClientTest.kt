@@ -67,6 +67,28 @@ class WireServerClientTest {
     }
 
     @Test
+    fun `a request without a link reports that nothing was sent`() {
+        startServer()
+        val c = startClient(token = "wrong")
+        Thread.sleep(300)
+        val failure = assertFailsWith<WireUnavailableException> { c.request("echo", ByteArray(0)) }
+        assertFalse(failure.sent)
+    }
+
+    @Test
+    fun `an unanswered sent request reports an unknown outcome`() {
+        val srv = startServer()
+        srv.handle("slow") { _, _ ->
+            Thread.sleep(1_500)
+            WireResponse.ok(ByteArray(0))
+        }
+        val c = WireClient("127.0.0.1", port, "Lobby-1", "good", requestTimeoutMs = 300).also { it.start(); client = it }
+        awaitConnected(c)
+        val failure = assertFailsWith<WireUnavailableException> { c.request("slow", ByteArray(0)) }
+        assertTrue(failure.sent)
+    }
+
+    @Test
     fun `a bad token is rejected and the client never connects`() {
         startServer()
         val c = startClient(token = "wrong")

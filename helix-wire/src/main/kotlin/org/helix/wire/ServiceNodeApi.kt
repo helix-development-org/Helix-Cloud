@@ -30,6 +30,7 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -246,7 +247,7 @@ class ServiceNodeApi(
      * @return the result, or `null` when the node is unreachable.
      */
     fun playerCommand(request: PlayerCommandRequest): ActionResult? =
-        call("player-command", request, PlayerCommandRequest.serializer(), ActionResult.serializer()) {
+        call("player-command", request, PlayerCommandRequest.serializer(), ActionResult.serializer(), idempotent = false) {
             postJson(
                 "/api/v1/internal/player-command",
                 PlayerCommandRequest.serializer(),
@@ -256,15 +257,39 @@ class ServiceNodeApi(
         }
 
     /**
-     * Invokes a bridge-invocable action.
+     * Invokes a bridge-invocable action at most once.
+     *
+     * Every invocation carries an [ActionInvocation.requestId]; one is generated when the caller did
+     * not set it. The node executes each `(service, requestId)` pair only once and answers repeats
+     * with the original result, so this method may fall back from the wire link to HTTP even when the
+     * wire frame was already sent (timeout, dropped connection) without risking a double execution.
+     *
+     * A `null` result means the outcome is **unknown**: the node may or may not have executed the
+     * action. Callers that move money or items must not treat `null` as a failure; they should retry
+     * with the **same** request id (set it themselves via [ActionInvocation.requestId]), which is safe
+     * and returns the original result once the node is reachable again.
      *
      * @param invocation the invocation.
-     * @return the result, or `null` when the node is unreachable.
+     * @return the result, or `null` when the outcome is unknown (node unreachable).
      */
-    fun action(invocation: ActionInvocation): ActionResult? =
-        call("action", invocation, ActionInvocation.serializer(), ActionResult.serializer()) {
-            postJson("/api/v1/internal/action", ActionInvocation.serializer(), invocation, ActionResult.serializer())
+    fun action(invocation: ActionInvocation): ActionResult? {
+        val tagged = if (invocation.requestId.isNullOrBlank()) invocation.copy(requestId = UUID.randomUUID().toString()) else invocation
+        val client = wire
+        if (client != null && client.isConnected()) {
+            val response = try {
+                client.request("action", WireCodec.encode(ActionInvocation.serializer(), tagged))
+            } catch (_: WireUnavailableException) {
+                null
+            }
+            if (response != null && response.ok) {
+                runCatching { WireCodec.decode(ActionResult.serializer(), response.body) }.getOrNull()?.let { return it }
+            } else if (response != null) {
+                warnOnce("wire:action", "wire call action failed: ${response.message}")
+            }
         }
+        // Safe even after a sent wire frame: the node deduplicates by request id.
+        return postJson("/api/v1/internal/action", ActionInvocation.serializer(), tagged, ActionResult.serializer())
+    }
 
     /**
      * Resolves one player's display profile.
@@ -377,6 +402,7 @@ class ServiceNodeApi(
         request: Q?,
         requestSerializer: KSerializer<Q>?,
         responseSerializer: KSerializer<R>,
+        idempotent: Boolean = true,
         httpFallback: () -> R?,
     ): R? {
         val client = wire
@@ -386,7 +412,13 @@ class ServiceNodeApi(
             } else {
                 ByteArray(0)
             }
-            val response = runCatching { client.request(endpoint, payload) }.getOrNull()
+            val response = try {
+                client.request(endpoint, payload)
+            } catch (failure: WireUnavailableException) {
+                // A sent but unanswered non-idempotent request may already have run: do not repeat it.
+                if (failure.sent && !idempotent) return null
+                null
+            }
             if (response != null && response.ok) {
                 return runCatching { WireCodec.decode(responseSerializer, response.body) }.getOrNull()
                     ?: httpFallback()

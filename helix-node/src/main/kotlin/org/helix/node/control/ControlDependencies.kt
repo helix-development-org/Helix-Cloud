@@ -150,7 +150,7 @@ data class ControlDependencies(
     val playerCommands: PlayerCommandService = PlayerCommandService(registry, permissionService)
 
     /** Bridge-invocable action execution shared by the internal routes. */
-    val bridgeActions: BridgeActionService = BridgeActionService(registry)
+    val bridgeActions: BridgeActionService = BridgeActionService(registry, taskOf = { id -> manager.find(id)?.toInfo()?.taskName })
 
     /** Web-panel Minecraft-account login and per-view authorization. */
     val panelAuth: PanelAuthService = PanelAuthService(
