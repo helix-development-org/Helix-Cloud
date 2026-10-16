@@ -1,0 +1,22 @@
+{
+  "tutorial.bar": "<#ffcf4a>Step {step}/{count}</#ffcf4a> <#f1e2c2>· {text}</#f1e2c2>",
+  "tutorial.greeting": "<#a8dcff>Lotte Laterne:</#a8dcff> <#f1e2c2>Welcome to Kronstadt, {name}! Over there – no, the other over there – is where it all begins.",
+  "tutorial.step.welcome": "Welcome to Kronstadt",
+  "tutorial.step.welcome.hint": "<#a8dcff>Lotte Laterne:</#a8dcff> <#f1e2c2>Let me show you around. The bar at the top always tells you what's next.",
+  "tutorial.step.plot": "Get a plot",
+  "tutorial.step.plot.hint": "<#a8dcff>Lotte Laterne:</#a8dcff> <#f1e2c2>A home first! Your first plot is free: <click:run_command:/gs><hover:show_text:'Open the land register'><#ffcf4a>[Land register]</#ffcf4a></hover></click>",
+  "tutorial.step.farm": "Visit the farm world",
+  "tutorial.step.farm.hint": "<#a8dcff>Lotte Laterne:</#a8dcff> <#f1e2c2>Building materials come from the farm world. Waldemar at the portal square takes you there: <click:run_command:/farmwelt><hover:show_text:'To the farm world'><#ffcf4a>[Farm world]</#ffcf4a></hover></click>",
+  "tutorial.step.sell": "Sell something to the grocer",
+  "tutorial.step.sell.hint": "<#a8dcff>Lotte Laterne:</#a8dcff> <#f1e2c2>Fritz at the market buys ores, wood and crops. Sell him something: <click:run_command:/kraemer><hover:show_text:'Open the grocer'><#ffcf4a>[Grocer]</#ffcf4a></hover></click>",
+  "tutorial.step.job": "Pick a job",
+  "tutorial.step.job.hint": "<#a8dcff>Lotte Laterne:</#a8dcff> <#f1e2c2>A job earns you crowns on the side. Henni hands out the shifts: <click:run_command:/jobs><hover:show_text:'Open the job board'><#ffcf4a>[Job board]</#ffcf4a></hover></click>",
+  "tutorial.step.done": "Done!",
+  "tutorial.step.done.hint": "<#a8dcff>Lotte Laterne:</#a8dcff> <#f1e2c2>You know your way around now. Almost as well as I do!",
+  "tutorial.done.title": "<#ffcf4a>Welcome, citizen!",
+  "tutorial.done.subtitle": "<#f1e2c2>+{amount} crowns",
+  "tutorial.done.subtitle.repeat": "<#f1e2c2>Tutorial completed",
+  "tutorial.done.chat": "<#4ac85e>Tutorial completed: received <#ffcf4a>{amount} crowns</#ffcf4a>.",
+  "tutorial.done.repeat": "<#4ac85e>Tutorial completed. You already got the bonus once.",
+  "tutorial.skipped": "<#f1e2c2>Tutorial skipped. Restart it anytime with <click:run_command:/tutorial neu><#ffcf4a>/tutorial neu</#ffcf4a></click>."
+}
