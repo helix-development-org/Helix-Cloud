@@ -140,6 +140,13 @@ object ConfigSeeds {
         // A12 inactivity
         int("plots.inactivityDays", 90, "Days of absence after which plots are released (tier0/tier1)")
         int("plots.inactivityDaysPremium", 180, "Days of absence after which plots are released (tier2/tier3)")
+
+        // A21.3 vehicles
+        int("vehicles.maxPerPlayer", 20, "Vehicles a player may own per instance")
+        int("vehicles.returnMinutes", 30, "Minutes without a driver after which a parked vehicle returns to the garage")
+        int("vehicles.maxHeight", 200, "Highest Y air vehicles may reach")
+        int("vehicles.foreignPlotClearance", 3, "Blocks air vehicles must stay above the ground over foreign plots")
+        int("vehicles.hornCooldownTicks", 30, "Cooldown of the horn in ticks")
     }
 
     /** Defaults replaced by a later release; an untouched old default is lifted on load. */

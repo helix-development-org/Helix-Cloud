@@ -75,6 +75,8 @@ Paper logs those flows via `citybuild.log.write`.
 
 ```text
 Home        {uuid, shard, name, world, x, y, z, yaw, pitch}
+Vehicle     {id, uuid, shard, model, color, locked, access: all|members|none, state: garage|world,
+             world?, x?, y?, z?, createdAt, updatedAt}
 Warp        {shard, name, icon, description, world, x, y, z, yaw, pitch, sortOrder}
 Auction     {id, shard, seller, sellerName, item, material, displayName, category, amount, price,
              createdAt, expiresAt, status: active|reserved|sold|cancelled|expired, buyer, closedAt, sellerNotified}
@@ -282,6 +284,17 @@ All settings with types and defaults: `citybuild.config.export`. Groups:
 | `citybuild.offer.delete` | `<uuid> <id>` | `{deleted:true}` | citybuild.admin.offers |
 | `citybuild.offer.buy` | `<uuid> <shard> <offerId> <count 1–64> <tier>` | `{offer, spec, count, paid}`. Hand out `count × ware.amount`. Errors: `not_available`, `tier`, `sold_out`, `insufficient_funds`. | – |
 
+### Vehicles (per instance, concept A21.3)
+
+| Action | Arguments | Answer | Permission |
+|---|---|---|---|
+| `citybuild.vehicle.register` | `<uuid> <shard> <model> [color]` | `Vehicle` in the garage; errors `unknown_model`, `invalid_model` (catalog kind ≠ `vehicle`), `limit` (`vehicles.maxPerPlayer`). The colour is clamped to the model's `data.colors`. | – |
+| `citybuild.vehicle.list` | `<uuid> <shard>` | `[Vehicle]` oldest first | – |
+| `citybuild.vehicle.update` | `<uuid> <id> <json {color?, locked?, access?}>` | `Vehicle`; errors `not_found`, `not_owner`, `invalid_access`, `invalid_color` | – |
+| `citybuild.vehicle.park` | `<uuid> <id> <garage\|world> [world x y z]` | `Vehicle`; `world` needs the position (`invalid_position`) | – |
+| `citybuild.vehicle.remove` | `<uuid> <id>` | `{removed:true}`; only the owner | – |
+| `citybuild.vehicle.recall` | `<shard>` | `{recalled:n}`: every vehicle of the instance marked `world` goes back to the garage (called on instance start) | – |
+
 ### Audit log, profile, arena
 
 | Action | Arguments | Answer | Permission |
@@ -303,6 +316,7 @@ Kinds the node writes itself:
 | Crates | `crate`, `crate.save` |
 | Offers | `offer`, `offer.save` |
 | Rewards and kits | `reward`, `kit` |
+| Vehicles | `vehicle`, `vehicle.remove` |
 
 ## Storage
 
@@ -320,6 +334,7 @@ Tables in schema `citybuild`:
 | Plot market | `plot_market` |
 | Player progress | `jobs` (JSONB profile), `rewards`, `tutorial`, `daily_counters`, `profile_reports` |
 | Offers and forge | `offer_buys`, `forge_serials` |
+| Vehicles | `vehicles` (own pool `citybuild-vehicles`) |
 | Audit | `logs` |
 
 Config, including forge templates, crates and offers, lives in the addon config store (`config.*` keys).
