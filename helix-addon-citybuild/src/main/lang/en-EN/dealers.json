@@ -1,0 +1,18 @@
+{
+  "dealers.balance": "<#ffcf4a>Crowns: {balance}",
+  "dealers.bought": "<#4ac85e>Bought: <#ffcf4a>{item}<#4ac85e> for <#ffcf4a>{price} crowns<#4ac85e>.",
+  "dealers.click": "Left-click: buy",
+  "dealers.confirm.price": "{price} crowns",
+  "dealers.confirm.title": "Buy?",
+  "dealers.confirm.variant": "Variant: {variant}",
+  "dealers.confirm.yes": "Buy",
+  "dealers.failed": "<#ff5a4a>The purchase failed. Please try again later.",
+  "dealers.next": "Next",
+  "dealers.prev": "Back",
+  "dealers.price": "Price: {price} crowns",
+  "dealers.title.moebel": "Furniture · {tab}",
+  "dealers.title.stellmacher": "Wheelwright · {tab}",
+  "dealers.title.tiere": "Animals · {tab}",
+  "dealers.too-poor": "<#ff5a4a>You do not have enough crowns. It costs {price}.",
+  "dealers.variant": "Variant: {variant} (right-click switches, {count} total)"
+}

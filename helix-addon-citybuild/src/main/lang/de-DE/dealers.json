@@ -1,0 +1,18 @@
+{
+  "dealers.balance": "<#ffcf4a>Kronen: {balance}",
+  "dealers.bought": "<#4ac85e>Gekauft: <#ffcf4a>{item}<#4ac85e> für <#ffcf4a>{price} Kronen<#4ac85e>.",
+  "dealers.click": "Linksklick: kaufen",
+  "dealers.confirm.price": "{price} Kronen",
+  "dealers.confirm.title": "Kaufen?",
+  "dealers.confirm.variant": "Variante: {variant}",
+  "dealers.confirm.yes": "Kaufen",
+  "dealers.failed": "<#ff5a4a>Der Kauf hat nicht geklappt. Versuch es später nochmal.",
+  "dealers.next": "Weiter",
+  "dealers.prev": "Zurück",
+  "dealers.price": "Preis: {price} Kronen",
+  "dealers.title.moebel": "Möbelhandel · {tab}",
+  "dealers.title.stellmacher": "Stellmacher · {tab}",
+  "dealers.title.tiere": "Tierhandel · {tab}",
+  "dealers.too-poor": "<#ff5a4a>Dafür fehlen dir Kronen. Es kostet {price}.",
+  "dealers.variant": "Variante: {variant} (Rechtsklick wechselt, {count} gesamt)"
+}

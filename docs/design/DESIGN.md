@@ -476,6 +476,36 @@ Nur auf den CityBuild-Servern. Model-Sheet nach `villager-vorlage.js`, bis zum B
 - Mimik: Ein Auge zugekniffen, Goldzahn blitzt
 - Zitat: „Psst. In der dritten Kiste … nein, ich sag nichts.“
 
+#### Kuno Kurbel – Stellmacher
+
+- Ort: Markt (Fahrzeuge, `/stellmacher`)
+- Robe: Rostbraun mit Lederschürze
+- Requisit: Schraubenschlüssel, Wagenrad auf dem Rücken
+- Wesen: Tüftler, stolz auf jede Speiche.
+- Spricht: Technisch, schwärmt von Achsen und Federung.
+- Mimik: Ölfleck auf der Wange, eine Braue hoch
+- Zitat: „Vier Räder, ein Traum. Drei gehen auch.“
+
+#### Tilda Tapete – Möbelhändlerin
+
+- Ort: Markt (Möbel, Hüte & Kostüme, `/moebel`)
+- Robe: Altrosa mit Spitzenkragen
+- Requisit: Stoffmuster-Fächer, Zollstock
+- Wesen: Stilbewusst, dramatisch.
+- Spricht: Geschmacksurteile, seufzt gern.
+- Mimik: Lider halb gesenkt, Kinn hoch
+- Zitat: „Dieser Stuhl? Der sagt so viel über dich.“
+
+#### Frieda Feder – Tierhändlerin
+
+- Ort: Markt (Haustiere, Nutztier-Eier, Futter, `/tierhandel`)
+- Robe: Wiesengrün mit Strohhut
+- Requisit: Futterbeutel, Huhn unterm Arm
+- Wesen: Bodenständig, warmherzig.
+- Spricht: Dialekt-Anklang, redet mit den Tieren.
+- Mimik: Breites Lachen, Sommersprossen
+- Zitat: „Gackert's, hat's Hunger. Gackert's nicht, auch.“
+
 ## 13 · Mobs und Kartenkreaturen
 
 - **Proportion**: Kopf um 30–50 % vergrößert gegenüber Vanilla, Körper leicht gestaucht, Gesamtgröße wie Vanilla.
