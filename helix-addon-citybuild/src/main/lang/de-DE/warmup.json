@@ -1,0 +1,7 @@
+{
+  "warmup.start": "<#f1e2c2>Teleport in <#ffcf4a>{seconds} s</#ffcf4a> – bleib still stehen.",
+  "warmup.countdown": "<#ffcf4a>Teleport in {seconds} s …",
+  "warmup.cancelled.move": "<#ffb43a>Achtung: Du hast dich bewegt – Teleport abgebrochen.",
+  "warmup.cancelled.damage": "<#ffb43a>Achtung: Du hast Schaden bekommen – Teleport abgebrochen.",
+  "warmup.cooldown": "<#ff5a4a>Du musst noch <#ffcf4a>{seconds} s</#ffcf4a> warten, bevor du wieder reisen kannst."
+}

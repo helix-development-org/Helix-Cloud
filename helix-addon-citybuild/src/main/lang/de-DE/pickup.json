@@ -1,0 +1,23 @@
+{
+  "pickup.broken": "Unlesbares Item",
+  "pickup.click": "<#ffcf4a>Klick: abholen",
+  "pickup.empty.1": "Leer. Hier landet, was nicht ins",
+  "pickup.empty.2": "Inventar passt.",
+  "pickup.from.auction": "Auktionshaus",
+  "pickup.from.crate": "Schatzkiste",
+  "pickup.from.kit": "Kit",
+  "pickup.from.kraemer": "Krämer",
+  "pickup.from.other": "Stadtverwaltung",
+  "pickup.from.reward": "Belohnung",
+  "pickup.from.shop": "Spieler-Shop",
+  "pickup.from.trade": "Handel",
+  "pickup.full": "<#ff5a4a>Dein Inventar ist voll. Mach erst Platz.",
+  "pickup.gone": "<#ff5a4a>Das wurde schon abgeholt.",
+  "pickup.overflow": "<#ffb43a>Achtung: {count} Stapel passten nicht ins Inventar und liegen in deiner <click:run_command:/abholkiste><hover:show_text:'Abholkiste öffnen'><#ffcf4a>Abholkiste</#ffcf4a></hover></click>.",
+  "pickup.queued": "<#ffb43a>Achtung: Die Abholkiste ist gerade nicht erreichbar. Deine Items werden nachgeliefert.",
+  "pickup.source": "<#f1e2c2>Herkunft: {source}",
+  "pickup.subtitle": "{count} wartet",
+  "pickup.take-all": "Alles holen",
+  "pickup.title": "Abholkiste",
+  "pickup.waiting": "<#f1e2c2>In deiner Abholkiste warten <#ffcf4a>{count}</#ffcf4a> Dinge. <click:run_command:/abholkiste><hover:show_text:'Abholkiste öffnen'><#ffcf4a>[Abholen]</#ffcf4a></hover></click>"
+}

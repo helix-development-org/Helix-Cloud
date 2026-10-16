@@ -1,0 +1,13 @@
+{
+  "instance.title": "Städte von Kronstadt",
+  "instance.subtitle": "Du bist in {current}",
+  "instance.row": "Stadt {number}",
+  "instance.here": "hier",
+  "instance.note.1": "Kronen gelten in jeder Stadt.",
+  "instance.note.2": "Items und Grundstücke bleiben in ihrer Stadt.",
+  "instance.empty": "Gerade ist keine andere Stadt offen.",
+  "instance.loading": "Ich frage beim Postamt nach …",
+  "instance.already": "<#5ab4ff>Du bist schon in dieser Stadt.",
+  "instance.full": "<#ff5a4a>Diese Stadt ist voll. Wähle eine andere.",
+  "instance.connecting": "<#f1e2c2>Reise nach <#ffcf4a>Stadt {number}</#ffcf4a> … <#5ab4ff>Deine Items bleiben hier."
+}

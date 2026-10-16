@@ -1,0 +1,5 @@
+{
+  "admin.help.header": "<#ffcf4a>CityBuild staff tools</#ffcf4a> <#f1e2c2>– subcommands of /cbadmin:",
+  "admin.help.line": "<#f1e2c2>  /cbadmin <#ffcf4a>{usage}</#ffcf4a>",
+  "admin.usage": "<#ff5a4a>Usage: <#ffcf4a>/cbadmin {usage}</#ffcf4a>"
+}
