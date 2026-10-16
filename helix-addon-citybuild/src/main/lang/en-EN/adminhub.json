@@ -259,5 +259,12 @@
   "adminhub.ware.tip": "<#c8bca8>Id: {id}",
   "adminhub.ware.title": "Pick ware",
   "adminhub.yes": "yes",
-  "adminhub.reload.done": "<#4ac85e>Configuration reloaded."
+  "adminhub.reload.done": "<#4ac85e>Configuration reloaded.",
+  "adminhub.shop.sell-too-high": "<#ff5a4a>The buy-back price must be below the sale price, otherwise money appears out of nothing.",
+  "adminhub.journal.player": "<#ffb43a>{name} has <#ffcf4a>{count}</#ffcf4a> open orders in the journal (<#ffcf4a>/cbadmin journal</#ffcf4a>).",
+  "adminhub.journal.count": "<#f1e2c2>Open orders in the journal: <#ffcf4a>{count}</#ffcf4a>",
+  "adminhub.journal.line": "<#c8bca8>{id} <#f1e2c2>{op} · {player} · {state} · attempts {attempts}",
+  "adminhub.journal.checking": "<#5ab4ff>Open orders are being re-checked.",
+  "adminhub.journal.settled": "<#4ac85e>Order <#ffcf4a>{id}</#ffcf4a> settled.",
+  "adminhub.journal.unknown": "<#ff5a4a>There is no open order <#ffcf4a>{id}</#ffcf4a>."
 }

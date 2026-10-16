@@ -259,5 +259,12 @@
   "adminhub.ware.tip": "<#c8bca8>Id: {id}",
   "adminhub.ware.title": "Ware wählen",
   "adminhub.yes": "ja",
-  "adminhub.reload.done": "<#4ac85e>Konfiguration neu geladen."
+  "adminhub.reload.done": "<#4ac85e>Konfiguration neu geladen.",
+  "adminhub.shop.sell-too-high": "<#ff5a4a>Der Ankauf muss unter dem Kaufpreis liegen, sonst entsteht Geld aus dem Nichts.",
+  "adminhub.journal.player": "<#ffb43a>{name} hat <#ffcf4a>{count}</#ffcf4a> offene Aufträge im Journal (<#ffcf4a>/cbadmin journal</#ffcf4a>).",
+  "adminhub.journal.count": "<#f1e2c2>Offene Aufträge im Journal: <#ffcf4a>{count}</#ffcf4a>",
+  "adminhub.journal.line": "<#c8bca8>{id} <#f1e2c2>{op} · {player} · {state} · Versuche {attempts}",
+  "adminhub.journal.checking": "<#5ab4ff>Offene Aufträge werden nachgeklärt.",
+  "adminhub.journal.settled": "<#4ac85e>Auftrag <#ffcf4a>{id}</#ffcf4a> abgeschlossen.",
+  "adminhub.journal.unknown": "<#ff5a4a>Es gibt keinen offenen Auftrag <#ffcf4a>{id}</#ffcf4a>."
 }

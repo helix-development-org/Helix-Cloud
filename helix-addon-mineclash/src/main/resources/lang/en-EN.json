@@ -430,5 +430,7 @@
   "shop.exchange.not_enough_emeralds": "<#ff5a4a>You don't have <#ffcf4a>{amount}</#ffcf4a> emeralds to sell. Empty your mine or win matches.",
   "shop.exchange.limit_reached": "<#ff5a4a>Daily limit reached: only <#ffcf4a>{remaining}</#ffcf4a> emeralds left today. Mira trades again tomorrow.",
   "shop.exchange.offline": "<#ff5a4a>The exchange is closed right now. Try again in a moment.",
-  "shop.exchange.busy": "<#a89a84>Mira is still counting …"
+  "shop.exchange.busy": "<#a89a84>Mira is still counting …",
+  "shop.exchange.pending": "<#ffb43a>Warning: The bank did not answer in time. Your booking is being checked and will be settled shortly.",
+  "shop.exchange.settled": "<#4ac85e>Your pending exchange booking is settled."
 }

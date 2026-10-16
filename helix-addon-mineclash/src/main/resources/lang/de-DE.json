@@ -430,5 +430,7 @@
   "shop.exchange.not_enough_emeralds": "<#ff5a4a>Du hast keine <#ffcf4a>{amount}</#ffcf4a> Smaragde zum Verkaufen. Leere deine Mine oder gewinne Matches.",
   "shop.exchange.limit_reached": "<#ff5a4a>Tageslimit erreicht: heute nur noch <#ffcf4a>{remaining}</#ffcf4a> Smaragde. Morgen tauscht Mira wieder.",
   "shop.exchange.offline": "<#ff5a4a>Die Wechselstube ist gerade geschlossen. Versuche es gleich noch einmal.",
-  "shop.exchange.busy": "<#a89a84>Mira zählt noch nach …"
+  "shop.exchange.busy": "<#a89a84>Mira zählt noch nach …",
+  "shop.exchange.pending": "<#ffb43a>Achtung: Die Bank hat nicht rechtzeitig geantwortet. Deine Buchung wird geprüft und gleich nachgetragen.",
+  "shop.exchange.settled": "<#4ac85e>Deine offene Buchung in der Wechselstube ist abgeschlossen."
 }

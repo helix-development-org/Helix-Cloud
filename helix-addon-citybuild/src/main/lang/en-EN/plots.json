@@ -109,5 +109,8 @@
   "plots.biome.cherry_grove": "Cherry grove",
   "plots.biome.badlands": "Badlands",
   "plots.biome.mushroom_fields": "Mushroom fields",
-  "plots.biome.meadow": "Meadow"
+  "plots.biome.meadow": "Meadow",
+  "plots.price.changed": "<#ffb43a>Warning: The price has changed – now <#ffcf4a>{price} crowns</#ffcf4a>. Please open the purchase again.",
+  "plots.busy": "<#ff5a4a>A plot booking is still running. Wait a moment.",
+  "plots.market.auto-withdrawn": "<#ffb43a>Warning: Your offer for plot <#ffcf4a>{id}</#ffcf4a> was withdrawn because the plot changed."
 }

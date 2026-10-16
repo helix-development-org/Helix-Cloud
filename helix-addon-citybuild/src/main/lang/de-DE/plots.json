@@ -109,5 +109,8 @@
   "plots.biome.cherry_grove": "Kirschhain",
   "plots.biome.badlands": "Tafelberge",
   "plots.biome.mushroom_fields": "Pilzland",
-  "plots.biome.meadow": "Blumenwiese"
+  "plots.biome.meadow": "Blumenwiese",
+  "plots.price.changed": "<#ffb43a>Achtung: Der Preis hat sich inzwischen geändert – jetzt <#ffcf4a>{price} Kronen</#ffcf4a>. Öffne den Kauf bitte noch einmal.",
+  "plots.busy": "<#ff5a4a>Eine Grundstücks-Buchung läuft noch. Warte kurz.",
+  "plots.market.auto-withdrawn": "<#ffb43a>Achtung: Dein Angebot für Grundstück <#ffcf4a>{id}</#ffcf4a> wurde zurückgezogen, weil sich das Grundstück verändert hat."
 }

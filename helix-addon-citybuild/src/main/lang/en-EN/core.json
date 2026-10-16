@@ -6,5 +6,8 @@
   "core.confirm.yes": "Confirm",
   "core.confirm.no": "Cancel",
   "core.kronen.insufficient": "<#ff5a4a>You don't have enough crowns. Check your balance with <#ffcf4a>/kronen</#ffcf4a>.",
-  "core.kronen.limit": "<#ff5a4a>The daily limit is reached. Come back tomorrow."
+  "core.kronen.limit": "<#ff5a4a>The daily limit is reached. Come back tomorrow.",
+  "core.op.pending": "<#ffb43a>Warning: The town hall did not answer in time. Your order is being checked and will be settled shortly – nothing is lost.",
+  "core.op.settled": "<#4ac85e>Your pending order is complete. Check your <#ffcf4a>/abholkiste</#ffcf4a> if something is missing.",
+  "core.op.reverted": "<#ffb43a>Your pending order was not carried out. Your items are back with you or in your <#ffcf4a>/abholkiste</#ffcf4a>."
 }
