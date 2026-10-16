@@ -22,9 +22,12 @@ import kotlinx.serialization.json.JsonPrimitive
  * - `vehicle`: `type` (`land`, `water`, `air`), `speed` (blocks/s), `seats`, `step`, `maxY`; look: `scale`, `offsetY`
  *   (lift so the model bottom touches the ground, 0.5 × scale), `hitWidth`, `hitHeight`, `seatOffsets` (`[[x, y, z], …]`,
  *   z = forward). Models face −Z (Blockbench north).
- * - `pet`: `traits` (`cosmetic`, `care`, `ability`), `favoriteFood`, `abilities`, `tricks`.
+ * - `pet`: `traits` (`cosmetic`, `care`, `ability`), `favoriteFood`, `abilities`, `tricks`, `tagHeight` (name tag above
+ *   the feet, blocks).
  * - `livestock`: `base` (vanilla mob), `yields` (`model`, `amount`), `intervalMinutes`, `feed`, `placement`.
- * - `creature`: `base`, `worlds`, `biomes`, `night`, `health`, `damage`, `speed`, `drops`, `hunter`, `boss`.
+ * - `creature`: `scale` (rig and base mob size), `base`, `worlds`, `biomes`, `night`, `health`, `damage`, `speed`, `drops`,
+ *   `hunter`, `boss`.
+ * Pets, livestock and creatures carry `rig` = `<kind>/<id>` ([RIG_KINDS]).
  * - `train`: `role` (`locomotive`, `wagon`), `length`, `scale`, `offsetY` (models face −Z, bottom on the rail).
  * - `station`: empty.
  *
@@ -32,6 +35,9 @@ import kotlinx.serialization.json.JsonPrimitive
  * `seconds`.
  */
 object ModelSeeds {
+    /** Kinds whose models are rigs (parts animated by Paper's `model/RigVisuals`). */
+    val RIG_KINDS: Set<String> = setOf("pet", "livestock", "creature")
+
     /**
      * @return the seed documents of collection `models`.
      */
@@ -39,7 +45,10 @@ object ModelSeeds {
         val list = mutableListOf<Pair<String, JsonObject>>()
         /** Adds one catalog entry. */
         fun add(id: String, kind: String, name: String, price: Long?, dealer: String?, data: JsonObject = obj(), variants: List<String> = emptyList()) {
-            list += id to obj("kind" to kind, "name" to name, "variants" to variants, "price" to price, "dealer" to dealer, "data" to data)
+            // Moving models (pets, livestock, creatures) are Blockbench rigs: Paper resource rigs/<kind>/<id>.json and
+            // part item models citybuild:<kind>/<id>/<part> (CityBuild resourcepack/generate.js).
+            val rig = if (kind in RIG_KINDS) "$kind/$id" else null
+            list += id to obj("kind" to kind, "name" to name, "rig" to rig, "variants" to variants, "price" to price, "dealer" to dealer, "data" to data)
         }
         // Werkzeuge & Waffen (Schmiede/Kisten, kein Händler)
         listOf(
@@ -117,15 +126,15 @@ object ModelSeeds {
         add("greif", "vehicle", "Greif", null, null, v("air", 10.0, 2).look(1.5, 0.75, 1.3, 1.8, listOf(0.0, 1.6, 0.2), listOf(0.0, 1.6, -0.4)))
         // Haustiere (Tierhändlerin Frieda Feder)
         /** Pet data. */
-        fun p(traits: List<String>, favorite: String, abilities: List<String> = emptyList()) =
-            obj("traits" to traits, "favoriteFood" to favorite, "abilities" to abilities, "tricks" to listOf("huepfen", "drehen", "pfote"))
+        fun p(traits: List<String>, favorite: String, abilities: List<String> = emptyList(), tagHeight: Double = 1.2) =
+            obj("traits" to traits, "favoriteFood" to favorite, "abilities" to abilities, "tricks" to listOf("huepfen", "drehen", "pfote"), "tagHeight" to tagHeight)
         add("katze", "pet", "Katze", 5000, "tiere", p(listOf("cosmetic", "care"), "kaese"))
         add("hund", "pet", "Hund", 5000, "tiere", p(listOf("cosmetic", "care"), "brezel"))
-        add("igel", "pet", "Igel", 4000, "tiere", p(listOf("cosmetic", "care"), "pilz"))
+        add("igel", "pet", "Igel", 4000, "tiere", p(listOf("cosmetic", "care"), "pilz", tagHeight = 0.8))
         add("fuchs", "pet", "Fuchs", 9000, "tiere", p(listOf("care", "ability"), "kronland_ei", listOf("magnet")))
-        add("eule", "pet", "Eule", 9000, "tiere", p(listOf("care", "ability"), "kuchenstueck", listOf("night_vision")))
-        add("schildkroete", "pet", "Schildkröte", 3000, "tiere", p(listOf("cosmetic"), "ruebe"))
-        add("frosch", "pet", "Frosch", 3000, "tiere", p(listOf("cosmetic"), "honigbrot"))
+        add("eule", "pet", "Eule", 9000, "tiere", p(listOf("care", "ability"), "kuchenstueck", listOf("night_vision"), 1.35))
+        add("schildkroete", "pet", "Schildkröte", 3000, "tiere", p(listOf("cosmetic"), "ruebe", tagHeight = 0.75))
+        add("frosch", "pet", "Frosch", 3000, "tiere", p(listOf("cosmetic"), "honigbrot", tagHeight = 0.75))
         add("mini_drache", "pet", "Mini-Drache", null, null, p(listOf("care", "ability"), "pilzpfanne", listOf("light", "speed")))
         // Nutztiere (Tierhändlerin)
         /** Livestock data. */
@@ -137,18 +146,18 @@ object ModelSeeds {
         add("bienenkorb", "livestock", "Bienenkorb", 1500, "tiere", l("BEE", listOf("honigwabe" to 1), 45, "DANDELION", "block"))
         // Farmwelt-Kreaturen und Boss
         /** Creature data. */
-        fun c(base: String, worlds: List<String>, biomes: List<String>, health: Double, damage: Double, drops: List<Triple<String, Int, Double>>, hunter: Double, night: Boolean = false, boss: Boolean = false) =
+        fun c(base: String, worlds: List<String>, biomes: List<String>, health: Double, damage: Double, drops: List<Triple<String, Int, Double>>, hunter: Double, night: Boolean = false, boss: Boolean = false, scale: Double = 1.0) =
             obj(
-                "base" to base, "worlds" to worlds, "biomes" to biomes, "night" to night, "health" to health, "damage" to damage, "speed" to 0.25,
+                "scale" to scale, "base" to base, "worlds" to worlds, "biomes" to biomes, "night" to night, "health" to health, "damage" to damage, "speed" to 0.25,
                 "drops" to drops.map { (m, max, chance) -> obj("model" to m, "min" to 1, "max" to max, "chance" to chance) }, "hunter" to hunter, "boss" to boss,
             )
-        add("pilzling", "creature", "Pilzling", null, null, c("ZOMBIE", listOf("farm"), listOf("FOREST", "DARK_FOREST", "BIRCH_FOREST"), 16.0, 3.0, listOf(Triple("pilz", 2, 0.8)), 1.0))
-        add("moorwicht", "creature", "Moorwicht", null, null, c("ZOMBIE", listOf("farm"), listOf("SWAMP", "MANGROVE_SWAMP"), 22.0, 4.0, listOf(Triple("nebelfell", 1, 0.6)), 2.0))
+        add("pilzling", "creature", "Pilzling", null, null, c("ZOMBIE", listOf("farm"), listOf("FOREST", "DARK_FOREST", "BIRCH_FOREST"), 16.0, 3.0, listOf(Triple("pilz", 2, 0.8)), 1.0, scale = 0.6))
+        add("moorwicht", "creature", "Moorwicht", null, null, c("ZOMBIE", listOf("farm"), listOf("SWAMP", "MANGROVE_SWAMP"), 22.0, 4.0, listOf(Triple("nebelfell", 1, 0.6)), 2.0, scale = 0.8))
         add("steinkrabbler", "creature", "Steinkrabbler", null, null, c("SPIDER", listOf("farm"), listOf("CAVES", "DRIPSTONE_CAVES", "LUSH_CAVES"), 20.0, 4.0, listOf(Triple("glutstaub", 2, 0.6)), 2.0))
-        add("nebelwolf", "creature", "Nebelwolf", null, null, c("WOLF", listOf("farm"), emptyList(), 24.0, 5.0, listOf(Triple("nebelfell", 2, 0.7), Triple("federn", 2, 0.3)), 3.0, night = true))
-        add("glutkaefer", "creature", "Glutkäfer", null, null, c("SPIDER", listOf("farm_nether"), emptyList(), 26.0, 6.0, listOf(Triple("glutstaub", 3, 0.8)), 3.0))
+        add("nebelwolf", "creature", "Nebelwolf", null, null, c("WOLF", listOf("farm"), emptyList(), 24.0, 5.0, listOf(Triple("nebelfell", 2, 0.7), Triple("federn", 2, 0.3)), 3.0, night = true, scale = 1.2))
+        add("glutkaefer", "creature", "Glutkäfer", null, null, c("SPIDER", listOf("farm_nether"), emptyList(), 26.0, 6.0, listOf(Triple("glutstaub", 3, 0.8)), 3.0, scale = 0.9))
         add("endschatten", "creature", "Endschatten", null, null, c("ENDERMAN", listOf("farm_end"), emptyList(), 40.0, 7.0, listOf(Triple("schattenperle", 1, 0.5)), 6.0))
-        add("waldriese", "creature", "Waldriese", null, null, c("ZOMBIE", listOf("farm"), emptyList(), 1200.0, 12.0, listOf(Triple("schattenperle", 3, 1.0)), 50.0, boss = true))
+        add("waldriese", "creature", "Waldriese", null, null, c("ZOMBIE", listOf("farm"), emptyList(), 1200.0, 12.0, listOf(Triple("schattenperle", 3, 1.0)), 50.0, boss = true, scale = 2.5))
         // Bahn
         add("dampflok", "train", "Dampflok", null, null, obj("role" to "locomotive", "length" to 5, "scale" to 2.0, "offsetY" to 1.0))
         add("personenwagen", "train", "Personenwagen", null, null, obj("role" to "wagon", "length" to 5, "scale" to 2.0, "offsetY" to 1.0))
