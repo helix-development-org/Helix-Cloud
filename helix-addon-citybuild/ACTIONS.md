@@ -277,6 +277,7 @@ All settings with types and defaults: `citybuild.config.export`. Groups:
 | `citybuild.log.query` | `[json {actor?, ref?, kind?, limit? (≤ 500)}]` | `[LogEntry]` newest first. `actor` also matches `target`; `ref` e.g. `auction:17`. | citybuild.admin.logs |
 | `citybuild.profile.report` | `<uuid> <shard> <json {plots, …}>` | `{stored:true}`; feeds the network profile (`plots` summed over instances) | – |
 | `citybuild.arena.record` | `<uuid> <kills> <deaths>` | `{accepted}`; forwards to `stats.add citybuild.arena.kills/deaths` | – |
+| `citybuild.arena.top` | `[limit 1–20, default 10]` | `[{rank, name, kills}]` from `stats.top citybuild.arena.kills`; empty array without `helix.stats` | – |
 
 Kinds the node writes itself:
 

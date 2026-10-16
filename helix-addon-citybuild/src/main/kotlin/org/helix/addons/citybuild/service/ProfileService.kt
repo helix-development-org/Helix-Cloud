@@ -116,13 +116,47 @@ class ProfileService(
             ctx.repository.putProfileReport(a.str(0, "uuid"), a.str(1, "shard"), a.json(2).toString())
             Results.ok(jsonOf("stored" to true))
         }
+        r.register("citybuild.arena.top", "citybuild.arena.top [limit 1–20]", "Arena leaderboard (kills) from the network stats.", null) { a ->
+            val limit = (a.opt(0)?.toIntOrNull() ?: DEFAULT_TOP).coerceIn(1, MAX_TOP)
+            Results.ok(json.encodeToJsonElement(arenaTop(limit)))
+        }
         r.register("citybuild.arena.record", "citybuild.arena.record <uuid> <kills> <deaths>", "Adds arena kills/deaths to the network stats.", null) { a ->
             Results.ok(jsonOf("accepted" to recordArena(a.str(0, "uuid"), a.int(1, "kills"), a.int(2, "deaths"))))
         }
     }
 
-    /** Stat keys. */
+    /**
+     * Reads the arena leaderboard (kills) from the stats addon (`stats.top`).
+     *
+     * @param limit number of entries.
+     * @return ranked entries; empty when the stats addon is missing or has no values.
+     */
+    fun arenaTop(limit: Int): List<ArenaRank> {
+        val result = runCatching { actions.invoke(ActionInvocation("stats.top", listOf(KILLS, limit.toString()))) }.getOrNull()
+        if (result == null || !result.success) return emptyList()
+        return parseTop(result.lines)
+    }
+
+    /** Stat keys and leaderboard parsing. */
     companion object {
+        /** Default leaderboard size. */
+        const val DEFAULT_TOP: Int = 10
+
+        /** Largest leaderboard size. */
+        const val MAX_TOP: Int = 20
+
+        private val TOP_LINE = Regex("""^#(\d+) (.+) - (-?\d+)$""")
+
+        /**
+         * Parses the `stats.top` lines (`#1 Steve - 42`).
+         *
+         * @param lines result lines of `stats.top`.
+         * @return parsed entries; malformed lines are skipped.
+         */
+        fun parseTop(lines: List<String>): List<ArenaRank> = lines.mapNotNull { line ->
+            TOP_LINE.matchEntire(line.trim())?.destructured?.let { (rank, name, kills) -> ArenaRank(rank.toInt(), name, kills.toLong()) }
+        }
+
         /** Arena kills. */
         const val KILLS: String = "citybuild.arena.kills"
 
@@ -130,3 +164,13 @@ class ProfileService(
         const val DEATHS: String = "citybuild.arena.deaths"
     }
 }
+
+/**
+ * One arena leaderboard row.
+ *
+ * @property rank position, starting at 1.
+ * @property name player name.
+ * @property kills arena kills.
+ */
+@kotlinx.serialization.Serializable
+data class ArenaRank(val rank: Int, val name: String, val kills: Long)
