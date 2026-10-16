@@ -85,6 +85,8 @@ object NavigatorGlyphs {
         Place("grenzlande", "Grenzlande", 7, 6, 6, 6, "hedda"),
         Place("nebelland", "Nebelland", 0, 6, 2, 6, "funkel"),
         Place("reserve", "Lichtung", 3, 7, 5, 7, "elsa"),
+        // CityBuild; the city villagers have no NPC model yet, so the mayor's head stands in (DESIGN §14)
+        Place("kronstadt", "Kronstadt", 3, 1, 5, 1, "bertold"),
     )
 
     /** The fog place for coming modes. */

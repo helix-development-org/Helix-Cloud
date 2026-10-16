@@ -15,5 +15,13 @@
   "navigator.lore.rosenarena": "Eins gegen eins um Rosen. Gorm hält deine Rosen.",
   "navigator.lore.grenzlande": "Jenseits der Mauern streifen ungebundene Mobs. Clans ziehen in den Krieg.",
   "navigator.lore.nebelland": "Prof. Funkel forscht noch. Es riecht leicht angebrannt.",
-  "navigator.lore.reserve": "Eine stille Lichtung. Elsa notiert hier ihre Taktiken."
+  "navigator.lore.reserve": "Eine stille Lichtung. Elsa notiert hier ihre Taktiken.",
+  "navigator.lore.kronstadt": "Die Handelsstadt des Reichs. Hol dir ein Grundstück und bau los.",
+  "navigator.instances.subtitle": "Wähle deine Stadt",
+  "navigator.instances.empty": "Gerade ist keine Stadt geöffnet. Schau gleich nochmal vorbei!",
+  "navigator.instances.state.open": "<#4ac85e>Offen",
+  "navigator.instances.state.busy": "<#ffcf4a>Fast voll",
+  "navigator.instances.state.full": "<#ff5a4a>Voll",
+  "navigator.instances.state.maintenance": "<#ffb43a>Achtung: Hier wird gerade gebaut.",
+  "navigator.instances.blocked": "<#ff5a4a>Gerade nicht betretbar. Wähle eine andere Instanz."
 }

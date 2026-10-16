@@ -71,7 +71,10 @@ data class ServerMenuSettings(
     val modes: List<NavigatorMode> = emptyList(),
 )
 
-/** One game mode of the navigator: task, display name, emblem id, place on the map, villager, lore, maintenance. */
+/**
+ * One game mode of the navigator: task, display name, emblem id, place on the map, villager, lore, maintenance and
+ * whether a click opens the instance picker instead of joining the least-loaded backend.
+ */
 @Serializable
 data class NavigatorMode(
     val task: String,
@@ -81,6 +84,7 @@ data class NavigatorMode(
     val villager: String = "",
     val lore: String = "",
     val maintenance: Boolean = false,
+    val pickInstance: Boolean = false,
 )
 
 /** A joinable backend returned by the `lobby.servers` action. */
