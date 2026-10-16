@@ -1,0 +1,20 @@
+{
+  "furniture.blocked": "<#ff5a4a>There is no room. Find a free spot.",
+  "furniture.border": "<#ff5a4a>The furniture sticks out over the plot edge. Move it inwards.",
+  "furniture.in-use": "<#ff5a4a>Someone is using it. Try again in a moment.",
+  "furniture.limit": "<#ff5a4a>This plot already has {limit} pieces of furniture. Pick one up first (Shift + left-click).",
+  "furniture.no-plot": "<#ff5a4a>There is no plot here. Place it on your plot.",
+  "furniture.no-rights": "<#ff5a4a>This is not your plot. Ask the owner to trust you.",
+  "furniture.not-empty": "<#ff5a4a>Empty it first, then you can pick it up.",
+  "furniture.not-yours": "<#ff5a4a>That is not yours.",
+  "furniture.only-plots": "<#ff5a4a>You can only place furniture on plots.",
+  "furniture.seat-taken": "<#ff5a4a>That seat is taken.",
+  "furniture.storage.title": "{name}",
+  "furniture.stove.can": "{times}×",
+  "furniture.stove.cooked": "<#4ac85e>Cooked: <#ffcf4a>{amount}× {item}",
+  "furniture.stove.empty": "No recipes yet. The team adds them in the admin hub.",
+  "furniture.stove.missing": "missing",
+  "furniture.stove.no-ingredients": "<#ff5a4a>You are missing ingredients.",
+  "furniture.stove.subtitle": "Click: cook · Shift: all",
+  "furniture.stove.title": "Stove"
+}

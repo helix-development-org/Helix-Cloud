@@ -34,7 +34,7 @@ class ConfigSeedsTest {
         assertEquals(8.0, store.document("jobs", "miner")!!.body["actions"]!!.jsonObject["break:DIAMOND_ORE"]!!.jsonPrimitive.content.toDouble())
         assertEquals("8", store.document("limits", "tier3")!!.body["plots"]!!.jsonPrimitive.content)
         assertEquals("1000", store.document("rewards", "day7")!!.body["kronen"]!!.jsonPrimitive.content)
-        assertEquals(10, store.documents("villagers").size)
+        assertEquals(13, store.documents("villagers").size)
         assertEquals(6, store.documents("enchants").size)
         assertEquals(9, store.documents("abilities").size)
         assertEquals(4, store.documents("kits").size)
