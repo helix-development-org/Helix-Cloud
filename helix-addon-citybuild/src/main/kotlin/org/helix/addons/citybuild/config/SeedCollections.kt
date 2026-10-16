@@ -22,6 +22,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * - `villagers` – the CityBuild cast.
  * - `enchants`, `abilities` – Kronland enchantments and forge abilities with their parameters.
  * - `crates` – crate specs ([org.helix.addons.citybuild.service.CrateSpec]).
+ * - `models`, `recipes` – model catalog and stove recipes ([ModelSeeds]).
  * - `forge`, `offers`, `arenas` – created at runtime (no seeds).
  */
 object SeedCollections {
@@ -48,6 +49,8 @@ object SeedCollections {
         "enchants" to enchants(),
         "abilities" to abilities(),
         "crates" to crates(),
+        "models" to ModelSeeds.models(),
+        "recipes" to ModelSeeds.recipes(),
     )
 
     private val woods = listOf("OAK", "SPRUCE", "BIRCH", "JUNGLE", "ACACIA", "DARK_OAK", "MANGROVE", "CHERRY", "PALE_OAK")
@@ -240,10 +243,10 @@ object SeedCollections {
     }
 
     private fun limits(): List<ConfigDocument> = listOf(
-        listOf(2, 2, 10, 5, 90, 0, 0, 0),
-        listOf(3, 4, 20, 8, 90, 1, 1, 0),
-        listOf(5, 7, 35, 12, 180, 1, 1, 1),
-        listOf(8, 12, 60, 20, 180, 1, 1, 1),
+        listOf(2, 2, 10, 5, 90, 0, 0, 0, 50, 6),
+        listOf(3, 4, 20, 8, 90, 1, 1, 0, 80, 10),
+        listOf(5, 7, 35, 12, 180, 1, 1, 1, 120, 16),
+        listOf(8, 12, 60, 20, 180, 1, 1, 1, 200, 24),
     ).mapIndexed { tier, v ->
         ConfigDocument(
             "tier$tier",
@@ -251,6 +254,7 @@ object SeedCollections {
             obj(
                 "plots" to v[0], "homes" to v[1], "shops" to v[2], "auctions" to v[3], "inactivityDays" to v[4],
                 "back" to (v[5] == 1), "weeklyKit" to (v[6] == 1), "builderKit" to (v[7] == 1),
+                "furniture" to v[8], "livestock" to v[9],
             ),
         )
     }
@@ -266,6 +270,9 @@ object SeedCollections {
         listOf("paula_paket", "Paula Paket", "reward", "markt", "Postgelb mit roten Säumen", "Umhängetasche voller Briefe", "Für dich! Unterschreib – nein, keine Zeit!"),
         listOf("brunhilde_brecher", "Brunhilde Brecher", "arena", "arenator", "Eisengrau mit Rot", "Rundschild, Holzschwert", "Hinfallen ist erlaubt. Liegenbleiben nicht."),
         listOf("greta_goldzahn", "Greta Goldzahn", "crates", "schatzkammer", "Purpurbraun mit Goldknöpfen", "Goldzahn, Schlüsselring", "Psst. In der dritten Kiste … nein, ich sag nichts."),
+        listOf("kuno_kurbel", "Kuno Kurbel", "stellmacher", "markt", "Rostbraun mit Lederschürze", "Schraubenschlüssel, Wagenrad auf dem Rücken", "Vier Räder, ein Traum. Drei gehen auch."),
+        listOf("tilda_tapete", "Tilda Tapete", "moebel", "markt", "Altrosa mit Spitzenkragen", "Stoffmuster-Fächer, Zollstock", "Dieser Stuhl? Der sagt so viel über dich."),
+        listOf("frieda_feder", "Frieda Feder", "tiere", "markt", "Wiesengrün mit Strohhut", "Futterbeutel, Huhn unterm Arm", "Gackert's, hat's Hunger. Gackert's nicht, auch."),
     ).mapIndexed { i, v ->
         ConfigDocument(v[0], i, obj("name" to v[1], "role" to v[2], "location" to v[3], "robe" to v[4], "prop" to v[5], "quote" to v[6]))
     }

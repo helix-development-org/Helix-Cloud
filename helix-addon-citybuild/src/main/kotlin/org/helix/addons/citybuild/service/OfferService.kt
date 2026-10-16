@@ -11,7 +11,7 @@ import org.helix.addons.citybuild.economy.MoneyResult
  * The ware of a special offer.
  *
  * @property type `forge` (ref = template id), `key` (ref = crate id), `item` (data = Base64 item
- *   stack) or `material` (ref = Bukkit material).
+ *   stack), `material` (ref = Bukkit material) or `model` (ref = model catalog id).
  * @property ref reference according to [type].
  * @property data Base64 item stack for type `item`.
  * @property amount items per purchased unit.
@@ -126,7 +126,7 @@ class OfferService(private val ctx: CityContext) {
             val id = a.str(1, "id")
             if (!Regex("[a-z0-9_]{1,48}").matches(id)) Results.fail("invalid_id", "offer id must match [a-z0-9_]{1,48}")
             val spec = runCatching { json.decodeFromJsonElement(OfferSpec.serializer(), a.json(2)) }.getOrElse { Results.fail("invalid", it.message ?: "invalid spec") }
-            if (spec.price < 0 || spec.ware.amount < 1 || spec.ware.type !in setOf("forge", "key", "item", "material")) Results.fail("invalid", "invalid offer")
+            if (spec.price < 0 || spec.ware.amount < 1 || spec.ware.type !in setOf("forge", "key", "item", "material", "model")) Results.fail("invalid", "invalid offer")
             val previous = ctx.config.document(COLLECTION, id)
             ctx.config.putDocument(COLLECTION, ConfigDocument(id, previous?.sortOrder ?: ctx.config.documents(COLLECTION).size, json.encodeToJsonElement(spec) as JsonObject))
             ctx.log("offer.save", "", a.str(0, "uuid"), ref = "offer:$id")
