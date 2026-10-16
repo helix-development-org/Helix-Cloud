@@ -416,5 +416,19 @@
   "war.encounter.no_escape": "<#ff5a4a>The combat zone won't let you out! Destroy the enemy tower.",
   "war.card_mob.name": "Card Mob: {card}",
   "war.card_mob.defeated": "<#4ac85e>Card mob defeated: <#ffcf4a>{card}</#ffcf4a> <#7a4a24>–</#7a4a24> pick up the card!",
-  "laby.chests.ready": "{count} ready"
+  "laby.chests.ready": "{count} ready",
+  "shop.exchange.category": "<#a89a84>Exchange · Crowns",
+  "shop.exchange.buy.name": "<#4ac85e>Buy {amount} emeralds",
+  "shop.exchange.sell.name": "<#ffcf4a>Sell {amount} emeralds",
+  "shop.exchange.buy.price": "<#f1e2c2>Price: {crown} <#ffcf4a>{price} crowns</#ffcf4a>",
+  "shop.exchange.sell.price": "<#f1e2c2>Proceeds: {crown} <#ffcf4a>{price} crowns</#ffcf4a>",
+  "shop.exchange.limit": "<#a89a84>{remaining} of {limit} emeralds left today",
+  "shop.exchange.click_sell": "<#ffcf4a>Click: Sell",
+  "shop.exchange.bought": "<#4ac85e>Emeralds bought: <#ffcf4a>+{amount}</#ffcf4a> <#f1e2c2>(-{price} crowns)",
+  "shop.exchange.sold": "<#4ac85e>Emeralds sold: <#ffcf4a>-{amount}</#ffcf4a> <#f1e2c2>(+{price} crowns)",
+  "shop.exchange.not_enough_crowns": "<#ff5a4a>Not enough crowns (price: <#ffcf4a>{price}</#ffcf4a>). Every match pays crowns.",
+  "shop.exchange.not_enough_emeralds": "<#ff5a4a>You don't have <#ffcf4a>{amount}</#ffcf4a> emeralds to sell. Empty your mine or win matches.",
+  "shop.exchange.limit_reached": "<#ff5a4a>Daily limit reached: only <#ffcf4a>{remaining}</#ffcf4a> emeralds left today. Mira trades again tomorrow.",
+  "shop.exchange.offline": "<#ff5a4a>The exchange is closed right now. Try again in a moment.",
+  "shop.exchange.busy": "<#a89a84>Mira is still counting …"
 }
