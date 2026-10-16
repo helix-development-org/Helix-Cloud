@@ -1,0 +1,12 @@
+{
+  "livestock.placed": "<#4ac85e><#ffcf4a>{animal}</#ffcf4a><#4ac85e> lebt jetzt auf deinem Grundstück.",
+  "livestock.only-plots": "<#ff5a4a>Nutztiere gibt es nur auf Grundstücken in der Plotwelt.",
+  "livestock.no-plot": "<#ff5a4a>Hier ist kein Grundstück. Stell dich auf deinen Plot.",
+  "livestock.no-rights": "<#ff5a4a>Das ist nicht dein Grundstück. Frag den Besitzer, ob er dich einträgt.",
+  "livestock.limit": "<#ff5a4a>Auf diesem Grundstück leben schon {limit} Nutztiere – mehr passen nicht.",
+  "livestock.blocked": "<#ff5a4a>Hier ist kein Platz. Such dir eine freie Stelle mit zwei Blöcken Luft.",
+  "livestock.not-ready": "<#f1e2c2><#ffcf4a>{animal}</#ffcf4a><#f1e2c2> ist noch nicht so weit – noch <#ffcf4a>{time}</#ffcf4a><#f1e2c2>. Futter macht es schneller.",
+  "livestock.no-yield": "<#ff5a4a>Für dieses Tier ist kein Ertrag eingestellt. Sag einem Teammitglied Bescheid.",
+  "livestock.offspring": "<#4ac85e>Nachwuchs! Ein junges <#ffcf4a>{animal}</#ffcf4a><#4ac85e> ist da.",
+  "livestock.picked": "<#f1e2c2><#ffcf4a>{animal}</#ffcf4a><#f1e2c2> ist wieder im Ei – du findest es im Inventar oder in der Abholkiste."
+}

@@ -63,12 +63,14 @@ class CityBuildAddon(
     private lateinit var messages: Messages
     private lateinit var config: ConfigStore
     private lateinit var repository: CityRepository
+    private lateinit var pets: org.helix.addons.citybuild.pet.PetStore
 
     /** Opens the stores and registers all actions and providers. */
     override fun enable() {
         messages = loadMessages()
         config = ConfigStore(context.storage())
         repository = openRepository()
+        pets = openPetStore()
         val kronen = gatewayFactory?.invoke(context.actions) ?: ActionKronenGateway(context.actions)
         val ctx = CityContext(repository, config, kronen, clock)
         val rewards = RewardService(ctx)
@@ -96,6 +98,7 @@ class CityBuildAddon(
         ForgeService(ctx).register(registrar)
         CrateService(ctx, random).register(registrar)
         OfferService(ctx).register(registrar)
+        org.helix.addons.citybuild.pet.PetService(ctx, pets).register(registrar)
         profiles.register(registrar)
         context.registerProfileInfoProvider(profiles.infoProvider)
         context.registerPlayerDataProvider(profiles.dataProvider)
@@ -105,6 +108,7 @@ class CityBuildAddon(
     /** Closes the repository. */
     override fun onDisable() {
         if (::repository.isInitialized) repository.close()
+        if (::pets.isInitialized) pets.close()
     }
 
     private fun handle(usage: String, arguments: List<String>, handler: (Args) -> ActionResult): ActionResult =
@@ -127,6 +131,16 @@ class CityBuildAddon(
                 .getOrElse { DocumentCityRepository(context.storage()) }
         }
         return DocumentCityRepository(context.storage())
+    }
+
+    private fun openPetStore(): org.helix.addons.citybuild.pet.PetStore {
+        val connection = context.storageConnection()
+        if (connection != null && connection.mode.equals("postgres", ignoreCase = true)) {
+            return runCatching { org.helix.addons.citybuild.pet.PostgresPetStore(connection) }
+                .onFailure { logger.warn("PostgreSQL pet store unavailable, using document store: {}", it.message) }
+                .getOrElse { org.helix.addons.citybuild.pet.DocumentPetStore(context.storage()) }
+        }
+        return org.helix.addons.citybuild.pet.DocumentPetStore(context.storage())
     }
 
     private fun registerConfigActions(r: ActionRegistrar) {

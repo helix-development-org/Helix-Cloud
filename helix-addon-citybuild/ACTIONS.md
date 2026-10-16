@@ -279,6 +279,19 @@ All settings with types and defaults: `citybuild.config.export`. Groups:
 | `citybuild.offer.delete` | `<uuid> <id>` | `{deleted:true}` | citybuild.admin.offers |
 | `citybuild.offer.buy` | `<uuid> <shard> <offerId> <count 1–64> <tier>` | `{offer, spec, count, paid}`. Hand out `count × ware.amount`. Errors: `not_available`, `tier`, `sold_out`, `insufficient_funds`. | – |
 
+### Pets (per instance)
+
+`Pet` = `{id, uuid, shard, type, name|null, variant|null, mood 0–100, lastFed, createdAt, updatedAt}` (epoch ms). Which pet is out is a matter of the Paper plugin; the node only keeps the records. Mood decay is computed on Paper, which sends the new value.
+
+| Action | Arguments | Answer | Permission |
+|---|---|---|---|
+| `citybuild.pet.register` | `<uuid> <shard> <type> [variant]` | `Pet`; errors `unknown_model`, `invalid_model` (catalog kind ≠ `pet`), `limit` (`pets.maxPerPlayer`). Unknown variants fall back to the default. | – |
+| `citybuild.pet.list` | `<uuid> <shard>` | `[Pet]` oldest first | – |
+| `citybuild.pet.update` | `<uuid> <id> <json {name?, variant?, mood?, fed?}>` | `Pet`; `name: ""` resets to the catalog name, `fed: true` stamps `lastFed`. Errors `not_found`, `not_owner`, `invalid_name` (> 24 chars or `< > & §`), `invalid_variant`, `invalid_mood`. | – |
+| `citybuild.pet.remove` | `<uuid> <id>` | `{removed:true}`; only the owner | – |
+
+Farm animals (livestock), farm-world creatures and the weekly boss need no actions of their own: livestock timers live in the instance's `livestock.json`, creatures and drops come from the `models` catalog, boss rewards from the collection `boss_rewards` (`{type: kronen|model|key|item, ref, amount, chance}`, paid by Paper: crowns via `eco.api.deposit`, items via the pickup box). Job values: farmer `collect:<livestock id>`, hunter `kill:creature:<creature id>` in collection `jobs`.
+
 ### Audit log, profile, arena
 
 | Action | Arguments | Answer | Permission |
@@ -300,6 +313,7 @@ Kinds the node writes itself:
 | Crates | `crate`, `crate.save` |
 | Offers | `offer`, `offer.save` |
 | Rewards and kits | `reward`, `kit` |
+| Pets | `pet`, `pet.remove` |
 
 ## Storage
 
@@ -318,6 +332,7 @@ Tables in schema `citybuild`:
 | Player progress | `jobs` (JSONB profile), `rewards`, `tutorial`, `daily_counters`, `profile_reports` |
 | Offers and forge | `offer_buys`, `forge_serials` |
 | Audit | `logs` |
+| Pets | `pets` (own pool, fallback document `data.pets`) |
 
 Config, including forge templates, crates and offers, lives in the addon config store (`config.*` keys).
 

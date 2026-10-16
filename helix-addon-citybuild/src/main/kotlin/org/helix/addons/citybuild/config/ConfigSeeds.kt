@@ -137,6 +137,27 @@ object ConfigSeeds {
         // A2 spawn town
         bool("spawn.placeholder", true, "Build the placeholder market square while no spawn map is installed")
 
+        // A21.5 pets, A21.6 livestock, A21.7 creatures and boss
+        int("pets.maxPerPlayer", 10, "Pets a player may own per instance")
+        int("pets.startMood", 80, "Mood of a newly redeemed pet")
+        int("pets.moodDecayPerHour", 5, "Mood a care pet loses per hour online")
+        int("pets.feedMood", 25, "Mood gained by feeding the favourite food")
+        int("pets.trickMood", 60, "Mood from which a care pet performs tricks")
+        int("pets.abilityMood", 50, "Mood from which a pet's abilities work")
+        int("pets.teleportDistance", 16, "Distance after which a pet teleports to its owner")
+        int("livestock.feedMinutes", 5, "Minutes a feeding shortens the time to the next yield")
+        int("livestock.breedCooldownMinutes", 20, "Cooldown between two offspring of one animal")
+        dbl("creatures.replaceChance", 0.35, "Chance that a natural hostile spawn in a farm world becomes a custom creature")
+        int("creatures.maxPerWorld", 60, "Custom creatures alive per farm world")
+        int("creatures.maxPerChunk", 3, "Custom creatures alive per chunk")
+        str("boss.id", "waldriese", "Catalog id of the weekly boss")
+        str("boss.day", "SATURDAY", "Weekday of the weekly boss")
+        str("boss.time", "20:00", "Time of the weekly boss")
+        int("boss.announceMinutes", 30, "Announcement before the boss appears")
+        int("boss.despawnMinutes", 30, "Minutes after which an undefeated boss leaves")
+        dbl("boss.minDamageShare", 0.05, "Damage share a player needs for the boss reward")
+        int("boss.radius", 1500, "Radius around the farm spawn in which the boss appears")
+
         // A12 inactivity
         int("plots.inactivityDays", 90, "Days of absence after which plots are released (tier0/tier1)")
         int("plots.inactivityDaysPremium", 180, "Days of absence after which plots are released (tier2/tier3)")
