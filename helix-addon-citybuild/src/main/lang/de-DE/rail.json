@@ -70,5 +70,6 @@
   "rail.admin.problem.too_short": "Mindestens zwei Wegpunkte nötig",
   "rail.admin.problem.not_junction": "Ein Wegpunkt liegt nicht auf einer Wegkreuzung",
   "rail.admin.problem.diagonal": "Zwei Wegpunkte liegen nicht auf einer Geraden",
-  "rail.admin.problem.zero_length": "Zwei Wegpunkte sind gleich"
+  "rail.admin.problem.zero_length": "Zwei Wegpunkte sind gleich",
+  "rail.admin.on-plots": "<#ff5a4a>Die Linie führt über {count} Plotfelder (zusammengelegte Plots). Lege die Wegpunkte auf freie Wege."
 }

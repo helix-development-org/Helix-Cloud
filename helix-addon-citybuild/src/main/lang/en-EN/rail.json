@@ -70,5 +70,6 @@
   "rail.admin.problem.too_short": "At least two waypoints needed",
   "rail.admin.problem.not_junction": "A waypoint is not on a road junction",
   "rail.admin.problem.diagonal": "Two waypoints are not in a straight line",
-  "rail.admin.problem.zero_length": "Two waypoints are identical"
+  "rail.admin.problem.zero_length": "Two waypoints are identical",
+  "rail.admin.on-plots": "<#ff5a4a>The line crosses {count} plot cells (merged plots). Move the waypoints onto free roads."
 }

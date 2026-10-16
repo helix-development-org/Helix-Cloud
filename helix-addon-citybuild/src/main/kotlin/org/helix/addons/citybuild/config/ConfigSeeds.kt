@@ -157,6 +157,7 @@ object ConfigSeeds {
         int("boss.despawnMinutes", 30, "Minutes after which an undefeated boss leaves")
         dbl("boss.minDamageShare", 0.05, "Damage share a player needs for the boss reward")
         int("boss.radius", 1500, "Radius around the farm spawn in which the boss appears")
+        str("boss.minion", "pilzling", "Catalog id of the creature the boss summons in phase 3")
 
         // A12 inactivity
         int("plots.inactivityDays", 90, "Days of absence after which plots are released (tier0/tier1)")
