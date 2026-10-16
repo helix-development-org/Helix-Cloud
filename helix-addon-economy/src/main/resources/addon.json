@@ -1,7 +1,7 @@
 {
   "id": "helix.economy",
   "name": "Helix Economy",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "main": "org.helix.addons.economy.EconomyAddon",
-  "description": "Coin balances with /balance and /pay plus admin actions."
+  "description": "Network currency Kronen (crowns): /kronen, /balance, /pay, admin and machine API with ledger and daily limits."
 }
