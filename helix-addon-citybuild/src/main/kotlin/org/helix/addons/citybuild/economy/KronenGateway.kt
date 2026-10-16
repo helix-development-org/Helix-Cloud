@@ -107,7 +107,7 @@ class ActionKronenGateway(private val actions: ActionInvoker) : KronenGateway {
             when {
                 text.startsWith("unknown action") || text.startsWith("unknown or non-bridge action") -> UNAVAILABLE
                 "insufficient" in text || "funds" in text -> INSUFFICIENT
-                "limit" in text -> LIMIT
+                "limit reached" in text -> LIMIT
                 else -> ERROR
             },
         )
