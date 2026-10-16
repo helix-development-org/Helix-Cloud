@@ -140,6 +140,9 @@ object ConfigSeeds {
         // A12 inactivity
         int("plots.inactivityDays", 90, "Days of absence after which plots are released (tier0/tier1)")
         int("plots.inactivityDaysPremium", 180, "Days of absence after which plots are released (tier2/tier3)")
+
+        // A21.4 rail network
+        addAll(RailSeeds.settings)
     }
 
     /** Defaults replaced by a later release; an untouched old default is lifted on load. */
