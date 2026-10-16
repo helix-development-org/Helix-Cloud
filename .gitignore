@@ -9,3 +9,5 @@ build/
 # MineClash Paper component and pack, produced by the MineClash repository (./gradlew deployHelix)
 helix-addon-mineclash/libs/paper.jar
 helix-addon-mineclash/libs/pack.zip
+helix-addon-citybuild/libs/paper.jar
+helix-addon-citybuild/libs/pack.zip
