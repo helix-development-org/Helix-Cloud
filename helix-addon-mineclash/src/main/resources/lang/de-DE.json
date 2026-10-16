@@ -416,5 +416,19 @@
   "war.encounter.no_escape": "<#ff5a4a>Die Kampfzone lässt dich nicht raus! Zerstöre den gegnerischen Turm.",
   "war.card_mob.name": "Karten-Mob: {card}",
   "war.card_mob.defeated": "<#4ac85e>Karten-Mob besiegt: <#ffcf4a>{card}</#ffcf4a> <#7a4a24>–</#7a4a24> heb die Karte auf!",
-  "laby.chests.ready": "{count} bereit"
+  "laby.chests.ready": "{count} bereit",
+  "shop.exchange.category": "<#a89a84>Wechselstube · Kronen",
+  "shop.exchange.buy.name": "<#4ac85e>{amount} Smaragde kaufen",
+  "shop.exchange.sell.name": "<#ffcf4a>{amount} Smaragde verkaufen",
+  "shop.exchange.buy.price": "<#f1e2c2>Preis: {crown} <#ffcf4a>{price} Kronen</#ffcf4a>",
+  "shop.exchange.sell.price": "<#f1e2c2>Erlös: {crown} <#ffcf4a>{price} Kronen</#ffcf4a>",
+  "shop.exchange.limit": "<#a89a84>Heute noch {remaining} von {limit} Smaragden",
+  "shop.exchange.click_sell": "<#ffcf4a>Klick: Verkaufen",
+  "shop.exchange.bought": "<#4ac85e>Smaragde gekauft: <#ffcf4a>+{amount}</#ffcf4a> <#f1e2c2>(-{price} Kronen)",
+  "shop.exchange.sold": "<#4ac85e>Smaragde verkauft: <#ffcf4a>-{amount}</#ffcf4a> <#f1e2c2>(+{price} Kronen)",
+  "shop.exchange.not_enough_crowns": "<#ff5a4a>Nicht genug Kronen (Preis: <#ffcf4a>{price}</#ffcf4a>). Kronen gibt es für jedes Match.",
+  "shop.exchange.not_enough_emeralds": "<#ff5a4a>Du hast keine <#ffcf4a>{amount}</#ffcf4a> Smaragde zum Verkaufen. Leere deine Mine oder gewinne Matches.",
+  "shop.exchange.limit_reached": "<#ff5a4a>Tageslimit erreicht: heute nur noch <#ffcf4a>{remaining}</#ffcf4a> Smaragde. Morgen tauscht Mira wieder.",
+  "shop.exchange.offline": "<#ff5a4a>Die Wechselstube ist gerade geschlossen. Versuche es gleich noch einmal.",
+  "shop.exchange.busy": "<#a89a84>Mira zählt noch nach …"
 }

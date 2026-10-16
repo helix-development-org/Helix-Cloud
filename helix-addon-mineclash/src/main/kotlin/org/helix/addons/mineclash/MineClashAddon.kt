@@ -11,6 +11,7 @@ import org.helix.addons.mineclash.profile.MatchRecord
 import org.helix.addons.mineclash.profile.PlayerProfile
 import org.helix.addons.mineclash.profile.PostgresProfileRepository
 import org.helix.addons.mineclash.profile.ProfileRepository
+import org.helix.addons.mineclash.profile.KronenRewards
 import org.helix.addons.mineclash.profile.StatsReporter
 import org.helix.addons.mineclash.queue.Matchmaker
 import org.helix.api.action.ActionInvocation
@@ -41,6 +42,7 @@ class MineClashAddon : AddonBase() {
     private lateinit var matchmaker: Matchmaker
     private lateinit var clans: ClanLookup
     private lateinit var stats: StatsReporter
+    private lateinit var kronen: KronenRewards
 
     /** Registers stores, actions and the dashboard panel. */
     override fun enable() {
@@ -50,6 +52,11 @@ class MineClashAddon : AddonBase() {
         matchmaker = Matchmaker(timeoutMillis = (config.setting("queue.timeoutSeconds")?.toLongOrNull() ?: 600L) * 1000)
         clans = ClanLookup(context.actions)
         stats = StatsReporter(context.actions) { uuid -> profiles.load(uuid)?.name?.takeIf { it.isNotBlank() } }
+        kronen = KronenRewards(
+            context.actions,
+            perMatch = { config.setting(KronenRewards.PER_MATCH)?.toLongOrNull() ?: 10L },
+            perWin = { config.setting(KronenRewards.PER_WIN)?.toLongOrNull() ?: 40L },
+        )
         registerConfigActions()
         registerProfileActions()
         registerQueueActions()
@@ -143,6 +150,7 @@ class MineClashAddon : AddonBase() {
                 .getOrElse { return@action ActionResult.error("invalid match json: ${it.message}") }
             profiles.recordMatch(record)
             stats.report(record) // network-wide stats (helix.stats), when installed
+            kronen.pay(record) // network currency (helix.economy), when installed
             ActionResult.ok("recorded")
         }
         action("mineclash.top", "Best players by roses as JSON.", "mineclash.top [limit]") { inv ->
