@@ -318,6 +318,19 @@ Kinds the node writes itself:
 | Rewards and kits | `reward`, `kit` |
 | Vehicles | `vehicle`, `vehicle.remove` |
 
+### Rail network (per instance, A21.4)
+
+Lines (`rail_lines`) and stations (`rail_stations`) are configuration documents written with `citybuild.config.doc.set`; track building, decorative trains and the ticket menu run on the Paper side. The node only stores discoveries.
+
+| Action | Arguments | Answer | Permission |
+|---|---|---|---|
+| `citybuild.rail.discovered` | `<uuid> <shard>` | `["stationId", …]` sorted (starter stations are not listed; Paper adds them) | – |
+| `citybuild.rail.discover` | `<uuid> <shard> <station>` | `{station, new}`; `new` is false when already known. Errors `invalid_station`, `not_found` (no such `rail_stations` document) | – |
+
+`rail_lines` body: `name`, `enabled`, `built`, `loop`, `points` `[{x, z}]` (plot-world road junctions; consecutive points share x or z), `trains` `[["dampflok", "personenwagen"], …]` (`models` ids of kind `train`, locomotive first), `count`, `speed` (blocks/s), `shards` (empty = all).
+`rail_stations` body: `name`, `line`, `world`, `x`, `y`, `z`, `yaw`, `starter`, `model` (default `haltestelle`), `enabled`, `shards`.
+Settings: `rail.viewRadius`, `rail.discoverRadius`, `rail.updateTicks`, `rail.buildBlocksPerTick`, `rail.defaultSpeed`.
+
 ## Storage
 
 | Mode | Where the data lives |
@@ -336,6 +349,7 @@ Tables in schema `citybuild`:
 | Offers and forge | `offer_buys`, `forge_serials` |
 | Vehicles | `vehicles` (own pool `citybuild-vehicles`) |
 | Audit | `logs` |
+| Rail network | `rail_discovered` (own pool `citybuild-rail`; document store key `rail_discovered:<uuid>`) |
 
 Config, including forge templates, crates and offers, lives in the addon config store (`config.*` keys).
 

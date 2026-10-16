@@ -147,6 +147,8 @@ object ConfigSeeds {
         int("vehicles.maxHeight", 200, "Highest Y air vehicles may reach")
         int("vehicles.foreignPlotClearance", 3, "Blocks air vehicles must stay above the ground over foreign plots")
         int("vehicles.hornCooldownTicks", 30, "Cooldown of the horn in ticks")
+        // A21.4 rail network
+        addAll(RailSeeds.settings)
     }
 
     /** Defaults replaced by a later release; an untouched old default is lifted on load. */

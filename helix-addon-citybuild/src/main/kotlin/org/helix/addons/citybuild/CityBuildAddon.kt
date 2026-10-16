@@ -6,6 +6,9 @@ import kotlinx.serialization.json.jsonObject
 import org.helix.addon.sdk.AddonBase
 import org.helix.addons.citybuild.config.ConfigDocument
 import org.helix.addons.citybuild.config.ConfigStore
+import org.helix.addons.citybuild.store.DocumentRailStore
+import org.helix.addons.citybuild.store.PostgresRailStore
+import org.helix.addons.citybuild.store.RailStore
 import org.helix.addons.citybuild.economy.ActionKronenGateway
 import org.helix.addons.citybuild.economy.KronenGateway
 import org.helix.addons.citybuild.service.ActionRegistrar
@@ -22,6 +25,7 @@ import org.helix.addons.citybuild.service.KitService
 import org.helix.addons.citybuild.service.OfferService
 import org.helix.addons.citybuild.service.PlotMarketService
 import org.helix.addons.citybuild.service.ProfileService
+import org.helix.addons.citybuild.service.RailService
 import org.helix.addons.citybuild.service.RewardService
 import org.helix.addons.citybuild.service.UsageException
 import org.helix.addons.citybuild.store.CityRepository
@@ -64,6 +68,7 @@ class CityBuildAddon(
     private lateinit var config: ConfigStore
     private lateinit var repository: CityRepository
     private lateinit var vehicles: org.helix.addons.citybuild.vehicle.VehicleStore
+    private lateinit var railStore: RailStore
 
     /** Opens the stores and registers all actions and providers. */
     override fun enable() {
@@ -71,6 +76,7 @@ class CityBuildAddon(
         config = ConfigStore(context.storage())
         repository = openRepository()
         vehicles = openVehicleStore()
+        railStore = openRailStore()
         val kronen = gatewayFactory?.invoke(context.actions) ?: ActionKronenGateway(context.actions)
         val ctx = CityContext(repository, config, kronen, clock)
         val rewards = RewardService(ctx)
@@ -100,6 +106,9 @@ class CityBuildAddon(
         OfferService(ctx).register(registrar)
         org.helix.addons.citybuild.vehicle.VehicleService(ctx, vehicles).register(registrar)
         profiles.register(registrar)
+        val rail = RailService(ctx, railStore) { name -> if (UUID_PATTERN.matches(name)) name else context.resolvePlayerUuid(name) }
+        rail.register(registrar)
+        context.registerPlayerDataProvider(rail.dataProvider)
         context.registerProfileInfoProvider(profiles.infoProvider)
         context.registerPlayerDataProvider(profiles.dataProvider)
         logger.info("CityBuild addon enabled: {} settings, collections {}", config.settings().size, config.collectionNames())
@@ -109,6 +118,7 @@ class CityBuildAddon(
     override fun onDisable() {
         if (::repository.isInitialized) repository.close()
         if (::vehicles.isInitialized) vehicles.close()
+        if (::railStore.isInitialized) railStore.close()
     }
 
     private fun handle(usage: String, arguments: List<String>, handler: (Args) -> ActionResult): ActionResult =
@@ -141,6 +151,16 @@ class CityBuildAddon(
                 .getOrElse { org.helix.addons.citybuild.vehicle.DocumentVehicleStore(context.storage()) }
         }
         return org.helix.addons.citybuild.vehicle.DocumentVehicleStore(context.storage())
+    }
+
+    private fun openRailStore(): RailStore {
+        val connection = context.storageConnection()
+        if (connection != null && connection.mode.equals("postgres", ignoreCase = true)) {
+            return runCatching { PostgresRailStore(connection) }
+                .onFailure { logger.warn("PostgreSQL rail store unavailable, using document store: {}", it.message) }
+                .getOrElse { DocumentRailStore(context.storage()) }
+        }
+        return DocumentRailStore(context.storage())
     }
 
     private fun registerConfigActions(r: ActionRegistrar) {

@@ -51,6 +51,8 @@ object SeedCollections {
         "crates" to crates(),
         "models" to ModelSeeds.models(),
         "recipes" to ModelSeeds.recipes(),
+        RailSeeds.LINES to RailSeeds.lines(),
+        RailSeeds.STATIONS to RailSeeds.stations(),
     )
 
     private val woods = listOf("OAK", "SPRUCE", "BIRCH", "JUNGLE", "ACACIA", "DARK_OAK", "MANGROVE", "CHERRY", "PALE_OAK")
