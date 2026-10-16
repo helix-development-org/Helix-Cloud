@@ -16,7 +16,7 @@ val RARITIES: List<String> = listOf("NORMAL", "SPECIAL", "ELITE", "TITAN", "BOSS
  * @property id prize id, unique within the crate.
  * @property type `forge` (ref = template id), `item` (data = Base64 item stack), `material`
  *   (ref = Bukkit material), `kronen` (amount = Kronen, paid by the node) or `key` (ref = crate id
- *   whose key is won).
+ *   whose key is won) or `model` (ref = model catalog id).
  * @property ref reference according to [type].
  * @property data Base64 item stack for type `item`.
  * @property amount stack size or Kronen.
@@ -186,6 +186,6 @@ class CrateService(private val ctx: CityContext, private val random: Random = Ra
         const val COLLECTION: String = "crates"
 
         /** Allowed prize types. */
-        val TYPES: Set<String> = setOf("forge", "item", "material", "kronen", "key")
+        val TYPES: Set<String> = setOf("forge", "item", "material", "kronen", "key", "model")
     }
 }
