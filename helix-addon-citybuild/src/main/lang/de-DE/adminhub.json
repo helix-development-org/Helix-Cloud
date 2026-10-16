@@ -258,5 +258,6 @@
   "adminhub.ware.subtitle": "Schmiede-Vorlagen und Schlüssel",
   "adminhub.ware.tip": "<#c8bca8>Id: {id}",
   "adminhub.ware.title": "Ware wählen",
-  "adminhub.yes": "ja"
+  "adminhub.yes": "ja",
+  "adminhub.reload.done": "<#4ac85e>Konfiguration neu geladen."
 }

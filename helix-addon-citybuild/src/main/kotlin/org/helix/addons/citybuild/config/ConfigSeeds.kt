@@ -132,6 +132,10 @@ object ConfigSeeds {
         int("forge.maxEnchantLevel", 255, "Highest enchantment level the forge allows")
         int("forge.maxLoreLines", 10, "Lore lines per forged item")
         int("crates.animationTicks", 60, "Duration of the crate opening animation")
+        int("forge.ability.hardMax", 256, "Upper bound of blocks a single multi-block ability may break")
+
+        // A2 spawn town
+        bool("spawn.placeholder", true, "Build the placeholder market square while no spawn map is installed")
 
         // A12 inactivity
         int("plots.inactivityDays", 90, "Days of absence after which plots are released (tier0/tier1)")

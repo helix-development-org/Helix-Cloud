@@ -258,5 +258,6 @@
   "adminhub.ware.subtitle": "Forge templates and keys",
   "adminhub.ware.tip": "<#c8bca8>Id: {id}",
   "adminhub.ware.title": "Pick ware",
-  "adminhub.yes": "yes"
+  "adminhub.yes": "yes",
+  "adminhub.reload.done": "<#4ac85e>Configuration reloaded."
 }
