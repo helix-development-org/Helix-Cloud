@@ -53,7 +53,16 @@ object SeedCollections {
         "recipes" to ModelSeeds.recipes(),
         RailSeeds.LINES to RailSeeds.lines(),
         RailSeeds.STATIONS to RailSeeds.stations(),
+        "boss_rewards" to bossRewards(),
     )
+
+    /** Rewards of the weekly boss (concept A21.7): every participant rolls each entry once. */
+    private fun bossRewards(): List<ConfigDocument> = listOf(
+        "kronen" to obj("type" to "kronen", "amount" to 2000, "chance" to 1.0),
+        "schattenperlen" to obj("type" to "model", "ref" to "schattenperle", "amount" to 3, "chance" to 1.0),
+        "schluessel" to obj("type" to "key", "ref" to "key_standard", "amount" to 1, "chance" to 0.5),
+        "mini_drache" to obj("type" to "model", "ref" to "mini_drache", "amount" to 1, "chance" to 0.02),
+    ).mapIndexed { i, (id, body) -> ConfigDocument(id, i, body) }
 
     private val woods = listOf("OAK", "SPRUCE", "BIRCH", "JUNGLE", "ACACIA", "DARK_OAK", "MANGROVE", "CHERRY", "PALE_OAK")
     private val colors = listOf(
@@ -160,13 +169,18 @@ object SeedCollections {
         val digger = listOf("DIRT", "GRASS_BLOCK", "COARSE_DIRT", "PODZOL", "SAND", "RED_SAND", "GRAVEL", "CLAY", "MUD", "SOUL_SAND", "SOUL_SOIL")
             .associate { "break:$it" to 0.05 }
         val farmer = listOf("WHEAT", "CARROTS", "POTATOES", "BEETROOTS", "NETHER_WART", "COCOA", "PUMPKIN", "MELON", "SWEET_BERRY_BUSH").associate { "harvest:$it" to 0.2 } +
-            listOf("COW", "SHEEP", "PIG", "CHICKEN", "RABBIT", "GOAT").associate { "breed:$it" to 1.0 }
+            listOf("COW", "SHEEP", "PIG", "CHICKEN", "RABBIT", "GOAT").associate { "breed:$it" to 1.0 } +
+            mapOf("collect:kronland_huhn" to 0.3, "collect:wollschaf" to 0.5, "collect:fleckkuh" to 0.5, "collect:bienenkorb" to 0.8)
         val hunter = mapOf(
             "ZOMBIE" to 1.0, "HUSK" to 1.0, "DROWNED" to 1.0, "ZOMBIE_VILLAGER" to 1.0, "SKELETON" to 1.0, "STRAY" to 1.0, "SPIDER" to 1.0,
             "CAVE_SPIDER" to 1.0, "CREEPER" to 1.5, "WITCH" to 2.0, "PHANTOM" to 2.0, "PILLAGER" to 2.0, "SLIME" to 0.5, "MAGMA_CUBE" to 0.5,
             "ENDERMAN" to 3.0, "BLAZE" to 3.0, "GHAST" to 3.0, "GUARDIAN" to 3.0, "SHULKER" to 3.0, "VINDICATOR" to 3.0, "PIGLIN_BRUTE" to 4.0,
             "EVOKER" to 5.0, "WITHER_SKELETON" to 6.0, "ELDER_GUARDIAN" to 20.0, "ENDER_DRAGON" to 100.0,
-        ).mapKeys { "kill:${it.key}" }
+        ).mapKeys { "kill:${it.key}" } + mapOf(
+            "kill:creature:pilzling" to 1.0, "kill:creature:moorwicht" to 2.0, "kill:creature:steinkrabbler" to 2.0,
+            "kill:creature:nebelwolf" to 3.0, "kill:creature:glutkaefer" to 3.0, "kill:creature:endschatten" to 6.0,
+            "kill:creature:waldriese" to 50.0,
+        )
         val fisher = mapOf("fish:FISH" to 2.0, "fish:TREASURE" to 8.0, "fish:JUNK" to 0.0)
         return listOf(
             Triple("holzfaeller", "Holzfäller" to "IRON_AXE", logs),

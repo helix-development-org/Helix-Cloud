@@ -294,6 +294,18 @@ All settings with types and defaults: `citybuild.config.export`. Groups:
 | `citybuild.vehicle.park` | `<uuid> <id> <garage\|world> [world x y z]` | `Vehicle`; `world` needs the position (`invalid_position`) | – |
 | `citybuild.vehicle.remove` | `<uuid> <id>` | `{removed:true}`; only the owner | – |
 | `citybuild.vehicle.recall` | `<shard>` | `{recalled:n}`: every vehicle of the instance marked `world` goes back to the garage (called on instance start) | – |
+### Pets (per instance)
+
+`Pet` = `{id, uuid, shard, type, name|null, variant|null, mood 0–100, lastFed, createdAt, updatedAt}` (epoch ms). Which pet is out is a matter of the Paper plugin; the node only keeps the records. Mood decay is computed on Paper, which sends the new value.
+
+| Action | Arguments | Answer | Permission |
+|---|---|---|---|
+| `citybuild.pet.register` | `<uuid> <shard> <type> [variant]` | `Pet`; errors `unknown_model`, `invalid_model` (catalog kind ≠ `pet`), `limit` (`pets.maxPerPlayer`). Unknown variants fall back to the default. | – |
+| `citybuild.pet.list` | `<uuid> <shard>` | `[Pet]` oldest first | – |
+| `citybuild.pet.update` | `<uuid> <id> <json {name?, variant?, mood?, fed?}>` | `Pet`; `name: ""` resets to the catalog name, `fed: true` stamps `lastFed`. Errors `not_found`, `not_owner`, `invalid_name` (> 24 chars or `< > & §`), `invalid_variant`, `invalid_mood`. | – |
+| `citybuild.pet.remove` | `<uuid> <id>` | `{removed:true}`; only the owner | – |
+
+Farm animals (livestock), farm-world creatures and the weekly boss need no actions of their own: livestock timers live in the instance's `livestock.json`, creatures and drops come from the `models` catalog, boss rewards from the collection `boss_rewards` (`{type: kronen|model|key|item, ref, amount, chance}`, paid by Paper: crowns via `eco.api.deposit`, items via the pickup box). Job values: farmer `collect:<livestock id>`, hunter `kill:creature:<creature id>` in collection `jobs`.
 
 ### Audit log, profile, arena
 
@@ -330,6 +342,7 @@ Lines (`rail_lines`) and stations (`rail_stations`) are configuration documents 
 `rail_lines` body: `name`, `enabled`, `built`, `loop`, `points` `[{x, z}]` (plot-world road junctions; consecutive points share x or z), `trains` `[["dampflok", "personenwagen"], …]` (`models` ids of kind `train`, locomotive first), `count`, `speed` (blocks/s), `shards` (empty = all).
 `rail_stations` body: `name`, `line`, `world`, `x`, `y`, `z`, `yaw`, `starter`, `model` (default `haltestelle`), `enabled`, `shards`.
 Settings: `rail.viewRadius`, `rail.discoverRadius`, `rail.updateTicks`, `rail.buildBlocksPerTick`, `rail.defaultSpeed`.
+| Pets | `pet`, `pet.remove` |
 
 ## Storage
 
@@ -350,6 +363,7 @@ Tables in schema `citybuild`:
 | Vehicles | `vehicles` (own pool `citybuild-vehicles`) |
 | Audit | `logs` |
 | Rail network | `rail_discovered` (own pool `citybuild-rail`; document store key `rail_discovered:<uuid>`) |
+| Pets | `pets` (own pool, fallback document `data.pets`) |
 
 Config, including forge templates, crates and offers, lives in the addon config store (`config.*` keys).
 

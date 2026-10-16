@@ -1,0 +1,12 @@
+{
+  "livestock.placed": "<#4ac85e><#ffcf4a>{animal}</#ffcf4a><#4ac85e> now lives on your plot.",
+  "livestock.only-plots": "<#ff5a4a>Farm animals live on plots in the plot world only.",
+  "livestock.no-plot": "<#ff5a4a>There is no plot here. Stand on your plot.",
+  "livestock.no-rights": "<#ff5a4a>This is not your plot. Ask the owner to add you.",
+  "livestock.limit": "<#ff5a4a>{limit} farm animals already live on this plot – no room for more.",
+  "livestock.blocked": "<#ff5a4a>No room here. Find a free spot with two blocks of air.",
+  "livestock.not-ready": "<#f1e2c2><#ffcf4a>{animal}</#ffcf4a><#f1e2c2> is not ready yet – <#ffcf4a>{time}</#ffcf4a><#f1e2c2> to go. Feeding speeds it up.",
+  "livestock.no-yield": "<#ff5a4a>No yield is set up for this animal. Please tell a team member.",
+  "livestock.offspring": "<#4ac85e>Offspring! A young <#ffcf4a>{animal}</#ffcf4a><#4ac85e> has arrived.",
+  "livestock.picked": "<#f1e2c2><#ffcf4a>{animal}</#ffcf4a><#f1e2c2> is back in its egg – check your inventory or pickup box."
+}
