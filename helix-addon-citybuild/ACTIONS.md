@@ -84,10 +84,10 @@ PlotListing {id, shard, plotId, seller, sellerName, price, world, x, z, size,
 JobProfile  {jobs: {<jobId>: {level, xp}}, active: [jobId|null …], switchedAt: [ms …], milestones: ["<job>:<level>" …]}
 SerialRecord{serial, forgeId, version, issuedTo, source, shard, issuedAt}
 LogEntry    {id, kind, shard, actor, target, amount, ref, data (JSON text), at}
-CrateEntry  {id, type: forge|item|material|kronen|key, ref, data, amount, weight, rarity: NORMAL|SPECIAL|ELITE|TITAN|BOSS}
+CrateEntry  {id, type: forge|item|material|kronen|key|model, ref, data, amount, weight, rarity: NORMAL|SPECIAL|ELITE|TITAN|BOSS}
 CrateSpec   {name, rarity, look: CHEST|BARREL|ENDER_CHEST|<model>, key (forge template id, default key_<crateId>),
              announceFrom (rarity|null), entries: [CrateEntry]}
-OfferWare   {type: forge|key|item|material, ref, data, amount}
+OfferWare   {type: forge|key|item|material|model, ref, data, amount}   (model: ref = catalog id)
 OfferSpec   {name, ware: OfferWare, price, stock|null, perPlayer|null, startsAt|null, endsAt|null, minTier, shards: []}
 ```
 
@@ -124,13 +124,15 @@ offers are collections too, so their edits reach every instance through the same
 | `jobs` | `holzfaeller`, `miner`, `graeber`, `farmer`, `jaeger`, `fischer` | `{name, icon, villager, worlds:[…], plots:bool, actions:{"break:STONE":0.05, "harvest:WHEAT":0.2, "breed:COW":1, "kill:ZOMBIE":1, "fish:FISH":2 …}}` (see below) |
 | `kits` | `starter`, `taeglich`, `woechentlich`, `baumeister` | `{name, icon, cooldownSeconds, once, minTier, items:[…]}`; item shapes below |
 | `rewards` | `day1`…`day7`, `job_10`, `job_25`, `job_50`, `tutorial` | `{kronen, items:[kit item shapes], keys:[{crate, amount}]}` |
-| `limits` | `tier0`…`tier3` | `{plots, homes, shops, auctions, inactivityDays, back, weeklyKit, builderKit}` |
-| `villagers` | e.g. `fritz_feilbiet` | `{name, role, location, robe, prop, quote}` (10 CityBuild figures) |
+| `limits` | `tier0`…`tier3` | `{plots, homes, shops, auctions, inactivityDays, back, weeklyKit, builderKit, furniture, livestock}` (`furniture`/`livestock` per plot) |
+| `villagers` | e.g. `fritz_feilbiet` | `{name, role, location, robe, prop, quote}` (13 CityBuild figures incl. the dealers `stellmacher`, `moebel`, `tiere`) |
 | `enchants` | e.g. `erntesegen` | `{name, appliesTo:[…], effect, perLevel, suggestedMax}` |
 | `abilities` | e.g. `flaechenabbau` | `{name, appliesTo:[…], params:{…}, multiBlock, disabledWorlds:[…]}` |
 | `crates` | crate id | `CrateSpec` (seed: `standard`) |
 | `forge` | template id | `{name, version, updatedBy, updatedAt, spec}`, where `spec` is Paper's item model (opaque to the node) |
 | `offers` | offer id | `OfferSpec` |
+| `models` | catalog id `[a-z0-9_]{1,40}` | `{kind, name, itemModel?, rig?, variants:[…], price\|null, dealer\|null, data:{…}}`; kinds and `data` fields see `config/ModelSeeds.kt` (game concept A21). Item model default `citybuild:model/<kind>/<id>`, variant `<itemModel>_<variant>`. |
+| `recipes` | recipe id | `{inputs:[{model\|material, amount}], output:{model\|material, amount}, seconds}` (stove) |
 | `arenas` | shard | free; reserved for the arena region (`{world, pos1, pos2}`), written via `config.doc.set` |
 
 Keys of the `jobs` collection's `actions` map:
@@ -150,6 +152,7 @@ Item shapes in `kits` and `rewards`:
 | `{type:"material", material, amount}` | a plain material |
 | `{type:"item", data, amount}` | a serialized item stack |
 | `{type:"forge", ref, amount}` | a forge item by reference, issued via `forge.issue` with source `kit` |
+| `{type:"model", ref, amount}` | a model catalog item (collection `models`) by reference |
 | `{type:"choice", options:[materials], picks, amount}` | the player chooses `picks` materials |
 
 All settings with types and defaults: `citybuild.config.export`. Groups:
