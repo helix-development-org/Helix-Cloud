@@ -19,11 +19,13 @@ import kotlinx.serialization.json.JsonPrimitive
  * - `food`: `food` (`nutrition`, `saturation`, `seconds`, `drink`, `effects`).
  * - `furniture`: `function` (`none`, `seat`, `light`, `storage`, `stove`), `width`, `height` (hitbox in blocks),
  *   `collision`, `seatHeight`, `light` (0–15), `rows` (storage rows).
- * - `vehicle`: `type` (`land`, `water`, `air`), `speed` (blocks/s), `seats`, `step`, `maxY`.
+ * - `vehicle`: `type` (`land`, `water`, `air`), `speed` (blocks/s), `seats`, `step`, `maxY`; look: `scale`, `offsetY`
+ *   (lift so the model bottom touches the ground, 0.5 × scale), `hitWidth`, `hitHeight`, `seatOffsets` (`[[x, y, z], …]`,
+ *   z = forward). Models face −Z (Blockbench north).
  * - `pet`: `traits` (`cosmetic`, `care`, `ability`), `favoriteFood`, `abilities`, `tricks`.
  * - `livestock`: `base` (vanilla mob), `yields` (`model`, `amount`), `intervalMinutes`, `feed`, `placement`.
  * - `creature`: `base`, `worlds`, `biomes`, `night`, `health`, `damage`, `speed`, `drops`, `hunter`, `boss`.
- * - `train`: `role` (`locomotive`, `wagon`), `length`.
+ * - `train`: `role` (`locomotive`, `wagon`), `length`, `scale`, `offsetY` (models face −Z, bottom on the rail).
  * - `station`: empty.
  *
  * `recipes` document body: `inputs` (list of `{model|material, amount}`), `output` (`{model|material, amount}`),
@@ -103,16 +105,16 @@ object ModelSeeds {
         // Fahrzeuge (Stellmacher Kuno Kurbel)
         /** Vehicle data. */
         fun v(type: String, speed: Double, seats: Int, maxY: Int = 200) = obj("type" to type, "speed" to speed, "seats" to seats, "step" to 1, "maxY" to maxY)
-        add("handkarren", "vehicle", "Handkarren", 2000, "stellmacher", v("land", 4.0, 1), listOf("holz", "rot"))
-        add("laufrad", "vehicle", "Laufrad", 3500, "stellmacher", v("land", 7.0, 1), listOf("holz", "blau"))
-        add("pferdekutsche", "vehicle", "Pferdekutsche", 25000, "stellmacher", v("land", 9.0, 4), listOf("rot", "gruen", "gold"))
-        add("bauernwagen", "vehicle", "Bauernwagen", 8000, "stellmacher", v("land", 6.0, 2), listOf("holz", "gruen"))
-        add("floss", "vehicle", "Floß", 1500, "stellmacher", v("water", 4.0, 2))
-        add("ruderboot", "vehicle", "Ruderboot", 6000, "stellmacher", v("water", 6.0, 2), listOf("holz", "blau"))
-        add("segelboot", "vehicle", "Segelboot", 30000, "stellmacher", v("water", 10.0, 4), listOf("weiss", "rot"))
-        add("heissluftballon", "vehicle", "Heißluftballon", 40000, "stellmacher", v("air", 4.0, 3), listOf("rot", "blau", "gold"))
-        add("flugmaschine", "vehicle", "Flugmaschine", 60000, "stellmacher", v("air", 12.0, 1))
-        add("greif", "vehicle", "Greif", null, null, v("air", 10.0, 2))
+        add("handkarren", "vehicle", "Handkarren", 2000, "stellmacher", v("land", 4.0, 1).look(1.0, 0.5, 1.1, 0.8, listOf(0.0, 0.4, -0.05)), listOf("holz", "rot"))
+        add("laufrad", "vehicle", "Laufrad", 3500, "stellmacher", v("land", 7.0, 1).look(1.0, 0.5, 0.6, 1.0, listOf(0.0, 0.8, -0.28)), listOf("holz", "blau"))
+        add("pferdekutsche", "vehicle", "Pferdekutsche", 25000, "stellmacher", v("land", 9.0, 4).look(2.0, 1.0, 2.2, 2.9, listOf(0.0, 1.5, 0.06), listOf(-0.4, 0.8, -0.9), listOf(0.4, 0.8, -0.9), listOf(0.0, 0.8, -2.0)), listOf("rot", "gruen", "gold"))
+        add("bauernwagen", "vehicle", "Bauernwagen", 8000, "stellmacher", v("land", 6.0, 2).look(1.5, 0.75, 1.6, 1.4, listOf(0.0, 1.1, 0.28), listOf(0.0, 1.4, -1.1)), listOf("holz", "gruen"))
+        add("floss", "vehicle", "Floß", 1500, "stellmacher", v("water", 4.0, 2).look(1.5, 0.6, 1.8, 0.6, listOf(-0.3, 0.4, 0.35), listOf(0.3, 0.4, -0.4)))
+        add("ruderboot", "vehicle", "Ruderboot", 6000, "stellmacher", v("water", 6.0, 2).look(1.5, 0.5, 1.4, 0.9, listOf(0.0, 0.5, 0.33), listOf(0.0, 0.5, -0.6)), listOf("holz", "blau"))
+        add("segelboot", "vehicle", "Segelboot", 30000, "stellmacher", v("water", 10.0, 4).look(2.0, 0.65, 2.0, 1.2, listOf(0.0, 1.0, -1.5), listOf(-0.5, 1.0, -2.0), listOf(0.5, 1.0, -2.0), listOf(0.0, 1.0, 1.0)), listOf("weiss", "rot"))
+        add("heissluftballon", "vehicle", "Heißluftballon", 40000, "stellmacher", v("air", 4.0, 3).look(3.0, 1.5, 1.9, 1.4, listOf(0.0, 0.3, 0.0), listOf(-0.45, 0.3, -0.35), listOf(0.45, 0.3, 0.35)), listOf("rot", "blau", "gold"))
+        add("flugmaschine", "vehicle", "Flugmaschine", 60000, "stellmacher", v("air", 12.0, 1).look(1.5, 0.75, 2.0, 1.1, listOf(0.0, 0.95, 0.05)))
+        add("greif", "vehicle", "Greif", null, null, v("air", 10.0, 2).look(1.5, 0.75, 1.3, 1.8, listOf(0.0, 1.6, 0.2), listOf(0.0, 1.6, -0.4)))
         // Haustiere (Tierhändlerin Frieda Feder)
         /** Pet data. */
         fun p(traits: List<String>, favorite: String, abilities: List<String> = emptyList()) =
@@ -148,10 +150,10 @@ object ModelSeeds {
         add("endschatten", "creature", "Endschatten", null, null, c("ENDERMAN", listOf("farm_end"), emptyList(), 40.0, 7.0, listOf(Triple("schattenperle", 1, 0.5)), 6.0))
         add("waldriese", "creature", "Waldriese", null, null, c("ZOMBIE", listOf("farm"), emptyList(), 1200.0, 12.0, listOf(Triple("schattenperle", 3, 1.0)), 50.0, boss = true))
         // Bahn
-        add("dampflok", "train", "Dampflok", null, null, obj("role" to "locomotive", "length" to 5))
-        add("personenwagen", "train", "Personenwagen", null, null, obj("role" to "wagon", "length" to 5))
-        add("gueterwagen", "train", "Güterwagen", null, null, obj("role" to "wagon", "length" to 4))
-        add("kohlewagen", "train", "Kohlewagen", null, null, obj("role" to "wagon", "length" to 3))
+        add("dampflok", "train", "Dampflok", null, null, obj("role" to "locomotive", "length" to 5, "scale" to 2.0, "offsetY" to 1.0))
+        add("personenwagen", "train", "Personenwagen", null, null, obj("role" to "wagon", "length" to 5, "scale" to 2.0, "offsetY" to 1.0))
+        add("gueterwagen", "train", "Güterwagen", null, null, obj("role" to "wagon", "length" to 4, "scale" to 2.0, "offsetY" to 1.0))
+        add("kohlewagen", "train", "Kohlewagen", null, null, obj("role" to "wagon", "length" to 3, "scale" to 2.0, "offsetY" to 1.0))
         add("haltestelle", "station", "Haltestelle", null, null)
         return list.mapIndexed { i, (id, body) -> ConfigDocument(id, i, body) }
     }
@@ -176,6 +178,18 @@ object ModelSeeds {
     }
 
     private fun obj(vararg pairs: Pair<String, Any?>): JsonObject = JsonObject(pairs.associate { (k, v) -> k to element(v) })
+
+    /* Model look of a vehicle: display scale, lift, hitbox and seats ([x, y, z] in blocks; z = forward, model front = −Z). */
+    private fun JsonObject.look(scale: Double, offsetY: Double, hitWidth: Double, hitHeight: Double, vararg seats: List<Double>): JsonObject =
+        JsonObject(
+            this + mapOf(
+                "scale" to element(scale),
+                "offsetY" to element(offsetY),
+                "hitWidth" to element(hitWidth),
+                "hitHeight" to element(hitHeight),
+                "seatOffsets" to element(seats.toList()),
+            ),
+        )
 
     private fun element(value: Any?): JsonElement = when (value) {
         null -> JsonNull
