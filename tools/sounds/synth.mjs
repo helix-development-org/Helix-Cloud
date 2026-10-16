@@ -615,6 +615,17 @@ const VOICES = {
   funkel:     { f0: 168, tempo: 0.74, tract: 1.0,  contour: "erratic",  breath: 0.07, rasp: 0.02, bright: 1.05, loud: 0, count: 34, hmm: "hmm" },
   ambo:       { f0: 96,  tempo: 0.8,  tract: 0.88, contour: "falling",  breath: 0.06, rasp: 0.08, bright: 0.85, loud: 0, count: 26, hmm: "hrm" },
   knoepfchen: { f0: 320, tempo: 0.8,  tract: 1.25, contour: "question", breath: 0.05, rasp: 0,    bright: 1.1, loud: 0,  count: 32, hmm: "hmm" },
+  // CityBuild figures (§12 "CityBuild-Figuren")
+  lotte:      { f0: 262, tempo: 0.7,  tract: 1.18, contour: "bouncy",   breath: 0.04, rasp: 0,    bright: 1.2, loud: 0,  count: 32, hmm: "hmm" },
+  gundula:    { f0: 196, tempo: 1.05, tract: 1.05, contour: "level",    breath: 0.03, rasp: 0,    bright: 0.9, loud: 0,  count: 28, hmm: "hrm", nasal: 0.25 },
+  fritz:      { f0: 140, tempo: 0.72, tract: 0.95, contour: "shout",    breath: 0.06, rasp: 0.06, bright: 1.25, loud: 2, count: 32, hmm: "hmm" },
+  ludwig:     { f0: 122, tempo: 0.6,  tract: 0.94, contour: "pompous",  breath: 0.04, rasp: 0.02, bright: 1.1, loud: 0,  count: 32, hmm: "hmm" },
+  henni:      { f0: 210, tempo: 0.66, tract: 1.04, contour: "falling",  breath: 0.05, rasp: 0.05, bright: 1.05, loud: 0, count: 26, hmm: "hrm" },
+  waldemar:   { f0: 92,  tempo: 1.4,  tract: 0.88, contour: "level",    breath: 0.12, rasp: 0.02, bright: 0.75, loud: -2, count: 24, hmm: "hmm" },
+  rupert:     { f0: 134, tempo: 0.95, tract: 0.96, contour: "level",    breath: 0.04, rasp: 0.03, bright: 0.95, loud: 0, count: 28, hmm: "hrm" },
+  paula:      { f0: 285, tempo: 0.55, tract: 1.2,  contour: "lively",   breath: 0.12, rasp: 0,    bright: 1.15, loud: 0, count: 34, hmm: "hmm" },
+  brunhilde:  { f0: 176, tempo: 0.85, tract: 0.98, contour: "shout",    breath: 0.07, rasp: 0.12, bright: 1.2, loud: 2,  count: 28, hmm: "hrm" },
+  greta:      { f0: 228, tempo: 1.1,  tract: 1.08, contour: "erratic",  breath: 0.16, rasp: 0.02, bright: 0.85, loud: -3, count: 28, hmm: "hmm" },
 };
 
 /** Pitch movement across one syllable (x = 0..1), as a frequency ratio. */
