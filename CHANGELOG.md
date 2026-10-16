@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Sicherheit: Bridge-Aktionen höchstens einmal, Task-Bindung
+
+- **Idempotente Bridge-Aktionen**: `ActionInvocation.requestId` (setzt
+  `ServiceNodeApi.action` automatisch). Der Node führt jede
+  `(Service, requestId)` höchstens einmal aus (10 min Cache, gleichzeitige
+  Duplikate warten auf das Original). Der HTTP-Rückfall nach einem gesendeten,
+  unbeantworteten Wire-Frame führt dadurch nicht mehr doppelt aus;
+  `WireUnavailableException.sent` meldet den unbekannten Ausgang,
+  Spielerbefehle werden danach nicht wiederholt.
+- **`ActionDescriptor.bridgeTasks`** (`AddonBase.action(…, bridgeTasks = …)`):
+  Bridge-Aufrufe nur von Diensten dieser Tasks; alle `citybuild.*`-Aktionen
+  sind auf Task `CityBuild` beschränkt. `eco.api.*` bleibt für alle
+  Paper-Dienste offen (MineClash braucht es).
+- **CityBuild**: Auktions- und Plot-Markt-Kauf erstatten automatisch, wenn
+  nach der Zahlung der Statuswechsel scheitert.
+
 ### Neu: Netzwerkwährung „Kronen“ (`helix.economy` 2.0)
 
 - **Kronen ersetzen Coins**: alle Spielertexte, Vault-Name „Krone/Kronen“,

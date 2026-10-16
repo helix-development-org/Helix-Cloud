@@ -20,6 +20,16 @@ plugin reaches it with its per-service token through `ServiceNodeApi.action(Acti
   arguments.
 - **Permission** columns are informational. Bridge calls are not permission-checked by the node, so the Paper
   plugin must check the player's permission before calling an admin action.
+- **Callers**: every action is registered with `bridgeTasks = {"CityBuild"}` — only services of the
+  `CityBuild` task may call them over the bridge (Lobby, MineClash and other servers get an error). Calls
+  with the static admin token (CLI, panel) are not restricted.
+- **Idempotency**: `ServiceNodeApi.action` always sends an `ActionInvocation.requestId`; the node runs each
+  `(service, requestId)` at most once and answers repeats with the original result for ten minutes. A `null`
+  result means the outcome is **unknown** — do not refund or roll back on `null`; retry with the **same**
+  `requestId` (set it on the invocation) to learn the original result.
+- **Compensation**: `auction.buy` and `plotmarket.buy` reverse the payment (seller loses what was received,
+  buyer gets the full price back, log kind `refund`) when the state change after a successful payment fails;
+  the listing returns to `active`.
 
 ### Error codes
 

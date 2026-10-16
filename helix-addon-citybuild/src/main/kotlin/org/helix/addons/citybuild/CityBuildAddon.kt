@@ -1,5 +1,6 @@
 package org.helix.addons.citybuild
 
+import org.helix.addons.citybuild.config.ConfigSeeds
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import org.helix.addon.sdk.AddonBase
@@ -79,7 +80,10 @@ class CityBuildAddon(
             label = { player, key -> messages.rawFor(player, key) },
         )
         val registrar = ActionRegistrar { name, usage, description, permission, handler ->
-            action(name, description, usage, permission = permission, bridgeInvocable = true) { inv -> handle(usage, inv.arguments, handler) }
+            // Only CityBuild servers may call CityBuild actions over the bridge (admin token: unrestricted).
+            action(name, description, usage, permission = permission, bridgeInvocable = true, bridgeTasks = setOf(ConfigSeeds.TASK)) { inv ->
+                handle(usage, inv.arguments, handler)
+            }
         }
         registerConfigActions(registrar)
         HomeService(ctx).register(registrar)

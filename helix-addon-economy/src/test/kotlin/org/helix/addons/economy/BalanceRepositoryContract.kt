@@ -126,6 +126,7 @@ abstract class BalanceRepositoryContract {
 
     @Test
     fun `concurrent withdrawals never overdraw`() {
+        repo.balance(steve.uuid) // initialise on the test thread so a skipped backend aborts here, not in a worker
         val pool = Executors.newFixedThreadPool(8)
         val results = (1..40).map { pool.submit<Booking> { repo.change(steve, -100, "shop") } }
         pool.shutdown()

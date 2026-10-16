@@ -80,18 +80,25 @@ class AuctionService(private val ctx: CityContext) {
         val now = ctx.now()
         ctx.repository.transitionAuction(id, setOf(AuctionStatus.ACTIVE), AuctionStatus.RESERVED, notBefore = now)
             ?: Results.fail("not_available", "auction $id is not available")
+        val fee = ctx.int("fees.auctionSalePermille", 50)
         val money = runCatching {
-            ctx.kronen.transfer(buyer, listing.seller, listing.price, "auction.sale", ctx.int("fees.auctionSalePermille", 50), "auction:$id")
+            ctx.kronen.transfer(buyer, listing.seller, listing.price, "auction.sale", fee, "auction:$id")
         }.getOrElse { org.helix.addons.citybuild.economy.MoneyResult.fail("error") }
         if (!money.ok) {
             ctx.repository.transitionAuction(id, setOf(AuctionStatus.RESERVED), AuctionStatus.ACTIVE)
             Results.fail(money.code ?: "error", "payment failed")
         }
-        val sold = ctx.repository.transitionAuction(id, setOf(AuctionStatus.RESERVED), AuctionStatus.SOLD, buyer = buyer, closedAt = now)
+        val sold = try {
+            ctx.repository.transitionAuction(id, setOf(AuctionStatus.RESERVED), AuctionStatus.SOLD, buyer = buyer, closedAt = now)
+        } catch (failure: Exception) {
+            logger.error("auction {} could not be marked sold after payment", id, failure)
+            null
+        }
         if (sold == null) {
-            // Cannot happen while only this flow touches reserved listings; compensate and report.
+            // Paid but not recorded: undo the payment and put the listing back on sale.
             logger.error("auction {} lost its reservation after payment; refunding {}", id, buyer)
-            ctx.kronen.transfer(listing.seller, buyer, listing.price, "auction.refund", 0, "auction:$id")
+            ctx.refundSale(buyer, listing.seller, listing.price, fee, shard, "auction:$id")
+            runCatching { ctx.repository.transitionAuction(id, setOf(AuctionStatus.RESERVED), AuctionStatus.ACTIVE) }
             Results.fail("error", "auction state changed during purchase")
         }
         ctx.log("auction.sale", shard, buyer, listing.seller, listing.price, "auction:$id")

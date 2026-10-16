@@ -76,15 +76,25 @@ class PlotMarketService(private val ctx: CityContext) {
         val listing = ctx.repository.listing(id)?.takeIf { it.shard == shard } ?: Results.fail("not_found", "no listing $id")
         if (listing.seller == buyer) Results.fail("own_listing", "cannot buy own plot")
         ctx.repository.transitionListing(id, setOf(ListingStatus.ACTIVE), ListingStatus.RESERVED) ?: Results.fail("not_available", "listing $id is not available")
+        val fee = ctx.int("fees.plotMarketPermille", 50)
         val money = runCatching {
-            ctx.kronen.transfer(buyer, listing.seller, listing.price, "plotmarket.sale", ctx.int("fees.plotMarketPermille", 50), "plot:$id")
+            ctx.kronen.transfer(buyer, listing.seller, listing.price, "plotmarket.sale", fee, "plot:$id")
         }.getOrElse { MoneyResult.fail("error") }
         if (!money.ok) {
             ctx.repository.transitionListing(id, setOf(ListingStatus.RESERVED), ListingStatus.ACTIVE)
             Results.fail(money.code ?: "error", "payment failed")
         }
-        val pending = ctx.repository.transitionListing(id, setOf(ListingStatus.RESERVED), ListingStatus.PENDING, buyer = buyer)
-            ?: Results.fail("error", "listing state changed during purchase")
+        val pending = try {
+            ctx.repository.transitionListing(id, setOf(ListingStatus.RESERVED), ListingStatus.PENDING, buyer = buyer)
+        } catch (failure: Exception) {
+            null
+        }
+        if (pending == null) {
+            // Paid but not recorded: undo the payment and offer the plot again.
+            ctx.refundSale(buyer, listing.seller, listing.price, fee, shard, "plot:$id")
+            runCatching { ctx.repository.transitionListing(id, setOf(ListingStatus.RESERVED), ListingStatus.ACTIVE) }
+            Results.fail("error", "listing state changed during purchase")
+        }
         ctx.log("plotmarket.sale", shard, buyer, listing.seller, listing.price, "plot:$id", jsonOf("plotId" to listing.plotId))
         return pending
     }

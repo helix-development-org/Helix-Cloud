@@ -1,5 +1,6 @@
 package org.helix.addons.citybuild.service
 
+import org.helix.addons.citybuild.economy.MoneyResult
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -185,6 +186,28 @@ class CityContext(
      * @return the body or `null`.
      */
     fun doc(collection: String, id: String): JsonObject? = config.document(collection, id)?.body
+
+    /**
+     * Reverses a completed sale transfer after a later step failed: takes back what the seller
+     * received (price minus the fee, rounded like the economy) and refunds the full price to the
+     * buyer, so the buyer never loses money to an internal error. Never throws; outcomes are logged.
+     *
+     * @param buyer buyer uuid.
+     * @param seller seller uuid.
+     * @param price the transferred price.
+     * @param feePermille the fee that was applied.
+     * @param shard instance (for the log).
+     * @param ref booking reference.
+     */
+    fun refundSale(buyer: String, seller: String, price: Long, feePermille: Int, shard: String, ref: String) {
+        val received = price - price * feePermille / 1000
+        val back = runCatching { kronen.withdraw(seller, received, "refund", ref) }.getOrElse { MoneyResult.fail("error") }
+        val refund = runCatching { kronen.deposit(buyer, price, "refund", ref) }.getOrElse { MoneyResult.fail("error") }
+        log(
+            "refund", shard, buyer, seller, price, ref,
+            jsonOf("sellerReversed" to back.ok, "buyerRefunded" to refund.ok, "received" to received),
+        )
+    }
 
     /**
      * Appends an audit log entry.

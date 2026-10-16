@@ -51,6 +51,9 @@ class ConfigSeedsTest {
         val actions = context.handlers.filterKeys { it.startsWith("citybuild.") }
         assertTrue(actions.size > 60, "expected many actions, got ${actions.size}")
         actions.values.forEach { (descriptor, _) -> assertTrue(descriptor.bridgeInvocable, "${descriptor.name} must be bridge invocable") }
+        actions.values.forEach { (descriptor, _) ->
+            assertEquals(setOf(ConfigSeeds.TASK), descriptor.bridgeTasks, "${descriptor.name} must be limited to CityBuild servers")
+        }
         val bundle = context.run("citybuild.config.bundle")
         assertTrue(bundle.success)
         val parsed = json.parseToJsonElement(bundle.lines.single()).jsonObject
