@@ -1,0 +1,25 @@
+{
+  "id": "citybuild",
+  "name": "CityBuild",
+  "version": "1.0.0",
+  "main": "org.helix.addons.citybuild.CityBuildAddon",
+  "description": "CityBuild (Kronstadt): plots, shops, auction house, jobs, homes, kits, forge, crates and offers per city instance.",
+  "permissions": [
+    "citybuild.play",
+    "citybuild.admin",
+    "citybuild.admin.forge",
+    "citybuild.admin.crates",
+    "citybuild.admin.offers",
+    "citybuild.admin.shop",
+    "citybuild.admin.kits",
+    "citybuild.admin.rewards",
+    "citybuild.admin.config",
+    "citybuild.admin.logs",
+    "citybuild.admin.warps",
+    "citybuild.build.spawn",
+    "citybuild.bypass.cooldown",
+    "citybuild.tier.1",
+    "citybuild.tier.2",
+    "citybuild.tier.3"
+  ]
+}
