@@ -46,7 +46,7 @@ Jede Farbe hat einen Token-Namen (Resourcepack-Palette, MiniMessage, CSS-Variabl
 | Name | Token | hell | basis | dunkel | Verwendung |
 |---|---|---|---|---|---|
 | Band-Rot | `ribbon` | `#ff7a6a` | `#d8382e` | `#9a2018` | Titelband, Gefahr, Benachrichtigungs-Badge |
-| Gold | `gold` | `#fff0a8` | `#ffcf4a` | `#e0a420` | Auswahl, aktiv, Belohnung, Rang-Prefix |
+| Gold | `gold` | `#fff0a8` | `#ffcf4a` | `#e0a420` | Auswahl, aktiv, Belohnung, Rang-Prefix, Kronen-Währung |
 | Smaragd | `emerald` | `#8cf09a` | `#4ac85e` | `#2a8a3e` | Bestätigen, Erfolg, Smaragd-Währung |
 | Diamant | `diamond` | `#a8dcff` | `#5ab4ff` | `#2f7ad0` | Premium, Info, Diamant-Währung |
 | Rose | `rose` | `#ffb0c0` | `#ff6a8a` | `#c8385a` | Rosen-Währung, Rang/Trophäen |
@@ -158,6 +158,8 @@ Fläche 384×256 px bei x = −104, y = −17 relativ zum Kistenfenster (176×22
 - **Truhen**: Je Seltenheit eigene Farbe der Beschläge, Form gleich. Kriegstruhen mit Banner in Teamfarbe.
 - **Animiert**: Frame-Streifen 16 px breit, 8–12 Frames, 2–4 Ticks pro Frame. Nur für Embleme, Kerzen, Fackeln, Edelsteine.
 
+- **Krone (Netzwerkwährung)**: 16×16, Zackenkrone in Gold (hell/basis/dunkel) mit drei Edelstein-Pixeln (Band-Rot, Smaragd, Diamant), Tinten-Kontur; Glyph im Netzwerk-Pack für Actionbar, Chat und Preis-Pills.
+
 Ist-Stand Währungs-Icons: Form bleibt, Kontur auf Tinte umstellen, Glanzpixel oben links ergänzen.
 
 ## 9 · Chat und Text
@@ -219,6 +221,18 @@ MineClash ist Teil der Welt, kein eigenes Branding; dieselben Tokens und Kompone
 - **Truhen**: Gleiche Form, Beschläge in Rarity-Farbe. Bereit: goldenes Glimmen (Partikel) + Sound. Öffnen: Deckel springt, Karten fliegen in einem Bogen zum Spieler.
 - **Schatzhalle**: Podeste aus Holz mit Eisen, Statusschild als Pergamentzettel mit Countdown in Diamant-Blau.
 - **Shop**: Typ „Tisch“ mit Händlerin-Kopf oben links. Tagesangebote als 3 Kacheln, Preis-Pill darunter. Ausverkauft: Stempel „Weg!“ in Rot quer.
+
+## 11b · CityBuild „Kronstadt“
+
+CityBuild ist die Handelsstadt des Reichs (Konzept: `CityBuild/CityBuild-Spielkonzept.md`). Kein eigenes Branding; dieselben Tokens und Komponenten. In MineClash wird CityBuild nie erwähnt, der Einstieg ist nur der Navigator.
+
+- **Währung**: Kronen (Token `gold`, Icon §8), netzwerkweit. Actionbar in CityBuild: `<krone> 12.340`.
+- **Krämer**: Typ „Tisch“ mit Krämer-Kopf oben links, Kategorien als Reiter, Waren als Kacheln mit Preis-Pill (Kauf Smaragd, Ankauf Gold). Sonderangebote mit Gold-Rahmen und Vorrat-Pill; ausverkauft: Stempel „Weg!“.
+- **Grundbuch, Auktionshaus, Plot-Markt, Homes, Warps, Instanzwahl**: Pergament-Buch; Instanzen mit Status-Pill (grün offen, gold fast voll, rot voll, grau Wartung).
+- **Shop-Schild**: Zeile 1 `[Shop]` in Gold, Art in Smaragd (Kauf) oder Diamant (Verkauf), Menge und Preis in Tinte.
+- **Schmiede (Team)**: Vollbild-Werkbank, Vorschau-Slot mittig auf einem Amboss, Reiter als Holzschilder. Admin-Items tragen optional die Lore-Zeile „Kronland-Schmiede“ in Gold-dunkel.
+- **Schatzkisten**: Beschläge in Rarity-Farbe (§11), Gewinne rotieren als ItemDisplay über der Kiste, Treffer mit Partikeln und Sound aus `reich`.
+- **Farmwelt-Reset**: Countdown in der Bossbar (blau, §10), Warntext Orange.
 
 ## 12 · Villager
 
@@ -358,6 +372,110 @@ Villager sind Charaktere: Name, Beruf, Haltung, Requisit, Sprechweise, Mimik-Set
 - Mimik: Große Augen, Braue hoch
 - Zitat: „Das Reich ist alt. Mindestens hundert. Glaube ich.“
 
+### CityBuild-Figuren (Kronstadt)
+
+Nur auf den CityBuild-Servern. Model-Sheet nach `villager-vorlage.js`, bis zum Blockbench-Modell Standard-Villager mit Profession.
+
+#### Lotte Laterne – Stadtführerin
+
+- Ort: Kronstadt-Spawn, Tutorial
+- Robe: Himmelblau
+- Requisit: Laterne an langem Stab
+- Wesen: Fröhlich, zeigt auf alles.
+- Spricht: Ausrufe, Wegbeschreibungen.
+- Mimik: Strahlend, Arm ausgestreckt
+- Zitat: „Da drüben! Nein, das andere Drüben.“
+
+#### Gundula Grundmann – Katasterbeamtin
+
+- Ort: Rathaus (Plots, Grundbuch, Plot-Markt)
+- Robe: Schiefergrau
+- Requisit: Maßband, dicker Foliant, Stempel
+- Wesen: Pedantisch, liebt Ordnung.
+- Spricht: Amtsdeutsch, nummeriert alles.
+- Mimik: Brille auf der Nasenspitze
+- Zitat: „Grundstück 4-17. Gestempelt. Zweifach.“
+
+#### Fritz Feilbiet – Krämer
+
+- Ort: Markt (Admin-Shop, Sonderangebote)
+- Robe: Kürbisorange mit Schürze
+- Requisit: Waage, Bleistift hinterm Ohr
+- Wesen: Laut, preist alles an.
+- Spricht: Marktschreier, Ausrufezeichen.
+- Mimik: Mund weit offen
+- Zitat: „Frische Steine! Heute noch steiniger!“
+
+#### Ludwig Lot – Auktionator
+
+- Ort: Auktionshalle
+- Robe: Dunkelgrün mit Weste
+- Requisit: Auktionshammer
+- Wesen: Schnell, feierlich.
+- Spricht: „Zum Ersten …“, zählt laut.
+- Mimik: Hammer erhoben
+- Zitat: „Zum Zweiten … und verkauft an den Herrn mit dem Hut!“
+
+#### Henni Hacke – Vorarbeiterin
+
+- Ort: Jobbrett am Portalplatz
+- Robe: Erdrot
+- Requisit: Spitzhacke über der Schulter
+- Wesen: Anpackend, kurz angebunden.
+- Spricht: Knappe Befehle.
+- Mimik: Ärmel hochgekrempelt
+- Zitat: „Reden später. Erst Schicht.“
+
+#### Waldemar Moos – Förster
+
+- Ort: Portalplatz (Farmwelt)
+- Robe: Moosgrün
+- Requisit: Axt, Vogelnest auf dem Hut
+- Wesen: Ruhig, naturverliebt.
+- Spricht: Langsam, flüstert.
+- Mimik: Halb lächelnd, Augen zu
+- Zitat: „Sonntag wächst alles neu. Der Wald verzeiht.“
+
+#### Rupert Ranzen – Quartiermeister
+
+- Ort: Rathaus-Keller (Kits)
+- Robe: Ockerbraun
+- Requisit: Riesiger Rucksack, Klemmbrett
+- Wesen: Ordentlich, zählt nach.
+- Spricht: Listen, Zahlen.
+- Mimik: Zusammengekniffene Augen
+- Zitat: „Drei Fackeln fehlen. Ich zähle nochmal.“
+
+#### Paula Paket – Postbotin
+
+- Ort: Markt (Tägliche Belohnung)
+- Robe: Postgelb mit roten Säumen
+- Requisit: Umhängetasche voller Briefe
+- Wesen: Eilig, außer Atem.
+- Spricht: Hastig, halbe Sätze.
+- Mimik: Schweißtropfen, Wangen rot
+- Zitat: „Für dich! Unterschreib – nein, keine Zeit!“
+
+#### Brunhilde Brecher – Waffenmeisterin
+
+- Ort: Arenator
+- Robe: Eisengrau mit Rot
+- Requisit: Rundschild, Holzschwert
+- Wesen: Rau, herzlich.
+- Spricht: Laut, klopft auf Schultern.
+- Mimik: Grinsen, Narbe an der Braue
+- Zitat: „Hinfallen ist erlaubt. Liegenbleiben nicht.“
+
+#### Greta Goldzahn – Schatzmeisterin
+
+- Ort: Schatzkammer am Markt (Schatzkisten)
+- Robe: Purpurbraun mit Goldknöpfen
+- Requisit: Goldzahn, Schlüsselring
+- Wesen: Verschmitzt, geheimnisvoll.
+- Spricht: Flüstert Gewinne.
+- Mimik: Ein Auge zugekniffen, Goldzahn blitzt
+- Zitat: „Psst. In der dritten Kiste … nein, ich sag nichts.“
+
 ## 13 · Mobs und Kartenkreaturen
 
 - **Proportion**: Kopf um 30–50 % vergrößert gegenüber Vanilla, Körper leicht gestaucht, Gesamtgröße wie Vanilla.
@@ -386,7 +504,7 @@ Villager sind Charaktere: Name, Beruf, Haltung, Requisit, Sprechweise, Mimik-Set
 
 - **Typ**: Landkarte auf Pergament, eingerahmt in Holz mit Eisenecken; Titelband „Karte des Reichs“.
 - **Stil**: Handgezeichnet, Tinten-Konturen, Wasser blassgrün-blau, Wald als runde Baumtupfen, Berge als Dreiecke mit Schnee. Basis: landkarte_entwurf.png.
-- **Orte**: Ankerplatz/Lobby (Mitte, Monument) · Kesseldorf (MineClash-Dorf) · Rosenarena (1v1) · Grenzlande (Krieg) · Nebelland (kommende Modi).
+- **Orte**: Ankerplatz/Lobby (Mitte, Monument) · Kesseldorf (MineClash-Dorf) · Rosenarena (1v1) · Grenzlande (Krieg) · Kronstadt (CityBuild, Emblem Krone, Villager Gundula Grundmann; Klick öffnet die Instanzwahl CityBuild-1/-2/-3) · Nebelland (kommende Modi).
 - **Ortsmarke**: 32×32 Emblem (Burg, Banner, Schwerter, Kompass, Krone) auf runder Pergament-Plakette mit Tinten-Kontur. Name darunter als Spruchband.
 - **Zustände**: Normal: Emblem ruhig. Hover: Emblem animiert + Tooltip mit Spielerzahl. Voll: Banner rot. Wartung: Emblem grau + Bauzaun-Icon.
 - **Villager**: Neben jeder Ortsmarke der zuständige Villager als Kopf-Item (Kampfmeister bei der Arena usw.).
@@ -526,7 +644,7 @@ Das lila Primary entfällt. Dunkelmodus (Holz) ist Standard, Hellmodus ist Perga
 
 - [ ] Name des Netzwerks und des Reichs (ersetzt [Name])
 - [ ] Zentrum der Lore (ersetzt Arbeitstitel „Ankerstein“) und damit die Bildmarke
-- [ ] Spieler-Ränge (Premium/VIP) neben den Team-Rängen
+- [ ] Spieler-Ränge (Premium/VIP) neben den Team-Rängen (CityBuild nutzt bis dahin Platzhalter-Stufen `citybuild.tier.1..3`)
 - [ ] Ob Villager-Rede im Chat erscheint oder nur als Hologramm über dem Villager
 - [ ] Eigene Ingame-Schrift für Titel (Version 2)
 - [ ] TTS-Werkzeug und Stimmen für Stufe 2 auswählen
