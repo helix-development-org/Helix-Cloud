@@ -5,11 +5,18 @@ The body is the shared model sheet of the cast (geometry and part pivots taken f
 animations stay identical); each character gets its own colours, props and face tweaks. Every face is painted flat in
 the Kronland style (§4): base colour on the sides, the light step on top, the dark step below, a 1 px darker edge.
 
-Usage: python3 tools/villagers/citybuild.py <villagers dir (npc-paper)> <heads dir (guis-paper)>
+Existing projects are never overwritten: after the first run the .bbmodel files are hand-maintained in Blockbench,
+so the script only creates missing villagers (pass --force to regenerate everything from scratch). The speaker heads
+are always re-rendered from the (possibly hand-painted) projects via heads.py.
+
+Usage: python3 tools/villagers/citybuild.py <villagers dir (npc-paper)> <heads dir (guis-paper)> [--force]
 """
-import base64, copy, json, struct, sys, uuid, zlib
+import base64, copy, json, os, struct, sys, uuid, zlib
+
+from heads import render as render_head
 
 VILLAGERS, HEADS = sys.argv[1], sys.argv[2]
+FORCE = "--force" in sys.argv[3:]
 INK = (0x2A, 0x16, 0x0A)
 SKIN = {"light": "#e0b48e", "mid": "#c99872", "dark": "#b9835e"}
 BASE_PARTS = {"belt", "belt_buckle", "brow", "collar", "cuffs", "eye_iris_l", "eye_iris_r", "eye_pupil_l",
@@ -264,60 +271,17 @@ def build(c, template):
     return d, colours
 
 
-# ---------------------------------------------------------------------------------------------------------------
-# Speaker heads: orthographic front view of the head group (+ collar), ink silhouette edge.
-# ---------------------------------------------------------------------------------------------------------------
-def head_icon(d, colours, px):
-    groups = {g["uuid"]: g["name"] for g in d["groups"]}
-    elements = {e["uuid"]: e for e in d["elements"]}
-    head_ids = set()
-
-    def walk(nodes, inside):
-        for n in nodes:
-            if isinstance(n, str):
-                if inside:
-                    head_ids.add(n)
-            else:
-                walk(n["children"], inside or groups[n["uuid"]] == "head")
-    walk(d["outliner"], False)
-    # lids rest almost closed-to-zero in game (lidRest), so the icon shows open eyes
-    cubes = [elements[u] for u in head_ids if not elements[u]["name"].startswith("lid_")]
-    cubes += [e for e in d["elements"] if e["name"] in ("collar", "robe")]
-    top = min(max(e["to"][1] for e in cubes), 36.0)
-    unit = 16.0 / px
-    img = [[None] * px for _ in range(px)]
-    for j in range(px):
-        wy = top - (j + 0.5) * unit
-        for i in range(px):
-            wx = 16.0 - (i + 0.5) * unit
-            best = None
-            for e in cubes:
-                f, t = e["from"], e["to"]
-                if f[0] <= wx <= t[0] and f[1] <= wy <= t[1] and (best is None or f[2] < best["from"][2]):
-                    best = e
-            if best is not None:
-                col = colours[best["name"]]
-                if best["to"][1] - wy < unit:
-                    col = light(col)
-                img[j][i] = col
-    out = [[img[j][i] for i in range(px)] for j in range(px)]
-    for j in range(px):
-        for i in range(px):
-            if img[j][i] is None:
-                continue
-            if any(not (0 <= j + dj < px and 0 <= i + di < px) or img[j + dj][i + di] is None
-                   for dj, di in ((1, 0), (-1, 0), (0, 1), (0, -1))):
-                out[j][i] = INK
-    raw = b"".join(b"\0" + b"".join(bytes((*p, 255)) if p else b"\0\0\0\0" for p in row) for row in out)
-    return write_png(px, px, raw)
-
-
 template = json.load(open(f"{VILLAGERS}/mira.bbmodel"))
 for c in CAST:
-    model, colours = build(c, template)
-    with open(f"{VILLAGERS}/{c['id']}.bbmodel", "w") as fh:
-        json.dump(model, fh, separators=(",", ":"))
+    path = f"{VILLAGERS}/{c['id']}.bbmodel"
+    if FORCE or not os.path.exists(path):
+        model, _ = build(c, template)
+        with open(path, "w") as fh:
+            json.dump(model, fh, separators=(",", ":"))
+        print(f"{c['id']}: generated, {len(model['elements'])} cubes")
+    else:
+        model = json.load(open(path))
+        print(f"{c['id']}: kept (hand-maintained)")
     for px in (16, 32):
         with open(f"{HEADS}/{c['id']}_{px}.png", "wb") as fh:
-            fh.write(head_icon(model, colours, px))
-    print(f"{c['id']}: {len(model['elements'])} cubes, texture {model['resolution']['width']}px")
+            fh.write(render_head(model, px))
