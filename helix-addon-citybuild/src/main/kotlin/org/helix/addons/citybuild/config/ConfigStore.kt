@@ -37,6 +37,16 @@ data class SettingsDocument(val values: Map<String, String> = emptyMap(), val ve
 data class CollectionDocument(val documents: List<ConfigDocument> = emptyList())
 
 /**
+ * Persisted bookkeeping of the seed upgrades.
+ *
+ * @property version seed version ([ConfigSeeds.SEED_VERSION]) the stored configuration was last upgraded to.
+ * @property seeded `collection/id` of every seed document ever inserted; a seeded document that is missing
+ *  later was deleted by an operator and is not inserted again.
+ */
+@Serializable
+data class SeedState(val version: Int = 0, val seeded: Set<String> = emptySet())
+
+/**
  * Configuration of CityBuild — typed settings plus document collections — persisted in the addon
  * storage and served to the Paper servers as one bundle. Missing seeds are inserted on load so a
  * new key becomes editable without wiping operator changes. All public methods are synchronized.
@@ -160,11 +170,15 @@ class ConfigStore(private val storage: AddonStorage) {
     }
 
     /**
-     * Inserts seed settings and documents that are missing and lifts untouched superseded defaults
-     * ([ConfigSeeds.supersededDefaults]); with [force] every seed overwrites the stored value.
+     * Brings the stored configuration up to the current seeds without destroying operator changes:
+     * missing settings are inserted and untouched superseded defaults ([ConfigSeeds.supersededDefaults])
+     * lifted; seed documents never inserted before are added (documents an operator deleted stay
+     * deleted); when the stored seed version is older than [ConfigSeeds.SEED_VERSION], fields a seed
+     * document gained are added to the stored document — existing values are never overwritten.
+     * With [force] every seed overwrites the stored value instead.
      *
      * @param force overwrite existing values.
-     * @return number of written entries.
+     * @return number of written entries (settings, documents and merged fields).
      */
     @Synchronized
     fun seed(force: Boolean): Int {
@@ -177,19 +191,36 @@ class ConfigStore(private val storage: AddonStorage) {
                 written++
             }
         }
+        val state = storage.read(SEED_STATE_KEY)?.let { json.decodeFromString<SeedState>(it) }
+        val seeded = state?.seeded?.toMutableSet() ?: mutableSetOf()
+        val upgrade = (state?.version ?: 0) < ConfigSeeds.SEED_VERSION
         for ((name, documents) in ConfigSeeds.collections) {
             val list = collections.getOrPut(name) { mutableListOf() }
             var changed = false
             for (document in documents) {
-                if (force || list.none { it.id == document.id }) {
-                    list.removeAll { it.id == document.id }
-                    list += document
-                    written++
-                    changed = true
+                val key = "$name/${document.id}"
+                val index = list.indexOfFirst { it.id == document.id }
+                when {
+                    force || (index < 0 && (state == null || key !in seeded)) -> {
+                        if (index >= 0) list.removeAt(index)
+                        list += document
+                        written++
+                        changed = true
+                    }
+                    index >= 0 && upgrade -> {
+                        val merged = mergeMissing(list[index].body, document.body)
+                        if (merged.second > 0) {
+                            list[index] = list[index].copy(body = merged.first)
+                            written += merged.second
+                            changed = true
+                        }
+                    }
                 }
+                seeded += key
             }
             if (changed) persistCollection(name)
         }
+        storage.write(SEED_STATE_KEY, json.encodeToString(SeedState(ConfigSeeds.SEED_VERSION, seeded)))
         if (written > 0) {
             settings = SettingsDocument(values, settings.version + 1)
             storage.write(SETTINGS_KEY, json.encodeToString(settings))
@@ -235,6 +266,28 @@ class ConfigStore(private val storage: AddonStorage) {
         }
     }.toString()
 
+    /**
+     * Adds every field of [seed] that [stored] lacks; nested objects are merged recursively, all
+     * other values (including arrays) of [stored] win.
+     *
+     * @return the merged object and the number of added fields.
+     */
+    private fun mergeMissing(stored: JsonObject, seed: JsonObject): Pair<JsonObject, Int> {
+        var added = 0
+        val result = LinkedHashMap(stored)
+        for ((key, value) in seed) {
+            val current = result[key]
+            when {
+                current == null -> { result[key] = value; added++ }
+                current is JsonObject && value is JsonObject -> {
+                    val (merged, count) = mergeMissing(current, value)
+                    if (count > 0) { result[key] = merged; added += count }
+                }
+            }
+        }
+        return JsonObject(result) to added
+    }
+
     private fun bump() {
         settings = settings.copy(version = settings.version + 1)
         storage.write(SETTINGS_KEY, json.encodeToString(settings))
@@ -247,5 +300,6 @@ class ConfigStore(private val storage: AddonStorage) {
     private companion object {
         const val SETTINGS_KEY = "config.settings"
         const val COLLECTION_PREFIX = "config.collection."
+        const val SEED_STATE_KEY = "config.seeds"
     }
 }

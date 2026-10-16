@@ -172,6 +172,12 @@ object ConfigSeeds {
         addAll(RailSeeds.settings)
     }
 
+    /**
+     * Version of the seed set. Raise it whenever seed documents gain fields that existing
+     * installations should receive (see [ConfigStore.seed]); 2 = model extension (concept A21).
+     */
+    const val SEED_VERSION: Int = 2
+
     /** Defaults replaced by a later release; an untouched old default is lifted on load. */
     val supersededDefaults: Map<String, Set<String>> = emptyMap()
 
