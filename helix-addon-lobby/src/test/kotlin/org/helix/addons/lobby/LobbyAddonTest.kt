@@ -67,4 +67,15 @@ class LobbyAddonTest {
         val config = json.decodeFromString(LobbyConfig.serializer(), exported.lines.first())
         assertEquals(listOf("Lobby"), config.lobbyTasks)
     }
+
+    @Test
+    fun `navigator modes keep pickInstance and old configs default to false`() {
+        val payload = """{"serverMenu":{"modes":[{"task":"CityBuild","place":"kronstadt","emblem":"crown","pickInstance":true},{"task":"MineClash-Game"}]}}"""
+
+        assertTrue(context.run("lobby.set", payload).success)
+
+        val modes = published().serverMenu.modes
+        assertTrue(modes.first { it.task == "CityBuild" }.pickInstance)
+        assertFalse(modes.first { it.task == "MineClash-Game" }.pickInstance)
+    }
 }

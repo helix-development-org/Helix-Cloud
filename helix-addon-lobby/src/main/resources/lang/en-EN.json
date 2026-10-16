@@ -15,5 +15,13 @@
   "navigator.lore.rosenarena": "One against one for roses. Gorm holds your roses.",
   "navigator.lore.grenzlande": "Beyond the walls roam unbound mobs. Clans go to war.",
   "navigator.lore.nebelland": "Prof. Funkel is still researching. It smells slightly burnt.",
-  "navigator.lore.reserve": "A quiet clearing. Elsa writes down her tactics here."
+  "navigator.lore.reserve": "A quiet clearing. Elsa writes down her tactics here.",
+  "navigator.lore.kronstadt": "The realm's trading city. Claim a plot and start building.",
+  "navigator.instances.subtitle": "Choose your city",
+  "navigator.instances.empty": "No city is open right now. Check back in a moment!",
+  "navigator.instances.state.open": "<#4ac85e>Open",
+  "navigator.instances.state.busy": "<#ffcf4a>Almost full",
+  "navigator.instances.state.full": "<#ff5a4a>Full",
+  "navigator.instances.state.maintenance": "<#ffb43a>Warning: under construction.",
+  "navigator.instances.blocked": "<#ff5a4a>Not joinable right now. Pick another instance."
 }
