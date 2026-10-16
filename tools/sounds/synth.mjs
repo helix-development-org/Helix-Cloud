@@ -626,6 +626,10 @@ const VOICES = {
   paula:      { f0: 285, tempo: 0.55, tract: 1.2,  contour: "lively",   breath: 0.12, rasp: 0,    bright: 1.15, loud: 0, count: 34, hmm: "hmm" },
   brunhilde:  { f0: 176, tempo: 0.85, tract: 0.98, contour: "shout",    breath: 0.07, rasp: 0.12, bright: 1.2, loud: 2,  count: 28, hmm: "hrm" },
   greta:      { f0: 228, tempo: 1.1,  tract: 1.08, contour: "erratic",  breath: 0.16, rasp: 0.02, bright: 0.85, loud: -3, count: 28, hmm: "hmm" },
+  // CityBuild dealers (A21.8)
+  kuno:       { f0: 118, tempo: 0.8,  tract: 0.92, contour: "level",    breath: 0.05, rasp: 0.07, bright: 1.0, loud: 0,  count: 30, hmm: "hrm" },
+  tilda:      { f0: 238, tempo: 1.0,  tract: 1.1,  contour: "pompous",  breath: 0.1,  rasp: 0,    bright: 1.05, loud: -1, count: 28, hmm: "hmm" },
+  frieda:     { f0: 214, tempo: 0.75, tract: 1.06, contour: "bouncy",   breath: 0.06, rasp: 0.02, bright: 1.1, loud: 0,  count: 30, hmm: "hmm" },
 };
 
 /** Pitch movement across one syllable (x = 0..1), as a frequency ratio. */

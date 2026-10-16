@@ -54,6 +54,9 @@ object VillagerCast {
         VillagerCharacter("paula", "Paula Paket", "Postbotin", "#f0c030", ticksPerLetter = 1),
         VillagerCharacter("brunhilde", "Brunhilde Brecher", "Waffenmeisterin", "#7a7f88", ticksPerLetter = 2),
         VillagerCharacter("greta", "Greta Goldzahn", "Schatzmeisterin", "#6e3a4a", ticksPerLetter = 2),
+        VillagerCharacter("kuno", "Kuno Kurbel", "Stellmacher", "#9a4a2a", ticksPerLetter = 2),
+        VillagerCharacter("tilda", "Tilda Tapete", "Möbelhändlerin", "#d8909a", ticksPerLetter = 2, lidRest = 0.45f),
+        VillagerCharacter("frieda", "Frieda Feder", "Tierhändlerin", "#5aa84a", ticksPerLetter = 2),
     )
 
     /** Characters by id. */

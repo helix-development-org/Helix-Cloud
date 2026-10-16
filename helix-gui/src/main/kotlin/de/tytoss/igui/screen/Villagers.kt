@@ -5,10 +5,12 @@ package de.tytoss.igui.screen
  * indices depend on it) and the item model of each 16×16 head icon (pure; shared with the pack generator).
  */
 object Villagers {
-    /** Villager ids, in glyph order: the network cast, then the CityBuild figures (§12 "CityBuild-Figuren"). */
+    /** Villager ids, in glyph order: the network cast, then the CityBuild figures (§12 "CityBuild-Figuren"),
+     *  then the CityBuild dealers (A21.8). */
     val IDS = listOf(
         "bertold", "mira", "gorm", "elsa", "klunk", "pitt", "hedda", "funkel", "ambo", "knoepfchen",
         "lotte", "gundula", "fritz", "ludwig", "henni", "waldemar", "rupert", "paula", "brunhilde", "greta",
+        "kuno", "tilda", "frieda",
     )
 
     /** The lobby narrator, speaker of empty states unless a menu names another villager. */
