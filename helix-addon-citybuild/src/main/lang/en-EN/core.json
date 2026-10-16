@@ -1,0 +1,10 @@
+{
+  "core.command.player-only": "<#ff5a4a>This command only works in game.",
+  "core.command.no-permission": "<#ff5a4a>You lack the permission for that. Ask a team member if you need it.",
+  "core.command.failed": "<#ff5a4a>Something went wrong. Try again in a moment.",
+  "core.node.unavailable": "<#ffb43a>Warning: The town hall is not answering right now. Try again in a moment.",
+  "core.confirm.yes": "Confirm",
+  "core.confirm.no": "Cancel",
+  "core.kronen.insufficient": "<#ff5a4a>You don't have enough crowns. Check your balance with <#ffcf4a>/kronen</#ffcf4a>.",
+  "core.kronen.limit": "<#ff5a4a>The daily limit is reached. Come back tomorrow."
+}
