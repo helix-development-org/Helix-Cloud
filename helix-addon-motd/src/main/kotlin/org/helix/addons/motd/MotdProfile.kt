@@ -19,6 +19,8 @@ import kotlinx.serialization.Serializable
  *  frame `[line1/line2]`. With more than one frame the server-list entry is
  *  animated: each ping shows the frame active at that moment.
  * @property frameIntervalMs milliseconds between animation frames.
+ * @property favicon server-list icon as plain Base64 of a 64×64 PNG; empty uses the network icon
+ *  bundled with the addon (see [MotdFavicon]).
  */
 @Serializable
 data class MotdProfile(
@@ -30,6 +32,7 @@ data class MotdProfile(
     val hover: List<String> = emptyList(),
     val frames: List<MotdFrame> = emptyList(),
     val frameIntervalMs: Long = 3000,
+    val favicon: String = "",
 ) {
     /**
      * Effective animation frames (falls back to the base lines).

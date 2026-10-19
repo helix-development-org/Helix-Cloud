@@ -13,6 +13,7 @@ import kotlinx.serialization.Serializable
  * @property hover lines shown when hovering the player count.
  * @property frames animation frames; empty means the single frame line1/line2.
  * @property frameIntervalMs milliseconds between animation frames.
+ * @property favicon server-list icon as plain Base64 of a 64×64 PNG; empty keeps the proxy's own icon.
  */
 @Serializable
 data class MotdProfileData(
@@ -24,6 +25,7 @@ data class MotdProfileData(
     val hover: List<String> = emptyList(),
     val frames: List<MotdFrameData> = emptyList(),
     val frameIntervalMs: Long = 3000,
+    val favicon: String = "",
 ) {
     /**
      * The frame active at the given time (time-based rotation).

@@ -16,6 +16,7 @@ import com.velocitypowered.api.plugin.Plugin
 import com.velocitypowered.api.proxy.Player
 import com.velocitypowered.api.proxy.ProxyServer
 import com.velocitypowered.api.proxy.server.ServerPing
+import com.velocitypowered.api.util.Favicon
 import com.velocitypowered.api.scheduler.ScheduledTask
 import kotlinx.serialization.json.Json
 import net.kyori.adventure.text.Component
@@ -518,6 +519,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
                 }.toTypedArray(),
             )
         }
+        faviconOf(profile.favicon)?.let { builder.favicon(it) }
         if (profile.versionText.isNotBlank()) {
             builder.version(
                 ServerPing.Version(
@@ -527,6 +529,25 @@ class HelixVelocityBridgePlugin @Inject constructor(
             )
         }
         event.ping = builder.build()
+    }
+
+    @Volatile
+    private var faviconCache: Pair<String, Favicon?>? = null
+
+    /**
+     * Decodes the profile icon once per distinct value; an invalid icon is logged once and skipped.
+     *
+     * @param base64 plain Base64 of a 64×64 PNG, or empty.
+     * @return the favicon, or `null` to keep the proxy default.
+     */
+    private fun faviconOf(base64: String): Favicon? {
+        if (base64.isBlank()) return null
+        faviconCache?.let { (key, icon) -> if (key == base64) return icon }
+        val icon = runCatching { Favicon("data:image/png;base64,$base64") }
+            .onFailure { logger.warn("MOTD favicon rejected: {}", it.message) }
+            .getOrNull()
+        faviconCache = base64 to icon
+        return icon
     }
 
     private fun applyContext(template: String, ctx: Map<String, String>): String {

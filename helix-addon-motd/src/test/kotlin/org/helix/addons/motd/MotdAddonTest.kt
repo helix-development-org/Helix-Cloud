@@ -113,4 +113,33 @@ class MotdAddonTest {
     fun `import rejects invalid json`() {
         assertFalse(context.run("motd.import", "{oops").success)
     }
+
+    @Test
+    fun `publishes the bundled network icon when no favicon is set`() {
+        val published = json.decodeFromString<MotdConfig>(context.bridgeValues.getValue("motd.config"))
+        assertTrue(published.normal.favicon.isNotEmpty())
+        assertEquals(null, MotdFavicon.validate(published.normal.favicon))
+        assertEquals(published.normal.favicon, published.maintenance.favicon)
+    }
+
+    @Test
+    fun `favicon can be replaced, rejected when not 64x64 and reset to default`() {
+        val custom = java.util.Base64.getEncoder().encodeToString(png(64, 64))
+        assertTrue(context.run("motd.set", "maintenance", "favicon", "data:image/png;base64,$custom").success)
+        var published = json.decodeFromString<MotdConfig>(context.bridgeValues.getValue("motd.config"))
+        assertEquals(custom, published.maintenance.favicon)
+
+        val wrong = java.util.Base64.getEncoder().encodeToString(png(32, 32))
+        assertFalse(context.run("motd.set", "maintenance", "favicon", wrong).success)
+        assertFalse(context.run("motd.set", "maintenance", "favicon", "not-base64!").success)
+
+        assertTrue(context.run("motd.set", "maintenance", "favicon", "default").success)
+        published = json.decodeFromString<MotdConfig>(context.bridgeValues.getValue("motd.config"))
+        assertEquals(MotdFavicon.default, published.maintenance.favicon)
+    }
+
+    private fun png(width: Int, height: Int): ByteArray {
+        val image = java.awt.image.BufferedImage(width, height, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+        return java.io.ByteArrayOutputStream().also { javax.imageio.ImageIO.write(image, "png", it) }.toByteArray()
+    }
 }
