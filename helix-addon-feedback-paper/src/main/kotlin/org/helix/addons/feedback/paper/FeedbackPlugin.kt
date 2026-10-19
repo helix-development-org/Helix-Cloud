@@ -18,7 +18,12 @@ import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerJoinEvent
+import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.plugin.java.JavaPlugin
+import org.bukkit.plugin.messaging.PluginMessageListener
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.helix.api.i18n.NodeTranslations
 import org.helix.api.message.LegacyToMini
 import java.io.File
@@ -33,7 +38,7 @@ import kotlin.coroutines.CoroutineContext
  *
  * Without a node connection (`HELIX_CONTROL_URL`/`HELIX_CONTROL_TOKEN`) the plugin disables itself.
  */
-class FeedbackPlugin : JavaPlugin(), Listener {
+class FeedbackPlugin : JavaPlugin(), Listener, PluginMessageListener {
     /** This server's service id (`HELIX_SERVICE_ID`). */
     var service: String = "local"
         private set
@@ -52,6 +57,12 @@ class FeedbackPlugin : JavaPlugin(), Listener {
     /** The node's `testphase` setting (bridge value `feedback.settings`; true until known otherwise). */
     @Volatile var testphase: Boolean = true
         private set
+
+    /** The node's `maxAttachmentBytes` setting (bridge value `feedback.settings`). */
+    @Volatile var maxAttachmentBytes: Int = ScreenshotUploads.DEFAULT_MAX_BYTES
+        private set
+
+    private val uploads = ScreenshotUploads()
 
     private var client: FeedbackNodeClient? = null
     private var translations: NodeTranslations? = null
@@ -107,6 +118,9 @@ class FeedbackPlugin : JavaPlugin(), Listener {
             server.pluginManager.registerEvents(it, this)
         }
         server.pluginManager.registerEvents(this, this)
+        server.messenger.registerOutgoingPluginChannel(this, SCREENSHOT_CHANNEL)
+        server.messenger.registerIncomingPluginChannel(this, SCREENSHOT_CHANNEL, this)
+        server.scheduler.runTaskTimer(this, Runnable { expireUploads() }, 20L, 20L)
         logger.info("HelixFeedback enabled for $service ($task)")
     }
 
@@ -233,8 +247,9 @@ class FeedbackPlugin : JavaPlugin(), Listener {
     private fun pollSettings() {
         val values = client?.bridgeValues() ?: return
         val raw = values[SETTINGS_BRIDGE_KEY] ?: return
-        runCatching { json.parseToJsonElement(raw).jsonObject["testphase"]?.jsonPrimitive?.booleanOrNull }
-            .getOrNull()?.let { testphase = it }
+        val settings = runCatching { json.parseToJsonElement(raw).jsonObject }.getOrNull() ?: return
+        settings["testphase"]?.jsonPrimitive?.booleanOrNull?.let { testphase = it }
+        settings["maxAttachmentBytes"]?.jsonPrimitive?.intOrNull?.takeIf { it > 0 }?.let { maxAttachmentBytes = it }
     }
 
     private fun reloadTools() {
@@ -276,14 +291,98 @@ class FeedbackPlugin : JavaPlugin(), Listener {
     }
 
     /**
-     * Hook for the screenshot transfer (plan 1 wave T2, LabyMod addon): the report [nr] asked for a screenshot.
-     * Until the transfer exists this only notes it in the log.
+     * Asks the reporter's LabyMod addon for a screenshot of report [nr] (channel `helix:feedback`): the client hides
+     * its GUI, captures one frame, and streams the JPEG back in chunks; [onPluginMessageReceived] assembles it and
+     * uploads it to the node. Without the channel or a report number the player is told that no screenshot was taken.
      *
      * @param player the reporter.
      * @param nr the created report number, null if unknown.
      */
     fun screenshotRequested(player: Player, nr: Long?) {
-        logger.info("Screenshot requested for report #${nr ?: "?"} by ${player.name} (transfer not available yet)")
+        if (!Bukkit.isPrimaryThread()) {
+            server.scheduler.runTask(this, Runnable { screenshotRequested(player, nr) })
+            return
+        }
+        if (nr == null || !capture.canScreenshot(player)) {
+            player.sendMessage(chat(player, "screenshot.failed"))
+            return
+        }
+        val upload = uploads.start(player.uniqueId, nr, maxAttachmentBytes, System.currentTimeMillis())
+        val request = buildJsonObject {
+            put("type", "capture")
+            put("id", upload.id)
+            put("maxWidth", SCREENSHOT_MAX_WIDTH)
+            put("quality", SCREENSHOT_QUALITY)
+            put("maxBytes", upload.maxBytes)
+        }
+        player.sendPluginMessage(this, SCREENSHOT_CHANNEL, request.toString().toByteArray(Charsets.UTF_8))
+    }
+
+    /**
+     * Receives screenshot chunks, `done` and `error` messages from the LabyMod addon.
+     *
+     * @param channel the channel (`helix:feedback`).
+     * @param player the sender.
+     * @param message UTF-8 JSON.
+     */
+    override fun onPluginMessageReceived(channel: String, player: Player, message: ByteArray) {
+        if (channel != SCREENSHOT_CHANNEL) return
+        val body = runCatching { json.parseToJsonElement(message.toString(Charsets.UTF_8)).jsonObject }.getOrNull() ?: return
+        val id = body["id"]?.jsonPrimitive?.content ?: return
+        when (body["type"]?.jsonPrimitive?.content) {
+            "chunk" -> {
+                val outcome = uploads.chunk(
+                    id, player.uniqueId,
+                    body["i"]?.jsonPrimitive?.intOrNull ?: -1,
+                    body["n"]?.jsonPrimitive?.intOrNull ?: 0,
+                    body["data"]?.jsonPrimitive?.content.orEmpty(),
+                )
+                if (outcome is ScreenshotUploads.Outcome.Failed && outcome.upload != null) screenshotFailed(player, outcome.reason)
+            }
+            "done" -> when (val outcome = uploads.finish(id, player.uniqueId)) {
+                is ScreenshotUploads.Outcome.Complete -> uploadScreenshot(player, outcome)
+                is ScreenshotUploads.Outcome.Failed -> if (outcome.upload != null) screenshotFailed(player, outcome.reason)
+                else -> Unit
+            }
+            "error" -> uploads.cancel(id, player.uniqueId)?.let { screenshotFailed(player, body["reason"]?.jsonPrimitive?.content ?: "failed") }
+        }
+    }
+
+    private fun uploadScreenshot(player: Player, outcome: ScreenshotUploads.Outcome.Complete) {
+        val viewer = PlayerRef(player.uniqueId.toString(), player.name)
+        val name = "screenshot-${outcome.upload.nr}.jpg"
+        server.scheduler.runTaskAsynchronously(this, Runnable {
+            val reply = client?.attach(outcome.upload.nr, viewer, name, "image/jpeg", outcome.bytes)
+            server.scheduler.runTask(this, Runnable {
+                if (!player.isOnline) return@Runnable
+                if (reply?.ok == true) {
+                    player.sendMessage(chat(player, "screenshot.attached", "nr" to outcome.upload.nr.toString()))
+                } else {
+                    screenshotFailed(player, reply?.code ?: "unavailable")
+                }
+            })
+        })
+    }
+
+    private fun screenshotFailed(player: Player, reason: String) {
+        logger.info("Screenshot of ${player.name} failed: $reason")
+        if (player.isOnline) player.sendMessage(chat(player, if (reason == "disabled") "screenshot.disabled" else "screenshot.failed"))
+    }
+
+    private fun expireUploads() {
+        uploads.expire(System.currentTimeMillis()).forEach { upload ->
+            server.getPlayer(upload.player)?.let { screenshotFailed(it, "timeout") }
+        }
+    }
+
+    /**
+     * Forgets open screenshot uploads of a leaving player.
+     *
+     * @param event the quit.
+     */
+    @EventHandler
+    fun onQuitUploads(event: PlayerQuitEvent) {
+        uploads.forget(event.player.uniqueId)
     }
 
     /**
@@ -342,6 +441,15 @@ class FeedbackPlugin : JavaPlugin(), Listener {
 
         /** May manage test points. */
         const val PERMISSION_ADMIN = "feedback.admin"
+
+        /** Plugin channel of the screenshot transfer with the Helix LabyMod addon. */
+        const val SCREENSHOT_CHANNEL = "helix:feedback"
+
+        /** Largest screenshot width the client sends. */
+        const val SCREENSHOT_MAX_WIDTH = 1280
+
+        /** JPEG start quality the client uses. */
+        const val SCREENSHOT_QUALITY = 0.8
 
         /** Bridge value the node may publish with its settings (`{"testphase":true,…}`). */
         const val SETTINGS_BRIDGE_KEY = "feedback.settings"

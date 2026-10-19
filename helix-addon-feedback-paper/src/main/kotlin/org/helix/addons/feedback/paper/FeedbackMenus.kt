@@ -166,7 +166,7 @@ class FeedbackMenus(
 
     private fun showForm(player: Player) {
         val draft = drafts.getOrPut(player.uniqueId) { ReportDraft(category = Category.forTask(plugin.task)) }
-        val labymod = capture.isLabyMod(player)
+        val labymod = capture.canScreenshot(player)
         val none = text(player, "form.empty")
         val rows = buildList {
             add(LedgerRow(text(player, "form.category"), text(player, draft.category.langKey), icon = ItemStack(Material.COMPASS)))
@@ -235,7 +235,7 @@ class FeedbackMenus(
                 ctx.gui.open(player, FORM)
                 return
             }
-            4 -> if (capture.isLabyMod(player)) draft.copy(screenshot = !draft.screenshot) else draft
+            4 -> if (capture.canScreenshot(player)) draft.copy(screenshot = !draft.screenshot) else draft
             else -> draft
         }
         drafts[player.uniqueId] = updated.copy(confirming = false)

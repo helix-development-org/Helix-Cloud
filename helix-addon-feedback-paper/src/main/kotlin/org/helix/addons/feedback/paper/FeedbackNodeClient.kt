@@ -41,6 +41,12 @@ object FeedbackActions {
     /** Test tool usage log. */
     const val TOOL_LOG = "feedback.toollog"
 
+    /** One part of a chunked attachment upload. */
+    const val ATTACH_CHUNK = "feedback.attach.chunk"
+
+    /** Completes a chunked attachment upload. */
+    const val ATTACH_FINISH = "feedback.attach.finish"
+
     /** Agreement state. */
     const val AGREEMENT_GET = "feedback.agreement.get"
 
@@ -308,6 +314,27 @@ class FeedbackNodeClient(controlUrl: String, token: String) {
      */
     fun testKronen(uuid: UUID, amount: Long, dailyLimit: Long): NodeReply =
         call(FeedbackActions.ECO_DEPOSIT, uuid.toString(), amount.toString(), "feedback.testkronen", "-", "feedback.testkronen", dailyLimit.toString())
+
+    /**
+     * Uploads an attachment in parts (`feedback.attach.chunk` …, then `feedback.attach.finish`).
+     *
+     * @param nr report number.
+     * @param viewer the reporter (must own the report).
+     * @param name file name.
+     * @param mime MIME type.
+     * @param bytes the data.
+     * @return the reply of the finishing call (or the first failing chunk).
+     */
+    fun attach(nr: Long, viewer: PlayerRef, name: String, mime: String, bytes: ByteArray): NodeReply {
+        val uploadId = UUID.randomUUID().toString()
+        val parts = ScreenshotUploads.parts(bytes)
+        parts.forEachIndexed { index, part ->
+            val reply = call(FeedbackActions.ATTACH_CHUNK, uploadId, index.toString(), parts.size.toString(), part)
+            if (!reply.ok) return reply
+        }
+        val viewerJson = buildJsonObject { put("uuid", viewer.uuid); put("name", viewer.name) }.toString()
+        return call(FeedbackActions.ATTACH_FINISH, uploadId, nr.toString(), name, mime, viewerJson)
+    }
 
     /**
      * Records one test tool use on the node (`feedback.toollog`).

@@ -102,3 +102,17 @@ Log lines: on `create`/`auto` the node calls `service.logs <context.service> 200
 
 Notifications to Discord: `context.publishNotification("bugreport", …)` for new reports and status changes;
 reports with severity `exploit` use the category `bugreport-staff`.
+
+## Screenshot channel (Paper ↔ Helix LabyMod addon)
+
+Plugin channel `helix:feedback`, one UTF-8 JSON object per message. The LabyMod addon registers the channel only when
+the player allows screenshots; `/bug` offers the screenshot option only to clients listening on it.
+
+- server → client: `{"type":"capture","id":<uploadId>,"maxWidth":1280,"quality":0.8,"maxBytes":<maxAttachmentBytes>}`
+  (sent right after `feedback.create` succeeded)
+- client → server: `{"type":"chunk","id","i","n","data":<base64 ≤ 21 000 raw bytes>}` …,
+  then `{"type":"done","id","bytes","mime":"image/jpeg","width","height"}` or `{"type":"error","id","reason"}`
+  (`disabled`, `busy`, `failed`, `too_large`)
+- Paper assembles the chunks (timeout 20 s, limit `maxAttachmentBytes` from the `feedback.settings` bridge value) and
+  uploads the JPEG with `feedback.attach.chunk` (256 KiB parts) + `feedback.attach.finish <uploadId> <nr>
+  screenshot-<nr>.jpg image/jpeg <viewerJson>`.
