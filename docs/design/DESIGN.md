@@ -193,7 +193,10 @@ Ist-Stand Währungs-Icons: Form bleibt, Kontur auf Tinte umstellen, Glanzpixel o
 | [Admin] | `#ff5a4a` | 80 |
 | [Mod] | `#ffb43a` | 70 |
 | [Support] | `#4ac85e` | 60 |
+| [Tester] | `#5ab4ff` | 10 |
 | [Spieler] | `#c8bca8` | 0 |
+
+**[Tester]** ist ein Spieler-Rang der geschlossenen Testphase (keine Team-Rechte; Gruppe `tester` mit Wartungs-Bypass, Feedback- und Test-Werkzeug-Rechten, Vergabe per `/tester`). Ehemalige Tester behalten nach dem Release das dauerhafte Abzeichen-Recht `badge.betatester` (Profil/Prefix-Variante), die Gruppe selbst endet mit der Testphase. Siehe `docs/TESTPHASE.md`.
 
 ## 10 · HUD, Tablist, Scoreboard, MOTD
 

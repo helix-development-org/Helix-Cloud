@@ -24,6 +24,7 @@ class PermissionsAddon : AddonBase() {
     private val json = Json { encodeDefaults = true }
     private lateinit var store: PermissionStore
     private lateinit var catalog: PermissionCatalog
+    private lateinit var tester: TesterAccess
 
     /**
      * Registers the resolver and all `perm.*` actions.
@@ -34,6 +35,8 @@ class PermissionsAddon : AddonBase() {
         if (store.group("default") == null) {
             seedDefaultGroups(fresh = store.allGroups().isEmpty())
         }
+        tester = TesterAccess(store, loadMessages())
+        tester.seedGroup()
         context.registerPermissionResolver { request -> store.has(request.name, request.permission, request.uuid) }
         // Group prefixes are DISPLAY state, deliberately decoupled from permission nodes: the
         // player's highest-weight group with a prefix wins, so a `*` grant never changes looks.
@@ -193,6 +196,13 @@ class PermissionsAddon : AddonBase() {
             playerCommand = true,
             permission = "helix.permissions",
         ) { invocation -> permissionsCommand(invocation.arguments.drop(1)) }
+        action(
+            "tester",
+            "Manages testers of the closed test phase.",
+            "tester <add|remove|list|info> [player] [duration]",
+            playerCommand = true,
+            permission = TesterAccess.MANAGE_PERMISSION,
+        ) { invocation -> tester.command(invocation.arguments.firstOrNull() ?: "", invocation.arguments.drop(1)) }
         panel("permissions", "Permissions", "/panel.html", PANEL_ICON)
     }
 

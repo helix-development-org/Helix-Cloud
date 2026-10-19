@@ -119,3 +119,26 @@ object StaffRanks {
         StaffRank("[Spieler]", 0xC8BCA8, 0),
     )
 }
+
+/**
+ * Player ranks of the design concept (§9) that are not staff: shown with a
+ * prefix like staff ranks, but granting no moderation rights.
+ */
+object PlayerRanks {
+    /**
+     * Tester of the closed test phase (Diamant-Blau, weight 10). The group
+     * `tester` carries the maintenance bypass and the feedback/test-tool
+     * permissions; see `docs/TESTPHASE.md`.
+     */
+    val TESTER: StaffRank = StaffRank("[Tester]", 0x5AB4FF, 10)
+
+    /**
+     * Permanent badge node for former testers (`badge.betatester`). It is
+     * granted per player at the end of the test phase and survives the
+     * release reset, unlike membership in the `tester` group.
+     */
+    const val BETA_TESTER_BADGE: String = "badge.betatester"
+
+    /** Player ranks in display order. */
+    val ALL: List<StaffRank> = listOf(TESTER)
+}
