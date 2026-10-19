@@ -10,6 +10,8 @@ import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.entity.EntityDamageEvent
+import org.bukkit.event.inventory.InventoryClickEvent
+import org.bukkit.event.inventory.InventoryDragEvent
 import org.bukkit.event.player.PlayerCommandPreprocessEvent
 import org.bukkit.event.player.PlayerDropItemEvent
 import org.bukkit.event.player.PlayerInteractEntityEvent
@@ -24,7 +26,12 @@ import java.util.concurrent.ConcurrentHashMap
  * The tester agreement (plan 1 §1): a tester (`feedback.tester`, not staff) who has not accepted the current
  * agreement version is frozen after joining – no moving, interacting, chatting or commands except
  * `/testervereinbarung` – and sees the rules as a book with „Annehmen“/„Ablehnen“. Accepting stores the version on the
- * node and unfreezes; declining kicks with a friendly text.
+ * node and unfreezes; declining kicks with a friendly text. When the node cannot be reached the tester is frozen as a
+ * precaution and the check is retried (fail closed).
+ *
+ * Commands handled by the proxy (Velocity) never pass the Paper command event, so they are not blocked here; proxy
+ * commands of testers are harmless network commands (`/lobby`, `/server`, `/msg` …) and the agreement only gates
+ * playing on this server.
  *
  * @property plugin the owning plugin.
  * @property client node client.
@@ -45,13 +52,26 @@ class AgreementGate(
      *
      * @param player the joining player.
      */
-    fun check(player: Player) {
+    fun check(player: Player, attempt: Int = 0) {
         if (!player.hasPermission(PERMISSION_TESTER) || player.hasPermission(PERMISSION_STAFF)) return
         plugin.server.scheduler.runTaskAsynchronously(plugin, Runnable {
-            val state = client.agreement(player.uniqueId) ?: return@Runnable
-            if (!FreezeRules.mustAccept(true, state.acceptedVersion, state.version, false)) return@Runnable
+            val state = client.agreement(player.uniqueId)
+            val mustFreeze = FreezeRules.frozenWith(true, false, state?.let { it.acceptedVersion to it.version })
             plugin.server.scheduler.runTask(plugin, Runnable {
                 if (!player.isOnline) return@Runnable
+                if (!mustFreeze) {
+                    frozen.remove(player.uniqueId)
+                    return@Runnable
+                }
+                val firstTime = !frozen.containsKey(player.uniqueId)
+                if (state == null) {
+                    frozen[player.uniqueId] = UNKNOWN_VERSION
+                    if (firstTime) player.sendMessage(mini.deserialize(text(player, "agreement.frozen")))
+                    if (attempt < MAX_RETRIES) {
+                        plugin.server.scheduler.runTaskLater(plugin, Runnable { if (player.isOnline) check(player, attempt + 1) }, RETRY_TICKS)
+                    }
+                    return@Runnable
+                }
                 frozen[player.uniqueId] = state.version
                 showBook(player)
             })
@@ -87,6 +107,10 @@ class AgreementGate(
             "annehmen", "accept" -> {
                 if (version == null) {
                     player.sendMessage(mini.deserialize(text(player, "agreement.already")))
+                    return
+                }
+                if (version == UNKNOWN_VERSION) {
+                    check(player)
                     return
                 }
                 plugin.server.scheduler.runTaskAsynchronously(plugin, Runnable {
@@ -148,6 +172,20 @@ class AgreementGate(
         if (isFrozen(player)) event.isCancelled = true
     }
 
+    /** Frozen players may not move items in any inventory. */
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    fun onInventoryClick(event: InventoryClickEvent) {
+        val player = event.whoClicked as? Player ?: return
+        if (isFrozen(player)) event.isCancelled = true
+    }
+
+    /** Frozen players may not drag items in any inventory. */
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    fun onInventoryDrag(event: InventoryDragEvent) {
+        val player = event.whoClicked as? Player ?: return
+        if (isFrozen(player)) event.isCancelled = true
+    }
+
     /** Frozen players may not chat. */
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     fun onChat(event: AsyncChatEvent) {
@@ -179,5 +217,14 @@ class AgreementGate(
 
         /** Rule pages before the choice page. */
         const val PAGES = 3
+
+        /** Marker version while the node could not be asked yet. */
+        const val UNKNOWN_VERSION = -1
+
+        /** Retries of an unanswered agreement check. */
+        const val MAX_RETRIES = 30
+
+        /** Ticks between two retries (10 s). */
+        const val RETRY_TICKS = 200L
     }
 }

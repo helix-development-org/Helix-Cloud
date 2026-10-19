@@ -141,6 +141,47 @@ class FeedbackPlugin : JavaPlugin(), Listener, PluginMessageListener {
         gate?.check(event.player)
     }
 
+    /** Players whose flight was granted by the test tools (only that flight is revoked again). */
+    private val toolFlight: MutableSet<java.util.UUID> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
+    /**
+     * Records that the test tools switched flight on or off for a player.
+     *
+     * @param player the tester.
+     * @param on whether flight is now granted.
+     */
+    fun markToolFlight(player: Player, on: Boolean) {
+        if (on) toolFlight += player.uniqueId else toolFlight -= player.uniqueId
+    }
+
+    /**
+     * Revokes test-tool flight that is no longer allowed (other world, test phase over, permission lost).
+     * Must run on the main thread.
+     *
+     * @param player the tester.
+     */
+    fun enforceFlight(player: Player) {
+        if (player.uniqueId !in toolFlight) return
+        val keep = TestToolRules.keepsFlight(testphase, player.hasPermission(PERMISSION_TOOLS), TestToolRules.flyAllowed(toolsConfig, player.world.name))
+        if (keep) return
+        toolFlight -= player.uniqueId
+        player.isFlying = false
+        player.allowFlight = false
+        logTool(player, "fly", "revoked")
+    }
+
+    /** Re-checks test-tool flight after a world change. */
+    @EventHandler
+    fun onWorldChange(event: org.bukkit.event.player.PlayerChangedWorldEvent) {
+        enforceFlight(event.player)
+    }
+
+    /** Forgets test-tool flight of leaving players. */
+    @EventHandler
+    fun onLeave(event: org.bukkit.event.player.PlayerQuitEvent) {
+        toolFlight -= event.player.uniqueId
+    }
+
     /** Handles `/bug`, `/bugs`, `/testtools` and `/testervereinbarung`. */
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
         val player = sender as? Player ?: run {
@@ -248,7 +289,11 @@ class FeedbackPlugin : JavaPlugin(), Listener, PluginMessageListener {
         val values = client?.bridgeValues() ?: return
         val raw = values[SETTINGS_BRIDGE_KEY] ?: return
         val settings = runCatching { json.parseToJsonElement(raw).jsonObject }.getOrNull() ?: return
-        settings["testphase"]?.jsonPrimitive?.booleanOrNull?.let { testphase = it }
+        settings["testphase"]?.jsonPrimitive?.booleanOrNull?.let { next ->
+            val closed = testphase && !next
+            testphase = next
+            if (closed) server.scheduler.runTask(this, Runnable { server.onlinePlayers.forEach(::enforceFlight) })
+        }
         settings["maxAttachmentBytes"]?.jsonPrimitive?.intOrNull?.takeIf { it > 0 }?.let { maxAttachmentBytes = it }
     }
 
@@ -283,7 +328,7 @@ class FeedbackPlugin : JavaPlugin(), Listener, PluginMessageListener {
             val entry = kotlinx.serialization.json.buildJsonObject {
                 put("name", kotlinx.serialization.json.JsonPrimitive(player.name))
                 put("action", kotlinx.serialization.json.JsonPrimitive(tool))
-                put("details", kotlinx.serialization.json.JsonPrimitive(value))
+                put("details", kotlinx.serialization.json.buildJsonObject { put("value", kotlinx.serialization.json.JsonPrimitive(value)) })
                 put("service", kotlinx.serialization.json.JsonPrimitive(service))
             }
             runCatching { client?.toolLog(player.uniqueId, entry) }

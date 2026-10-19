@@ -33,12 +33,20 @@ Points are granted to the reporter when a report enters `confirmed` for the firs
 
 - Calls from the CLI, REST/dashboard or other addons are **staff** calls.
 - Calls from a Paper/Velocity bridge (`source = BRIDGE`) act **on behalf of a player** given in the payload
-  (`viewer`/`actor` = `{uuid, name}`). Staff = the player holds `feedback.staff` (checked by name).
+  (`viewer`/`actor`/`author` = `{uuid, name}`) and are **never staff**, whatever name the payload carries (staff work
+  happens in the dashboard).
   - Non-staff players only see and comment on **their own** reports.
   - Reports with severity `exploit` are visible to staff and to their reporter only.
-- Write actions on status/assignee/duplicate need staff.
-- Bridge calls of `feedback.list`/`get`/`comment`/`attach`/`attach.finish` must name the player (`viewer`, `author`,
-  trailing `viewerJson` = `{"uuid":…,"name":…}`); without it a bridge `list` answers `forbidden`.
+- Write actions on status/assignee/duplicate/severity need staff and are **not bridge-invocable**
+  (`feedback.status`, `feedback.assign`, `feedback.duplicate`, `feedback.severity`, `feedback.list`,
+  `feedback.toollog.list`, `feedback.settings`, `feedback.rewards.table`, `feedback.rewards.grant`).
+- Non-staff `create` and `comment` (bridge, or addon calls with `asPlayer`) need `feedback.report` (checked by name on
+  the node) and the current tester agreement: failures `not_tester`, `agreement_required`.
+- Non-staff limits (settings): `cooldownSeconds`/`maxPerDay` for reports, `commentCooldownSeconds`/`maxCommentsPerDay`
+  for comments (`comment_cooldown` with the remaining seconds, `comment_limit`), `maxAttachmentsPerReport`
+  (`attachment_limit`). At most 64 chunked uploads may be open at once (`busy`).
+- New automatic reports are capped per service and hour (`maxAutoPerServiceHour`, failure `auto_limit`); known
+  hashes still count up.
 - Malformed calls answer `usage` with the usage line in `lines[1]`.
 - `feedback.settings`, `feedback.rewards.table`, `feedback.rewards.grant`, `feedback.attachment` and `feedback.export`
   and `feedback.toollog.list` are not bridge-invocable (dashboard/CLI/addons only).
@@ -110,6 +118,12 @@ Log lines: on `create`/`auto` the node calls `service.logs <context.service> 200
 
 Notifications to Discord: `context.publishNotification("bugreport", …)` for new reports and status changes;
 reports with severity `exploit` use the category `bugreport-staff`.
+
+### `feedback.severity <nr> <severity> [category]` (staff, not bridge-invocable)
+
+Reclassifies a report. Points already granted follow the new severity (the reporter's total is adjusted). Emits
+`FeedbackEvent` `{type: "reclassified", from: <old severity>, to: <new severity>, note?: "category a -> b"}`; the Discord
+mirror moves the thread between forum and staff channel when the change crosses `exploit`. Answer: `Report`.
 
 ## Panel
 

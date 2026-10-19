@@ -73,4 +73,16 @@ object Statuses {
             else -> report.points to report.pointsGranted
         }
     }
+
+    /**
+     * Points of a report after a reclassification: only reports whose points are currently granted follow the new
+     * severity; automatic reports never earn points.
+     *
+     * @param report the report before the change.
+     * @param severity the new severity.
+     * @param table points per severity.
+     * @return the new points value.
+     */
+    fun reclassifiedPoints(report: Report, severity: String, table: Map<String, Int>): Int =
+        if (report.reporter?.uuid != null && report.pointsGranted && report.points > 0) table[severity] ?: 0 else report.points
 }

@@ -25,7 +25,9 @@ class FeedbackAddonTest {
         context.invocationResult = { inv ->
             if (inv.action == "service.logs") ActionResult.ok("[09:59:00 ERROR]: boom", "[09:59:30 INFO]: ok") else ActionResult.ok()
         }
+        context.permissionCheck = { _, perm -> perm == "feedback.report" }
         FeedbackAddon(clock = clock).onEnable(context)
+        listOf("alice", "bob", "carl").forEach { call("feedback.agreement.accept", "uuid-$it") }
     }
 
     private fun call(action: String, vararg args: String, source: ActionSource = ActionSource.BRIDGE): ActionResult =
@@ -58,17 +60,36 @@ class FeedbackAddonTest {
     }
 
     @Test
-    fun `bridge players need staff rights for status changes`() {
+    fun `staff workflow is dashboard only and bridge callers are never staff`() {
         val nr = create("alice")
-        val asPlayer = call("feedback.status", """{"nr":$nr,"status":"confirmed","actor":{"uuid":"uuid-bob","name":"bob"}}""")
-        assertEquals("forbidden", asPlayer.lines[0])
-        context.permissionCheck = { player, perm -> player == "mod" && perm == "feedback.staff" }
-        val asStaff = call("feedback.status", """{"nr":$nr,"status":"confirmed","actor":{"uuid":"uuid-mod","name":"mod"}}""")
-        assertTrue(asStaff.success, asStaff.lines.joinToString())
+        for (action in listOf("feedback.status", "feedback.assign", "feedback.duplicate", "feedback.severity", "feedback.list", "feedback.toollog.list")) {
+            assertFalse(context.handlers.getValue(action).first.bridgeInvocable, action)
+        }
+        context.permissionCheck = { player, perm -> perm == "feedback.report" || (player == "mod" && perm == "feedback.staff") }
+        val viaBridge = call("feedback.status", """{"nr":$nr,"status":"confirmed","actor":{"uuid":"uuid-mod","name":"mod"}}""")
+        assertEquals("forbidden", viaBridge.lines[0], "a payload name never grants staff rights over the bridge")
+        assertEquals("forbidden", call("feedback.get", nr.toString(), """{"uuid":"uuid-mod","name":"mod"}""").lines[0])
+        val panel = call("feedback.status", """{"nr":$nr,"status":"confirmed"}""", source = ActionSource.REST)
+        assertTrue(panel.success, panel.lines.joinToString())
         val top = Json.parseToJsonElement(call("feedback.top").lines[0]).jsonArray
         assertEquals(2, top.single().jsonObject["points"]!!.jsonPrimitive.int)
         val notes = Json.parseToJsonElement(call("feedback.notifications", "uuid-alice").lines[0]).jsonArray
         assertEquals(1, notes.size)
+        val reclassified = call("feedback.severity", nr.toString(), "blocking", source = ActionSource.REST)
+        assertTrue(reclassified.success, reclassified.lines.joinToString())
+        assertEquals(4, Json.parseToJsonElement(call("feedback.top").lines[0]).jsonArray.single().jsonObject["points"]!!.jsonPrimitive.int)
+        assertTrue(context.notifications.any { it.first == FeedbackEvent.CATEGORY && it.second.contains("\"reclassified\"") })
+    }
+
+    @Test
+    fun `reporting needs the tester permission and the agreement`() {
+        context.permissionCheck = { _, _ -> false }
+        val body = """{"reporter":{"uuid":"uuid-dora","name":"dora"},"severity":"minor","category":"other","title":"x","description":"y"}"""
+        assertEquals("not_tester", call("feedback.create", body).lines[0])
+        context.permissionCheck = { _, perm -> perm == "feedback.report" }
+        assertEquals("agreement_required", call("feedback.create", body).lines[0])
+        call("feedback.agreement.accept", "uuid-dora")
+        assertTrue(call("feedback.create", body).success)
     }
 
     @Test
@@ -80,7 +101,7 @@ class FeedbackAddonTest {
         assertEquals(1, asBob["total"]!!.jsonPrimitive.int)
         val panel = Json.parseToJsonElement(call("feedback.list", source = ActionSource.REST).lines[0]).jsonObject
         assertEquals(2, panel["total"]!!.jsonPrimitive.int)
-        assertEquals("forbidden", call("feedback.list").lines[0], "bridge list needs a viewer")
+        assertEquals(0, Json.parseToJsonElement(call("feedback.list").lines[0]).jsonObject["total"]!!.jsonPrimitive.int, "no viewer, no reports")
     }
 
     @Test
@@ -117,8 +138,10 @@ class FeedbackAddonTest {
         val logged = call("feedback.toollog", "uuid-alice", """{"name":"alice","action":"kronen","details":{"amount":500},"service":"CityBuild-1"}""")
         assertTrue(logged.success, logged.lines.joinToString())
         assertEquals("invalid_toollog", call("feedback.toollog", "uuid-alice", """{"name":"alice"}""").lines[0])
+        val primitive = call("feedback.toollog", "uuid-alice", """{"name":"alice","action":"fly","details":"true"}""")
+        assertTrue(Json.parseToJsonElement(primitive.lines[0]).jsonObject["details"]!!.jsonObject.containsKey("value"))
         val list = Json.parseToJsonElement(call("feedback.toollog.list", "uuid-alice", source = ActionSource.REST).lines[0]).jsonArray
-        assertEquals("kronen", list.single().jsonObject["action"]!!.jsonPrimitive.content)
+        assertEquals("kronen", list.first().jsonObject["action"]!!.jsonPrimitive.content)
         assertFalse(context.handlers.getValue("feedback.toollog.list").first.bridgeInvocable)
     }
 

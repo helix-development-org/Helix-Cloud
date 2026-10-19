@@ -45,7 +45,7 @@ private class FakeFeedback : FeedbackPort {
     override fun attachment(attachment: BugAttachment): BugFile = BugFile(attachment.name, attachment.mime, byteArrayOf(1))
 
     override fun link(nr: Long, threadId: String) {
-        reports[nr] = reports.getValue(nr).copy(discordThread = threadId)
+        reports[nr] = reports.getValue(nr).copy(discordThread = threadId.takeIf { it != "-" })
     }
 
     override fun byThread(threadId: String): BugReport? = reports.values.firstOrNull { it.discordThread == threadId }
@@ -143,6 +143,31 @@ class BugMirrorTest {
         report(7, severity = "exploit")
         mirror.onEvent(BugEvent("created", 7, source = "ingame"))
         assertEquals(1, forum.opened.size)
+    }
+
+    @Test
+    fun `automatic error reports only go to the staff channel`() = runBlocking {
+        report(20, reporter = null)
+        feedback.reports[20] = feedback.reports.getValue(20).copy(source = "auto")
+        mirror.onEvent(BugEvent("created", 20, source = "auto"))
+        assertEquals("staff", forum.opened.single().first)
+    }
+
+    @Test
+    fun `reclassification to exploit moves the thread to the staff channel`() = runBlocking {
+        report(21, severity = "minor")
+        mirror.onEvent(BugEvent("created", 21, source = "ingame"))
+        assertEquals("forum", forum.opened.single().first)
+        feedback.reports[21] = feedback.reports.getValue(21).copy(severity = "exploit")
+        mirror.onEvent(BugEvent("reclassified", 21, severity = "exploit", from = "minor", to = "exploit", actor = "Mod"))
+        assertTrue(forum.posts.any { it.first == "thread-1" && it.second.startsWith("bug.moved|") })
+        assertTrue(forum.updates.any { it.first == "thread-1" && it.third == true })
+        assertEquals("staff", forum.opened.last().first)
+        assertEquals("thread-2", feedback.reports.getValue(21).discordThread)
+        feedback.reports[21] = feedback.reports.getValue(21).copy(category = "lobby")
+        mirror.onEvent(BugEvent("reclassified", 21, severity = "exploit", from = "exploit", to = "exploit", actor = "Mod"))
+        assertTrue(forum.posts.any { it.first == "thread-2" && it.second.startsWith("bug.reclassified|") })
+        assertEquals(2, forum.opened.size)
     }
 
     @Test
