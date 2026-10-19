@@ -169,7 +169,7 @@ class HelixNode(
     )
 
     /** Proxy routing state. */
-    val routing: ProxyRoutingService = ProxyRoutingService(manager)
+    val routing: ProxyRoutingService = ProxyRoutingService(manager, paths.config.resolve("maintenance.json"))
 
     /** Per-service bridge tokens minted for managed services (see [bridgeEnvironment]). */
     private val serviceTokens: ServiceTokenRegistry = ServiceTokenRegistry()
@@ -259,9 +259,9 @@ class HelixNode(
         "velocity",
         mapOf(
             "en" to linkedMapOf(
-                "screen.maintenance" to "<#ffb43a><bold>Maintenance</bold>\n" +
-                    "<#f1e2c2><#ffcf4a>{network}</#ffcf4a> is currently under maintenance.\n" +
-                    "<#f1e2c2>Please check back soon.",
+                "screen.maintenance" to "<#5ab4ff><bold>Closed test phase</bold>\n" +
+                    "<#f1e2c2><#ffcf4a>{network}</#ffcf4a> is in its closed test phase.\n" +
+                    "<#f1e2c2>Updates and release news on <#ffcf4a>kronland.de</#ffcf4a>.",
                 "screen.server_full" to "<#ff5a4a><bold>Network full</bold>\n" +
                     "<#f1e2c2><#ffcf4a>{network}</#ffcf4a> is full right now " +
                     "<#7a4a24>(</#7a4a24><#ffcf4a>{online}</#ffcf4a><#7a4a24>/</#7a4a24><#ffcf4a>{max}</#ffcf4a><#7a4a24>)</#7a4a24>\n" +
@@ -282,9 +282,9 @@ class HelixNode(
                 "motd.maintenance" to "<#ffb43a>Maintenance",
             ),
             "de" to linkedMapOf(
-                "screen.maintenance" to "<#ffb43a><bold>Wartungsarbeiten</bold>\n" +
-                    "<#f1e2c2><#ffcf4a>{network}</#ffcf4a> befindet sich gerade in Wartung.\n" +
-                    "<#f1e2c2>Schau später noch einmal vorbei.",
+                "screen.maintenance" to "<#5ab4ff><bold>Geschlossene Testphase</bold>\n" +
+                    "<#f1e2c2><#ffcf4a>{network}</#ffcf4a> ist in der geschlossenen Testphase.\n" +
+                    "<#f1e2c2>Infos und Release-News auf <#ffcf4a>kronland.de</#ffcf4a>.",
                 "screen.server_full" to "<#ff5a4a><bold>Netzwerk voll</bold>\n" +
                     "<#f1e2c2><#ffcf4a>{network}</#ffcf4a> ist gerade voll " +
                     "<#7a4a24>(</#7a4a24><#ffcf4a>{online}</#ffcf4a><#7a4a24>/</#7a4a24><#ffcf4a>{max}</#ffcf4a><#7a4a24>)</#7a4a24>\n" +
