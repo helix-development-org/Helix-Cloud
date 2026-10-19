@@ -647,7 +647,7 @@ Das lila Primary entfällt. Dunkelmodus (Holz) ist Standard, Hellmodus ist Perga
 ## 19 · Logo und Wortmarke
 
 - **Wortmarke**: „Kronland“ in Lilita-artiger, dicker Cartoon-Schrift; Gold-Füllung, 3 px Tinten-Kontur, 4 px Schlagschatten, dahinter „MC“ als kleine Plakette in Band-Rot (Tinten-Kontur, Glanzkante oben, Pergament-Buchstaben). Ingame als eigene Pixel-Glyph (groß 148×27, klein 81×18; Breite wegen der Plakette über 128 px). Web: Schriftzug „KronlandMC“.
-- **Bildmarke**: Ein Wappen/Schild (Form aus navigator/shield.png) mit dem Zentrum der Lore als Motiv. Wird erst gestaltet, wenn der Name feststeht.
+- **Bildmarke** (Owner-Entscheidung 19.10.2026, Entwurf A „Kronen-Siegel“): runde Goldmünze (`gold`, 3 Stufen) mit Band-Rot-Ring und Goldpunkten, innen Pergament-Scheibe, darauf eine große Zackenkrone in Gold mit Band-Rot-Kugeln auf den Spitzen und drei Edelsteinen im Kronreif (Band-Rot, Smaragd, Diamant); 1 px Tinten-Kontur, Licht oben links. **Kein „MC“ und keine Schrift in der Bildmarke.** Varianten: 256 (Logo), 64 (Server-Icon), 32 (vereinfacht), 16 (nur Krone auf roter Münze). Dateien und Regeln: `docs/design/brand/` (README). Einsatz: Serverliste (MOTD-Addon-Standard-Favicon), Webpanel (Favicon, Logo neben dem Schriftzug), LabyMod-Addon-Icon.
 - **Varianten**: Voll (Bildmarke + Wortmarke), nur Wortmarke, nur Bildmarke (Favicon, Tab-Icon, Discord).
 - **Größen**: Ingame 16, 32, 64 px Höhe; Web min. 24 px Höhe.
 - **Schutzraum**: Mindestens eine Konturbreite × 4 rundum.
@@ -679,7 +679,7 @@ Das lila Primary entfällt. Dunkelmodus (Holz) ist Standard, Hellmodus ist Perga
 ## 21 · Offene Entscheidungen
 
 - [x] Name des Netzwerks und des Reichs: Netzwerk **KronlandMC** (kronland.de), Reich **Kronland** (19.10.2026)
-- [ ] Zentrum der Lore (ersetzt Arbeitstitel „Ankerstein“) und damit die Bildmarke
+- [ ] Zentrum der Lore (ersetzt Arbeitstitel „Ankerstein“); die Bildmarke ist unabhängig davon entschieden (Kronen-Siegel, §19)
 - [ ] Spieler-Ränge (Premium/VIP) neben den Team-Rängen (CityBuild nutzt bis dahin Platzhalter-Stufen `citybuild.tier.1..3`)
 - [ ] Ob Villager-Rede im Chat erscheint oder nur als Hologramm über dem Villager
 - [ ] Eigene Ingame-Schrift für Titel (Version 2)
