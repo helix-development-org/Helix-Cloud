@@ -5,6 +5,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
@@ -47,9 +48,17 @@ class FeedbackAddon(
     override fun enable() {
         messages = loadMessages()
         store = storeFactory?.invoke() ?: openStore()
-        service = FeedbackService(store, clock, ::serviceLogs) { category, key, params ->
-            runCatching { context.publishNotification(category, messages.format(key, params)) }
-        }
+        service = FeedbackService(
+            store = store,
+            clock = clock,
+            logs = ::serviceLogs,
+            notify = { category, key, params ->
+                runCatching { context.publishNotification(category, messages.format(key, params)) }
+            },
+            events = { event ->
+                runCatching { context.publishNotification(FeedbackEvent.CATEGORY, json.encodeToString(FeedbackEvent.serializer(), event)) }
+            },
+        )
         registerActions()
         publishSettings(service.settings())
         panel("feedback", "Bugs", "/panel.html")
@@ -80,7 +89,7 @@ class FeedbackAddon(
         action("feedback.create", "Creates a bug report.", "feedback.create <json>", bridgeInvocable = true) { inv ->
             val body = body(inv, 0) ?: return@action bad("usage: feedback.create <json>")
             val reporter = ref(body["reporter"])
-            val viewer = viewer(inv, reporter)
+            val viewer = viewer(inv, reporter, asPlayer(body))
             val input = NewReport(
                 reporter = reporter,
                 severity = body.str("severity").orEmpty(),
@@ -145,7 +154,8 @@ class FeedbackAddon(
         action("feedback.comment", "Comments on a bug report.", "feedback.comment <json>", bridgeInvocable = true) { inv ->
             val body = body(inv, 0) ?: return@action bad("usage: feedback.comment <json>")
             val nr = (body["nr"] as? JsonPrimitive)?.longOrNull ?: return@action bad("nr required")
-            reply(service.comment(nr, body.str("text").orEmpty(), viewer(inv, ref(body["author"])))) { encode(Comment.serializer(), it) }
+            val viewer = viewer(inv, ref(body["author"]), asPlayer(body))
+            reply(service.comment(nr, body.str("text").orEmpty(), viewer, body.str("via"))) { encode(Comment.serializer(), it) }
         }
         action("feedback.status", "Changes the status of a bug report.", "feedback.status <json>", bridgeInvocable = true) { inv ->
             val body = body(inv, 0) ?: return@action bad("usage: feedback.status <json>")
@@ -168,8 +178,9 @@ class FeedbackAddon(
         action("feedback.attach", "Attaches a file to a bug report.", "feedback.attach <nr> <name> <mime> <base64> [viewerJson]", bridgeInvocable = true) { inv ->
             val nr = number(inv, 0) ?: return@action bad("usage: feedback.attach <nr> <name> <mime> <base64> [viewerJson]")
             val bytes = decode(inv.arguments.getOrNull(3)) ?: return@action fail("invalid_attachment", "base64 expected")
-            val viewer = viewer(inv, ref(body(inv, 4)))
-            reply(service.attach(nr, inv.arguments.getOrNull(1).orEmpty(), inv.arguments.getOrNull(2).orEmpty(), bytes, viewer)) {
+            val extra = body(inv, 4)
+            val viewer = viewer(inv, ref(extra), extra?.let(::asPlayer) ?: false)
+            reply(service.attach(nr, inv.arguments.getOrNull(1).orEmpty(), inv.arguments.getOrNull(2).orEmpty(), bytes, viewer, extra?.str("via"))) {
                 encode(Attachment.serializer(), it)
             }
         }
@@ -182,8 +193,9 @@ class FeedbackAddon(
         }
         action("feedback.attach.finish", "Completes a chunked attachment upload.", "feedback.attach.finish <uploadId> <nr> <name> <mime> [viewerJson]", bridgeInvocable = true) { inv ->
             val nr = number(inv, 1) ?: return@action bad("usage: feedback.attach.finish <uploadId> <nr> <name> <mime> [viewerJson]")
-            val viewer = viewer(inv, ref(body(inv, 4)))
-            reply(service.finish(inv.arguments[0], nr, inv.arguments.getOrNull(2).orEmpty(), inv.arguments.getOrNull(3).orEmpty(), viewer)) {
+            val extra = body(inv, 4)
+            val viewer = viewer(inv, ref(extra), extra?.let(::asPlayer) ?: false)
+            reply(service.finish(inv.arguments[0], nr, inv.arguments.getOrNull(2).orEmpty(), inv.arguments.getOrNull(3).orEmpty(), viewer, extra?.str("via"))) {
                 encode(Attachment.serializer(), it)
             }
         }
@@ -191,6 +203,16 @@ class FeedbackAddon(
             val id = inv.arguments.getOrNull(0) ?: return@action bad("usage: feedback.attachment <id>")
             val (mime, bytes) = service.attachment(id) ?: return@action fail("not_found", "attachment $id not found")
             ActionResult.ok(mime, Base64.getEncoder().encodeToString(bytes))
+        }
+        action("feedback.discord.link", "Links a bug report to its Discord thread.", "feedback.discord.link <nr> <threadId|->") { inv ->
+            val nr = number(inv, 0) ?: return@action bad("usage: feedback.discord.link <nr> <threadId|->")
+            val thread = inv.arguments.getOrNull(1)?.takeIf { it != "-" }.orEmpty()
+            reply(service.linkDiscord(nr, thread)) { encode(Report.serializer(), it) }
+        }
+        action("feedback.discord.find", "Finds the bug report mirrored by a Discord thread.", "feedback.discord.find <threadId>") { inv ->
+            val thread = inv.arguments.getOrNull(0) ?: return@action bad("usage: feedback.discord.find <threadId>")
+            val report = service.byDiscordThread(thread) ?: return@action fail("not_found", "no report for thread $thread")
+            ActionResult.ok(encode(Report.serializer(), report))
         }
         action("feedback.mine", "Lists the reports of a player.", "feedback.mine <uuid> [limit]", bridgeInvocable = true) { inv ->
             val uuid = inv.arguments.getOrNull(0) ?: return@action bad("usage: feedback.mine <uuid> [limit]")
@@ -308,11 +330,16 @@ class FeedbackAddon(
     /**
      * Builds the caller of a bridge call from the payload; every other source is staff.
      */
-    private fun viewer(inv: ActionInvocation, ref: PlayerRef?): Viewer {
-        if (inv.source != ActionSource.BRIDGE) return Viewer(ref ?: PlayerRef(null, inv.actor ?: "dashboard"), true)
+    private fun viewer(inv: ActionInvocation, ref: PlayerRef?, asPlayer: Boolean = false): Viewer {
+        if (inv.source != ActionSource.BRIDGE && !(asPlayer && ref != null)) {
+            return Viewer(ref ?: PlayerRef(null, inv.actor ?: "dashboard"), true)
+        }
         val staff = ref?.name?.takeIf { it.isNotBlank() }?.let { runCatching { context.hasPermission(it, STAFF) }.getOrDefault(false) } ?: false
         return Viewer(ref, staff)
     }
+
+    /** `asPlayer: true` lets an addon (the Discord bot) act with the rights and limits of the named player. */
+    private fun asPlayer(body: JsonObject): Boolean = (body["asPlayer"] as? JsonPrimitive)?.booleanOrNull == true
 
     private fun ref(element: kotlinx.serialization.json.JsonElement?): PlayerRef? {
         val obj = element as? JsonObject ?: return null

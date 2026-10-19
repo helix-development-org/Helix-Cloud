@@ -134,12 +134,14 @@ data class ReportDetails(val report: Report, val comments: List<Comment>, val ev
  * @param clock time source.
  * @param logs supplier of the newest console lines of a service (oldest first); empty when unknown.
  * @param notify publishes a notification: category (`bugreport`, `bugreport-staff`), message key, parameters.
+ * @param events receives a [FeedbackEvent] for every created report, status change, comment and attachment.
  */
 class FeedbackService(
     private val store: FeedbackStore,
     private val clock: Clock = Clock.systemUTC(),
     private val logs: (service: String) -> List<String> = { emptyList() },
     private val notify: (category: String, key: String, params: Map<String, String>) -> Unit = { _, _, _ -> },
+    private val events: (FeedbackEvent) -> Unit = {},
 ) {
     private val lock = Any()
     private val uploads = HashMap<String, Upload>()
@@ -212,6 +214,7 @@ class FeedbackService(
         store.putReport(report)
         store.addEvent(ReportEvent(report.nr, now, viewer.actorName, "created", to = Statuses.NEW))
         announce("notify.new", report)
+        emit(FeedbackEvent("created", report.nr, source = report.source, severity = report.severity, actor = viewer.actorName))
         Outcome.Ok(report)
     }
 
@@ -251,6 +254,7 @@ class FeedbackService(
         store.putReport(report)
         store.addEvent(ReportEvent(report.nr, now, "system", "auto", to = Statuses.NEW))
         announce("notify.auto", report)
+        emit(FeedbackEvent("created", report.nr, source = report.source, severity = report.severity, actor = "system"))
         Outcome.Ok(report to true)
     }
 
@@ -304,9 +308,10 @@ class FeedbackService(
      * @param nr report number.
      * @param text comment text.
      * @param viewer author.
+     * @param via originating channel (for example `discord`), echoed in the [FeedbackEvent].
      * @return the comment or a failure.
      */
-    fun comment(nr: Long, text: String, viewer: Viewer): Outcome<Comment> = synchronized(lock) {
+    fun comment(nr: Long, text: String, viewer: Viewer, via: String? = null): Outcome<Comment> = synchronized(lock) {
         val report = store.report(nr) ?: return Outcome.Fail("not_found", "report #$nr not found")
         if (!visible(report, viewer)) return Outcome.Fail("forbidden", "not your report")
         val clean = text.trim()
@@ -316,6 +321,7 @@ class FeedbackService(
         store.addComment(comment)
         store.addEvent(ReportEvent(nr, now, viewer.actorName, "comment"))
         store.putReport(report.copy(updatedAt = now))
+        emit(FeedbackEvent("comment", nr, severity = report.severity, actor = viewer.actorName, commentId = comment.id, via = via))
         Outcome.Ok(comment)
     }
 
@@ -381,9 +387,10 @@ class FeedbackService(
      * @param mime MIME type.
      * @param bytes content.
      * @param viewer caller (reporter or staff).
+     * @param via originating channel (for example `discord`), echoed in the [FeedbackEvent].
      * @return the attachment metadata or a failure (`too_large`, `forbidden`, `not_found`).
      */
-    fun attach(nr: Long, name: String, mime: String, bytes: ByteArray, viewer: Viewer): Outcome<Attachment> = synchronized(lock) {
+    fun attach(nr: Long, name: String, mime: String, bytes: ByteArray, viewer: Viewer, via: String? = null): Outcome<Attachment> = synchronized(lock) {
         val report = store.report(nr) ?: return Outcome.Fail("not_found", "report #$nr not found")
         if (!visible(report, viewer)) return Outcome.Fail("forbidden", "not your report")
         val max = settings().maxAttachmentBytes
@@ -394,6 +401,7 @@ class FeedbackService(
         store.putAttachment(nr, attachment, bytes)
         store.putReport(report.copy(attachments = report.attachments + attachment, updatedAt = now))
         store.addEvent(ReportEvent(nr, now, viewer.actorName, "attach", to = attachment.name))
+        emit(FeedbackEvent("attachment", nr, severity = report.severity, actor = viewer.actorName, attachmentId = attachment.id, via = via))
         Outcome.Ok(attachment)
     }
 
@@ -429,14 +437,15 @@ class FeedbackService(
      * @param name file name.
      * @param mime MIME type.
      * @param viewer caller.
+     * @param via originating channel, echoed in the [FeedbackEvent].
      * @return the attachment or a failure (`incomplete`, `not_found`, …).
      */
-    fun finish(uploadId: String, nr: Long, name: String, mime: String, viewer: Viewer): Outcome<Attachment> = synchronized(lock) {
+    fun finish(uploadId: String, nr: Long, name: String, mime: String, viewer: Viewer, via: String? = null): Outcome<Attachment> = synchronized(lock) {
         expireUploads()
         val upload = uploads[uploadId] ?: return Outcome.Fail("not_found", "upload $uploadId unknown or expired")
         if (upload.parts.size != upload.count) return Outcome.Fail("incomplete", "${upload.parts.size}/${upload.count} chunks")
         val bytes = (0 until upload.count).fold(ByteArray(0)) { acc, i -> acc + upload.parts.getValue(i) }
-        val result = attach(nr, name, mime, bytes, viewer)
+        val result = attach(nr, name, mime, bytes, viewer, via)
         if (result is Outcome.Ok) uploads.remove(uploadId)
         result
     }
@@ -583,6 +592,33 @@ class FeedbackService(
     fun all(): List<Report> = store.reports()
 
     /**
+     * Links a report to the Discord thread mirroring it (staff/addon only).
+     *
+     * @param nr report number.
+     * @param threadId Discord thread id, blank to clear.
+     * @return the updated report or `not_found`.
+     */
+    fun linkDiscord(nr: Long, threadId: String): Outcome<Report> = synchronized(lock) {
+        val report = store.report(nr) ?: return Outcome.Fail("not_found", "report #$nr not found")
+        val updated = report.copy(discordThread = threadId.trim().takeIf { it.isNotEmpty() })
+        store.putReport(updated)
+        Outcome.Ok(updated)
+    }
+
+    /**
+     * Finds the report mirrored by a Discord thread.
+     *
+     * @param threadId Discord thread id.
+     * @return the report or `null`.
+     */
+    fun byDiscordThread(threadId: String): Report? =
+        threadId.takeIf { it.isNotBlank() }?.let { id -> store.reports().firstOrNull { it.discordThread == id } }
+
+    private fun emit(event: FeedbackEvent) {
+        runCatching { events(event) }
+    }
+
+    /**
      * Whether [viewer] may see [report]: staff see everything, players only their own reports.
      *
      * @param report the report.
@@ -615,6 +651,7 @@ class FeedbackService(
             }
         }
         announce("notify.status", updated)
+        emit(FeedbackEvent("status", report.nr, severity = report.severity, from = report.status, to = to, actor = viewer.actorName, note = note))
         return updated
     }
 

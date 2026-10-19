@@ -222,3 +222,39 @@ data class ToolLogEntry(
     val service: String? = null,
     val at: Long,
 )
+
+/**
+ * Machine-readable change of a report, published on the notification bus under [FeedbackEvent.CATEGORY] so other
+ * addons (the Discord bot) can mirror reports without parsing the human notification texts.
+ *
+ * @property type `created`, `status`, `comment` or `attachment`.
+ * @property nr report number.
+ * @property source report source (on `created`).
+ * @property severity report severity (exploit routing).
+ * @property from previous status (on `status`).
+ * @property to new status (on `status`).
+ * @property actor display name of the acting player or staff member.
+ * @property note history note (on `status`).
+ * @property commentId comment id (on `comment`).
+ * @property attachmentId attachment id (on `attachment`).
+ * @property via originating channel (`discord` for changes mirrored from Discord), so mirrors skip their own echo.
+ */
+@Serializable
+data class FeedbackEvent(
+    val type: String,
+    val nr: Long,
+    val source: String? = null,
+    val severity: String? = null,
+    val from: String? = null,
+    val to: String? = null,
+    val actor: String? = null,
+    val note: String? = null,
+    val commentId: String? = null,
+    val attachmentId: String? = null,
+    val via: String? = null,
+) {
+    companion object {
+        /** Notification-bus category carrying the JSON-encoded events. */
+        const val CATEGORY: String = "feedback-event"
+    }
+}

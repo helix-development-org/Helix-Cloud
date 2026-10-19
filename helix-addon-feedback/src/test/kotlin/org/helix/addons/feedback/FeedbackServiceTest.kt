@@ -29,9 +29,14 @@ class FeedbackServiceTest {
     private val clock = TestClock()
     private val notified = mutableListOf<Pair<String, String>>()
     private var logLines: List<String> = emptyList()
-    private val service = FeedbackService(DocumentFeedbackStore(InMemoryAddonStorage()), clock, { logLines }) { category, key, _ ->
-        notified += category to key
-    }
+    private val events = mutableListOf<FeedbackEvent>()
+    private val service = FeedbackService(
+        DocumentFeedbackStore(InMemoryAddonStorage()),
+        clock,
+        { logLines },
+        notify = { category, key, _ -> notified += category to key },
+        events = { events += it },
+    )
 
     private val alice = PlayerRef("uuid-alice", "Alice")
     private val bob = PlayerRef("uuid-bob", "Bob")
@@ -210,5 +215,29 @@ class FeedbackServiceTest {
         assertIs<Outcome.Ok<PendingReward>>(service.claim("uuid-alice", reward.id))
         assertEquals("claimed", assertIs<Outcome.Fail>(service.claim("uuid-alice", reward.id)).code)
         assertTrue(service.pending("uuid-alice").isEmpty())
+    }
+
+    @Test
+    fun `events mirror creation, status, comments and attachments`() {
+        val r = report()
+        service.status(r.nr, Statuses.CONFIRMED, staff)
+        service.comment(r.nr, "from discord", aliceView, via = "discord")
+        service.attach(r.nr, "a.png", "image/png", byteArrayOf(1, 2), aliceView)
+        assertEquals(listOf("created", "status", "comment", "attachment"), events.map { it.type })
+        assertEquals(Statuses.NEW, events[1].from)
+        assertEquals(Statuses.CONFIRMED, events[1].to)
+        assertEquals("discord", events[2].via)
+        assertEquals(null, events[3].via)
+    }
+
+    @Test
+    fun `discord threads are linked and found`() {
+        val r = report()
+        assertEquals(null, service.byDiscordThread("123"))
+        service.linkDiscord(r.nr, "123")
+        assertEquals(r.nr, service.byDiscordThread("123")?.nr)
+        service.linkDiscord(r.nr, "")
+        assertEquals(null, service.byDiscordThread("123"))
+        assertTrue(service.linkDiscord(999, "1") is Outcome.Fail)
     }
 }

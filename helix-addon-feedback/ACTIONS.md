@@ -42,6 +42,11 @@ Points are granted to the reporter when a report enters `confirmed` for the firs
 - Malformed calls answer `usage` with the usage line in `lines[1]`.
 - `feedback.settings`, `feedback.rewards.table`, `feedback.rewards.grant`, `feedback.attachment` and `feedback.export`
   and `feedback.toollog.list` are not bridge-invocable (dashboard/CLI/addons only).
+- Addon calls (for example the Discord bot) may set `"asPlayer": true` in the JSON of `create`/`comment` (or in the
+  trailing `viewerJson` of `attach`/`attach.finish`): the call then runs with the rights and spam limits of the named
+  player instead of staff rights.
+- `comment` and the trailing `viewerJson` of `attach`/`attach.finish` accept an optional `"via"` (for example
+  `"discord"`); it is only echoed in the resulting `FeedbackEvent` so mirrors can skip their own changes.
 - JSON payloads may span several arguments (they are joined with spaces from their position on).
 
 ## Models (JSON)
@@ -74,6 +79,8 @@ discordThread|null, createdAt, updatedAt}`
 | `feedback.attach` | ✔ | `<nr> <name> <mime> <base64> [viewerJson]` | `Attachment`; `too_large` (> `maxAttachmentBytes`, default 2 MiB) |
 | `feedback.attach.chunk` | ✔ | `<uploadId> <index> <count> <base64>` then `feedback.attach.finish <uploadId> <nr> <name> <mime> [viewerJson]` | chunk: `{received}`; finish: `Attachment` (uploads expire after 10 min) |
 | `feedback.attachment` | – | `<id>` | `lines[0]` = mime, `lines[1]` = base64 |
+| `feedback.discord.link` | – | `<nr> <threadId\|->` | `Report` with `discordThread` set (`-` clears); used by the Discord bot |
+| `feedback.discord.find` | – | `<threadId>` | `Report` mirrored by that Discord thread; `not_found` |
 | `feedback.mine` | ✔ | `<uuid> [limit]` | `[Report]` newest first (own reports, incl. exploits) |
 | `feedback.notifications` | ✔ | `<uuid>` | `[Notification]` unread |
 | `feedback.notifications.ack` | ✔ | `<uuid> [id …]` | `{acked}` (no ids = all) |
@@ -124,3 +131,7 @@ the player allows screenshots; `/bug` offers the screenshot option only to clien
 - Paper assembles the chunks (timeout 20 s, limit `maxAttachmentBytes` from the `feedback.settings` bridge value) and
   uploads the JPEG with `feedback.attach.chunk` (256 KiB parts) + `feedback.attach.finish <uploadId> <nr>
   screenshot-<nr>.jpg image/jpeg <viewerJson>`.
+Machine events: every created report (incl. new auto reports), status change, comment and attachment is published as
+`context.publishNotification("feedback-event", <FeedbackEvent JSON>)` with
+`FeedbackEvent` = `{type: created|status|comment|attachment, nr, source?, severity?, from?, to?, actor?, note?,
+commentId?, attachmentId?, via?}`. The Discord bot mirrors reports into forum threads from these events.

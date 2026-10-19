@@ -132,4 +132,20 @@ class FeedbackAddonTest {
         val console = context.run("feedback.whoami")
         assertTrue(console.lines.single().contains("\"admin\":true"))
     }
+
+    @Test
+    fun `addons acting for a player obey the player limits and events reach the bus`() {
+        val body = """{"reporter":{"uuid":"uuid-carl","name":"carl"},"severity":"minor","category":"other","title":"Discord",""" +
+            """"description":"aus dem Forum","source":"discord","asPlayer":true}"""
+        val first = call("feedback.create", body, source = ActionSource.ADDON)
+        assertTrue(first.success, first.lines.joinToString())
+        val second = call("feedback.create", body, source = ActionSource.ADDON)
+        assertEquals("cooldown", second.lines[0])
+        val nr = Json.parseToJsonElement(first.lines[0]).jsonObject["nr"]!!.jsonPrimitive.long
+        assertTrue(context.notifications.any { it.first == FeedbackEvent.CATEGORY && it.second.contains("\"nr\":$nr") })
+        assertTrue(call("feedback.discord.link", nr.toString(), "777", source = ActionSource.ADDON).success)
+        val found = call("feedback.discord.find", "777", source = ActionSource.ADDON)
+        assertEquals(nr, Json.parseToJsonElement(found.lines[0]).jsonObject["nr"]!!.jsonPrimitive.long)
+        assertFalse(context.handlers.getValue("feedback.discord.link").first.bridgeInvocable)
+    }
 }
