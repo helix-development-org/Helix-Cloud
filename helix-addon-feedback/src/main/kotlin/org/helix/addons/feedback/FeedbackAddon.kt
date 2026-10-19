@@ -272,6 +272,17 @@ class FeedbackAddon(
             val limit = inv.arguments.getOrNull(1)?.toIntOrNull() ?: 100
             ActionResult.ok(json.encodeToString(ListSerializer(ToolLogEntry.serializer()), service.toolLogs(uuid, limit)))
         }
+        action("feedback.whoami", "Panel user and its feedback rights.", "feedback.whoami") { inv ->
+            val name = inv.actor?.takeIf { it.isNotBlank() } ?: "dashboard"
+            val has = { node: String -> name != "dashboard" && runCatching { context.hasPermission(name, node) }.getOrDefault(false) }
+            ActionResult.ok(
+                buildJsonObject {
+                    put("name", name)
+                    put("staff", true)
+                    put("admin", name == "dashboard" || has(ADMIN))
+                }.toString(),
+            )
+        }
         action("feedback.export", "Summary of reports and points for the panel.", "feedback.export") { _ ->
             val all = service.all()
             ActionResult.ok(
@@ -333,6 +344,9 @@ class FeedbackAddon(
 
     private companion object {
         const val STAFF = "feedback.staff"
+
+        /** Permission for settings and the reward table. */
+        const val ADMIN = "feedback.admin"
         const val LOG_TAIL = 2000
         const val SETTINGS_KEY = "feedback.settings"
     }

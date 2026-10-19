@@ -121,4 +121,15 @@ class FeedbackAddonTest {
         assertEquals("kronen", list.single().jsonObject["action"]!!.jsonPrimitive.content)
         assertFalse(context.handlers.getValue("feedback.toollog.list").first.bridgeInvocable)
     }
+
+    @Test
+    fun `whoami reports the panel user`() {
+        val me = context.handlers.getValue("feedback.whoami").second.execute(
+            org.helix.api.action.ActionInvocation("feedback.whoami", emptyList(), org.helix.api.action.ActionSource.REST, actor = "Tytoss"),
+        )
+        assertTrue(me.success)
+        assertTrue(me.lines.single().contains("\"name\":\"Tytoss\""))
+        val console = context.run("feedback.whoami")
+        assertTrue(console.lines.single().contains("\"admin\":true"))
+    }
 }
