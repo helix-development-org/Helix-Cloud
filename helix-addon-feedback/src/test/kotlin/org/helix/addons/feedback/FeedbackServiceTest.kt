@@ -44,6 +44,11 @@ class FeedbackServiceTest {
     private val bobView = Viewer(bob, false)
     private val staff = Viewer(PlayerRef("uuid-staff", "Mod"), true)
 
+    init {
+        service.accept("uuid-alice")
+        service.accept("uuid-bob")
+    }
+
     private fun report(by: PlayerRef = alice, severity: String = Severities.ANNOYING, viewer: Viewer = Viewer(by, false)): Report {
         val r = service.create(NewReport(by, severity, "citybuild", "Truhe verschwindet", "Beim Öffnen weg"), viewer)
         return assertIs<Outcome.Ok<Report>>(r).value
@@ -207,9 +212,9 @@ class FeedbackServiceTest {
 
     @Test
     fun `agreements and rewards are tracked`() {
-        assertEquals(1 to null, service.agreement("uuid-alice"))
-        service.accept("uuid-alice")
-        assertEquals(1 to 1, service.agreement("uuid-alice"))
+        assertEquals(1 to null, service.agreement("uuid-x"))
+        service.accept("uuid-x")
+        assertEquals(1 to 1, service.agreement("uuid-x"))
         val reward = service.grant("uuid-alice", JsonObject(mapOf("kronen" to JsonPrimitive(500))))
         assertEquals(listOf(reward.id), service.pending("uuid-alice").map { it.id })
         assertIs<Outcome.Ok<PendingReward>>(service.claim("uuid-alice", reward.id))
@@ -239,5 +244,47 @@ class FeedbackServiceTest {
         service.linkDiscord(r.nr, "")
         assertEquals(null, service.byDiscordThread("123"))
         assertTrue(service.linkDiscord(999, "1") is Outcome.Fail)
+    }
+
+    @Test
+    fun `automatic reports are capped per service and hour`() {
+        service.patchSettings(JsonObject(mapOf("maxAutoPerServiceHour" to JsonPrimitive(2))))
+        val ctx = JsonObject(mapOf("service" to JsonPrimitive("CityBuild-1")))
+        assertIs<Outcome.Ok<*>>(service.auto(AutoReport("h1", "A", "x", context = ctx)))
+        assertIs<Outcome.Ok<*>>(service.auto(AutoReport("h2", "B", "x", context = ctx)))
+        assertEquals("auto_limit", assertIs<Outcome.Fail>(service.auto(AutoReport("h3", "C", "x", context = ctx))).code)
+        assertIs<Outcome.Ok<*>>(service.auto(AutoReport("h1", "A", "x", context = ctx)), "known hashes still count up")
+        clock.advanceSeconds(3601)
+        assertIs<Outcome.Ok<*>>(service.auto(AutoReport("h3", "C", "x", context = ctx)))
+    }
+
+    @Test
+    fun `comments and attachments of players are limited`() {
+        service.patchSettings(JsonObject(mapOf("commentCooldownSeconds" to JsonPrimitive(10), "maxCommentsPerDay" to JsonPrimitive(2), "maxAttachmentsPerReport" to JsonPrimitive(1))))
+        val r = report()
+        assertIs<Outcome.Ok<*>>(service.comment(r.nr, "eins", aliceView))
+        assertEquals("comment_cooldown", assertIs<Outcome.Fail>(service.comment(r.nr, "zwei", aliceView)).code)
+        clock.advanceSeconds(11)
+        assertIs<Outcome.Ok<*>>(service.comment(r.nr, "zwei", aliceView))
+        clock.advanceSeconds(11)
+        assertEquals("comment_limit", assertIs<Outcome.Fail>(service.comment(r.nr, "drei", aliceView)).code)
+        assertIs<Outcome.Ok<*>>(service.comment(r.nr, "Team", staff), "staff is not limited")
+        assertIs<Outcome.Ok<*>>(service.attach(r.nr, "a.png", "image/png", byteArrayOf(1), aliceView))
+        assertEquals("attachment_limit", assertIs<Outcome.Fail>(service.attach(r.nr, "b.png", "image/png", byteArrayOf(1), aliceView)).code)
+    }
+
+    @Test
+    fun `players without agreement cannot comment and staff can reclassify`() {
+        val r = report(severity = Severities.EXPLOIT)
+        service.status(r.nr, Statuses.CONFIRMED, staff)
+        assertEquals(10, service.top().single().total)
+        val down = assertIs<Outcome.Ok<Report>>(service.severity(r.nr, Severities.MINOR, "lobby", staff)).value
+        assertEquals(Severities.MINOR, down.severity)
+        assertEquals("lobby", down.category)
+        assertEquals(1, service.top().single().total)
+        assertEquals("forbidden", assertIs<Outcome.Fail>(service.severity(r.nr, Severities.CRASH, null, aliceView)).code)
+        assertTrue(events.any { it.type == "reclassified" && it.from == Severities.EXPLOIT && it.to == Severities.MINOR })
+        val carl = Viewer(PlayerRef("uuid-carl", "Carl"), false)
+        assertEquals("forbidden", assertIs<Outcome.Fail>(service.comment(r.nr, "hi", carl)).code)
     }
 }

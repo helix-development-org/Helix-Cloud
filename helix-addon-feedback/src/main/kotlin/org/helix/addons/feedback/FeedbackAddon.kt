@@ -63,6 +63,7 @@ class FeedbackAddon(
             events = { event ->
                 runCatching { context.publishNotification(FeedbackEvent.CATEGORY, json.encodeToString(FeedbackEvent.serializer(), event)) }
             },
+            hasPermission = { name, node -> runCatching { context.hasPermission(name, node) }.getOrDefault(false) },
         )
         registerActions()
         registerRelease()
@@ -124,10 +125,9 @@ class FeedbackAddon(
                 buildJsonObject { put("nr", report.nr); put("new", new); put("count", report.count) }.toString()
             }
         }
-        action("feedback.list", "Lists bug reports.", "feedback.list [json]", bridgeInvocable = true) { inv ->
+        action("feedback.list", "Lists bug reports.", "feedback.list [json]") { inv ->
             val body = body(inv, 0) ?: JsonObject(emptyMap())
             val viewer = viewer(inv, ref(body["viewer"]))
-            if (inv.source == ActionSource.BRIDGE && viewer.ref?.uuid == null && !viewer.staff) return@action fail("forbidden", "viewer required")
             val filter = ListFilter(
                 status = body.strings("status"),
                 severity = body.strings("severity"),
@@ -163,23 +163,28 @@ class FeedbackAddon(
             val viewer = viewer(inv, ref(body["author"]), asPlayer(body))
             reply(service.comment(nr, body.str("text").orEmpty(), viewer, body.str("via"))) { encode(Comment.serializer(), it) }
         }
-        action("feedback.status", "Changes the status of a bug report.", "feedback.status <json>", bridgeInvocable = true) { inv ->
+        action("feedback.status", "Changes the status of a bug report.", "feedback.status <json>") { inv ->
             val body = body(inv, 0) ?: return@action bad("usage: feedback.status <json>")
             val nr = (body["nr"] as? JsonPrimitive)?.longOrNull ?: return@action bad("nr required")
             reply(service.status(nr, body.str("status").orEmpty(), viewer(inv, ref(body["actor"])), body.str("note"))) {
                 encode(Report.serializer(), it)
             }
         }
-        action("feedback.assign", "Assigns a bug report.", "feedback.assign <json>", bridgeInvocable = true) { inv ->
+        action("feedback.assign", "Assigns a bug report.", "feedback.assign <json>") { inv ->
             val body = body(inv, 0) ?: return@action bad("usage: feedback.assign <json>")
             val nr = (body["nr"] as? JsonPrimitive)?.longOrNull ?: return@action bad("nr required")
             reply(service.assign(nr, body.str("assignee"), viewer(inv, ref(body["actor"])))) { encode(Report.serializer(), it) }
         }
-        action("feedback.duplicate", "Marks a bug report as duplicate.", "feedback.duplicate <json>", bridgeInvocable = true) { inv ->
+        action("feedback.duplicate", "Marks a bug report as duplicate.", "feedback.duplicate <json>") { inv ->
             val body = body(inv, 0) ?: return@action bad("usage: feedback.duplicate <json>")
             val nr = (body["nr"] as? JsonPrimitive)?.longOrNull ?: return@action bad("nr required")
             val of = (body["of"] as? JsonPrimitive)?.longOrNull ?: return@action bad("of required")
             reply(service.duplicate(nr, of, viewer(inv, ref(body["actor"])))) { encode(Report.serializer(), it) }
+        }
+        action("feedback.severity", "Reclassifies a bug report (severity, optional category).", "feedback.severity <nr> <severity> [category]") { inv ->
+            val nr = number(inv, 0) ?: return@action bad("usage: feedback.severity <nr> <severity> [category]")
+            val severity = inv.arguments.getOrNull(1) ?: return@action bad("usage: feedback.severity <nr> <severity> [category]")
+            reply(service.severity(nr, severity, inv.arguments.getOrNull(2), viewer(inv, null))) { encode(Report.serializer(), it) }
         }
         action("feedback.attach", "Attaches a file to a bug report.", "feedback.attach <nr> <name> <mime> <base64> [viewerJson]", bridgeInvocable = true) { inv ->
             val nr = number(inv, 0) ?: return@action bad("usage: feedback.attach <nr> <name> <mime> <base64> [viewerJson]")
@@ -284,7 +289,7 @@ class FeedbackAddon(
             val reward = body(inv, 1) ?: return@action bad("reward JSON object required")
             ActionResult.ok(encode(PendingReward.serializer(), service.grant(uuid, reward)))
         }
-        action("feedback.rewards.claim", "Marks a reward as claimed.", "feedback.rewards.claim <uuid> <id>", bridgeInvocable = true) { inv ->
+        action("feedback.rewards.claim", "Marks a reward as claimed (staff/addons; Paper uses feedback.rewards.redeem).", "feedback.rewards.claim <uuid> <id>") { inv ->
             val uuid = inv.arguments.getOrNull(0)
             val id = inv.arguments.getOrNull(1)
             if (uuid == null || id == null) return@action bad("usage: feedback.rewards.claim <uuid> <id>")
@@ -347,6 +352,12 @@ class FeedbackAddon(
             val id = inv.arguments.getOrNull(1)
             val name = inv.arguments.getOrNull(2)
             if (uuid == null || id == null || name == null) return@action bad("usage: feedback.rewards.redeem <uuid> <id> <name>")
+            // A server may only redeem for a player who is online on the network under that uuid and name.
+            if (inv.source == ActionSource.BRIDGE &&
+                context.onlinePlayers().none { it.uuid.equals(uuid, ignoreCase = true) && it.name.equals(name, ignoreCase = true) }
+            ) {
+                return@action fail("forbidden", "player $name is not online with uuid $uuid")
+            }
             redeem(uuid, id, name)
         }
         context.registerProfileInfoProvider(
@@ -444,13 +455,17 @@ class FeedbackAddon(
     }
 
     /**
-     * Builds the caller of a bridge call from the payload; every other source is staff.
+     * Builds the caller. Bridge calls (Paper components) always act as the named player and never get staff rights:
+     * the payload name is not trusted for permissions, staff work happens in the dashboard. Addons acting for a
+     * player (`asPlayer`, the Discord bot) get staff rights only when that player has `feedback.staff`; every other
+     * source (dashboard, CLI, addons) is staff.
      */
     private fun viewer(inv: ActionInvocation, ref: PlayerRef?, asPlayer: Boolean = false): Viewer {
-        if (inv.source != ActionSource.BRIDGE && !(asPlayer && ref != null)) {
+        if (inv.source == ActionSource.BRIDGE) return bridgeViewer(ref)
+        if (!(asPlayer && ref != null)) {
             return Viewer(ref ?: PlayerRef(null, inv.actor ?: "dashboard"), true)
         }
-        val staff = ref?.name?.takeIf { it.isNotBlank() }?.let { runCatching { context.hasPermission(it, STAFF) }.getOrDefault(false) } ?: false
+        val staff = ref.name.takeIf { it.isNotBlank() }?.let { runCatching { context.hasPermission(it, STAFF) }.getOrDefault(false) } ?: false
         return Viewer(ref, staff)
     }
 
@@ -485,12 +500,23 @@ class FeedbackAddon(
 
     private fun bad(usage: String) = ActionResult.error("usage", usage)
 
-    private companion object {
+    internal companion object {
+        /**
+         * The caller of a bridge call: always the named player, never staff.
+         *
+         * @param ref player from the payload.
+         * @return the viewer.
+         */
+        fun bridgeViewer(ref: PlayerRef?): Viewer = Viewer(ref, false)
+
+        /** Staff permission of the feedback workflow. */
         const val STAFF = "feedback.staff"
 
         /** Permission for settings and the reward table. */
         const val ADMIN = "feedback.admin"
+        /** Console lines requested from `service.logs`. */
         const val LOG_TAIL = 2000
+        /** Bridge value carrying the public settings. */
         const val SETTINGS_KEY = "feedback.settings"
     }
 }

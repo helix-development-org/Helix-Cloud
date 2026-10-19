@@ -134,7 +134,10 @@ data class ReportDetails(val report: Report, val comments: List<Comment>, val ev
  * @param clock time source.
  * @param logs supplier of the newest console lines of a service (oldest first); empty when unknown.
  * @param notify publishes a notification: category (`bugreport`, `bugreport-staff`), message key, parameters.
- * @param events receives a [FeedbackEvent] for every created report, status change, comment and attachment.
+ * @param events receives a [FeedbackEvent] for every created report, status change, reclassification, comment and
+ *   attachment.
+ * @param hasPermission whether a player (by name) holds a permission node; used to require `feedback.report` from
+ *   non-staff reporters and commenters.
  */
 class FeedbackService(
     private val store: FeedbackStore,
@@ -142,6 +145,7 @@ class FeedbackService(
     private val logs: (service: String) -> List<String> = { emptyList() },
     private val notify: (category: String, key: String, params: Map<String, String>) -> Unit = { _, _, _ -> },
     private val events: (FeedbackEvent) -> Unit = {},
+    private val hasPermission: (name: String, node: String) -> Boolean = { _, _ -> true },
 ) {
     private val lock = Any()
     private val uploads = HashMap<String, Upload>()
@@ -182,6 +186,7 @@ class FeedbackService(
         val settings = settings()
         validate(input.severity, input.category, input.title, input.description, input.source)?.let { return it }
         if (!viewer.staff && !settings.testphase) return Outcome.Fail("testphase_closed", "the test phase is closed")
+        if (!viewer.staff) testerGate(input.reporter, settings)?.let { return it }
         val reporterUuid = input.reporter?.uuid
         if (!viewer.staff && reporterUuid != null) {
             val own = store.reports().filter { it.reporter?.uuid == reporterUuid && it.source != Sources.AUTO }
@@ -229,12 +234,21 @@ class FeedbackService(
         val severity = input.severity.takeIf { it in Severities.ALL } ?: Severities.ANNOYING
         val category = input.category.takeIf { it in Categories.ALL } ?: "network"
         val now = clock.millis()
-        val existing = store.reports().lastOrNull { it.hash == input.hash && it.status != Statuses.CLOSED }
+        val reports = store.reports()
+        val existing = reports.lastOrNull { it.hash == input.hash && it.status != Statuses.CLOSED }
         if (existing != null) {
             val affected = (existing.affected + listOfNotNull(input.player?.uuid)).distinct().take(MAX_AFFECTED)
             val updated = existing.copy(count = existing.count + 1, affected = affected, updatedAt = now)
             store.putReport(updated)
             return Outcome.Ok(updated to false)
+        }
+        val service = (input.context["service"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+        val recent = reports.count {
+            it.source == Sources.AUTO && it.createdAt >= now - HOUR_MILLIS &&
+                (it.context["service"] as? JsonPrimitive)?.contentOrNull.orEmpty() == service
+        }
+        if (recent >= settings().maxAutoPerServiceHour) {
+            return Outcome.Fail("auto_limit", "at most ${settings().maxAutoPerServiceHour} new automatic reports per service and hour")
         }
         val report = Report(
             nr = store.nextNumber(),
@@ -317,6 +331,11 @@ class FeedbackService(
         val clean = text.trim()
         if (clean.isEmpty() || clean.length > MAX_DESCRIPTION) return Outcome.Fail("invalid_text", "1..$MAX_DESCRIPTION characters")
         val now = clock.millis()
+        if (!viewer.staff) {
+            val settings = settings()
+            testerGate(viewer.ref, settings)?.let { return it }
+            commentLimit(viewer, settings, now)?.let { return it }
+        }
         val comment = Comment(UUID.randomUUID().toString(), nr, viewer.ref ?: PlayerRef(null, viewer.actorName), viewer.staff, clean, now)
         store.addComment(comment)
         store.addEvent(ReportEvent(nr, now, viewer.actorName, "comment"))
@@ -362,6 +381,38 @@ class FeedbackService(
     }
 
     /**
+     * Reclassifies a report (staff only): new severity and optionally category. Points already granted follow the
+     * new severity; the reporter's total is adjusted.
+     *
+     * @param nr report number.
+     * @param severity new severity.
+     * @param category new category, `null` to keep it.
+     * @param viewer staff caller.
+     * @return the updated report or a failure (`forbidden`, `invalid_severity`, `invalid_category`, `not_found`).
+     */
+    fun severity(nr: Long, severity: String, category: String?, viewer: Viewer): Outcome<Report> = synchronized(lock) {
+        if (!viewer.staff) return Outcome.Fail("forbidden", "staff only")
+        if (severity !in Severities.ALL) return Outcome.Fail("invalid_severity", severity)
+        if (category != null && category !in Categories.ALL) return Outcome.Fail("invalid_category", category)
+        val report = store.report(nr) ?: return Outcome.Fail("not_found", "report #$nr not found")
+        val newCategory = category ?: report.category
+        if (severity == report.severity && newCategory == report.category) return Outcome.Ok(report)
+        val now = clock.millis()
+        val points = Statuses.reclassifiedPoints(report, severity, settings().points)
+        val updated = report.copy(severity = severity, category = newCategory, points = points, updatedAt = now)
+        store.putReport(updated)
+        val reporter = report.reporter
+        if (reporter?.uuid != null && points != report.points) {
+            val current = store.points(reporter.uuid) ?: Points(reporter.uuid, reporter.name, 0)
+            store.putPoints(current.copy(total = (current.total + points - report.points).coerceAtLeast(0)))
+        }
+        val note = if (newCategory != report.category) "category ${report.category} -> $newCategory" else null
+        store.addEvent(ReportEvent(nr, now, viewer.actorName, "reclassified", report.severity, severity, note))
+        emit(FeedbackEvent("reclassified", nr, source = report.source, severity = severity, from = report.severity, to = severity, actor = viewer.actorName, note = note))
+        Outcome.Ok(updated)
+    }
+
+    /**
      * Sets or clears the assignee (staff only).
      *
      * @param nr report number.
@@ -396,6 +447,9 @@ class FeedbackService(
         val max = settings().maxAttachmentBytes
         if (bytes.isEmpty()) return Outcome.Fail("invalid_attachment", "empty attachment")
         if (bytes.size > max) return Outcome.Fail("too_large", "max $max bytes")
+        if (!viewer.staff && report.attachments.size >= settings().maxAttachmentsPerReport) {
+            return Outcome.Fail("attachment_limit", "at most ${settings().maxAttachmentsPerReport} attachments per report")
+        }
         val now = clock.millis()
         val attachment = Attachment(UUID.randomUUID().toString(), name.take(MAX_NAME).ifBlank { "attachment" }, mime.ifBlank { "application/octet-stream" }, bytes.size, now)
         store.putAttachment(nr, attachment, bytes)
@@ -419,6 +473,7 @@ class FeedbackService(
         if (uploadId.isBlank() || count !in 1..MAX_CHUNKS || index !in 0 until count) {
             return Outcome.Fail("invalid_chunk", "index $index of $count")
         }
+        if (uploadId !in uploads && uploads.size >= MAX_UPLOADS) return Outcome.Fail("busy", "too many uploads in progress")
         val upload = uploads.getOrPut(uploadId) { Upload(count, clock.millis()) }
         if (upload.count != count) return Outcome.Fail("invalid_chunk", "chunk count changed")
         upload.parts[index] = bytes
@@ -617,7 +672,11 @@ class FeedbackService(
             uuid = uuid,
             name = body.str("name").orEmpty(),
             action = action,
-            details = body["details"] as? JsonObject ?: JsonObject(emptyMap()),
+            details = when (val raw = body["details"]) {
+                is JsonObject -> raw
+                null -> JsonObject(emptyMap())
+                else -> JsonObject(mapOf("value" to raw))
+            },
             service = body.str("service"),
             at = clock.millis(),
         )
@@ -659,6 +718,40 @@ class FeedbackService(
      */
     fun byDiscordThread(threadId: String): Report? =
         threadId.takeIf { it.isNotBlank() }?.let { id -> store.reports().firstOrNull { it.discordThread == id } }
+
+    /**
+     * Non-staff reporters and commenters need `feedback.report` and the current tester agreement.
+     *
+     * @param ref the acting player.
+     * @param settings current settings.
+     * @return a failure (`not_tester`, `agreement_required`) or `null` when allowed.
+     */
+    private fun testerGate(ref: PlayerRef?, settings: FeedbackSettings): Outcome.Fail? {
+        val name = ref?.name?.takeIf { it.isNotBlank() } ?: return Outcome.Fail("not_tester", "player name required")
+        if (!runCatching { hasPermission(name, REPORT_PERMISSION) }.getOrDefault(false)) {
+            return Outcome.Fail("not_tester", "$REPORT_PERMISSION required")
+        }
+        val uuid = ref.uuid ?: return Outcome.Fail("agreement_required", "player uuid required")
+        val accepted = store.agreement(uuid)?.version ?: 0
+        if (accepted < settings.agreementVersion) return Outcome.Fail("agreement_required", "tester agreement not accepted")
+        return null
+    }
+
+    private fun commentLimit(viewer: Viewer, settings: FeedbackSettings, now: Long): Outcome.Fail? {
+        val uuid = viewer.ref?.uuid ?: return null
+        val own = store.reports().filter { it.reporter?.uuid == uuid }
+            .flatMap { store.comments(it.nr) }.filter { it.author.uuid == uuid && !it.staff }
+        val last = own.maxOfOrNull { it.at }
+        if (last != null && now - last < settings.commentCooldownSeconds * 1000L) {
+            return Outcome.Fail("comment_cooldown", ((settings.commentCooldownSeconds * 1000L - (now - last) + 999) / 1000).toString())
+        }
+        val zone = ZoneId.of(settings.zone)
+        val dayStart = Instant.ofEpochMilli(now).atZone(zone).toLocalDate().atStartOfDay(zone).toInstant().toEpochMilli()
+        if (own.count { it.at >= dayStart } >= settings.maxCommentsPerDay) {
+            return Outcome.Fail("comment_limit", "at most ${settings.maxCommentsPerDay} comments per day")
+        }
+        return null
+    }
 
     private fun emit(event: FeedbackEvent) {
         runCatching { events(event) }
@@ -755,6 +848,9 @@ class FeedbackService(
         const val MAX_AFFECTED = 200
         const val MAX_CHUNKS = 256
         const val UPLOAD_TTL_MILLIS = 10 * 60 * 1000L
+        const val MAX_UPLOADS = 64
+        const val HOUR_MILLIS = 60 * 60 * 1000L
+        const val REPORT_PERMISSION = "feedback.report"
     }
 }
 

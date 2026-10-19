@@ -39,6 +39,21 @@ object FreezeRules {
      */
     fun mustAccept(permissionTester: Boolean, acceptedVersion: Int?, currentVersion: Int, staff: Boolean): Boolean =
         permissionTester && !staff && (acceptedVersion == null || acceptedVersion < currentVersion)
+
+    /**
+     * Freeze decision when the node may be unreachable: without an answer a tester is frozen as a precaution
+     * (fail closed) and the check is retried.
+     *
+     * @param permissionTester whether the player has `feedback.tester`.
+     * @param staff whether the player is staff.
+     * @param state the node's answer `(acceptedVersion, currentVersion)`, null when unreachable.
+     * @return true when the player has to stay frozen.
+     */
+    fun frozenWith(permissionTester: Boolean, staff: Boolean, state: Pair<Int?, Int>?): Boolean = when {
+        !permissionTester || staff -> false
+        state == null -> true
+        else -> mustAccept(true, state.first, state.second, false)
+    }
 }
 
 /**
@@ -50,7 +65,7 @@ object FreezeRules {
  * @property points named test points of this server (name to location).
  */
 data class TestToolsConfig(
-    val flyWorlds: Set<String> = setOf("world", "lobby", "plots", "spawn"),
+    val flyWorlds: Set<String> = setOf("lobby", "plots"),
     val kronenAmount: Long = 1000,
     val kronenDailyLimit: Long = 10_000,
     val points: Map<String, TestPoint> = emptyMap(),
@@ -87,6 +102,17 @@ object TestToolRules {
      */
     fun flyAllowed(config: TestToolsConfig, world: String): Boolean =
         config.flyWorlds.any { it.equals(world, ignoreCase = true) }
+
+    /**
+     * Whether a tester may keep the flight the test tools granted (checked on world change and settings updates).
+     *
+     * @param testphase the node's `testphase` setting.
+     * @param hasPermission whether the player has `tester.tools`.
+     * @param flyAllowedHere whether the current world allows test flight.
+     * @return true when the flight stays.
+     */
+    fun keepsFlight(testphase: Boolean, hasPermission: Boolean, flyAllowedHere: Boolean): Boolean =
+        testphase && hasPermission && flyAllowedHere
 
     /**
      * @param name a requested test point name.

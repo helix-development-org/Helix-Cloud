@@ -54,7 +54,9 @@ class ReleaseRewardsTest {
                 else -> ActionResult.ok("1500")
             }
         }
+        context.permissionCheck = { _, perm -> perm == "feedback.report" }
         FeedbackAddon(clock = TestClock()).onEnable(context)
+        listOf("alice", "bob").forEach { call("feedback.agreement.accept", "uuid-$it", source = ActionSource.BRIDGE) }
     }
 
     private fun call(action: String, vararg args: String, source: ActionSource = ActionSource.REST): ActionResult =
@@ -96,6 +98,9 @@ class ReleaseRewardsTest {
         call("feedback.release.reset", "run")
         val id = pending("uuid-bob").single()["id"]!!.jsonPrimitive.content
 
+        assertEquals("forbidden", call("feedback.rewards.redeem", "uuid-bob", id, "bob", source = ActionSource.BRIDGE).lines[0], "bob is not online")
+        context.online += org.helix.api.player.OnlinePlayer("bob", "uuid-bob", "Proxy-1", 0L)
+
         ecoFails = true
         assertEquals("payout_failed", call("feedback.rewards.redeem", "uuid-bob", id, "bob", source = ActionSource.BRIDGE).lines[0])
         assertEquals(1, pending("uuid-bob").size)
@@ -106,5 +111,6 @@ class ReleaseRewardsTest {
         assertTrue(pending("uuid-bob").isEmpty())
         assertEquals("claimed", call("feedback.rewards.redeem", "uuid-bob", id, "bob", source = ActionSource.BRIDGE).lines[0])
         assertFalse(context.handlers.getValue("feedback.release.reset").first.bridgeInvocable)
+        assertFalse(context.handlers.getValue("feedback.rewards.claim").first.bridgeInvocable)
     }
 }

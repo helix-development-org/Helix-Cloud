@@ -2,7 +2,7 @@
 # Die übrigen Einstellungen (Testphase, Cooldown, Tageslimit, Punkte) verwaltet das Node-Addon helix.feedback.
 testtools:
   # Welten, in denen Tester fliegen dürfen.
-  fly-worlds: [world, lobby, spawn, plots]
+  fly-worlds: [lobby, plots]
   # Test-Kronen pro Klick und netzwerkweites Tageslimit je Tester.
   kronen-amount: 1000
   kronen-daily-limit: 10000
