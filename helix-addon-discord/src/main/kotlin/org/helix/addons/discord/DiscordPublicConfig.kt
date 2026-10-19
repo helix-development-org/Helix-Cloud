@@ -22,6 +22,13 @@ import kotlinx.serialization.Serializable
  * @property tokenSet whether a bot token is stored.
  * @property connected whether the bot is currently connected.
  * @property links number of confirmed account links.
+ * @property bugForumChannelId bug forum channel id.
+ * @property bugStaffChannelId exploit channel id.
+ * @property bugTags forum tag overrides.
+ * @property bugBoardChannelId leaderboard channel id.
+ * @property bugBoardDay leaderboard weekday (1–7).
+ * @property bugBoardHour leaderboard hour.
+ * @property bugBoardZone leaderboard time zone.
  */
 @Serializable
 data class DiscordPublicConfig(
@@ -42,6 +49,13 @@ data class DiscordPublicConfig(
     val tokenSet: Boolean,
     val connected: Boolean,
     val links: Int,
+    val bugForumChannelId: String = "",
+    val bugStaffChannelId: String = "",
+    val bugTags: Map<String, String> = emptyMap(),
+    val bugBoardChannelId: String = "",
+    val bugBoardDay: Int = 7,
+    val bugBoardHour: Int = 18,
+    val bugBoardZone: String = "Europe/Berlin",
 ) {
     companion object {
         /**
@@ -71,6 +85,13 @@ data class DiscordPublicConfig(
                 tokenSet = config.botToken.isNotBlank(),
                 connected = connected,
                 links = links,
+                bugForumChannelId = config.bugForumChannelId,
+                bugStaffChannelId = config.bugStaffChannelId,
+                bugTags = config.bugTags,
+                bugBoardChannelId = config.bugBoardChannelId,
+                bugBoardDay = config.bugBoardDay,
+                bugBoardHour = config.bugBoardHour,
+                bugBoardZone = config.bugBoardZone,
             )
     }
 }

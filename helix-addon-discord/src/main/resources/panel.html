@@ -14,10 +14,14 @@
       <div class="field"><label>Notification channel</label><input id="notifychannel" placeholder="channel id"></div>
       <div class="field"><label>Notification categories <span class="muted">(comma-separated)</span></label><input id="categories" placeholder="moderation"></div>
       <div class="field"><label>Status interval <span class="muted">(seconds)</span></label><input id="interval" placeholder="60"></div>
+      <div class="field"><label>Bug forum channel <span class="muted">(forum, blank = off)</span></label><input id="bugforum" placeholder="channel id"></div>
+      <div class="field"><label>Exploit channel <span class="muted">(staff only)</span></label><input id="bugstaff" placeholder="channel id"></div>
+      <div class="field"><label>Bug leaderboard channel</label><input id="bugboard" placeholder="channel id"></div>
+      <div class="field"><label>Leaderboard day / hour <span class="muted">(1=Mon…7=Sun, 0–23)</span></label><div class="row"><input id="bugboardday" placeholder="7" style="max-width:80px"><input id="bugboardhour" placeholder="18" style="max-width:80px"></div></div>
       <div class="field wide" style="grid-column:1/-1"><label>Critical actions <span class="muted">(comma-separated, type-to-confirm tier)</span></label><input id="critical" placeholder="platform.stop,launcher.restart"></div>
     </div>
     <div class="row" style="margin-top:14px"><button class="btn" id="save">Save &amp; reconnect</button></div>
-    <p class="muted" style="margin-top:10px">Per-category routing: <code>discord.config.set category.&lt;name&gt;=&lt;channel&gt;</code> and <code>audit.&lt;type&gt;=&lt;channel&gt;</code> (types: action, denied, confirmation, link). Account links: <code>discord.link.set/remove/list</code>.</p>
+    <p class="muted" style="margin-top:10px">Per-category routing: <code>discord.config.set category.&lt;name&gt;=&lt;channel&gt;</code> and <code>audit.&lt;type&gt;=&lt;channel&gt;</code> (types: action, denied, confirmation, link). Account links: <code>discord.link.set/remove/list</code>. Bug forum tags are matched by name (Kleinigkeit, Störend, Blockierend, Absturz, Exploit · MineClash, CityBuild, Lobby, Netzwerk, Grafik, Sonstiges · Neu, Bestätigt, In Arbeit, Behoben, Geschlossen, Abgelehnt, Duplikat, Kein Bug) or set with <code>bugtag.&lt;severity|category|status&gt;.&lt;key&gt;=&lt;tag id&gt;</code>. The bug mirror needs the privileged <b>Message Content</b> intent.</p>
   </div>
 </div>
 <div class="card">
@@ -34,6 +38,11 @@ async function load() {
     document.getElementById(id).value = c[{guild:"guildId",panelchannel:"panelChannelId",statuschannel:"statusChannelId",auditchannel:"auditChannelId",notifychannel:"notificationChannelId"}[id]] || "";
   }
   document.getElementById("categories").value = (c.notificationCategories || []).join(",");
+  document.getElementById("bugforum").value = c.bugForumChannelId || "";
+  document.getElementById("bugstaff").value = c.bugStaffChannelId || "";
+  document.getElementById("bugboard").value = c.bugBoardChannelId || "";
+  document.getElementById("bugboardday").value = c.bugBoardDay || 7;
+  document.getElementById("bugboardhour").value = c.bugBoardHour ?? 18;
   document.getElementById("interval").value = c.statusIntervalSeconds || 60;
   document.getElementById("critical").value = (c.criticalActions || []).join(",");
   document.getElementById("status").innerHTML =
@@ -45,7 +54,7 @@ async function load() {
 document.getElementById("save").onclick = async () => {
   const args = [];
   const t = document.getElementById("token").value.trim(); if (t) args.push("token=" + t);
-  for (const id of ["guild","panelchannel","statuschannel","auditchannel","notifychannel","categories","interval","critical"]) {
+  for (const id of ["guild","panelchannel","statuschannel","auditchannel","notifychannel","categories","interval","critical","bugforum","bugstaff","bugboard","bugboardday","bugboardhour"]) {
     args.push(id + "=" + document.getElementById(id).value.trim());
   }
   const r = await Helix.action("discord.config.set", ...args);

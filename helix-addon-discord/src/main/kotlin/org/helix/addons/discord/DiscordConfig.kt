@@ -35,6 +35,14 @@ import org.helix.api.storage.AddonStorage
  * @property normalActions actions forced into the confirmation-free tier.
  * @property destructiveActions actions forced into the button-confirm tier.
  * @property criticalActions actions forced into the type-to-confirm tier.
+ * @property bugForumChannelId forum channel mirroring bug reports (blank disables the bug mirror).
+ * @property bugStaffChannelId forum or text channel for exploit reports (staff only; blank drops them).
+ * @property bugTags forum tag overrides: `severity.<key>`, `category.<key>` or `status.<key>` to tag id;
+ *   without an override the tag is matched by name (see [BugTags]).
+ * @property bugBoardChannelId channel of the weekly tester leaderboard (blank disables it).
+ * @property bugBoardDay weekday of the leaderboard post (1 = Monday … 7 = Sunday).
+ * @property bugBoardHour hour of the leaderboard post (0–23, network time zone [bugBoardZone]).
+ * @property bugBoardZone time zone of the leaderboard schedule.
  */
 @Serializable
 data class DiscordConfig(
@@ -53,7 +61,21 @@ data class DiscordConfig(
     val normalActions: List<String> = emptyList(),
     val destructiveActions: List<String> = emptyList(),
     val criticalActions: List<String> = DEFAULT_CRITICAL,
+    val bugForumChannelId: String = "",
+    val bugStaffChannelId: String = "",
+    val bugTags: Map<String, String> = emptyMap(),
+    val bugBoardChannelId: String = "",
+    val bugBoardDay: Int = 7,
+    val bugBoardHour: Int = 18,
+    val bugBoardZone: String = "Europe/Berlin",
 ) {
+    /**
+     * Whether the bug-report mirror is enabled.
+     *
+     * @return `true` when a bug forum is configured.
+     */
+    fun bugMirror(): Boolean = bugForumChannelId.isNotBlank()
+
     /**
      * Whether token and guild are configured.
      *
