@@ -37,6 +37,14 @@ interface ProfileRepository {
      */
     fun topByRoses(limit: Int): List<Triple<String, String, Long>>
 
+    /**
+     * Counts or deletes every profile and the match history (network release reset).
+     *
+     * @param dryRun `true` only counts.
+     * @return record counts (`profiles`, `match_history`), counted before deletion.
+     */
+    fun wipe(dryRun: Boolean): Map<String, Int>
+
     /** Releases resources such as connection pools. */
     fun close() {}
 }
@@ -69,6 +77,16 @@ class DocumentProfileRepository(private val storage: AddonStorage) : ProfileRepo
             .sortedByDescending { it.roses }
             .take(limit)
             .map { Triple(it.uuid, it.name, it.roses) }
+
+    override fun wipe(dryRun: Boolean): Map<String, Int> {
+        val profileKeys = storage.keys().filter { it.startsWith(PROFILE_PREFIX) }
+        val matches = storage.read(MATCHES_KEY)?.let { json.decodeFromString<List<MatchRecord>>(it) }.orEmpty().size
+        if (!dryRun) {
+            profileKeys.forEach(storage::delete)
+            storage.delete(MATCHES_KEY)
+        }
+        return linkedMapOf("profiles" to profileKeys.size, "match_history" to matches)
+    }
 
     /** Companion with storage keys. */
     companion object {

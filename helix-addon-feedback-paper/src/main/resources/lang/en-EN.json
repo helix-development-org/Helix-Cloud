@@ -110,5 +110,12 @@
   "tools.extra.unhandled": "<#ffb43a>Heads up: this tool is not available on this server.",
   "screenshot.attached": "<#4ac85e>Screenshot attached to report <#ffcf4a>#{nr}</#ffcf4a>.",
   "screenshot.failed": "<#ffb43a>Note: the screenshot could not be taken. Your report arrived anyway – feel free to add a picture in the Discord thread.",
-  "screenshot.disabled": "<#ffb43a>Note: screenshots are turned off in your KronlandMC addon. Your report arrived anyway."
+  "screenshot.disabled": "<#ffb43a>Note: screenshots are turned off in your KronlandMC addon. Your report arrived anyway.",
+  "profile.badge": "Beta tester",
+  "profile.badge.value": "<#5ab4ff>✦ Took part in the test phase</#5ab4ff>",
+  "profile.points": "Bug points",
+  "release.reward.network": "<#4ac85e>Thanks for testing! Release reward: <#ffcf4a>{kronen} crowns</#ffcf4a>{extra}.</#4ac85e>",
+  "release.reward.extra": " and unlocks",
+  "release.reward.citybuild": "<#f1e2c2>More release rewards (keys/items) wait in your pickup box on your first CityBuild visit.</#f1e2c2>",
+  "release.reward.failed": "<#ff5a4a>Your release reward could not be paid right now. We will try again on your next join.</#ff5a4a>"
 }

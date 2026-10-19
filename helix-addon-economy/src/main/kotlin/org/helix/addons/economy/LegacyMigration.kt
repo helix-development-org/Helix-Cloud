@@ -61,6 +61,19 @@ class LegacyMigration(
         return repository.importBalance(holder, amount)
     }
 
+    /**
+     * Counts or drops the parked legacy balances (release reset: nobody may import old coins afterwards).
+     *
+     * @param dryRun `true` only counts.
+     * @return number of parked balances.
+     */
+    @Synchronized
+    fun clearUnresolved(dryRun: Boolean): Int {
+        val count = readUnresolved().size
+        if (!dryRun && count > 0) storage.write(UNRESOLVED, json.encodeToString(emptyMap<String, Long>()))
+        return count
+    }
+
     private fun readUnresolved(): Map<String, Long> =
         storage.read(UNRESOLVED)?.let { json.decodeFromString<Map<String, Long>>(it) }.orEmpty()
 

@@ -113,6 +113,22 @@ class StatsStore(private val storage: AddonStorage) {
         return removed != null
     }
 
+    /**
+     * Counts or deletes every recorded value of every stat (network release reset).
+     *
+     * @param dryRun `true` only counts.
+     * @return number of stat values (player × stat), counted before deletion.
+     */
+    @Synchronized
+    fun wipe(dryRun: Boolean): Int {
+        val count = stats.values.sumOf { it.size }
+        if (!dryRun && stats.isNotEmpty()) {
+            stats.clear()
+            persist()
+        }
+        return count
+    }
+
     private fun persist() {
         storage.write(DOCUMENT, json.encodeToString(StatsDocument(stats.mapValues { it.value.toMap() })))
     }

@@ -2,6 +2,7 @@ package org.helix.addons.permissions
 
 import kotlinx.serialization.json.Json
 import org.helix.addon.sdk.AddonBase
+import org.helix.api.release.ReleaseReset
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
 import org.helix.api.action.ActionSource
@@ -185,6 +186,16 @@ class PermissionsAddon : AddonBase() {
                 ?: return@action ActionResult.error("usage: perm.check <player> <permission>")
             val granted = store.has(player, permission)
             ActionResult.ok("$player ${if (granted) "HAS" else "does NOT have"} $permission")
+        }
+        action(
+            "perm" + ReleaseReset.ACTION_SUFFIX,
+            "Release reset: beta badge for every tester, optionally removes the tester group from everyone.",
+            "perm.release.reset <plan|run> [--remove-testers]",
+            permission = ReleaseReset.PERMISSION,
+        ) { inv ->
+            val dryRun = ReleaseReset.dryRun(inv.arguments)
+                ?: return@action ActionResult.error("usage: perm.release.reset <plan|run> [--remove-testers]")
+            ActionResult.ok(tester.release(dryRun, ReleaseReset.FLAG_REMOVE_TESTERS in inv.arguments).toJson())
         }
         action("perm.export", "Exports all groups and users as JSON (used by the dashboard).", "perm.export") {
             ActionResult.ok(json.encodeToString(store.document()))

@@ -41,6 +41,14 @@ interface RailStore : AutoCloseable {
     fun export(uuid: String): Map<String, List<String>>
 
     /** Releases resources (no-op for the document store). */
+    /**
+     * Counts or deletes every discovered-station record (release reset).
+     *
+     * @param dryRun `true` only counts.
+     * @return number of records (counted before deletion).
+     */
+    fun wipe(dryRun: Boolean): Int
+
     override fun close() {}
 }
 
@@ -75,8 +83,19 @@ class DocumentRailStore(private val storage: AddonStorage) : RailStore {
     @Synchronized
     override fun export(uuid: String): Map<String, List<String>> = read(uuid).mapValues { it.value.sorted() }
 
+    @Synchronized
+    override fun wipe(dryRun: Boolean): Int {
+        val keys = storage.keys().filter { it.startsWith(KEY_PREFIX) }
+        if (!dryRun) keys.forEach(storage::delete)
+        return keys.size
+    }
+
     private fun read(uuid: String): Map<String, List<String>> =
         storage.read(key(uuid))?.let { runCatching { json.decodeFromString<Map<String, List<String>>>(it) }.getOrNull() }.orEmpty()
 
-    private fun key(uuid: String) = "rail_discovered:$uuid"
+    private fun key(uuid: String) = KEY_PREFIX + uuid
+
+    private companion object {
+        const val KEY_PREFIX = "rail_discovered:"
+    }
 }

@@ -3,6 +3,8 @@ package org.helix.addons.stats
 import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
+import org.helix.api.release.ReleaseReport
+import org.helix.api.release.ReleaseReset
 
 /**
  * Generic stats/leaderboards addon.
@@ -58,6 +60,22 @@ class StatsAddon : AddonBase() {
                 return@action ActionResult.error("usage: stats.get <stat> <player>")
             }
             ActionResult.ok(store.get(stat, player).toString())
+        }
+        action(
+            "stats" + ReleaseReset.ACTION_SUFFIX,
+            "Release reset: deletes every stat value and archived season.",
+            "stats.release.reset <plan|run>",
+            permission = ReleaseReset.PERMISSION,
+        ) { inv ->
+            val dryRun = ReleaseReset.dryRun(inv.arguments)
+                ?: return@action ActionResult.error("usage: stats.release.reset <plan|run>")
+            ActionResult.ok(
+                ReleaseReport(
+                    addon = "stats",
+                    mode = if (dryRun) ReleaseReset.PLAN else ReleaseReset.RUN,
+                    deleted = linkedMapOf("values" to store.wipe(dryRun), "seasons" to seasons.wipe(dryRun)),
+                ).toJson(),
+            )
         }
         action("stats.top", "Returns the top players for a stat.", "stats.top <stat> [limit]") { inv ->
             val stat = inv.arguments.getOrNull(0)

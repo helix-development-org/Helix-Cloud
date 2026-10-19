@@ -139,6 +139,44 @@ class FeedbackPlugin : JavaPlugin(), Listener, PluginMessageListener {
     @EventHandler
     fun onJoin(event: PlayerJoinEvent) {
         gate?.check(event.player)
+        val player = event.player
+        server.scheduler.runTaskLaterAsynchronously(this, Runnable { payReleaseRewards(player) }, REWARD_DELAY_TICKS)
+    }
+
+    /**
+     * Pays the network part of release rewards (crowns, unlocks) on join and points to CityBuild for item parts;
+     * the CityBuild plugin delivers those itself. Runs asynchronously.
+     */
+    private fun payReleaseRewards(player: Player) {
+        val client = client ?: return
+        if (!player.isOnline) return
+        val pending = client.pendingRewards(player.uniqueId) ?: return
+        var citybuildWaiting = false
+        pending.forEach { reward ->
+            val body = reward["reward"] as? kotlinx.serialization.json.JsonObject ?: return@forEach
+            val id = (reward["id"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: return@forEach
+            if ((body["release"] as? kotlinx.serialization.json.JsonPrimitive)?.content != "true") return@forEach
+            when ((body["part"] as? kotlinx.serialization.json.JsonPrimitive)?.content) {
+                "network" -> {
+                    val reply = client.redeemReward(player.uniqueId, id, player.name)
+                    val kronen = (body["kronen"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: "0"
+                    val unlocks = (body["permissions"] as? kotlinx.serialization.json.JsonArray)?.isNotEmpty() == true
+                    server.scheduler.runTask(this, Runnable {
+                        if (!player.isOnline) return@Runnable
+                        if (reply.ok) {
+                            val extra = if (unlocks) text(player, "release.reward.extra") else ""
+                            player.sendMessage(chat(player, "release.reward.network", "kronen" to kronen, "extra" to extra))
+                        } else if (reply.code != "claimed") {
+                            player.sendMessage(chat(player, "release.reward.failed"))
+                        }
+                    })
+                }
+                "citybuild" -> citybuildWaiting = true
+            }
+        }
+        if (citybuildWaiting && !task.equals(CITYBUILD_TASK, ignoreCase = true)) {
+            server.scheduler.runTask(this, Runnable { if (player.isOnline) player.sendMessage(chat(player, "release.reward.citybuild")) })
+        }
     }
 
     /** Handles `/bug`, `/bugs`, `/testtools` and `/testervereinbarung`. */
@@ -432,6 +470,12 @@ class FeedbackPlugin : JavaPlugin(), Listener, PluginMessageListener {
     companion object {
         /** Owner of the node translations. */
         const val OWNER = "feedback"
+
+        /** Delay before release rewards are paid after a join (let the client settle). */
+        const val REWARD_DELAY_TICKS = 60L
+
+        /** Task whose plugin delivers the item part of release rewards. */
+        const val CITYBUILD_TASK = "CityBuild"
 
         /** May open `/testtools`. */
         const val PERMISSION_TOOLS = "tester.tools"

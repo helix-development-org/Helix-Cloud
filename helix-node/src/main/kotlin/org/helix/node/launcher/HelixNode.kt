@@ -702,6 +702,12 @@ class HelixNode(
         ).registerAll(registry)
         addonActions.registerAll(registry)
         BackupActions(backups).registerAll(registry)
+        org.helix.node.release.ReleaseActions(
+            org.helix.node.release.ReleaseResetService(
+                host = org.helix.node.release.NodeReleaseHost(paths, taskStore, manager, backups, routing, registry, ::recordEvent),
+                config = { org.helix.node.release.ReleaseConfig.load(paths.config) },
+            ),
+        ).registerAll(registry)
         registerControlActions()
         WhitelistActions(whitelist).registerAll(registry)
         PlayerDataActions(playerData).registerAll(registry)

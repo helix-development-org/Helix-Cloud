@@ -19,7 +19,12 @@ import org.helix.addons.feedback.store.PostgresFeedbackStore
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
 import org.helix.api.action.ActionSource
+import org.helix.api.addon.ProfileInfoEntry
+import org.helix.api.addon.ProfileInfoProvider
+import org.helix.api.design.PlayerRanks
 import org.helix.api.message.Messages
+import org.helix.api.release.ReleaseReport
+import org.helix.api.release.ReleaseReset
 import org.slf4j.LoggerFactory
 import java.time.Clock
 import java.util.Base64
@@ -60,6 +65,7 @@ class FeedbackAddon(
             },
         )
         registerActions()
+        registerRelease()
         publishSettings(service.settings())
         panel("feedback", "Bugs", "/panel.html")
     }
@@ -316,6 +322,116 @@ class FeedbackAddon(
                 }.toString(),
             )
         }
+    }
+
+    /**
+     * Release reset participant, reward redemption and the beta-tester profile entry (plan 1, sections 8/9).
+     */
+    private fun registerRelease() {
+        action(
+            "feedback" + ReleaseReset.ACTION_SUFFIX,
+            "Release reset: queues release rewards, grants the beta badge to point holders and closes the test phase.",
+            "feedback.release.reset <plan|run>",
+            permission = ReleaseReset.PERMISSION,
+        ) { inv ->
+            val dryRun = ReleaseReset.dryRun(inv.arguments) ?: return@action bad("usage: feedback.release.reset <plan|run>")
+            ActionResult.ok(releaseReset(dryRun).toJson())
+        }
+        action(
+            "feedback.rewards.redeem",
+            "Redeems a pending reward: pays crowns and permissions of network parts, marks CityBuild parts delivered.",
+            "feedback.rewards.redeem <uuid> <id> <name>",
+            bridgeInvocable = true,
+        ) { inv ->
+            val uuid = inv.arguments.getOrNull(0)
+            val id = inv.arguments.getOrNull(1)
+            val name = inv.arguments.getOrNull(2)
+            if (uuid == null || id == null || name == null) return@action bad("usage: feedback.rewards.redeem <uuid> <id> <name>")
+            redeem(uuid, id, name)
+        }
+        context.registerProfileInfoProvider(
+            /** Profile entries „Beta-Tester“ (badge permission) and „Bug-Punkte“. */
+            object : ProfileInfoProvider {
+                override fun infoFor(player: String): List<ProfileInfoEntry> {
+                    val entries = mutableListOf<ProfileInfoEntry>()
+                    val badge = runCatching { context.hasPermission(player, PlayerRanks.BETA_TESTER_BADGE) }.getOrDefault(false)
+                    if (badge) entries += ProfileInfoEntry(messages.rawFor(player, "profile.badge"), messages.rawFor(player, "profile.badge.value"))
+                    service.top(Int.MAX_VALUE).firstOrNull { it.name.equals(player, ignoreCase = true) }?.let { points ->
+                        entries += ProfileInfoEntry(messages.rawFor(player, "profile.points"), points.total.toString())
+                    }
+                    return entries
+                }
+            },
+        )
+    }
+
+    /**
+     * Prepares rewards, grants `badge.betatester` to every point holder and closes the test phase.
+     *
+     * @param dryRun `true` only computes.
+     * @return the participant report.
+     */
+    internal fun releaseReset(dryRun: Boolean): ReleaseReport {
+        val preparation = service.prepareRelease(dryRun)
+        var badges = 0
+        if (!dryRun) {
+            preparation.holders.forEach { holder ->
+                val name = holder.name.ifBlank { context.lastKnownName(holder.uuid) ?: return@forEach }
+                val result = runCatching {
+                    context.actions.invoke(ActionInvocation("perm.user.grant", listOf(name, PlayerRanks.BETA_TESTER_BADGE), ActionSource.ADDON))
+                }.getOrNull()
+                if (result?.success == true) badges++ else logger.warn("Beta badge for {} failed: {}", name, result?.lines)
+            }
+            publishSettings(service.settings())
+        }
+        return ReleaseReport(
+            addon = "feedback",
+            mode = if (dryRun) ReleaseReset.PLAN else ReleaseReset.RUN,
+            kept = mapOf(
+                "reports" to "bug reports, comments, attachments and points",
+                "rewards" to "pending rewards (paid out after the release)",
+            ),
+            notes = listOf(
+                "point holders: ${preparation.holders.size}",
+                "release reward parts: ${preparation.granted.size} (" +
+                    "${preparation.granted.count { ReleaseRewards.partOf(it.reward) == ReleaseRewards.PART_NETWORK }} network, " +
+                    "${preparation.granted.count { ReleaseRewards.partOf(it.reward) == ReleaseRewards.PART_CITYBUILD }} citybuild)",
+                "already prepared: ${preparation.alreadyPrepared}, below every tier: ${preparation.withoutTier}",
+                if (dryRun) "beta badge would be granted to ${preparation.holders.size} point holder(s)" else "beta badge granted: $badges",
+                "test phase: " + if (dryRun) "would be closed" else "closed",
+            ),
+        )
+    }
+
+    /**
+     * Pays a pending reward. Network parts pay crowns (`eco.api.deposit`, reason `release-reward`, ref = reward
+     * id) and grant permissions; CityBuild parts are only marked as delivered (the plugin gave the items). A failed
+     * payout reopens the reward.
+     */
+    private fun redeem(uuid: String, id: String, name: String): ActionResult {
+        val claimed = when (val outcome = service.claim(uuid, id)) {
+            is Outcome.Ok -> outcome.value
+            is Outcome.Fail -> return fail(outcome.code, outcome.detail)
+        }
+        if (ReleaseRewards.partOf(claimed.reward) == ReleaseRewards.PART_NETWORK) {
+            val kronen = (claimed.reward["kronen"] as? JsonPrimitive)?.longOrNull ?: 0L
+            if (kronen > 0) {
+                val paid = runCatching {
+                    context.actions.invoke(
+                        ActionInvocation("eco.api.deposit", listOf(uuid, kronen.toString(), "release-reward", id), ActionSource.ADDON),
+                    )
+                }.getOrNull()
+                if (paid?.success != true) {
+                    service.unclaim(uuid, id)
+                    return fail("payout_failed", paid?.lines?.joinToString(" ") ?: "economy unavailable")
+                }
+            }
+            (claimed.reward["permissions"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.forEach { node ->
+                runCatching { context.actions.invoke(ActionInvocation("perm.user.grant", listOf(name, node), ActionSource.ADDON)) }
+                    .onFailure { logger.warn("Reward permission {} for {} failed: {}", node, name, it.message) }
+            }
+        }
+        return ActionResult.ok(encode(PendingReward.serializer(), claimed))
     }
 
     /**

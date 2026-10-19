@@ -1,5 +1,7 @@
 package org.helix.addons.permissions
 
+import org.helix.api.release.ReleaseReport
+import org.helix.api.release.ReleaseReset
 import org.helix.api.action.ActionResult
 import org.helix.api.design.PlayerRanks
 import org.helix.api.message.Messages
@@ -85,6 +87,65 @@ class TesterAccess(
         }.sortedBy { it.first }
     }
 
+    /**
+     * Release step of the closed test phase: gives every current tester the permanent beta badge (group
+     * [BADGE_GROUP] with [PlayerRanks.BETA_TESTER_BADGE]) and optionally removes all `tester` memberships.
+     *
+     * @param dryRun `true` only counts.
+     * @param removeTesters also remove the `tester` group from every member.
+     * @return the report of this step.
+     */
+    fun release(dryRun: Boolean, removeTesters: Boolean): ReleaseReport {
+        val members = testers().map { it.first }
+        val createGroup = store.group(BADGE_GROUP) == null
+        if (!dryRun) {
+            seedBadgeGroup()
+            members.forEach { name ->
+                val user = store.user(name)
+                val groups = (user.groups + BADGE_GROUP).distinct()
+                    .let { all -> if (removeTesters) all.filter { !it.equals(GROUP, ignoreCase = true) } else all }
+                val timed = if (removeTesters) user.timedGroups.filter { !it.value.equals(GROUP, ignoreCase = true) } else user.timedGroups
+                store.saveUser(user.copy(groups = groups, timedGroups = timed))
+            }
+        }
+        return ReleaseReport(
+            addon = "permissions",
+            mode = if (dryRun) ReleaseReset.PLAN else ReleaseReset.RUN,
+            deleted = if (removeTesters) linkedMapOf("tester_memberships" to members.size) else emptyMap(),
+            kept = buildMap {
+                put("groups", "all groups and user grants")
+                if (!removeTesters) put("tester_memberships", "${members.size} testers keep the tester group")
+            },
+            notes = listOfNotNull(
+                "beta badge ($BADGE_GROUP) for ${members.size} tester(s)",
+                if (createGroup) "group $BADGE_GROUP will be created" else null,
+            ),
+        )
+    }
+
+    /**
+     * Creates the permanent badge group [BADGE_GROUP] when missing (weight 1, so every real rank prefix wins).
+     *
+     * @return `true` when the group was created.
+     */
+    fun seedBadgeGroup(): Boolean {
+        if (store.group(BADGE_GROUP) != null) {
+            return false
+        }
+        val rank = PlayerRanks.TESTER
+        store.saveGroup(
+            PermissionGroup(
+                name = BADGE_GROUP,
+                weight = 1,
+                default = false,
+                permissions = listOf(PlayerRanks.BETA_TESTER_BADGE),
+                prefix = "<#%06x>[Beta]</#%06x> ".format(rank.color, rank.color),
+                color = "<#%06x>".format(rank.color),
+            ),
+        )
+        return true
+    }
+
     private fun add(executor: String, player: String, durationToken: String?): ActionResult {
         val user = store.user(player)
         if (durationToken.isNullOrBlank()) {
@@ -157,6 +218,9 @@ class TesterAccess(
     companion object {
         /** Name of the tester group. */
         const val GROUP: String = "tester"
+
+        /** Permanent badge group of former testers. */
+        const val BADGE_GROUP: String = "betatester"
 
         /** Team permission for the `/tester` command. */
         const val MANAGE_PERMISSION: String = "tester.manage"

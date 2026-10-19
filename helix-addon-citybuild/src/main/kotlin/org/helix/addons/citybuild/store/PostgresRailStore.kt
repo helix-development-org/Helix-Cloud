@@ -72,5 +72,11 @@ class PostgresRailStore(connection: StorageConnection) : RailStore {
         }
     }
 
+    override fun wipe(dryRun: Boolean): Int = pool.connection.use { c ->
+        val count = c.createStatement().use { st -> st.executeQuery("SELECT COUNT(*) FROM citybuild.rail_discovered").use { rs -> if (rs.next()) rs.getInt(1) else 0 } }
+        if (!dryRun) c.createStatement().use { st -> st.executeUpdate("DELETE FROM citybuild.rail_discovered") }
+        count
+    }
+
     override fun close() = pool.close()
 }

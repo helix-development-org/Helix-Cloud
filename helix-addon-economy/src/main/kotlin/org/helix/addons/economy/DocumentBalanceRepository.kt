@@ -129,6 +129,20 @@ class DocumentBalanceRepository(
         return existed
     }
 
+    @Synchronized
+    override fun wipeAll(dryRun: Boolean): Map<String, Int> {
+        val ledgers = storage.keys().filter { it.startsWith(LEDGER_PREFIX) && it != SEQUENCE }
+        val dailies = storage.keys().filter { it.startsWith(DAILY_PREFIX) }
+        val counts = linkedMapOf("accounts" to accounts.size, "ledger" to ledgers.size, "daily_counters" to dailies.size)
+        if (!dryRun) {
+            ledgers.forEach(storage::delete)
+            dailies.forEach(storage::delete)
+            accounts.clear()
+            persistAccounts()
+        }
+        return counts
+    }
+
     private fun today(): String = BalanceRepository.today(clock).toString()
 
     private fun store(holder: Holder, balance: Long) {

@@ -52,6 +52,12 @@ class PostgresVehicleStore(connection: StorageConnection) : VehicleStore {
             VehicleStates.GARAGE, at, shard, VehicleStates.WORLD,
         )
 
+    override fun wipe(dryRun: Boolean): Int = pool.connection.use { c ->
+        val count = c.createStatement().use { st -> st.executeQuery("SELECT COUNT(*) FROM citybuild.vehicles").use { rs -> if (rs.next()) rs.getInt(1) else 0 } }
+        if (!dryRun) c.createStatement().use { st -> st.executeUpdate("DELETE FROM citybuild.vehicles") }
+        count
+    }
+
     override fun close() = pool.close()
 
     private fun query(sql: String, vararg args: Any?): List<Vehicle> = pool.connection.use { c ->

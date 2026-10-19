@@ -70,6 +70,14 @@ interface PetStore : AutoCloseable {
     fun delete(id: String): Boolean
 
     /** Releases resources. */
+    /**
+     * Counts or deletes every pet record of every instance (release reset).
+     *
+     * @param dryRun `true` only counts.
+     * @return number of records (counted before deletion).
+     */
+    fun wipe(dryRun: Boolean): Int
+
     override fun close() {}
 }
 
@@ -95,6 +103,8 @@ class DocumentPetStore(private val storage: org.helix.api.storage.AddonStorage) 
     }
 
     @Synchronized override fun delete(id: String): Boolean = rows.removeAll { it.id == id }.also { if (it) save() }
+
+    @Synchronized override fun wipe(dryRun: Boolean): Int = rows.size.also { if (!dryRun && it > 0) { rows.clear(); save() } }
 
     private fun save() = storage.write(KEY, json.encodeToString(ListSerializer(Pet.serializer()), rows))
 

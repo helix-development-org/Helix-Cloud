@@ -117,6 +117,14 @@ interface VehicleStore : AutoCloseable {
     fun recallAll(shard: String, at: Long): Int
 
     /** Releases resources. */
+    /**
+     * Counts or deletes every vehicle record of every instance (release reset).
+     *
+     * @param dryRun `true` only counts.
+     * @return number of records (counted before deletion).
+     */
+    fun wipe(dryRun: Boolean): Int
+
     override fun close() {}
 }
 
@@ -156,6 +164,8 @@ class DocumentVehicleStore(private val storage: org.helix.api.storage.AddonStora
         if (moved > 0) save()
         return moved
     }
+
+    @Synchronized override fun wipe(dryRun: Boolean): Int = rows.size.also { if (!dryRun && it > 0) { rows.clear(); save() } }
 
     private fun save() = storage.write(KEY, json.encodeToString(ListSerializer(Vehicle.serializer()), rows))
 

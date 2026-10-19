@@ -44,6 +44,12 @@ class PostgresPetStore(connection: StorageConnection) : PetStore {
 
     override fun delete(id: String): Boolean = update("DELETE FROM citybuild.pets WHERE id = ?", id) > 0
 
+    override fun wipe(dryRun: Boolean): Int = pool.connection.use { c ->
+        val count = c.createStatement().use { st -> st.executeQuery("SELECT COUNT(*) FROM citybuild.pets").use { rs -> if (rs.next()) rs.getInt(1) else 0 } }
+        if (!dryRun) c.createStatement().use { st -> st.executeUpdate("DELETE FROM citybuild.pets") }
+        count
+    }
+
     override fun close() = pool.close()
 
     private fun query(sql: String, vararg args: Any?): List<Pet> = pool.connection.use { c ->

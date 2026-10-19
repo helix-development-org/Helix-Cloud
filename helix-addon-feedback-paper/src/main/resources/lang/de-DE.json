@@ -110,5 +110,12 @@
   "tools.extra.unhandled": "<#ffb43a>Achtung: Dieses Werkzeug ist auf diesem Server nicht verfügbar.",
   "screenshot.attached": "<#4ac85e>Screenshot an Meldung <#ffcf4a>#{nr}</#ffcf4a> angehängt.",
   "screenshot.failed": "<#ffb43a>Achtung: Der Screenshot konnte nicht aufgenommen werden. Deine Meldung ist trotzdem angekommen – häng ein Bild gern im Discord-Thread an.",
-  "screenshot.disabled": "<#ffb43a>Achtung: Screenshots sind in deinem KronlandMC-Addon ausgeschaltet. Deine Meldung ist trotzdem angekommen."
+  "screenshot.disabled": "<#ffb43a>Achtung: Screenshots sind in deinem KronlandMC-Addon ausgeschaltet. Deine Meldung ist trotzdem angekommen.",
+  "profile.badge": "Beta-Tester",
+  "profile.badge.value": "<#5ab4ff>✦ Dabei in der Testphase</#5ab4ff>",
+  "profile.points": "Bug-Punkte",
+  "release.reward.network": "<#4ac85e>Danke fürs Testen! Release-Belohnung: <#ffcf4a>{kronen} Kronen</#ffcf4a>{extra}.</#4ac85e>",
+  "release.reward.extra": " und Freischaltungen",
+  "release.reward.citybuild": "<#f1e2c2>Weitere Release-Belohnungen (Schlüssel/Items) liegen beim ersten CityBuild-Besuch in deiner Abholkiste.</#f1e2c2>",
+  "release.reward.failed": "<#ff5a4a>Deine Release-Belohnung konnte gerade nicht ausgezahlt werden. Wir versuchen es beim nächsten Join erneut.</#ff5a4a>"
 }

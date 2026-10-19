@@ -38,6 +38,12 @@ object FeedbackActions {
     /** Points ranking. */
     const val TOP = "feedback.top"
 
+    /** Pending rewards of a player. */
+    const val REWARDS_PENDING = "feedback.rewards.pending"
+
+    /** Redeems one pending reward. */
+    const val REWARDS_REDEEM = "feedback.rewards.redeem"
+
     /** Test tool usage log. */
     const val TOOL_LOG = "feedback.toollog"
 
@@ -335,6 +341,27 @@ class FeedbackNodeClient(controlUrl: String, token: String) {
         val viewerJson = buildJsonObject { put("uuid", viewer.uuid); put("name", viewer.name) }.toString()
         return call(FeedbackActions.ATTACH_FINISH, uploadId, nr.toString(), name, mime, viewerJson)
     }
+
+    /**
+     * @param uuid the player.
+     * @return the player's unclaimed rewards as raw JSON objects, null when the node was unreachable.
+     */
+    fun pendingRewards(uuid: UUID): List<JsonObject>? {
+        val reply = call(FeedbackActions.REWARDS_PENDING, uuid.toString())
+        if (!reply.ok) return null
+        return runCatching { json.parseToJsonElement(reply.body ?: "[]") as kotlinx.serialization.json.JsonArray }
+            .getOrNull()?.mapNotNull { it as? JsonObject }
+    }
+
+    /**
+     * Redeems a reward (network part: the node pays crowns and permissions).
+     *
+     * @param uuid the player.
+     * @param id reward id.
+     * @param name the player's name (for permission grants).
+     * @return the reply.
+     */
+    fun redeemReward(uuid: UUID, id: String, name: String): NodeReply = call(FeedbackActions.REWARDS_REDEEM, uuid.toString(), id, name)
 
     /**
      * Records one test tool use on the node (`feedback.toollog`).

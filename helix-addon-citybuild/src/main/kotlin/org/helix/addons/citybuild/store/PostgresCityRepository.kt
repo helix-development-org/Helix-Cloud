@@ -256,6 +256,15 @@ class PostgresCityRepository(connection: StorageConnection) : CityRepository {
         deleted > 0
     }
 
+    override fun wipeGameplay(dryRun: Boolean): Map<String, Int> = transaction { c ->
+        val counts = linkedMapOf<String, Int>()
+        GAMEPLAY_TABLES.forEach { table -> counts[table] = c.single("SELECT COUNT(*) FROM citybuild.$table").toInt() }
+        if (!dryRun) {
+            c.createStatement().use { st -> st.execute("TRUNCATE ${GAMEPLAY_TABLES.joinToString { "citybuild.$it" }}") }
+        }
+        counts
+    }
+
     /** Closes the connection pool. */
     override fun close() = pool.close()
 
@@ -347,6 +356,12 @@ class PostgresCityRepository(connection: StorageConnection) : CityRepository {
     private class LongIds(val ids: List<Long>)
 
     private companion object {
+        /** Tables emptied by the release reset; warps and the audit log are kept. */
+        val GAMEPLAY_TABLES = listOf(
+            "homes", "kit_claims", "auctions", "pickup", "plot_market", "jobs", "rewards", "tutorial", "daily_counters",
+            "offer_buys", "forge_serials", "profile_reports",
+        )
+
         val SCHEMA = listOf(
             "CREATE SCHEMA IF NOT EXISTS citybuild",
             "CREATE TABLE IF NOT EXISTS citybuild.homes (uuid TEXT NOT NULL, shard TEXT NOT NULL, name_key TEXT NOT NULL, name TEXT NOT NULL, world TEXT NOT NULL, " +

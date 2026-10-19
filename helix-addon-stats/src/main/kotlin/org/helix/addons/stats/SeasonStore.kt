@@ -72,6 +72,22 @@ class SeasonStore(private val storage: AddonStorage, private val stats: StatsSto
     fun season(stat: String, season: Int): SeasonRecord? =
         seasons[stat.lowercase()]?.firstOrNull { it.season == season }
 
+    /**
+     * Counts or deletes every archived season (network release reset).
+     *
+     * @param dryRun `true` only counts.
+     * @return number of archived season records, counted before deletion.
+     */
+    @Synchronized
+    fun wipe(dryRun: Boolean): Int {
+        val count = seasons.values.sumOf { it.size }
+        if (!dryRun && seasons.isNotEmpty()) {
+            seasons.clear()
+            persist()
+        }
+        return count
+    }
+
     private fun persist() {
         storage.write(DOCUMENT, json.encodeToString(SeasonsDocument(seasons.mapValues { it.value.toList() })))
     }
