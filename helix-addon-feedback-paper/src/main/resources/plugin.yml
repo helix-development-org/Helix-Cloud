@@ -1,0 +1,43 @@
+name: HelixFeedback
+version: '${version}'
+main: org.helix.addons.feedback.paper.FeedbackPlugin
+api-version: '1.21'
+description: Paper side of helix.feedback – /bug reports with context, /bugs, tester agreement, automatic error reports and /testtools of the closed test phase.
+depend: [Helix-GUIs]
+softdepend: [IGuard]
+commands:
+  bug:
+    description: Report a bug (form with automatic context).
+    usage: /bug
+    aliases: [fehler, report-bug]
+    permission: feedback.report
+  bugs:
+    description: Your bug reports and the tester ranking.
+    usage: /bugs [top]
+    aliases: [meinebugs]
+    permission: feedback.report
+  testtools:
+    description: Tools of the closed test phase.
+    usage: /testtools [punkt setzen|loeschen <name>]
+    aliases: [tt]
+    permission: tester.tools
+  testervereinbarung:
+    description: Show, accept or decline the tester agreement.
+    usage: /testervereinbarung [annehmen|ablehnen]
+    aliases: [testeragreement]
+permissions:
+  feedback.report:
+    description: Report bugs with /bug and see own reports with /bugs.
+    default: false
+  feedback.tester:
+    description: Tester of the closed test phase (must accept the tester agreement).
+    default: false
+  feedback.staff:
+    description: Staff of the feedback system (never frozen by the agreement, sees exploit reports).
+    default: op
+  feedback.admin:
+    description: Manage test points of /testtools.
+    default: op
+  tester.tools:
+    description: Use /testtools during the test phase.
+    default: false
