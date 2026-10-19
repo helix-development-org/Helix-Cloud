@@ -41,7 +41,8 @@ Points are granted to the reporter when a report enters `confirmed` for the firs
   trailing `viewerJson` = `{"uuid":…,"name":…}`); without it a bridge `list` answers `forbidden`.
 - Malformed calls answer `usage` with the usage line in `lines[1]`.
 - `feedback.settings`, `feedback.rewards.table`, `feedback.rewards.grant`, `feedback.attachment` and `feedback.export`
-  are not bridge-invocable (dashboard/CLI/addons only).
+  and `feedback.toollog.list` are not bridge-invocable (dashboard/CLI/addons only).
+- JSON payloads may span several arguments (they are joined with spaces from their position on).
 
 ## Models (JSON)
 
@@ -56,7 +57,7 @@ discordThread|null, createdAt, updatedAt}`
 
 `Attachment` = `{id, name, mime, size, at}` · `Comment` = `{id, nr, author:{uuid|null,name}, staff, text, at}`
 · `ReportEvent` = `{nr, at, actor, type, from|null, to|null, note|null}` · `Notification` =
-`{id, uuid, nr, title, status, at}` · `PendingReward` = `{id, uuid, reward:{…}, createdAt, claimedAt|null}`
+`{id, uuid, nr, title, status, at}` · `ToolLogEntry` = `{uuid, name, action, details:{…}, service|null, at}` · `PendingReward` = `{id, uuid, reward:{…}, createdAt, claimedAt|null}`
 
 ## Actions
 
@@ -84,7 +85,13 @@ discordThread|null, createdAt, updatedAt}`
 | `feedback.rewards.pending` | ✔ | `<uuid>` | `[PendingReward]` unclaimed |
 | `feedback.rewards.grant` | – | `<uuid> <json reward>` | `PendingReward` |
 | `feedback.rewards.claim` | ✔ | `<uuid> <id>` | `PendingReward` (claimed); `not_found`, `claimed` |
+| `feedback.toollog` | ✔ | `<uuid> <json {name?, action, details?:{…}, service?}>` | `ToolLogEntry`; `invalid_toollog` (action required) |
+| `feedback.toollog.list` | – | `[uuid\|-] [limit=100, max 1000]` | `[ToolLogEntry]` oldest first |
 | `feedback.export` | – | – | `{total, byStatus:{…}, bySeverity:{…}, top:[{uuid,name,total}]}` |
+
+Bridge value `feedback.settings`: the settings below as JSON **without** `rewards`, republished on every
+`feedback.settings` patch – Paper components read `testphase`, `cooldownSeconds`, `maxPerDay`, `maxAttachmentBytes`,
+`agreementVersion` from it.
 
 Settings (`feedback.settings`): `testphase` (true), `cooldownSeconds` (60), `maxPerDay` (20), `zone`
 (Europe/Berlin), `logMinutes` (10), `logMaxLines` (100), `maxAttachmentBytes` (2097152), `agreementVersion` (1),

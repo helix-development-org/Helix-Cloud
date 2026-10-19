@@ -202,3 +202,23 @@ object Sources {
     /** All sources. */
     val ALL: List<String> = listOf(INGAME, DISCORD, PANEL, AUTO)
 }
+
+/**
+ * One logged use of a tester tool (`/testtools`), kept for abuse checks and as report context.
+ *
+ * @property uuid tester UUID.
+ * @property name tester name.
+ * @property action tool action (for example `kronen`, `time`, `teleport`).
+ * @property details free-form details sent by the plugin.
+ * @property service service the tool was used on.
+ * @property at time (epoch ms).
+ */
+@Serializable
+data class ToolLogEntry(
+    val uuid: String,
+    val name: String = "",
+    val action: String,
+    val details: JsonObject = JsonObject(emptyMap()),
+    val service: String? = null,
+    val at: Long,
+)

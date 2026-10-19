@@ -547,6 +547,38 @@ class FeedbackService(
         Outcome.Ok(claimed)
     }
 
+    /**
+     * Records the use of a tester tool.
+     *
+     * @param uuid tester UUID.
+     * @param body `{name?, action, details?, service?}` from the plugin.
+     * @return the stored entry or `invalid_toollog`.
+     */
+    fun toolLog(uuid: String, body: JsonObject): Outcome<ToolLogEntry> {
+        val action = body.str("action")?.trim()?.takeIf { it.isNotEmpty() && it.length <= MAX_NAME }
+            ?: return Outcome.Fail("invalid_toollog", "action required")
+        if (uuid.isBlank()) return Outcome.Fail("invalid_toollog", "uuid required")
+        val entry = ToolLogEntry(
+            uuid = uuid,
+            name = body.str("name").orEmpty(),
+            action = action,
+            details = body["details"] as? JsonObject ?: JsonObject(emptyMap()),
+            service = body.str("service"),
+            at = clock.millis(),
+        )
+        store.addToolLog(entry)
+        return Outcome.Ok(entry)
+    }
+
+    /**
+     * Reads tester tool log entries.
+     *
+     * @param uuid only this tester, or all when `null`.
+     * @param limit maximum number of entries.
+     * @return entries, oldest first.
+     */
+    fun toolLogs(uuid: String?, limit: Int = 100): List<ToolLogEntry> = store.toolLogs(uuid, limit.coerceIn(1, MAX_TOOLLOG_PAGE))
+
     /** @return all reports (for summaries). */
     fun all(): List<Report> = store.reports()
 
@@ -636,6 +668,7 @@ class FeedbackService(
         const val MAX_DESCRIPTION = 4000
         const val MAX_NAME = 120
         const val MAX_PAGE = 200
+        const val MAX_TOOLLOG_PAGE = 1000
         const val MAX_AFFECTED = 200
         const val MAX_CHUNKS = 256
         const val UPLOAD_TTL_MILLIS = 10 * 60 * 1000L

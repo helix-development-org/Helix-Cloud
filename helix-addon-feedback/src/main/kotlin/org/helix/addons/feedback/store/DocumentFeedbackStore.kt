@@ -13,6 +13,7 @@ import org.helix.addons.feedback.PendingReward
 import org.helix.addons.feedback.Points
 import org.helix.addons.feedback.Report
 import org.helix.addons.feedback.ReportEvent
+import org.helix.addons.feedback.ToolLogEntry
 import org.helix.api.storage.AddonStorage
 import java.util.Base64
 
@@ -91,6 +92,17 @@ class DocumentFeedbackStore(private val storage: AddonStorage) : FeedbackStore {
 
     override fun rewards(uuid: String): List<PendingReward> = list("$REWARDS$uuid", PendingReward.serializer())
 
+    @Synchronized
+    override fun addToolLog(entry: ToolLogEntry) {
+        val key = "$TOOLLOG${entry.uuid}"
+        writeList(key, ToolLogEntry.serializer(), (list(key, ToolLogEntry.serializer()) + entry).takeLast(MAX_TOOLLOG_PER_PLAYER))
+    }
+
+    override fun toolLogs(uuid: String?, limit: Int): List<ToolLogEntry> {
+        val keys = if (uuid != null) listOf("$TOOLLOG$uuid") else storage.keys().filter { it.startsWith(TOOLLOG) }
+        return keys.flatMap { list(it, ToolLogEntry.serializer()) }.sortedBy { it.at }.takeLast(limit)
+    }
+
     override fun settings(): FeedbackSettings? = read(SETTINGS, FeedbackSettings.serializer())
 
     override fun putSettings(settings: FeedbackSettings) = write(SETTINGS, FeedbackSettings.serializer(), settings)
@@ -117,5 +129,7 @@ class DocumentFeedbackStore(private val storage: AddonStorage) : FeedbackStore {
         const val NOTIFICATIONS = "notifications:"
         const val REWARDS = "rewards:"
         const val SETTINGS = "settings"
+        const val TOOLLOG = "toollog:"
+        const val MAX_TOOLLOG_PER_PLAYER = 500
     }
 }

@@ -51,6 +51,7 @@ class FeedbackAddon(
             runCatching { context.publishNotification(category, messages.format(key, params)) }
         }
         registerActions()
+        publishSettings(service.settings())
         panel("feedback", "Bugs", "/panel.html")
     }
 
@@ -230,7 +231,7 @@ class FeedbackAddon(
         action("feedback.settings", "Shows or patches the feedback settings.", "feedback.settings [json]", permission = "feedback.admin") { inv ->
             val patch = body(inv, 0)
             val settings = if (patch == null) service.settings() else when (val r = service.patchSettings(patch)) {
-                is Outcome.Ok -> r.value
+                is Outcome.Ok -> r.value.also { publishSettings(it) }
                 is Outcome.Fail -> return@action fail(r.code, r.detail)
             }
             ActionResult.ok(encode(FeedbackSettings.serializer(), settings))
@@ -261,6 +262,16 @@ class FeedbackAddon(
             if (uuid == null || id == null) return@action bad("usage: feedback.rewards.claim <uuid> <id>")
             reply(service.claim(uuid, id)) { encode(PendingReward.serializer(), it) }
         }
+        action("feedback.toollog", "Records the use of a tester tool.", "feedback.toollog <uuid> <json>", bridgeInvocable = true) { inv ->
+            val uuid = inv.arguments.getOrNull(0) ?: return@action bad("usage: feedback.toollog <uuid> <json>")
+            val body = body(inv, 1) ?: return@action bad("usage: feedback.toollog <uuid> <json>")
+            reply(service.toolLog(uuid, body)) { encode(ToolLogEntry.serializer(), it) }
+        }
+        action("feedback.toollog.list", "Lists tester tool usage.", "feedback.toollog.list [uuid|-] [limit]") { inv ->
+            val uuid = inv.arguments.getOrNull(0)?.takeIf { it != "-" && it.isNotBlank() }
+            val limit = inv.arguments.getOrNull(1)?.toIntOrNull() ?: 100
+            ActionResult.ok(json.encodeToString(ListSerializer(ToolLogEntry.serializer()), service.toolLogs(uuid, limit)))
+        }
         action("feedback.export", "Summary of reports and points for the panel.", "feedback.export") { _ ->
             val all = service.all()
             ActionResult.ok(
@@ -272,6 +283,15 @@ class FeedbackAddon(
                 }.toString(),
             )
         }
+    }
+
+    /**
+     * Publishes the settings Paper components read (everything except the reward table) as bridge value
+     * `feedback.settings`.
+     */
+    private fun publishSettings(settings: FeedbackSettings) {
+        val full = json.encodeToJsonElement(FeedbackSettings.serializer(), settings) as JsonObject
+        runCatching { context.publishBridgeValue(SETTINGS_KEY, JsonObject(full - "rewards").toString()) }
     }
 
     /**
@@ -291,8 +311,8 @@ class FeedbackAddon(
     }
 
     private fun body(inv: ActionInvocation, index: Int): JsonObject? {
-        val raw = if (index == 0) inv.arguments.joinToString(" ") else inv.arguments.getOrNull(index)
-        if (raw.isNullOrBlank()) return null
+        val raw = inv.arguments.drop(index).joinToString(" ")
+        if (raw.isBlank()) return null
         return runCatching { json.parseToJsonElement(raw).jsonObject }.getOrNull()
     }
 
@@ -314,5 +334,6 @@ class FeedbackAddon(
     private companion object {
         const val STAFF = "feedback.staff"
         const val LOG_TAIL = 2000
+        const val SETTINGS_KEY = "feedback.settings"
     }
 }

@@ -9,6 +9,7 @@ import org.helix.addons.feedback.PendingReward
 import org.helix.addons.feedback.Points
 import org.helix.addons.feedback.Report
 import org.helix.addons.feedback.ReportEvent
+import org.helix.addons.feedback.ToolLogEntry
 
 /**
  * Persistence of the feedback addon. Implementations only store and load; all rules live in
@@ -139,6 +140,22 @@ interface FeedbackStore : AutoCloseable {
      * @return all rewards of the recipient (pending and claimed).
      */
     fun rewards(uuid: String): List<PendingReward>
+
+    /**
+     * Appends a tester tool log entry.
+     *
+     * @param entry the entry.
+     */
+    fun addToolLog(entry: ToolLogEntry)
+
+    /**
+     * Loads tester tool log entries.
+     *
+     * @param uuid only entries of this tester, or all when `null`.
+     * @param limit maximum number of entries (newest kept).
+     * @return entries, oldest first.
+     */
+    fun toolLogs(uuid: String?, limit: Int): List<ToolLogEntry>
 
     /** @return the stored settings or `null` before the first write. */
     fun settings(): FeedbackSettings?

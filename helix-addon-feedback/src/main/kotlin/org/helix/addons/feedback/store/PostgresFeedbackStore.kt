@@ -13,6 +13,7 @@ import org.helix.addons.feedback.PendingReward
 import org.helix.addons.feedback.Points
 import org.helix.addons.feedback.Report
 import org.helix.addons.feedback.ReportEvent
+import org.helix.addons.feedback.ToolLogEntry
 import org.helix.api.addon.StorageConnection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
@@ -144,6 +145,20 @@ class PostgresFeedbackStore(connection: StorageConnection) : FeedbackStore {
     override fun rewards(uuid: String): List<PendingReward> =
         queryData("SELECT data FROM feedback.pending_rewards WHERE uuid = ? ORDER BY id", PendingReward.serializer(), uuid)
 
+    override fun addToolLog(entry: ToolLogEntry) {
+        update(
+            "INSERT INTO feedback.tool_log (uuid, at, data) VALUES (?, ?, ?::jsonb)",
+            entry.uuid, entry.at, encode(ToolLogEntry.serializer(), entry),
+        )
+    }
+
+    override fun toolLogs(uuid: String?, limit: Int): List<ToolLogEntry> =
+        if (uuid != null) {
+            queryData("SELECT data FROM feedback.tool_log WHERE uuid = ? ORDER BY at DESC, id DESC LIMIT ?", ToolLogEntry.serializer(), uuid, limit)
+        } else {
+            queryData("SELECT data FROM feedback.tool_log ORDER BY at DESC, id DESC LIMIT ?", ToolLogEntry.serializer(), limit)
+        }.reversed()
+
     override fun settings(): FeedbackSettings? =
         queryData("SELECT data FROM feedback.settings WHERE id = 1", FeedbackSettings.serializer()).firstOrNull()
 
@@ -206,6 +221,8 @@ class PostgresFeedbackStore(connection: StorageConnection) : FeedbackStore {
             "CREATE TABLE IF NOT EXISTS feedback.pending_rewards (id TEXT PRIMARY KEY, uuid TEXT NOT NULL, data JSONB NOT NULL)",
             "CREATE INDEX IF NOT EXISTS rewards_uuid ON feedback.pending_rewards (uuid)",
             "CREATE TABLE IF NOT EXISTS feedback.settings (id INT PRIMARY KEY, data JSONB NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS feedback.tool_log (id BIGSERIAL PRIMARY KEY, uuid TEXT NOT NULL, at BIGINT NOT NULL, data JSONB NOT NULL)",
+            "CREATE INDEX IF NOT EXISTS tool_log_uuid ON feedback.tool_log (uuid, at)",
         )
     }
 }

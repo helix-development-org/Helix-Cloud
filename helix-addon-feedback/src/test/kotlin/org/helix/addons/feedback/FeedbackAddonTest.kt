@@ -106,4 +106,19 @@ class FeedbackAddonTest {
         assertEquals(false, Json.parseToJsonElement(call("feedback.agreement.get", "uuid-x").lines[0]).jsonObject["accepted"]!!.jsonPrimitive.content.toBoolean())
         assertEquals("invalid_settings", call("feedback.settings", """{"zone":"Mars/Base"}""", source = ActionSource.REST).lines[0])
     }
+
+    @Test
+    fun `settings are published as bridge value and tool use is logged`() {
+        val published = Json.parseToJsonElement(context.bridgeValues.getValue("feedback.settings")).jsonObject
+        assertEquals("true", published["testphase"]!!.jsonPrimitive.content)
+        assertFalse(published.containsKey("rewards"))
+        call("feedback.settings", """{"testphase":false}""", source = ActionSource.REST)
+        assertEquals("false", Json.parseToJsonElement(context.bridgeValues.getValue("feedback.settings")).jsonObject["testphase"]!!.jsonPrimitive.content)
+        val logged = call("feedback.toollog", "uuid-alice", """{"name":"alice","action":"kronen","details":{"amount":500},"service":"CityBuild-1"}""")
+        assertTrue(logged.success, logged.lines.joinToString())
+        assertEquals("invalid_toollog", call("feedback.toollog", "uuid-alice", """{"name":"alice"}""").lines[0])
+        val list = Json.parseToJsonElement(call("feedback.toollog.list", "uuid-alice", source = ActionSource.REST).lines[0]).jsonArray
+        assertEquals("kronen", list.single().jsonObject["action"]!!.jsonPrimitive.content)
+        assertFalse(context.handlers.getValue("feedback.toollog.list").first.bridgeInvocable)
+    }
 }
