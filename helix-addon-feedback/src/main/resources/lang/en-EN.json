@@ -1,0 +1,5 @@
+{
+  "notify.new": "<#5ab4ff>Bug report</#5ab4ff> <#ffcf4a>#{nr}</#ffcf4a> <#f1e2c2>({severity}, {category}) by <#ffcf4a>{reporter}</#ffcf4a>: {title}",
+  "notify.auto": "<#ffb43a>Automatic error report</#ffb43a> <#ffcf4a>#{nr}</#ffcf4a> <#f1e2c2>({category}): {title}",
+  "notify.status": "<#5ab4ff>Bug report</#5ab4ff> <#ffcf4a>#{nr}</#ffcf4a> <#f1e2c2>is now <#ffcf4a>{status}</#ffcf4a>: {title}"
+}

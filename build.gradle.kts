@@ -96,6 +96,7 @@ val addonModules = listOf(
     "helix-addon-lobby",
     "helix-addon-mineclash",
     "helix-addon-citybuild",
+    "helix-addon-feedback",
     "helix-addon-mobs",
 )
 

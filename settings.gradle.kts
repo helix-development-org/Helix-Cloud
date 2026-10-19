@@ -57,5 +57,6 @@ include(
     "helix-addon-lobby-paper",
     "helix-addon-mineclash",
     "helix-addon-citybuild",
+    "helix-addon-feedback",
     "helix-addon-mobs"
 )
