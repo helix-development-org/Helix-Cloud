@@ -17,11 +17,11 @@ data class MotdConfig(
             "<#ffcf4a>kronland.de</#ffcf4a>",
     ),
     val maintenance: MotdProfile = MotdProfile(
-        line1 = "<#ffcf4a><bold>{network}</bold></#ffcf4a> <#7a4a24>·</#7a4a24> <#ffb43a>Maintenance",
-        line2 = "<#ffb43a>The villagers are rebuilding the kingdom <#7a4a24>—</#7a4a24> <#ffcf4a>kronland.de",
+        line1 = "<#ffcf4a><bold>{network}</bold></#ffcf4a> <#7a4a24>·</#7a4a24> <#5ab4ff>Geschlossene Testphase",
+        line2 = "<#d8382e>»</#d8382e> <#f1e2c2>Infos auf <#ffcf4a>kronland.de</#ffcf4a> <#7a4a24>·</#7a4a24> <#f1e2c2>Discord: <#ffcf4a>/discord",
         onlinePlayers = 0,
         maxPlayers = 0,
-        versionText = "&6Maintenance",
+        versionText = "&bTestphase",
     ),
 ) {
     /**
