@@ -117,5 +117,12 @@
   "error.agreement": "<#ff5a4a>Please accept the tester agreement first (<#ffcf4a>/testervereinbarung</#ffcf4a>).",
   "error.comment-cooldown": "<#ff5a4a>Not so fast – wait a moment before replying again.",
   "error.comment-limit": "<#ff5a4a>You reached the maximum number of replies for today.",
-  "error.attachment-limit": "<#ff5a4a>This report already has the maximum number of attachments."
+  "error.attachment-limit": "<#ff5a4a>This report already has the maximum number of attachments.",
+  "profile.badge": "Beta tester",
+  "profile.badge.value": "<#5ab4ff>✦ Took part in the test phase</#5ab4ff>",
+  "profile.points": "Bug points",
+  "release.reward.network": "<#4ac85e>Thanks for testing! Release reward: <#ffcf4a>{kronen} crowns</#ffcf4a>{extra}.</#4ac85e>",
+  "release.reward.extra": " and unlocks",
+  "release.reward.citybuild": "<#f1e2c2>More release rewards (keys/items) wait in your pickup box on your first CityBuild visit.</#f1e2c2>",
+  "release.reward.failed": "<#ff5a4a>Your release reward could not be paid right now. We will try again on your next join.</#ff5a4a>"
 }

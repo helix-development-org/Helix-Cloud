@@ -612,6 +612,52 @@ class FeedbackService(
     }
 
     /**
+     * Gives a claimed reward back (payout failed after the claim).
+     *
+     * @param uuid recipient.
+     * @param id reward id.
+     * @return `true` when a claimed reward was reopened.
+     */
+    fun unclaim(uuid: String, id: String): Boolean = synchronized(lock) {
+        val reward = store.rewards(uuid).firstOrNull { it.id == id && it.claimedAt != null } ?: return false
+        store.putReward(reward.copy(claimedAt = null))
+        true
+    }
+
+    /**
+     * Release step: queues the release reward parts of every player with points (once per player) and closes the
+     * test phase.
+     *
+     * @param dryRun `true` only computes.
+     * @return what was (or would be) granted.
+     */
+    fun prepareRelease(dryRun: Boolean): ReleasePreparation = synchronized(lock) {
+        val settings = settings()
+        val holders = store.allPoints().filter { it.total > 0 }
+        val granted = mutableListOf<PendingReward>()
+        var already = 0
+        var withoutTier = 0
+        holders.forEach { holder ->
+            if (store.rewards(holder.uuid).any { ReleaseRewards.isRelease(it.reward) }) {
+                already++
+                return@forEach
+            }
+            val tier = ReleaseRewards.tierFor(holder.total, settings.rewards)
+            if (tier == null) {
+                withoutTier++
+                return@forEach
+            }
+            ReleaseRewards.parts(tier, holder.total).forEach { part ->
+                val reward = PendingReward(UUID.randomUUID().toString(), holder.uuid, part, clock.millis())
+                if (!dryRun) store.putReward(reward)
+                granted += reward
+            }
+        }
+        if (!dryRun && settings.testphase) store.putSettings(settings.copy(testphase = false))
+        ReleasePreparation(holders, granted, already, withoutTier)
+    }
+
+    /**
      * Records the use of a tester tool.
      *
      * @param uuid tester UUID.

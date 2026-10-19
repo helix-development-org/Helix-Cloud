@@ -396,4 +396,14 @@ interface CityRepository : AutoCloseable {
      * @return `true` when something was deleted.
      */
     fun deletePlayer(uuid: String): Boolean
+
+    /**
+     * Counts or deletes the gameplay data of the release reset (plan 1, section 9): homes, kit claims, auctions,
+     * pickup boxes, plot market, jobs, daily rewards, tutorial state, daily counters, offer purchases, forge serials
+     * and profile reports. Warps (spawn points of the team) and the audit log are kept.
+     *
+     * @param dryRun `true` only counts.
+     * @return rows per data set (counted before deletion).
+     */
+    fun wipeGameplay(dryRun: Boolean): Map<String, Int>
 }

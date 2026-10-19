@@ -10,6 +10,8 @@ import org.helix.api.action.ActionResult
 import org.helix.api.action.ActionSource
 import org.helix.api.addon.PlayerDataProvider
 import org.helix.api.message.Messages
+import org.helix.api.release.ReleaseReport
+import org.helix.api.release.ReleaseReset
 import org.slf4j.LoggerFactory
 import java.time.Instant
 import java.time.format.DateTimeFormatter
@@ -145,7 +147,38 @@ class EconomyAddon : AddonBase() {
         ) { invocation -> pay(invocation) }
     }
 
+    /**
+     * Counts (plan) or deletes (run) all crown accounts for the network release; players start again with the
+     * starting balance on their next booking.
+     *
+     * @param arguments `plan` or `run`.
+     * @return a [ReleaseReport] line.
+     */
+    internal fun releaseReset(arguments: List<String>): ActionResult {
+        val dryRun = ReleaseReset.dryRun(arguments)
+            ?: return ActionResult.error("usage: eco.release.reset <plan|run>")
+        val known = if (dryRun) emptyList() else repository.accounts()
+        val deleted = LinkedHashMap(repository.wipeAll(dryRun))
+        // Paper reads balances from bridge values first; republish the starting balance so no stale value survives.
+        known.forEach { account -> publish(Holder(account.uuid, account.name)) }
+        deleted["legacy_unresolved"] = migration.clearUnresolved(dryRun)
+        return ActionResult.ok(
+            ReleaseReport(
+                addon = "economy",
+                mode = if (dryRun) ReleaseReset.PLAN else ReleaseReset.RUN,
+                deleted = deleted,
+                kept = mapOf("legacy_migrated" to "reference copy of the pre-crown document"),
+            ).toJson(),
+        )
+    }
+
     private fun registerAdminActions() {
+        action(
+            "eco" + ReleaseReset.ACTION_SUFFIX,
+            "Release reset: deletes every crown account with ledger, daily counters and parked legacy balances.",
+            "eco.release.reset <plan|run>",
+            permission = ReleaseReset.PERMISSION,
+        ) { invocation -> releaseReset(invocation.arguments) }
         action("eco.get", "Shows a player's crown balance.", "eco.get <player>") { invocation ->
             val arg = invocation.arguments.firstOrNull() ?: return@action ActionResult.error("usage: eco.get <player>")
             val holder = resolve(arg) ?: return@action ActionResult.error("unknown player: $arg")

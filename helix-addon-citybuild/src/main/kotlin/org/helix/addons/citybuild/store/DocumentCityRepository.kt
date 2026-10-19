@@ -310,6 +310,29 @@ class DocumentCityRepository(private val storage: AddonStorage) : CityRepository
         return changed
     }
 
+    @Synchronized override fun wipeGameplay(dryRun: Boolean): Map<String, Int> {
+        val counts = linkedMapOf(
+            "homes" to homes.size, "kit_claims" to kitClaims.size, "auctions" to auctions.size, "pickup" to pickups.size,
+            "plot_market" to listings.size, "jobs" to jobs.size, "rewards" to rewards.size, "tutorial" to tutorials.size,
+            "daily_counters" to counters.size, "offer_buys" to offers.size, "forge_serials" to serials.size,
+            "profile_reports" to reports.size,
+        )
+        if (dryRun) return counts
+        homes.clear(); save("homes", homes, Home.serializer())
+        kitClaims.clear(); save("kitclaims", kitClaims, KitClaimRow.serializer())
+        auctions.clear(); save("auctions", auctions, Auction.serializer())
+        pickups.clear(); save("pickups", pickups, Pickup.serializer())
+        listings.clear(); save("listings", listings, PlotListing.serializer())
+        counters.clear(); save("counters", counters, CounterRow.serializer())
+        offers.clear(); save("offers", offers, OfferRow.serializer())
+        serials.clear(); save("serials", serials, SerialRecord.serializer())
+        reports.clear(); save("reports", reports, ReportRow.serializer())
+        jobs.clear(); saveMap("jobs", jobs, JobProfile.serializer())
+        rewards.clear(); saveMap("rewards", rewards, RewardState.serializer())
+        tutorials.clear(); saveMap("tutorials", tutorials, TutorialState.serializer())
+        return counts
+    }
+
     /** Nothing to release. */
     override fun close() = Unit
 

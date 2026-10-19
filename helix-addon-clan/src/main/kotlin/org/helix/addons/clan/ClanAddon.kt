@@ -5,6 +5,8 @@ import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
 import org.helix.api.action.ActionSource
+import org.helix.api.release.ReleaseReport
+import org.helix.api.release.ReleaseReset
 import org.helix.api.display.DisplayProfile
 import org.helix.api.message.Messages
 import java.util.concurrent.ConcurrentHashMap
@@ -95,6 +97,25 @@ class ClanAddon : AddonBase() {
             val executor = invocation.arguments.firstOrNull()
                 ?: return@registerAction ActionResult.error("missing executing player")
             chat(executor, invocation.arguments.drop(1).joinToString(" "))
+        }
+        action(
+            "clan" + ReleaseReset.ACTION_SUFFIX,
+            "Release reset: empties every clan bank (clans, members and tags stay).",
+            "clan.release.reset <plan|run>",
+            permission = ReleaseReset.PERMISSION,
+        ) { inv ->
+            val dryRun = ReleaseReset.dryRun(inv.arguments)
+                ?: return@action ActionResult.error("usage: clan.release.reset <plan|run>")
+            val (banks, total) = store.emptyBanks(dryRun)
+            ActionResult.ok(
+                ReleaseReport(
+                    addon = "clan",
+                    mode = if (dryRun) ReleaseReset.PLAN else ReleaseReset.RUN,
+                    deleted = linkedMapOf("bank_balances" to banks),
+                    kept = mapOf("clans" to "clans, members, roles, tags and verification"),
+                    notes = listOf("crowns in clan banks: $total"),
+                ).toJson(),
+            )
         }
         action("clan.list", "Lists all clans as JSON (dashboard/panel).", "clan.list") {
             ActionResult.ok(

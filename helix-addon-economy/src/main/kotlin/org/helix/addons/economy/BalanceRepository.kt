@@ -228,6 +228,14 @@ interface BalanceRepository : AutoCloseable {
      */
     fun delete(uuid: String): Boolean
 
+    /**
+     * Counts or deletes every account with its ledger and daily counters (network release reset).
+     *
+     * @param dryRun `true` only counts.
+     * @return record counts per data set (`accounts`, `ledger`, `daily_counters`), counted before deletion.
+     */
+    fun wipeAll(dryRun: Boolean): Map<String, Int>
+
     /** Releases resources such as connection pools. */
     override fun close() {
     }

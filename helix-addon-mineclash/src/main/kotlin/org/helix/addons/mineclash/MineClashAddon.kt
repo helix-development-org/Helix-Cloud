@@ -14,6 +14,8 @@ import org.helix.addons.mineclash.profile.ProfileRepository
 import org.helix.addons.mineclash.profile.KronenRewards
 import org.helix.addons.mineclash.profile.StatsReporter
 import org.helix.addons.mineclash.queue.Matchmaker
+import org.helix.api.release.ReleaseReport
+import org.helix.api.release.ReleaseReset
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
 import org.slf4j.LoggerFactory
@@ -152,6 +154,23 @@ class MineClashAddon : AddonBase() {
             stats.report(record) // network-wide stats (helix.stats), when installed
             kronen.pay(record) // network currency (helix.economy), when installed
             ActionResult.ok("recorded")
+        }
+        action(
+            "mineclash" + ReleaseReset.ACTION_SUFFIX,
+            "Release reset: deletes every MineClash profile and the match history (keeps configuration).",
+            "mineclash.release.reset <plan|run>",
+            permission = ReleaseReset.PERMISSION,
+        ) { inv ->
+            val dryRun = ReleaseReset.dryRun(inv.arguments)
+                ?: return@action ActionResult.error("usage", "mineclash.release.reset <plan|run>")
+            ActionResult.ok(
+                ReleaseReport(
+                    addon = "mineclash",
+                    mode = if (dryRun) ReleaseReset.PLAN else ReleaseReset.RUN,
+                    deleted = profiles.wipe(dryRun),
+                    kept = mapOf("config" to "settings, cards, chests, buildings, perks and servers"),
+                ).toJson(),
+            )
         }
         action("mineclash.top", "Best players by roses as JSON.", "mineclash.top [limit]") { inv ->
             val limit = inv.arguments.firstOrNull()?.toIntOrNull() ?: 10

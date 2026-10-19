@@ -115,5 +115,12 @@
   "error.agreement": "<#ff5a4a>Bitte nimm zuerst die Tester-Vereinbarung an (<#ffcf4a>/testervereinbarung</#ffcf4a>).",
   "error.comment-cooldown": "<#ff5a4a>Nicht so schnell – warte kurz vor der nächsten Antwort.",
   "error.comment-limit": "<#ff5a4a>Du hast heute die maximale Anzahl an Antworten erreicht.",
-  "error.attachment-limit": "<#ff5a4a>Diese Meldung hat schon die maximale Anzahl an Anhängen."
+  "error.attachment-limit": "<#ff5a4a>Diese Meldung hat schon die maximale Anzahl an Anhängen.",
+  "profile.badge": "Beta-Tester",
+  "profile.badge.value": "<#5ab4ff>✦ Dabei in der Testphase</#5ab4ff>",
+  "profile.points": "Bug-Punkte",
+  "release.reward.network": "<#4ac85e>Danke fürs Testen! Release-Belohnung: <#ffcf4a>{kronen} Kronen</#ffcf4a>{extra}.</#4ac85e>",
+  "release.reward.extra": " und Freischaltungen",
+  "release.reward.citybuild": "<#f1e2c2>Weitere Release-Belohnungen (Schlüssel/Items) liegen beim ersten CityBuild-Besuch in deiner Abholkiste.</#f1e2c2>",
+  "release.reward.failed": "<#ff5a4a>Deine Release-Belohnung konnte gerade nicht ausgezahlt werden. Wir versuchen es beim nächsten Join erneut.</#ff5a4a>"
 }

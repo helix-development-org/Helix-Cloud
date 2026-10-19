@@ -86,4 +86,23 @@ class TesterAccessTest {
         assertTrue(lines[1].startsWith("tester.entry.timed player=alex"))
         assertTrue(lines[2].startsWith("tester.entry.permanent player=steve"))
     }
+
+    @Test
+    fun `release gives testers the beta badge and can remove the tester group`() {
+        access.seedGroup()
+        access.command("mod", listOf("add", "alice"))
+        access.command("mod", listOf("add", "bob", "7d"))
+        val plan = access.release(dryRun = true, removeTesters = true)
+        assertEquals(2, plan.deleted["tester_memberships"])
+        assertNull(store.group(TesterAccess.BADGE_GROUP), "a plan changes nothing")
+
+        access.release(dryRun = false, removeTesters = false)
+        assertTrue(store.has("alice", "badge.betatester") && store.has("bob", "badge.betatester"))
+        assertTrue(store.has("alice", "helix.maintenance.bypass"), "testers keep their group without the flag")
+
+        access.release(dryRun = false, removeTesters = true)
+        assertTrue(store.has("bob", "badge.betatester"))
+        assertFalse(store.has("bob", "helix.maintenance.bypass"))
+        assertEquals(1, store.group(TesterAccess.BADGE_GROUP)!!.weight)
+    }
 }

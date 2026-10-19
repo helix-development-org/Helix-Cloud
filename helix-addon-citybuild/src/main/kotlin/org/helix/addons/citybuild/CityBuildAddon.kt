@@ -4,6 +4,8 @@ import org.helix.addons.citybuild.config.ConfigSeeds
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import org.helix.addon.sdk.AddonBase
+import org.helix.api.release.ReleaseReport
+import org.helix.api.release.ReleaseReset
 import org.helix.addons.citybuild.config.ConfigDocument
 import org.helix.addons.citybuild.config.ConfigStore
 import org.helix.addons.citybuild.store.DocumentRailStore
@@ -112,9 +114,40 @@ class CityBuildAddon(
         val rail = RailService(ctx, railStore) { name -> if (UUID_PATTERN.matches(name)) name else context.resolvePlayerUuid(name) }
         rail.register(registrar)
         context.registerPlayerDataProvider(rail.dataProvider)
+        action(
+            "citybuild" + ReleaseReset.ACTION_SUFFIX,
+            "Release reset: deletes CityBuild gameplay data (keeps configuration, warps, audit log).",
+            "citybuild.release.reset <plan|run>",
+            permission = ReleaseReset.PERMISSION,
+        ) { inv -> releaseReset(inv.arguments) }
         context.registerProfileInfoProvider(profiles.infoProvider)
         context.registerPlayerDataProvider(profiles.dataProvider)
         logger.info("CityBuild addon enabled: {} settings, collections {}", config.settings().size, config.collectionNames())
+    }
+
+    /**
+     * Counts (plan) or deletes (run) all CityBuild gameplay data across every instance. Kept: configuration and
+     * seeds, warps of the team, the audit log. World files (plots, farm worlds) are wiped by the node orchestrator.
+     *
+     * @param arguments `plan` or `run`.
+     * @return a [ReleaseReport] line.
+     */
+    internal fun releaseReset(arguments: List<String>): ActionResult {
+        val dryRun = ReleaseReset.dryRun(arguments)
+            ?: return ActionResult.error("usage", "citybuild.release.reset <plan|run>")
+        val deleted = linkedMapOf<String, Int>()
+        repository.wipeGameplay(dryRun).forEach { (table, count) -> deleted[table] = count }
+        deleted["vehicles"] = vehicles.wipe(dryRun)
+        deleted["pets"] = pets.wipe(dryRun)
+        deleted["rail_discovered"] = railStore.wipe(dryRun)
+        val report = ReleaseReport(
+            addon = "citybuild",
+            mode = if (dryRun) ReleaseReset.PLAN else ReleaseReset.RUN,
+            deleted = deleted,
+            kept = mapOf("config" to "settings, collections and seeds", "warps" to "team spawn points", "logs" to "audit log"),
+        )
+        if (!dryRun) logger.warn("CityBuild release reset done: {}", deleted)
+        return ActionResult.ok(report.toJson())
     }
 
     /** Closes the repository. */

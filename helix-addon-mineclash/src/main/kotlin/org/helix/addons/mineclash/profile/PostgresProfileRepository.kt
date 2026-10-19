@@ -113,5 +113,16 @@ class PostgresProfileRepository(connection: StorageConnection) : ProfileReposito
             }
         }
 
+    override fun wipe(dryRun: Boolean): Map<String, Int> = pool.connection.use { c ->
+        val counts = linkedMapOf<String, Int>()
+        listOf("profiles", "match_history").forEach { table ->
+            counts[table] = c.createStatement().use { st ->
+                st.executeQuery("SELECT COUNT(*) FROM mineclash.$table").use { rs -> if (rs.next()) rs.getInt(1) else 0 }
+            }
+        }
+        if (!dryRun) c.createStatement().use { st -> st.execute("TRUNCATE mineclash.match_history, mineclash.profiles") }
+        counts
+    }
+
     override fun close() = pool.close()
 }

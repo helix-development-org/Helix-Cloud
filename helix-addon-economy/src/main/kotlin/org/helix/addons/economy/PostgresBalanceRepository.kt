@@ -244,6 +244,20 @@ class PostgresBalanceRepository(
             }
         }
 
+    override fun wipeAll(dryRun: Boolean): Map<String, Int> =
+        transaction { c ->
+            val counts = linkedMapOf<String, Int>()
+            listOf("accounts", "ledger", "daily_counters").forEach { table ->
+                counts[table] = c.createStatement().use { st ->
+                    st.executeQuery("SELECT COUNT(*) FROM economy.$table").use { rs -> if (rs.next()) rs.getInt(1) else 0 }
+                }
+            }
+            if (!dryRun) {
+                c.createStatement().use { st -> st.execute("TRUNCATE economy.ledger, economy.daily_counters, economy.accounts") }
+            }
+            counts
+        }
+
     override fun close() {
         if (owned) {
             (dataSource as? AutoCloseable)?.close()

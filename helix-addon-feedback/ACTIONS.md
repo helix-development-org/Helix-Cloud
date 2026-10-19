@@ -99,7 +99,9 @@ discordThread|null, createdAt, updatedAt}`
 | `feedback.rewards.table` | – | `[json [{minPoints, kronen, keys:[…], items:[…], note}]]` | current table |
 | `feedback.rewards.pending` | ✔ | `<uuid>` | `[PendingReward]` unclaimed |
 | `feedback.rewards.grant` | – | `<uuid> <json reward>` | `PendingReward` |
-| `feedback.rewards.claim` | ✔ | `<uuid> <id>` | `PendingReward` (claimed); `not_found`, `claimed` |
+| `feedback.rewards.claim` | – | `<uuid> <id>` | `PendingReward` (claimed); `not_found`, `claimed` – staff/addons only; Paper uses `redeem` |
+| `feedback.rewards.redeem` | ✔ | `<uuid> <id> <name>` | `PendingReward` (claimed, idempotent: second call `claimed`). Network part: pays `kronen` via `eco.api.deposit <uuid> <n> release-reward <id>` and grants `permissions` via `perm.user.grant`; payout failure reopens the reward (`payout_failed`). CityBuild part: only marked claimed – the CityBuild plugin delivers keys/items. Bridge calls need the player online under that uuid and name (`forbidden`) |
+| `feedback.release.reset` | – | `<plan\|run>` | `ReleaseReport` (helix-api `org.helix.api.release`); permission `release.reset`; called by the node's `release.reset` |
 | `feedback.toollog` | ✔ | `<uuid> <json {name?, action, details?:{…}, service?}>` | `ToolLogEntry`; `invalid_toollog` (action required) |
 | `feedback.toollog.list` | – | `[uuid\|-] [limit=100, max 1000]` | `[ToolLogEntry]` oldest first |
 | `feedback.whoami` | – | – | `{name, staff:true, admin}` – the panel user (`actor`) and whether it holds `feedback.admin` |
@@ -149,3 +151,20 @@ Machine events: every created report (incl. new auto reports), status change, co
 `context.publishNotification("feedback-event", <FeedbackEvent JSON>)` with
 `FeedbackEvent` = `{type: created|status|comment|attachment, nr, source?, severity?, from?, to?, actor?, note?,
 commentId?, attachmentId?, via?}`. The Discord bot mirrors reports into forum threads from these events.
+
+## Release rewards (plan 1, section 8)
+
+`feedback.rewards.table` tiers: `{minPoints, kronen?, keys?:[crateId], items?:[ref], permissions?:[node], note?}`.
+Item refs: `forge:<template>`, `model:<catalog id>`, `<material>` or `<material>*<amount>` (CityBuild items);
+`perm:<node>` / `cosmetic:<node>` are permission grants (cosmetics unlock by permission).
+
+On `feedback.release.reset run` every player with points gets the highest reached tier, split into up to two
+`PendingReward`s (`reward.release = true`, `reward.points`, `reward.tier`, `reward.note`):
+
+- `part: "network"` – `kronen`, `permissions`; the feedback Paper plugin redeems it on the first join anywhere.
+- `part: "citybuild"` – `keys`, `items`; the CityBuild plugin redeems it on the first join of any CityBuild instance
+  and puts the items into the player's inventory / pickup box.
+
+The run also grants `badge.betatester` (`perm.user.grant`) to every point holder, sets `testphase = false` and
+republishes the bridge value. A second run grants nothing new. The profile shows „Beta-Tester“ (badge permission)
+and „Bug-Punkte“.

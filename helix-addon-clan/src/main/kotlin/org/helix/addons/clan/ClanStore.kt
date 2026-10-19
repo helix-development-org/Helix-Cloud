@@ -288,6 +288,22 @@ class ClanStore(private val storage: AddonStorage) {
     fun allClans(): List<Pair<String, Clan>> =
         clans.entries.sortedByDescending { it.value.members.size }.map { it.key to it.value }
 
+    /**
+     * Counts or empties every clan bank (network release reset; clans and members stay).
+     *
+     * @param dryRun `true` only counts.
+     * @return number of clans with a non-empty bank and the summed balance before the reset.
+     */
+    @Synchronized
+    fun emptyBanks(dryRun: Boolean): Pair<Int, Long> {
+        val filled = clans.filterValues { it.bank > 0 }
+        if (!dryRun && filled.isNotEmpty()) {
+            filled.forEach { (id, clan) -> clans[id] = clan.copy(bank = 0) }
+            persist()
+        }
+        return filled.size to filled.values.sumOf { it.bank }
+    }
+
     private fun persist() {
         storage.write(
             DOCUMENT,

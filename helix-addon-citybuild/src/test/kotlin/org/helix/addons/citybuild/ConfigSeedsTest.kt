@@ -48,7 +48,7 @@ class ConfigSeedsTest {
     fun `every citybuild action is bridge invocable and the bundle is served`() {
         val context = RecordingAddonContext(createTempDirectory("citybuild"))
         CityBuildAddon(gatewayFactory = { FakeKronen() }).onEnable(context)
-        val actions = context.handlers.filterKeys { it.startsWith("citybuild.") }
+        val actions = context.handlers.filterKeys { it.startsWith("citybuild.") && it != "citybuild.release.reset" }
         assertTrue(actions.size > 60, "expected many actions, got ${actions.size}")
         actions.values.forEach { (descriptor, _) -> assertTrue(descriptor.bridgeInvocable, "${descriptor.name} must be bridge invocable") }
         actions.values.forEach { (descriptor, _) ->
