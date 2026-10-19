@@ -68,7 +68,7 @@ export function LoginView({ establish }: { establish: (token: string) => Promise
   return (
     // Parchment card on wood (§17): the backdrop keeps the wood token set, the card the parchment one.
     <div className="theme-wood kl-planks flex min-h-screen flex-col items-center justify-center gap-6 p-4 text-foreground">
-      <Wordmark size={52} />
+      <Wordmark size={52} mark />
       <div className="kl-rise relative w-full max-w-[440px]">
         <Card className="theme-parchment">
           <CardHeader className="items-center gap-3 pb-4 text-center">

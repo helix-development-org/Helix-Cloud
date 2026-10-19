@@ -40,6 +40,7 @@ val buildDashboard by tasks.registering(Exec::class) {
     environment("CI", "true")
     commandLine("sh", "-c", "pnpm install --frozen-lockfile && pnpm build")
     inputs.dir(dashboardDir.dir("src"))
+    inputs.dir(dashboardDir.dir("public"))
     inputs.file(dashboardDir.file("package.json"))
     inputs.file(dashboardDir.file("pnpm-lock.yaml"))
     inputs.file(dashboardDir.file("index.html"))

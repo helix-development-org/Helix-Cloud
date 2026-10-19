@@ -65,7 +65,7 @@ export function AppShell(props: {
       {/* Sidebar: wood in both modes (§17) — the theme-wood scope gives it the dark token set. */}
       <aside className="theme-wood flex w-60 flex-col border-r-[3px] border-[var(--sidebar-border)] bg-sidebar text-sidebar-foreground">
         <div className="flex flex-col items-start gap-1 px-5 pt-5 pb-4">
-          <Wordmark size={30} />
+          <Wordmark size={30} mark />
           <div className="pl-1 font-display text-xs tracking-[0.08em] text-[var(--parchment-lo)]">Staff Panel</div>
         </div>
         <nav className="flex-1 overflow-y-auto px-3 pb-4">
