@@ -115,4 +115,23 @@ class ProxyRoutingServiceTest {
         assertEquals(3, overview.onlinePlayers)
         assertEquals(100, overview.maxPlayers)
     }
+
+    @Test
+    fun `maintenance survives a cold start when a state file is given`() {
+        val file = paths.config.resolve("maintenance.json")
+        val first = ProxyRoutingService(manager, file)
+        assertEquals(false, first.maintenance)
+        first.maintenance = true
+        assertTrue(Files.exists(file))
+        assertEquals(true, ProxyRoutingService(manager, file).maintenance)
+        first.maintenance = false
+        assertEquals(false, ProxyRoutingService(manager, file).maintenance)
+    }
+
+    @Test
+    fun `a broken maintenance file falls back to off`() {
+        val file = paths.config.resolve("maintenance.json")
+        Files.writeString(file, "not json")
+        assertEquals(false, ProxyRoutingService(manager, file).maintenance)
+    }
 }

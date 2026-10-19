@@ -169,7 +169,7 @@ class HelixNode(
     )
 
     /** Proxy routing state. */
-    val routing: ProxyRoutingService = ProxyRoutingService(manager)
+    val routing: ProxyRoutingService = ProxyRoutingService(manager, paths.config.resolve("maintenance.json"))
 
     /** Per-service bridge tokens minted for managed services (see [bridgeEnvironment]). */
     private val serviceTokens: ServiceTokenRegistry = ServiceTokenRegistry()
