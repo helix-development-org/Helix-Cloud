@@ -1,0 +1,20 @@
+<div class="card">
+  <div class="card-head"><h2>Bug reports</h2><div class="right"><button class="btn sm subtle" id="refresh">Refresh</button></div></div>
+  <div id="list"><div class="empty">loading…</div></div>
+</div>
+<script>
+"use strict";
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const sev = { minor: "", annoying: "warn", blocking: "warn", crash: "bad", exploit: "bad" };
+async function load() {
+  const r = await Helix.action("feedback.list", JSON.stringify({ limit: 100 }));
+  let page = { total: 0, items: [] }; try { page = JSON.parse(r.lines[0] || "{}"); } catch (e) {}
+  const box = document.getElementById("list");
+  box.innerHTML = page.items && page.items.length ? `<table><thead><tr><th>#</th><th>Title</th><th>Severity</th><th>Category</th><th>Status</th><th>Reporter</th></tr></thead><tbody>${
+    page.items.map(b => `<tr><td>${b.nr}</td><td><strong>${esc(b.title)}</strong></td><td><span class="badge ${sev[b.severity] || ""}">${esc(b.severity)}</span></td>
+      <td>${esc(b.category)}</td><td>${esc(b.status)}</td><td>${esc(b.reporter ? b.reporter.name : b.source)}</td></tr>`).join("")
+  }</tbody></table>` : '<div class="empty">No bug reports yet</div>';
+}
+document.getElementById("refresh").onclick = load;
+Helix.ready(load);
+</script>

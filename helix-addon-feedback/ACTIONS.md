@@ -37,15 +37,21 @@ Points are granted to the reporter when a report enters `confirmed` for the firs
   - Non-staff players only see and comment on **their own** reports.
   - Reports with severity `exploit` are visible to staff and to their reporter only.
 - Write actions on status/assignee/duplicate need staff.
+- Bridge calls of `feedback.list`/`get`/`comment`/`attach`/`attach.finish` must name the player (`viewer`, `author`,
+  trailing `viewerJson` = `{"uuid":…,"name":…}`); without it a bridge `list` answers `forbidden`.
+- Malformed calls answer `usage` with the usage line in `lines[1]`.
+- `feedback.settings`, `feedback.rewards.table`, `feedback.rewards.grant`, `feedback.attachment` and `feedback.export`
+  are not bridge-invocable (dashboard/CLI/addons only).
 
 ## Models (JSON)
 
 `Report` = `{nr, status, severity, category, title, description, reporter:{uuid,name}|null, context:{…},
-assignee|null, duplicateOf|null, points, source, hash|null, count, affected:[uuid], attachments:[Attachment],
+assignee|null, duplicateOf|null, points, pointsGranted, source, hash|null, count, affected:[uuid], attachments:[Attachment],
 discordThread|null, createdAt, updatedAt}`
 
 `context` (filled by Paper, extended by the node): `service`, `task`, `world`, `x`, `y`, `z`, `yaw`, `pitch`,
-`gamemode`, `tps`, `mspt`, `ping`, `client:{version, brand, family, labymod}`, `versions:{…}`, and node-added
+`gamemode`, `tps`, `mspt`, `ping`, `client:{version, brand, family, labymod}`, `versions:{…}`, `serverTime`
+(`HH:mm:ss` local server clock – used to cut the log window; falls back to the `zone` setting), and node-added
 `logs:[line]` (WARN/ERROR lines of the reporting service from the last `logMinutes`, max `logMaxLines`).
 
 `Attachment` = `{id, name, mime, size, at}` · `Comment` = `{id, nr, author:{uuid|null,name}, staff, text, at}`
@@ -64,8 +70,8 @@ discordThread|null, createdAt, updatedAt}`
 | `feedback.status` | ✔ | `<json {nr, status, actor?:{uuid,name}, note?}>` | `Report`; `invalid_transition`, `forbidden` |
 | `feedback.assign` | ✔ | `<json {nr, assignee|null, actor?}>` | `Report` |
 | `feedback.duplicate` | ✔ | `<json {nr, of, actor?}>` | `Report` (status `duplicate`, points revoked) |
-| `feedback.attach` | ✔ | `<nr> <name> <mime> <base64>` | `Attachment`; `too_large` (> `maxAttachmentBytes`, default 2 MiB) |
-| `feedback.attach.chunk` | ✔ | `<uploadId> <index> <count> <base64>` then `feedback.attach.finish <uploadId> <nr> <name> <mime>` | chunk: `{received}`; finish: `Attachment` (uploads expire after 10 min) |
+| `feedback.attach` | ✔ | `<nr> <name> <mime> <base64> [viewerJson]` | `Attachment`; `too_large` (> `maxAttachmentBytes`, default 2 MiB) |
+| `feedback.attach.chunk` | ✔ | `<uploadId> <index> <count> <base64>` then `feedback.attach.finish <uploadId> <nr> <name> <mime> [viewerJson]` | chunk: `{received}`; finish: `Attachment` (uploads expire after 10 min) |
 | `feedback.attachment` | – | `<id>` | `lines[0]` = mime, `lines[1]` = base64 |
 | `feedback.mine` | ✔ | `<uuid> [limit]` | `[Report]` newest first (own reports, incl. exploits) |
 | `feedback.notifications` | ✔ | `<uuid>` | `[Notification]` unread |
@@ -78,11 +84,14 @@ discordThread|null, createdAt, updatedAt}`
 | `feedback.rewards.pending` | ✔ | `<uuid>` | `[PendingReward]` unclaimed |
 | `feedback.rewards.grant` | – | `<uuid> <json reward>` | `PendingReward` |
 | `feedback.rewards.claim` | ✔ | `<uuid> <id>` | `PendingReward` (claimed); `not_found`, `claimed` |
-| `feedback.export` | – | – | `{reports, points}` summary for the panel |
+| `feedback.export` | – | – | `{total, byStatus:{…}, bySeverity:{…}, top:[{uuid,name,total}]}` |
 
 Settings (`feedback.settings`): `testphase` (true), `cooldownSeconds` (60), `maxPerDay` (20), `zone`
 (Europe/Berlin), `logMinutes` (10), `logMaxLines` (100), `maxAttachmentBytes` (2097152), `agreementVersion` (1),
 `points` (`{minor:1, annoying:2, blocking:4, crash:6, exploit:10}`).
+
+Log lines: on `create`/`auto` the node calls `service.logs <context.service> 2000` and keeps WARN/ERROR entries
+(with their stack-trace continuation lines) of the last `logMinutes`, at most `logMaxLines`; lists omit `context.logs`.
 
 Notifications to Discord: `context.publishNotification("bugreport", …)` for new reports and status changes;
 reports with severity `exploit` use the category `bugreport-staff`.

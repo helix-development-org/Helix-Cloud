@@ -1,0 +1,109 @@
+package org.helix.addons.feedback
+
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
+import org.helix.addon.sdk.testing.RecordingAddonContext
+import org.helix.api.action.ActionInvocation
+import org.helix.api.action.ActionResult
+import org.helix.api.action.ActionSource
+import java.util.Base64
+import kotlin.io.path.createTempDirectory
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+class FeedbackAddonTest {
+    private val context = RecordingAddonContext(createTempDirectory("feedback"))
+    private val clock = TestClock()
+
+    init {
+        context.invocationResult = { inv ->
+            if (inv.action == "service.logs") ActionResult.ok("[09:59:00 ERROR]: boom", "[09:59:30 INFO]: ok") else ActionResult.ok()
+        }
+        FeedbackAddon(clock = clock).onEnable(context)
+    }
+
+    private fun call(action: String, vararg args: String, source: ActionSource = ActionSource.BRIDGE): ActionResult =
+        context.handlers.getValue(action).second.execute(ActionInvocation(action, args.toList(), source))
+
+    private fun create(name: String, severity: String = "annoying"): Long {
+        val body = """{"reporter":{"uuid":"uuid-$name","name":"$name"},"severity":"$severity","category":"lobby","title":"Bug von $name",""" +
+            """"description":"kaputt","context":{"service":"Lobby-1","serverTime":"10:00:00"}}"""
+        val r = call("feedback.create", body)
+        assertTrue(r.success, r.lines.joinToString())
+        return Json.parseToJsonElement(r.lines[0]).jsonObject["nr"]!!.jsonPrimitive.long
+    }
+
+    @Test
+    fun `registers bridge actions and the panel`() {
+        val bridge = context.handlers.filterValues { it.first.bridgeInvocable }.keys
+        assertTrue("feedback.create" in bridge && "feedback.attach.chunk" in bridge && "feedback.mine" in bridge)
+        assertFalse(context.handlers.getValue("feedback.settings").first.bridgeInvocable)
+        assertFalse(context.handlers.getValue("feedback.attachment").first.bridgeInvocable)
+    }
+
+    @Test
+    fun `bridge reports carry the service log excerpt and notify discord`() {
+        val nr = create("alice")
+        val details = Json.parseToJsonElement(call("feedback.get", nr.toString(), """{"uuid":"uuid-alice","name":"alice"}""").lines[0]).jsonObject
+        val logs = details["report"]!!.jsonObject["context"]!!.jsonObject["logs"]!!.jsonArray.map { it.jsonPrimitive.content }
+        assertEquals(listOf("[09:59:00 ERROR]: boom"), logs)
+        assertTrue(context.invocations.any { it.action == "service.logs" && it.arguments.first() == "Lobby-1" })
+        assertTrue(context.notifications.any { it.first == "bugreport" && it.second.contains("#$nr") })
+    }
+
+    @Test
+    fun `bridge players need staff rights for status changes`() {
+        val nr = create("alice")
+        val asPlayer = call("feedback.status", """{"nr":$nr,"status":"confirmed","actor":{"uuid":"uuid-bob","name":"bob"}}""")
+        assertEquals("forbidden", asPlayer.lines[0])
+        context.permissionCheck = { player, perm -> player == "mod" && perm == "feedback.staff" }
+        val asStaff = call("feedback.status", """{"nr":$nr,"status":"confirmed","actor":{"uuid":"uuid-mod","name":"mod"}}""")
+        assertTrue(asStaff.success, asStaff.lines.joinToString())
+        val top = Json.parseToJsonElement(call("feedback.top").lines[0]).jsonArray
+        assertEquals(2, top.single().jsonObject["points"]!!.jsonPrimitive.int)
+        val notes = Json.parseToJsonElement(call("feedback.notifications", "uuid-alice").lines[0]).jsonArray
+        assertEquals(1, notes.size)
+    }
+
+    @Test
+    fun `dashboard calls are staff and see every report`() {
+        create("alice", "exploit")
+        clock.advanceSeconds(61)
+        create("bob")
+        val asBob = Json.parseToJsonElement(call("feedback.list", """{"viewer":{"uuid":"uuid-bob","name":"bob"}}""").lines[0]).jsonObject
+        assertEquals(1, asBob["total"]!!.jsonPrimitive.int)
+        val panel = Json.parseToJsonElement(call("feedback.list", source = ActionSource.REST).lines[0]).jsonObject
+        assertEquals(2, panel["total"]!!.jsonPrimitive.int)
+        assertEquals("forbidden", call("feedback.list").lines[0], "bridge list needs a viewer")
+    }
+
+    @Test
+    fun `chunked attachment upload over actions`() {
+        val nr = create("alice")
+        val data = Base64.getEncoder().encodeToString(byteArrayOf(9, 8, 7))
+        assertTrue(call("feedback.attach.chunk", "up", "0", "1", data).success)
+        val viewer = """{"uuid":"uuid-alice","name":"alice"}"""
+        val att = call("feedback.attach.finish", "up", nr.toString(), "shot.jpg", "image/jpeg", viewer)
+        assertTrue(att.success, att.lines.joinToString())
+        val id = Json.parseToJsonElement(att.lines[0]).jsonObject["id"]!!.jsonPrimitive.content
+        val loaded = call("feedback.attachment", id, source = ActionSource.REST)
+        assertEquals(listOf("image/jpeg", data), loaded.lines)
+    }
+
+    @Test
+    fun `agreement and settings round trip`() {
+        assertEquals(false, Json.parseToJsonElement(call("feedback.agreement.get", "uuid-x").lines[0]).jsonObject["accepted"]!!.jsonPrimitive.content.toBoolean())
+        call("feedback.agreement.accept", "uuid-x")
+        assertEquals(true, Json.parseToJsonElement(call("feedback.agreement.get", "uuid-x").lines[0]).jsonObject["accepted"]!!.jsonPrimitive.content.toBoolean())
+        val patched = call("feedback.settings", """{"agreementVersion":2}""", source = ActionSource.REST)
+        assertTrue(patched.success)
+        assertEquals(false, Json.parseToJsonElement(call("feedback.agreement.get", "uuid-x").lines[0]).jsonObject["accepted"]!!.jsonPrimitive.content.toBoolean())
+        assertEquals("invalid_settings", call("feedback.settings", """{"zone":"Mars/Base"}""", source = ActionSource.REST).lines[0])
+    }
+}

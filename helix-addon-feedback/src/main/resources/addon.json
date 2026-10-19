@@ -1,0 +1,13 @@
+{
+  "id": "feedback",
+  "name": "Feedback",
+  "version": "1.0.0",
+  "main": "org.helix.addons.feedback.FeedbackAddon",
+  "description": "Closed test phase: bug reports with context, logs and attachments, status workflow, tester points and pending release rewards.",
+  "permissions": [
+    "feedback.report",
+    "feedback.tester",
+    "feedback.staff",
+    "feedback.admin"
+  ]
+}
