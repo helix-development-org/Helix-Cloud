@@ -183,5 +183,12 @@
   "bug.error.unavailable": "⚠️ The bug system is not reachable right now. Please try again later.",
   "bug.error.other": "⚠️ That did not work: {detail}",
   "bug.board.title": "🏆 Bug hunters of the week",
-  "bug.board.empty": "No confirmed reports yet – go hunt some bugs!"
+  "bug.board.empty": "No confirmed reports yet – go hunt some bugs!",
+  "bug.moved": "🔀 Report #{nr} was reclassified by the team and moved to another channel. This thread is closed.",
+  "bug.reclassified": "🏷️ Reclassified: **{from}** → **{to}** · category **{category}** (by {actor})",
+  "bug.error.not_tester": "🚫 Only testers can report bugs. You do not have the tester rank (yet).",
+  "bug.error.agreement_required": "📜 Please accept the tester agreement in game first, then you can report here.",
+  "bug.error.comment_cooldown": "⏳ Please wait {detail} more seconds before replying again.",
+  "bug.error.comment_limit": "⏳ You reached the maximum number of replies for today.",
+  "bug.error.attachment_limit": "📦 This report already has the maximum number of attachments."
 }

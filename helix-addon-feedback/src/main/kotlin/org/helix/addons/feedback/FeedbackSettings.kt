@@ -15,6 +15,10 @@ import kotlinx.serialization.json.JsonObject
  * @property maxAttachmentBytes maximum size of one attachment.
  * @property agreementVersion current version of the tester agreement.
  * @property points points per severity for confirmed reports.
+ * @property commentCooldownSeconds minimum seconds between two comments of the same (non-staff) player.
+ * @property maxCommentsPerDay maximum comments per (non-staff) player and calendar day.
+ * @property maxAttachmentsPerReport maximum attachments a non-staff caller may add to one report.
+ * @property maxAutoPerServiceHour maximum new automatic reports per service and hour (existing ones still count up).
  * @property rewards release reward table, one entry per tier (`minPoints`, `kronen`, `keys`, `items`, `note`).
  */
 @Serializable
@@ -34,5 +38,9 @@ data class FeedbackSettings(
         Severities.CRASH to 6,
         Severities.EXPLOIT to 10,
     ),
+    val commentCooldownSeconds: Int = 10,
+    val maxCommentsPerDay: Int = 50,
+    val maxAttachmentsPerReport: Int = 10,
+    val maxAutoPerServiceHour: Int = 20,
     val rewards: List<JsonObject> = emptyList(),
 )

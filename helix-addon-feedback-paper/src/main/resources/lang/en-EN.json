@@ -110,5 +110,10 @@
   "tools.extra.unhandled": "<#ffb43a>Heads up: this tool is not available on this server.",
   "screenshot.attached": "<#4ac85e>Screenshot attached to report <#ffcf4a>#{nr}</#ffcf4a>.",
   "screenshot.failed": "<#ffb43a>Note: the screenshot could not be taken. Your report arrived anyway – feel free to add a picture in the Discord thread.",
-  "screenshot.disabled": "<#ffb43a>Note: screenshots are turned off in your KronlandMC addon. Your report arrived anyway."
+  "screenshot.disabled": "<#ffb43a>Note: screenshots are turned off in your KronlandMC addon. Your report arrived anyway.",
+  "error.not-tester": "<#ff5a4a>Only testers can report bugs.",
+  "error.agreement": "<#ff5a4a>Please accept the tester agreement first (<#ffcf4a>/testervereinbarung</#ffcf4a>).",
+  "error.comment-cooldown": "<#ff5a4a>Not so fast – wait a moment before replying again.",
+  "error.comment-limit": "<#ff5a4a>You reached the maximum number of replies for today.",
+  "error.attachment-limit": "<#ff5a4a>This report already has the maximum number of attachments."
 }

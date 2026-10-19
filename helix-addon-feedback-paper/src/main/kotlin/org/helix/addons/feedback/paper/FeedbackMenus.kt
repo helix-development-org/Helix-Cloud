@@ -481,6 +481,7 @@ class FeedbackMenus(
                 } else {
                     player.allowFlight = !player.allowFlight
                     if (!player.allowFlight) player.isFlying = false
+                    plugin.markToolFlight(player, player.allowFlight)
                     plugin.logTool(player, "fly", player.allowFlight.toString())
                 }
             }
@@ -624,6 +625,11 @@ class FeedbackMenus(
             code == "testphase_closed" -> "error.testphase-closed"
             code == "forbidden" -> "error.forbidden"
             code == "not_found" -> "error.not-found"
+            code == "not_tester" -> "error.not-tester"
+            code == "agreement_required" -> "error.agreement"
+            code == "comment_cooldown" -> "error.comment-cooldown"
+            code == "comment_limit" -> "error.comment-limit"
+            code == "attachment_limit" -> "error.attachment-limit"
             code.startsWith("invalid") -> "error.invalid"
             else -> "error.unavailable"
         }

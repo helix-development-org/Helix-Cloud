@@ -183,5 +183,12 @@
   "bug.error.unavailable": "⚠️ Das Bug-System ist gerade nicht erreichbar. Versuche es später noch einmal.",
   "bug.error.other": "⚠️ Das hat nicht geklappt: {detail}",
   "bug.board.title": "🏆 Bug-Jäger der Woche",
-  "bug.board.empty": "Noch keine bestätigten Meldungen – ran an die Bugs!"
+  "bug.board.empty": "Noch keine bestätigten Meldungen – ran an die Bugs!",
+  "bug.moved": "🔀 Meldung #{nr} wurde vom Team neu eingeordnet und in einen anderen Kanal verschoben. Dieser Thread ist geschlossen.",
+  "bug.reclassified": "🏷️ Neu eingeordnet: **{from}** → **{to}** · Kategorie **{category}** (von {actor})",
+  "bug.error.not_tester": "🚫 Bugs melden können nur Tester. Du hast (noch) keinen Tester-Rang.",
+  "bug.error.agreement_required": "📜 Bitte nimm zuerst ingame die Tester-Vereinbarung an, dann kannst du hier melden.",
+  "bug.error.comment_cooldown": "⏳ Bitte warte noch {detail} Sekunden bis zur nächsten Antwort.",
+  "bug.error.comment_limit": "⏳ Du hast heute die maximale Anzahl an Antworten erreicht.",
+  "bug.error.attachment_limit": "📦 Diese Meldung hat schon die maximale Anzahl an Anhängen."
 }

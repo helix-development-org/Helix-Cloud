@@ -79,15 +79,15 @@ class FeedbackLogicTest {
 
     @Test
     fun `stack hash ignores line numbers, ids and lambda suffixes`() {
-        fun error(message: String, line: Int, lambda: String) = IllegalStateException(message).apply {
+        fun error(message: String, line: Int, lambda: String, method: String = "buy") = IllegalStateException(message).apply {
             stackTrace = arrayOf(
-                StackTraceElement("de.tytoss.citybuild.shop.Shop\$lambda\$$lambda", "buy", "Shop.kt", line),
+                StackTraceElement("de.tytoss.citybuild.shop.Shop\$lambda\$$lambda", method, "Shop.kt", line),
                 StackTraceElement("java.lang.Thread", "run", "Thread.java", 1),
             )
         }
         val a = error("Entity 1234 at 0xdeadbeef failed", 10, "1")
         val b = error("Entity 98 at 0xcafebabe failed", 99, "7")
-        val c = error("Other failure", 10, "1")
+        val c = error("Entity 1234 at 0xdeadbeef failed", 10, "1", method = "sell")
         assertEquals(StackTraces.hash(a), StackTraces.hash(b))
         assertNotEquals(StackTraces.hash(a), StackTraces.hash(c))
         assertEquals(16, StackTraces.hash(a).length)
@@ -142,5 +142,36 @@ class FeedbackLogicTest {
         assertEquals("error.cooldown", FeedbackMenus.errorKey("cooldown"))
         assertEquals("error.invalid", FeedbackMenus.errorKey("invalid_title"))
         assertEquals("error.unavailable", FeedbackMenus.errorKey("unavailable"))
+        assertEquals("error.not-tester", FeedbackMenus.errorKey("not_tester"))
+        assertEquals("error.agreement", FeedbackMenus.errorKey("agreement_required"))
+        assertEquals("error.attachment-limit", FeedbackMenus.errorKey("attachment_limit"))
+    }
+
+    @Test
+    fun `test flight is revoked outside allowed worlds and after the test phase`() {
+        val config = TestToolsConfig()
+        assertEquals(setOf("lobby", "plots"), config.flyWorlds)
+        assertTrue(TestToolRules.keepsFlight(true, true, TestToolRules.flyAllowed(config, "plots")))
+        assertFalse(TestToolRules.keepsFlight(true, true, TestToolRules.flyAllowed(config, "farm")))
+        assertFalse(TestToolRules.keepsFlight(true, true, TestToolRules.flyAllowed(config, "spawn")))
+        assertFalse(TestToolRules.keepsFlight(false, true, true))
+        assertFalse(TestToolRules.keepsFlight(true, false, true))
+    }
+
+    @Test
+    fun `freeze fails closed when the node does not answer`() {
+        assertTrue(FreezeRules.frozenWith(true, false, null))
+        assertFalse(FreezeRules.frozenWith(true, true, null), "staff is never frozen")
+        assertFalse(FreezeRules.frozenWith(false, false, null))
+        assertFalse(FreezeRules.frozenWith(true, false, 2 to 2))
+        assertTrue(FreezeRules.frozenWith(true, false, 1 to 2))
+    }
+
+    @Test
+    fun `stack hash ignores the exception message`() {
+        val a = IllegalStateException("Player Alice not found")
+        val b = IllegalStateException("Player Bob not found")
+        b.stackTrace = a.stackTrace
+        assertEquals(StackTraces.hash(a), StackTraces.hash(b))
     }
 }

@@ -11,7 +11,12 @@ import java.util.concurrent.ConcurrentHashMap
  * reports (plan 1 section 5).
  *
  * - New report → thread in [DiscordConfig.bugForumChannelId] (title `#123 Title`, severity/category/status tags,
- *   context, reporter mention, screenshots as files); exploits go to [DiscordConfig.bugStaffChannelId] only.
+ *   context, reporter mention, screenshots as files); exploits and automatic error reports go to
+ *   [DiscordConfig.bugStaffChannelId] only.
+ * - Reclassification → message and new tags; when a report moves between the public forum and the staff channel
+ *   (to or from `exploit`), the old thread gets a neutral "moved" note and is locked, and a new thread is opened
+ *   in the right channel. The bot cannot delete the old starter post (needs Manage Messages and is irreversible),
+ *   so staff should delete it by hand when it contains exploit details.
  * - Status change → message in the thread, tags updated, closing statuses archive and lock the thread.
  * - Comments and attachments made in game or in the panel → message in the thread.
  * - New forum post of a linked tester → `feedback.create` (severity/category from the post's tags), files are
@@ -47,6 +52,7 @@ class BugMirror(
         when (event.type) {
             "created" -> if (event.source != "discord") feedback.get(event.nr)?.let { ensureThread(it.report) }
             "status" -> onStatus(event)
+            "reclassified" -> onReclassified(event)
             "comment" -> if (event.via != "discord") onComment(event)
             "attachment" -> if (event.via != "discord") onAttachment(event)
         }
@@ -103,14 +109,15 @@ class BugMirror(
     }
 
     /**
-     * The channel a report is mirrored to: exploits only to the staff channel, everything else to the forum.
+     * The channel a report is mirrored to: exploits and automatic error reports (stack traces) only to the staff
+     * channel, everything else to the forum.
      *
      * @param report the report.
      * @return the channel id or `null` when the report is dropped.
      */
     fun channelFor(report: BugReport): String? {
         val cfg = config()
-        val channel = if (report.severity == "exploit") cfg.bugStaffChannelId else cfg.bugForumChannelId
+        val channel = if (staffOnly(report)) cfg.bugStaffChannelId else cfg.bugForumChannelId
         return channel.takeIf { it.isNotBlank() }
     }
 
@@ -172,6 +179,43 @@ class BugMirror(
         val channel = channelFor(report)
         val tags = if (channel != null && forum.isForum(channel)) BugTags.forReport(report, config().bugTags, forum.tags(channel)) else null
         forum.update(thread, tags = tags, closed = if (closing) true else null)
+    }
+
+    /**
+     * Whether a report belongs to the staff channel only.
+     *
+     * @param report the report.
+     * @return true for exploits and automatic error reports.
+     */
+    fun staffOnly(report: BugReport): Boolean = report.severity == "exploit" || report.source == "auto"
+
+    private suspend fun onReclassified(event: BugEvent) {
+        val report = feedback.get(event.nr)?.report ?: return
+        val old = report.discordThread?.takeIf { it.isNotBlank() }
+        val oldChannel = channelFor(report.copy(severity = event.from ?: report.severity))
+        val newChannel = channelFor(report)
+        if (old != null && oldChannel != newChannel) {
+            forum.post(old, text("bug.moved", mapOf("nr" to report.nr.toString())))
+            forum.update(old, closed = true)
+            feedback.link(report.nr, "-")
+            ensureThread(report.copy(discordThread = null))
+            return
+        }
+        val thread = ensureThread(report) ?: return
+        forum.post(
+            thread,
+            text(
+                "bug.reclassified",
+                mapOf(
+                    "from" to label("severity", event.from.orEmpty()),
+                    "to" to label("severity", report.severity),
+                    "category" to label("category", report.category),
+                    "actor" to (event.actor ?: "Team"),
+                ),
+            ),
+        )
+        val tags = newChannel?.takeIf { forum.isForum(it) }?.let { BugTags.forReport(report, config().bugTags, forum.tags(it)) }
+        if (tags != null) forum.update(thread, tags = tags)
     }
 
     private suspend fun onComment(event: BugEvent) {
@@ -263,6 +307,9 @@ class BugMirror(
         const val MAX_FILES = 10
         const val MAX_FILE_BYTES = 2 * 1024 * 1024
         const val BOARD_SIZE = 10
-        val KNOWN_ERRORS = setOf("cooldown", "daily_limit", "testphase_closed", "forbidden", "not_found", "too_large", "unavailable")
+        val KNOWN_ERRORS = setOf(
+            "cooldown", "daily_limit", "testphase_closed", "forbidden", "not_found", "too_large", "unavailable",
+            "not_tester", "agreement_required", "comment_cooldown", "comment_limit", "attachment_limit",
+        )
     }
 }

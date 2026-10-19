@@ -42,8 +42,9 @@ object StackTraces {
         "${className.replace(synthetic, "")}.${method.replace(synthetic, "")}"
 
     /**
-     * The signature of a throwable: its class, normalised message and the first [SIGNATURE_FRAMES] frames that
-     * are not JDK/Kotlin runtime frames (falling back to all frames), including causes' classes.
+     * The signature of a throwable: its class and the first [SIGNATURE_FRAMES] frames that are not JDK/Kotlin
+     * runtime frames (falling back to all frames), including causes' classes. The message is left out on purpose:
+     * messages often carry player names or other per-call text and would split one bug into many reports.
      *
      * @param error the throwable.
      * @return the signature text the hash is computed from.
@@ -54,7 +55,7 @@ object StackTraces {
         val picked = (own.ifEmpty { frames }).take(SIGNATURE_FRAMES)
         val causes = generateSequence(error.cause) { it.cause }.take(5).map { it.javaClass.name }.toList()
         return buildString {
-            append(error.javaClass.name).append(':').append(normalizeMessage(error.message))
+            append(error.javaClass.name)
             picked.forEach { append('\n').append(it) }
             causes.forEach { append("\ncaused by ").append(it) }
         }

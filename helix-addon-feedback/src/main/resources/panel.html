@@ -270,6 +270,8 @@ function renderDetail() {
           <div class="row"><input id="d-assignee" class="grow" value="${esc(b.assignee || "")}" placeholder="Name"><button class="btn sm subtle" id="d-assign">Setzen</button><button class="btn sm subtle" id="d-me">Mir</button></div>
           <label style="margin-top:12px">Duplikat von</label>
           <div class="row"><input id="d-dup" class="grow" type="number" min="1" placeholder="Nr."><button class="btn sm subtle" id="d-markdup">Verknüpfen</button></div>
+          <label style="margin-top:12px">Neu einordnen</label>
+          <div class="row"><select id="d-sev" class="grow">${Object.entries(SEVERITY).map(([k, v]) => `<option value="${k}" ${k === b.severity ? "selected" : ""}>${esc(v)}</option>`).join("")}</select><select id="d-cat" class="grow">${Object.entries(CATEGORY).map(([k, v]) => `<option value="${k}" ${k === b.category ? "selected" : ""}>${esc(v)}</option>`).join("")}</select><button class="btn sm subtle" id="d-reclass">Übernehmen</button></div>
           <div class="row" style="margin-top:14px">
             <button class="btn sm" id="d-tp" ${canTp ? "" : "disabled"}>Hinteleportieren</button>
             <button class="btn sm subtle" id="d-md">Als Markdown kopieren</button>
@@ -290,6 +292,7 @@ function renderDetail() {
   $("d-assign").onclick = () => assign($("d-assignee").value.trim() || null);
   $("d-me").onclick = () => assign(me.name);
   $("d-markdup").onclick = markDuplicate;
+  $("d-reclass").onclick = reclassify;
   $("d-send").onclick = sendComment;
   $("d-upload").onclick = upload;
   $("d-tp").onclick = teleport;
@@ -329,6 +332,15 @@ async function markDuplicate() {
   if (!of || of === current.report.nr) return Helix.toast("Gültige Nummer angeben");
   const r = await call("feedback.duplicate", JSON.stringify({ nr: current.report.nr, of }));
   if (r.success) { Helix.toast(`#${current.report.nr} ist Duplikat von #${of}`); openDetail(current.report.nr); loadList(); loadSummary(); }
+}
+async function reclassify() {
+  const severity = $("d-sev").value, category = $("d-cat").value;
+  if (severity === current.report.severity && category === current.report.category) return Helix.toast("Keine Änderung");
+  if (severity === "exploit" || current.report.severity === "exploit") {
+    if (!confirm("Wechsel von/zu Exploit verschiebt den Discord-Thread in einen anderen Kanal. Fortfahren?")) return;
+  }
+  const r = await call("feedback.severity", String(current.report.nr), severity, category);
+  if (r.success) { Helix.toast(`#${current.report.nr} neu eingeordnet`); openDetail(current.report.nr); loadList(); loadSummary(); }
 }
 async function sendComment() {
   const text = $("d-comment").value.trim(); if (!text) return;
