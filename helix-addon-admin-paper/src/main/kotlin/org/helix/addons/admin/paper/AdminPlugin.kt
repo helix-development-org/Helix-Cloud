@@ -71,7 +71,7 @@ class AdminPlugin : JavaPlugin(), Listener, PluginMessageListener {
     private val arrivals = ConcurrentHashMap<String, Arrival>()
 
     /** A player expected to join this server who must be placed on arrival (cross-server go-to/bring). */
-    private data class Arrival(val to: String?, val mode: String, val expiresAtMs: Long)
+    private data class Arrival(val to: String?, val mode: String, val expiresAtMs: Long, val location: JsonObject? = null)
 
     /** Connects to the node, registers the channels and starts presence, bridge-value and job polling. */
     override fun onEnable() {
@@ -282,7 +282,12 @@ class AdminPlugin : JavaPlugin(), Listener, PluginMessageListener {
         val player = Bukkit.getPlayerExact(name)
         when (job.str("type")) {
             "arrive" -> {
-                arrivals[name.lowercase()] = Arrival(payload.str("to"), payload.str("mode") ?: "goto", System.currentTimeMillis() + ARRIVAL_TTL_MS)
+                arrivals[name.lowercase()] = Arrival(
+                    payload.str("to"),
+                    payload.str("mode") ?: "goto",
+                    System.currentTimeMillis() + ARRIVAL_TTL_MS,
+                    payload.takeIf { payload.str("mode") == "location" },
+                )
                 player?.let(::arrive)
             }
             "connect" -> player?.let { connect(it, payload.str("service") ?: return) }
@@ -295,6 +300,15 @@ class AdminPlugin : JavaPlugin(), Listener, PluginMessageListener {
 
     private fun arrive(player: Player) {
         val arrival = arrivals.remove(player.name.lowercase())?.takeIf { it.expiresAtMs > System.currentTimeMillis() } ?: return
+        arrival.location?.let { spot ->
+            val world = spot.str("world")?.let(Bukkit::getWorld) ?: player.world
+            val num = { key: String -> spot[key]?.jsonPrimitive?.contentOrNull?.toDoubleOrNull() }
+            val loc = org.bukkit.Location(world, num("x") ?: return, num("y") ?: return, num("z") ?: return)
+            num("yaw")?.let { loc.yaw = it.toFloat() }
+            num("pitch")?.let { loc.pitch = it.toFloat() }
+            player.teleport(loc)
+            return
+        }
         val target = arrival.to?.let(Bukkit::getPlayerExact) ?: return
         if (arrival.mode == "spectate") spectate(player, target) else player.teleport(target)
     }
