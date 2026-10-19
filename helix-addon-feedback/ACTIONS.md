@@ -87,6 +87,7 @@ discordThread|null, createdAt, updatedAt}`
 | `feedback.rewards.claim` | ✔ | `<uuid> <id>` | `PendingReward` (claimed); `not_found`, `claimed` |
 | `feedback.toollog` | ✔ | `<uuid> <json {name?, action, details?:{…}, service?}>` | `ToolLogEntry`; `invalid_toollog` (action required) |
 | `feedback.toollog.list` | – | `[uuid\|-] [limit=100, max 1000]` | `[ToolLogEntry]` oldest first |
+| `feedback.whoami` | – | – | `{name, staff:true, admin}` – the panel user (`actor`) and whether it holds `feedback.admin` |
 | `feedback.export` | – | – | `{total, byStatus:{…}, bySeverity:{…}, top:[{uuid,name,total}]}` |
 
 Bridge value `feedback.settings`: the settings below as JSON **without** `rewards`, republished on every
@@ -102,3 +103,11 @@ Log lines: on `create`/`auto` the node calls `service.logs <context.service> 200
 
 Notifications to Discord: `context.publishNotification("bugreport", …)` for new reports and status changes;
 reports with severity `exploit` use the category `bugreport-staff`.
+
+## Panel
+
+`panel.html` (tab „Bugs“): list with filters (status, severity, category, task, source, reporter, search, sort, pages),
+detail (context, log excerpt, attachments with preview/upload, comments, events, status transitions, assignee,
+duplicate, points), „Hinteleportieren“ via `admin.teleport.location @self <service> <world> <x> <y> <z> [yaw] [pitch]`
+(helix-addon-admin; the panel user must be online), „Als Markdown kopieren“, tester ranking, test tool log and – with
+`feedback.admin` – settings and the release reward table.

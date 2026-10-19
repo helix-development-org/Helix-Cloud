@@ -1,20 +1,487 @@
-<div class="card">
-  <div class="card-head"><h2>Bug reports</h2><div class="right"><button class="btn sm subtle" id="refresh">Refresh</button></div></div>
-  <div id="list"><div class="empty">loading…</div></div>
+<style>
+  .tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+  .tabs .btn[aria-pressed="true"]{background:var(--gold);color:#2a160a;text-shadow:none;--hi:#fff0a8;--lo:#e0a420}
+  .filters{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;align-items:end}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .grow{flex:1}
+  tr.clickable{cursor:pointer}
+  tr.exploit td:first-child{box-shadow:inset 4px 0 0 var(--bad)}
+  .st-new{background:var(--info);color:#fff;text-shadow:0 1px 0 #2a160a}
+  .st-confirmed{background:var(--gold);color:#2a160a}
+  .st-in_progress{background:var(--warn);color:#2a160a}
+  .st-fixed{background:var(--good);color:#fff;text-shadow:0 1px 0 #2a160a}
+  .st-closed{background:var(--surface-2);color:var(--ink-3)}
+  .st-rejected,.st-not_a_bug,.st-duplicate{background:var(--surface-2);color:var(--ink-2);text-decoration:line-through}
+  .kv{display:grid;grid-template-columns:140px 1fr;gap:6px 14px;font-size:13.5px}
+  .kv dt{color:var(--ink-3);font-weight:700}
+  .kv dd{margin:0;word-break:break-word}
+  pre.log{background:#1b120b;color:#f1e2c2;border:1px solid var(--outline);border-radius:12px;padding:10px 12px;max-height:340px;overflow:auto;font-family:var(--mono);font-size:12px;white-space:pre}
+  .desc{white-space:pre-wrap;line-height:1.5;font-size:14px}
+  .grid2{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:18px}
+  @media (max-width:900px){.grid2{grid-template-columns:1fr}}
+  .comment{border-bottom:1px solid var(--line);padding:9px 0}
+  .comment .who{font-weight:800}
+  .thumbs{display:flex;gap:10px;flex-wrap:wrap}
+  .thumbs figure{margin:0;border:2px solid var(--outline);border-radius:12px;overflow:hidden;background:var(--surface-2);max-width:220px}
+  .thumbs img{display:block;max-width:220px;max-height:150px;cursor:zoom-in}
+  .thumbs figcaption{font-size:11.5px;padding:4px 8px;color:var(--ink-3)}
+  .pager{display:flex;gap:10px;align-items:center;justify-content:flex-end;padding:12px 16px}
+  .hidden{display:none!important}
+  .ev{font-size:12.5px;color:var(--ink-2);padding:3px 0}
+  .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:50;cursor:zoom-out}
+  .lightbox img{max-width:94vw;max-height:94vh;border-radius:12px}
+  .rewards td input{min-width:70px}
+</style>
+
+<div class="tabs" id="tabs">
+  <button class="btn sm subtle" data-tab="reports" aria-pressed="true">Meldungen</button>
+  <button class="btn sm subtle" data-tab="top">Rangliste</button>
+  <button class="btn sm subtle" data-tab="tools">Testtools-Protokoll</button>
+  <button class="btn sm subtle hidden" data-tab="settings" id="tab-settings">Einstellungen</button>
 </div>
+
+<!-- ============================================================ Meldungen -->
+<section id="view-reports">
+  <div class="card" id="list-card">
+    <div class="card-head"><h2>Bug-Meldungen</h2><span class="sub" id="summary"></span>
+      <div class="right" style="margin-left:auto"><button class="btn sm subtle" id="refresh">Aktualisieren</button></div></div>
+    <div class="card-body">
+      <div class="filters">
+        <div><label>Suche</label><input id="f-query" placeholder="Titel, Text, #Nr …"></div>
+        <div><label>Status</label><select id="f-status"><option value="">offen (neu–behoben)</option><option value="*">alle</option></select></div>
+        <div><label>Schwere</label><select id="f-severity"><option value="">alle</option></select></div>
+        <div><label>Kategorie</label><select id="f-category"><option value="">alle</option></select></div>
+        <div><label>Modus (Task)</label><select id="f-task"><option value="">alle</option></select></div>
+        <div><label>Quelle</label><select id="f-source"><option value="">alle</option></select></div>
+        <div><label>Melder</label><input id="f-reporter" placeholder="Name oder UUID"></div>
+        <div><label>Sortierung</label><select id="f-sort"><option value="new">neueste</option><option value="updated">zuletzt geändert</option><option value="severity">Schwere</option></select></div>
+      </div>
+    </div>
+    <div id="list"><div class="empty">lädt …</div></div>
+    <div class="pager"><span class="sub" id="pageinfo"></span><button class="btn sm subtle" id="prev">‹ Zurück</button><button class="btn sm subtle" id="next">Weiter ›</button></div>
+  </div>
+
+  <div id="detail" class="hidden"></div>
+</section>
+
+<!-- ============================================================ Rangliste -->
+<section id="view-top" class="hidden">
+  <div class="card">
+    <div class="card-head"><h2>Tester-Rangliste</h2><span class="sub">Punkte für bestätigte Meldungen</span></div>
+    <div id="top"><div class="empty">lädt …</div></div>
+  </div>
+</section>
+
+<!-- ============================================================ Testtools -->
+<section id="view-tools" class="hidden">
+  <div class="card">
+    <div class="card-head"><h2>Testtools-Protokoll</h2>
+      <div class="right row" style="margin-left:auto"><input id="t-uuid" placeholder="UUID filtern (leer = alle)" style="width:280px"><button class="btn sm subtle" id="t-load">Laden</button></div></div>
+    <div id="tools"><div class="empty">lädt …</div></div>
+  </div>
+</section>
+
+<!-- ============================================================ Einstellungen -->
+<section id="view-settings" class="hidden">
+  <div class="card">
+    <div class="card-head"><h2>Testphase &amp; Meldungen</h2></div>
+    <div class="card-body">
+      <div class="filters">
+        <div><label class="checkbox"><input type="checkbox" id="s-testphase" style="width:auto"> Testphase aktiv</label></div>
+        <div><label>Cooldown (Sekunden)</label><input id="s-cooldown" type="number" min="0"></div>
+        <div><label>Meldungen pro Tag</label><input id="s-perday" type="number" min="1"></div>
+        <div><label>Vereinbarungs-Version</label><input id="s-agreement" type="number" min="1"></div>
+        <div><label>Log-Fenster (Minuten)</label><input id="s-logmin" type="number" min="1"></div>
+        <div><label>Log-Zeilen max.</label><input id="s-loglines" type="number" min="1"></div>
+        <div><label>Anhang max. (KB)</label><input id="s-maxatt" type="number" min="64"></div>
+        <div><label>Zeitzone</label><input id="s-zone"></div>
+      </div>
+      <h2 style="margin:18px 0 8px;font-size:15px">Punkte je Schwere</h2>
+      <div class="filters" id="s-points"></div>
+      <div class="row" style="margin-top:16px"><button class="btn good" id="s-save">Speichern</button>
+        <span class="sub">Hinweis: Erhöht man die Vereinbarungs-Version, müssen alle Tester die Regeln erneut annehmen.</span></div>
+    </div>
+  </div>
+  <div class="card rewards">
+    <div class="card-head"><h2>Release-Belohnungen</h2><span class="sub">Punkte-Stufen → Belohnung (beim Release-Reset vergeben)</span>
+      <div class="right" style="margin-left:auto"><button class="btn sm subtle" id="r-add">Stufe hinzufügen</button></div></div>
+    <div id="rewards"><div class="empty">lädt …</div></div>
+    <div class="card-body"><button class="btn good" id="r-save">Belohnungen speichern</button></div>
+  </div>
+</section>
+
 <script>
 "use strict";
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
-const sev = { minor: "", annoying: "warn", blocking: "warn", crash: "bad", exploit: "bad" };
-async function load() {
-  const r = await Helix.action("feedback.list", JSON.stringify({ limit: 100 }));
-  let page = { total: 0, items: [] }; try { page = JSON.parse(r.lines[0] || "{}"); } catch (e) {}
-  const box = document.getElementById("list");
-  box.innerHTML = page.items && page.items.length ? `<table><thead><tr><th>#</th><th>Title</th><th>Severity</th><th>Category</th><th>Status</th><th>Reporter</th></tr></thead><tbody>${
-    page.items.map(b => `<tr><td>${b.nr}</td><td><strong>${esc(b.title)}</strong></td><td><span class="badge ${sev[b.severity] || ""}">${esc(b.severity)}</span></td>
-      <td>${esc(b.category)}</td><td>${esc(b.status)}</td><td>${esc(b.reporter ? b.reporter.name : b.source)}</td></tr>`).join("")
-  }</tbody></table>` : '<div class="empty">No bug reports yet</div>';
+const $ = id => document.getElementById(id);
+
+const SEVERITY = { minor: "Kleinigkeit", annoying: "Störend", blocking: "Blockierend", crash: "Absturz", exploit: "Exploit" };
+const SEV_RANK = { exploit: 0, crash: 1, blocking: 2, annoying: 3, minor: 4 };
+const SEV_CLASS = { minor: "neutral", annoying: "warn", blocking: "warn", crash: "bad", exploit: "bad" };
+const CATEGORY = { mineclash: "MineClash", citybuild: "CityBuild", lobby: "Lobby", network: "Netzwerk", graphics: "Grafik/Texte", other: "Sonstiges" };
+const STATUS = { new: "Neu", confirmed: "Bestätigt", in_progress: "In Arbeit", fixed: "Behoben", closed: "Geschlossen", rejected: "Abgelehnt", duplicate: "Duplikat", not_a_bug: "Kein Bug" };
+const OPEN = ["new", "confirmed", "in_progress", "fixed"];
+const SOURCE = { ingame: "Ingame", discord: "Discord", panel: "Panel", auto: "Automatisch" };
+const TRANSITIONS = {
+  new: ["confirmed", "rejected", "duplicate", "not_a_bug"],
+  confirmed: ["in_progress", "fixed", "rejected", "duplicate", "not_a_bug"],
+  in_progress: ["fixed", "confirmed"],
+  fixed: ["closed", "in_progress"],
+  closed: ["in_progress"],
+  rejected: ["new"], duplicate: ["new"], not_a_bug: ["new"],
+};
+const PAGE = 25;
+
+let me = { name: "dashboard", admin: false };
+let settings = null;
+let page = 0, total = 0, current = null, tasks = new Set();
+
+function fill(select, map) { Object.entries(map).forEach(([k, v]) => select.insertAdjacentHTML("beforeend", `<option value="${k}">${esc(v)}</option>`)); }
+fill($("f-severity"), SEVERITY); fill($("f-category"), CATEGORY); fill($("f-source"), SOURCE);
+fill($("f-status"), STATUS);
+
+function parse(r, fallback) { try { return JSON.parse(r.lines[0]); } catch (e) { return fallback; } }
+async function call(name, ...args) {
+  const r = await Helix.action(name, ...args);
+  if (!r.success) { Helix.toast((r.lines[1] || r.lines[0] || "Fehler") + ` (${name})`); }
+  return r;
 }
-document.getElementById("refresh").onclick = load;
-Helix.ready(load);
+const ago = ms => {
+  const s = Math.max(0, (Date.now() - ms) / 1000);
+  if (s < 60) return "gerade eben"; if (s < 3600) return `vor ${Math.floor(s / 60)} min`;
+  if (s < 86400) return `vor ${Math.floor(s / 3600)} h`; return new Date(ms).toLocaleString("de-DE");
+};
+const statusBadge = s => `<span class="badge st-${esc(s)}">${esc(STATUS[s] || s)}</span>`;
+const sevBadge = s => `<span class="badge ${SEV_CLASS[s] || ""}">${esc(SEVERITY[s] || s)}</span>`;
+
+// ------------------------------------------------------------------ tabs
+document.querySelectorAll("#tabs [data-tab]").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#tabs [data-tab]").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+  ["reports", "top", "tools", "settings"].forEach(t => $("view-" + t).classList.toggle("hidden", t !== b.dataset.tab));
+  ({ reports: loadList, top: loadTop, tools: loadTools, settings: loadSettings })[b.dataset.tab]();
+});
+
+// ------------------------------------------------------------------ list
+function filterJson() {
+  const st = $("f-status").value;
+  const body = { limit: PAGE, offset: page * PAGE, sort: $("f-sort").value };
+  if (st === "") body.status = OPEN; else if (st !== "*") body.status = [st];
+  if ($("f-severity").value) body.severity = [$("f-severity").value];
+  if ($("f-category").value) body.category = [$("f-category").value];
+  const q = $("f-query").value.trim(); if (q) body.query = q.replace(/^#/, "");
+  const rep = $("f-reporter").value.trim(); if (rep) body.reporter = rep;
+  return body;
+}
+async function loadList() {
+  const r = await call("feedback.list", JSON.stringify(filterJson()));
+  const data = parse(r, { total: 0, items: [] });
+  total = data.total || 0;
+  let items = data.items || [];
+  items.forEach(i => i.context && i.context.task && tasks.add(i.context.task));
+  const sel = $("f-task"), have = new Set([...sel.options].map(o => o.value));
+  [...tasks].sort().forEach(t => { if (!have.has(t)) sel.insertAdjacentHTML("beforeend", `<option value="${esc(t)}">${esc(t)}</option>`); });
+  if (sel.value) items = items.filter(i => (i.context || {}).task === sel.value);
+  if ($("f-source").value) items = items.filter(i => i.source === $("f-source").value);
+  $("list").innerHTML = items.length ? `<table><thead><tr><th>#</th><th>Titel</th><th>Schwere</th><th>Kategorie</th><th>Status</th><th>Melder</th><th>Modus</th><th>Geändert</th></tr></thead><tbody>${
+    items.map(b => `<tr class="clickable ${b.severity === "exploit" ? "exploit" : ""}" data-nr="${b.nr}">
+      <td><strong>#${b.nr}</strong></td>
+      <td><strong>${esc(b.title)}</strong>${b.source === "auto" && b.count > 1 ? ` <span class="chip">×${b.count}</span>` : ""}${(b.attachments || []).length ? ' <span class="chip">📎</span>' : ""}</td>
+      <td>${sevBadge(b.severity)}</td><td>${esc(CATEGORY[b.category] || b.category)}</td><td>${statusBadge(b.status)}</td>
+      <td>${esc(b.reporter ? b.reporter.name : SOURCE[b.source] || b.source)}</td>
+      <td class="muted">${esc((b.context || {}).task || "–")}</td><td class="muted">${ago(b.updatedAt)}</td></tr>`).join("")
+  }</tbody></table>` : '<div class="empty">Keine Meldungen für diesen Filter.</div>';
+  $("list").querySelectorAll("[data-nr]").forEach(tr => tr.onclick = () => openDetail(Number(tr.dataset.nr)));
+  const pages = Math.max(1, Math.ceil(total / PAGE));
+  $("pageinfo").textContent = `Seite ${page + 1} / ${pages} · ${total} Meldungen`;
+  $("prev").disabled = page === 0; $("next").disabled = page + 1 >= pages;
+}
+async function loadSummary() {
+  const r = await Helix.action("feedback.export");
+  if (!r.success) return;
+  const d = parse(r, null); if (!d) return;
+  const by = d.byStatus || {};
+  $("summary").textContent = `${d.total} gesamt · ${OPEN.reduce((n, s) => n + (by[s] || 0), 0)} offen · ${by.new || 0} neu`;
+}
+["f-status", "f-severity", "f-category", "f-task", "f-source", "f-sort"].forEach(id => $(id).onchange = () => { page = 0; loadList(); });
+let typing; ["f-query", "f-reporter"].forEach(id => $(id).oninput = () => { clearTimeout(typing); typing = setTimeout(() => { page = 0; loadList(); }, 350); });
+$("prev").onclick = () => { if (page > 0) { page--; loadList(); } };
+$("next").onclick = () => { page++; loadList(); };
+$("refresh").onclick = () => { loadList(); loadSummary(); if (current) openDetail(current.report.nr); };
+
+// ------------------------------------------------------------------ detail
+async function openDetail(nr) {
+  const r = await call("feedback.get", String(nr));
+  if (!r.success) return;
+  current = parse(r, null); if (!current) return;
+  renderDetail();
+  $("detail").classList.remove("hidden");
+  $("detail").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function contextRows(c) {
+  const rows = [];
+  const add = (k, v) => { if (v !== undefined && v !== null && v !== "") rows.push(`<dt>${esc(k)}</dt><dd>${v}</dd>`); };
+  add("Server", esc([c.service, c.task && `(${c.task})`].filter(Boolean).join(" ")));
+  add("Welt", esc(c.world));
+  if (c.x !== undefined) add("Position", `<span class="mono">${[c.x, c.y, c.z].map(n => Number(n).toFixed(1)).join(" / ")}</span>${c.yaw !== undefined ? ` <span class="muted">· Blick ${Number(c.yaw).toFixed(0)}° / ${Number(c.pitch || 0).toFixed(0)}°</span>` : ""}`);
+  add("Gamemode", esc(c.gamemode));
+  if (c.tps !== undefined) add("Leistung", esc(`TPS ${Number(c.tps).toFixed(1)}${c.mspt !== undefined ? ` · MSPT ${Number(c.mspt).toFixed(1)}` : ""}${c.ping !== undefined ? ` · Ping ${c.ping} ms` : ""}`));
+  if (c.client) add("Client", esc([c.client.version, c.client.brand, c.client.family, c.client.labymod ? "LabyMod" : ""].filter(Boolean).join(" · ")));
+  add("Serverzeit", esc(c.serverTime));
+  if (c.versions && Object.keys(c.versions).length) add("Versionen", `<details><summary class="muted">${Object.keys(c.versions).length} Plugins</summary><div class="mono">${Object.entries(c.versions).map(([k, v]) => `${esc(k)} ${esc(v)}`).join("<br>")}</div></details>`);
+  return rows.join("");
+}
+function renderDetail() {
+  const { report: b, comments = [], events = [] } = current;
+  const c = b.context || {};
+  const next = TRANSITIONS[b.status] || [];
+  const logs = c.logs || [];
+  const canTp = c.service && c.world && c.x !== undefined;
+  $("detail").innerHTML = `
+  <div class="card">
+    <div class="card-head"><h2>#${b.nr} · ${esc(b.title)}</h2>
+      <div style="margin-left:auto" class="row">${sevBadge(b.severity)}${statusBadge(b.status)}<button class="btn sm subtle" id="d-close">Schließen</button></div></div>
+    <div class="card-body grid2">
+      <div>
+        <div class="row" style="margin-bottom:10px">
+          <span class="chip">${esc(CATEGORY[b.category] || b.category)}</span><span class="chip">${esc(SOURCE[b.source] || b.source)}</span>
+          ${b.reporter ? `<span class="chip">von ${esc(b.reporter.name)}</span>` : ""}
+          ${b.source === "auto" ? `<span class="chip">×${b.count} · ${(b.affected || []).length} Spieler</span>` : ""}
+          <span class="chip">Punkte: ${b.pointsGranted ? b.points : 0}${b.pointsGranted ? "" : " (noch nicht vergeben)"}</span>
+          ${b.duplicateOf ? `<span class="chip">Duplikat von <a href="#" data-open="${b.duplicateOf}">#${b.duplicateOf}</a></span>` : ""}
+          ${b.discordThread ? `<span class="chip">Discord-Thread</span>` : ""}
+        </div>
+        <div class="desc">${esc(b.description) || '<span class="muted">Keine Beschreibung.</span>'}</div>
+        <h2 style="margin:18px 0 8px;font-size:15px">Anhänge</h2>
+        <div class="thumbs" id="d-att">${(b.attachments || []).length ? "" : '<span class="muted">Keine Anhänge.</span>'}</div>
+        <div class="row" style="margin-top:10px"><input type="file" id="d-file" accept="image/*,.txt,.log" style="max-width:320px"><button class="btn sm subtle" id="d-upload">Hochladen</button>
+          <span class="sub">max. ${Math.round(((settings && settings.maxAttachmentBytes) || 2097152) / 1024)} KB</span></div>
+        <h2 style="margin:18px 0 8px;font-size:15px">Log-Auszug (${logs.length} Zeilen)</h2>
+        ${logs.length ? `<details ${logs.length <= 12 ? "open" : ""}><summary class="muted">anzeigen</summary><pre class="log">${esc(logs.join("\n"))}</pre></details>` : '<span class="muted">Keine WARN/ERROR-Zeilen im Zeitfenster.</span>'}
+        <h2 style="margin:18px 0 8px;font-size:15px">Kommentare</h2>
+        <div>${comments.length ? comments.map(cm => `<div class="comment"><span class="who">${esc(cm.author.name)}</span> ${cm.staff ? '<span class="badge info">Team</span>' : ""}<span class="sub">${ago(cm.at)}</span><div class="desc">${esc(cm.text)}</div></div>`).join("") : '<span class="muted">Noch keine Kommentare.</span>'}</div>
+        <div class="row" style="margin-top:10px"><textarea id="d-comment" rows="2" class="grow" placeholder="Antwort an den Melder bzw. Team-Notiz …"></textarea><button class="btn sm" id="d-send">Senden</button></div>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:14px"><div class="card-body">
+          <label>Status ändern</label>
+          <div class="row">${next.length ? next.map(s => `<button class="btn sm ${s === "rejected" || s === "not_a_bug" ? "danger" : s === "fixed" || s === "closed" ? "good" : "subtle"}" data-status="${s}">${esc(STATUS[s])}</button>`).join("") : '<span class="muted">Keine Übergänge.</span>'}</div>
+          <input id="d-note" placeholder="Notiz zum Statuswechsel (optional)" style="margin-top:8px">
+          <label style="margin-top:12px">Zuständig</label>
+          <div class="row"><input id="d-assignee" class="grow" value="${esc(b.assignee || "")}" placeholder="Name"><button class="btn sm subtle" id="d-assign">Setzen</button><button class="btn sm subtle" id="d-me">Mir</button></div>
+          <label style="margin-top:12px">Duplikat von</label>
+          <div class="row"><input id="d-dup" class="grow" type="number" min="1" placeholder="Nr."><button class="btn sm subtle" id="d-markdup">Verknüpfen</button></div>
+          <div class="row" style="margin-top:14px">
+            <button class="btn sm" id="d-tp" ${canTp ? "" : "disabled"}>Hinteleportieren</button>
+            <button class="btn sm subtle" id="d-md">Als Markdown kopieren</button>
+          </div>
+          ${canTp ? "" : '<div class="sub" style="margin-top:6px">Keine Position in der Meldung.</div>'}
+        </div></div>
+        <dl class="kv">${contextRows(c) || '<dt>Kontext</dt><dd class="muted">keiner</dd>'}
+          <dt>Erstellt</dt><dd>${esc(new Date(b.createdAt).toLocaleString("de-DE"))}</dd>
+          <dt>Geändert</dt><dd>${esc(new Date(b.updatedAt).toLocaleString("de-DE"))}</dd></dl>
+        <h2 style="margin:18px 0 8px;font-size:15px">Verlauf</h2>
+        ${events.length ? events.map(e => `<div class="ev"><span class="sub">${esc(new Date(e.at).toLocaleString("de-DE"))}</span> · <strong>${esc(e.actor)}</strong> ${esc(e.type)}${e.from || e.to ? `: ${esc(STATUS[e.from] || e.from || "–")} → ${esc(STATUS[e.to] || e.to || "–")}` : ""}${e.note ? ` <span class="muted">„${esc(e.note)}“</span>` : ""}</div>`).join("") : '<span class="muted">Kein Verlauf.</span>'}
+      </div>
+    </div>
+  </div>`;
+  $("d-close").onclick = () => { $("detail").classList.add("hidden"); current = null; };
+  $("detail").querySelectorAll("[data-open]").forEach(a => a.onclick = ev => { ev.preventDefault(); openDetail(Number(a.dataset.open)); });
+  $("detail").querySelectorAll("[data-status]").forEach(x => x.onclick = () => changeStatus(x.dataset.status));
+  $("d-assign").onclick = () => assign($("d-assignee").value.trim() || null);
+  $("d-me").onclick = () => assign(me.name);
+  $("d-markdup").onclick = markDuplicate;
+  $("d-send").onclick = sendComment;
+  $("d-upload").onclick = upload;
+  $("d-tp").onclick = teleport;
+  $("d-md").onclick = copyMarkdown;
+  loadAttachments(b.attachments || []);
+}
+async function loadAttachments(list) {
+  const box = $("d-att");
+  for (const a of list) {
+    const r = await Helix.action("feedback.attachment", a.id);
+    const fig = document.createElement("figure");
+    if (r.success && String(r.lines[0]).startsWith("image/")) {
+      const src = `data:${r.lines[0]};base64,${r.lines[1]}`;
+      fig.innerHTML = `<img alt="${esc(a.name)}" src="${src}"><figcaption>${esc(a.name)} · ${Math.round(a.size / 1024)} KB · <a href="${src}" download="${esc(a.name)}">Download</a></figcaption>`;
+      fig.querySelector("img").onclick = () => { const lb = document.createElement("div"); lb.className = "lightbox"; lb.innerHTML = `<img src="${src}">`; lb.onclick = () => lb.remove(); document.body.appendChild(lb); };
+    } else if (r.success) {
+      const src = `data:${r.lines[0]};base64,${r.lines[1]}`;
+      fig.innerHTML = `<figcaption>📄 ${esc(a.name)} · ${Math.round(a.size / 1024)} KB · <a href="${src}" download="${esc(a.name)}">Download</a></figcaption>`;
+    } else {
+      fig.innerHTML = `<figcaption>${esc(a.name)} – nicht ladbar</figcaption>`;
+    }
+    box.appendChild(fig);
+  }
+}
+async function changeStatus(status) {
+  const note = $("d-note").value.trim();
+  const body = { nr: current.report.nr, status }; if (note) body.note = note;
+  const r = await call("feedback.status", JSON.stringify(body));
+  if (r.success) { Helix.toast(`#${current.report.nr} → ${STATUS[status]}`); openDetail(current.report.nr); loadList(); loadSummary(); }
+}
+async function assign(name) {
+  const r = await call("feedback.assign", JSON.stringify({ nr: current.report.nr, assignee: name }));
+  if (r.success) { Helix.toast(name ? `Zuständig: ${name}` : "Zuständigkeit entfernt"); openDetail(current.report.nr); loadList(); }
+}
+async function markDuplicate() {
+  const of = Number($("d-dup").value);
+  if (!of || of === current.report.nr) return Helix.toast("Gültige Nummer angeben");
+  const r = await call("feedback.duplicate", JSON.stringify({ nr: current.report.nr, of }));
+  if (r.success) { Helix.toast(`#${current.report.nr} ist Duplikat von #${of}`); openDetail(current.report.nr); loadList(); loadSummary(); }
+}
+async function sendComment() {
+  const text = $("d-comment").value.trim(); if (!text) return;
+  const r = await call("feedback.comment", JSON.stringify({ nr: current.report.nr, author: { name: me.name }, text }));
+  if (r.success) { $("d-comment").value = ""; openDetail(current.report.nr); }
+}
+function readFile(file) {
+  return new Promise((ok, fail) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(",")[1] || ""); fr.onerror = fail; fr.readAsDataURL(file); });
+}
+async function upload() {
+  const file = $("d-file").files[0]; if (!file) return Helix.toast("Datei wählen");
+  const max = (settings && settings.maxAttachmentBytes) || 2097152;
+  if (file.size > max) return Helix.toast(`Zu groß (max. ${Math.round(max / 1024)} KB)`);
+  const b64 = await readFile(file);
+  const mime = file.type || "application/octet-stream";
+  const CHUNK = 48000;
+  let r;
+  if (b64.length <= CHUNK) {
+    r = await call("feedback.attach", String(current.report.nr), file.name.replace(/\s+/g, "_"), mime, b64);
+  } else {
+    const id = "panel-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const count = Math.ceil(b64.length / CHUNK);
+    for (let i = 0; i < count; i++) {
+      const c = await call("feedback.attach.chunk", id, String(i), String(count), b64.slice(i * CHUNK, (i + 1) * CHUNK));
+      if (!c.success) return;
+    }
+    r = await call("feedback.attach.finish", id, String(current.report.nr), file.name.replace(/\s+/g, "_"), mime);
+  }
+  if (r.success) { Helix.toast("Anhang hochgeladen"); openDetail(current.report.nr); }
+}
+async function teleport() {
+  const c = current.report.context || {};
+  const args = ["@self", c.service, c.world, String(c.x), String(c.y), String(c.z)];
+  if (c.yaw !== undefined) args.push(String(c.yaw), String(c.pitch || 0));
+  const r = await Helix.action("admin.teleport.location", ...args);
+  if (r.success) Helix.toast(`Teleport zu ${c.service} läuft – im Spiel nachsehen.`);
+  else Helix.toast(/not online/.test(r.lines[0] || "") ? "Du musst dafür im Spiel online sein." : (r.lines[0] || "Teleport fehlgeschlagen"));
+}
+function markdown() {
+  const b = current.report, c = b.context || {};
+  const lines = [
+    `## #${b.nr} ${b.title}`, "",
+    `- **Schwere:** ${SEVERITY[b.severity] || b.severity}`,
+    `- **Kategorie:** ${CATEGORY[b.category] || b.category}`,
+    `- **Status:** ${STATUS[b.status] || b.status}`,
+    `- **Melder:** ${b.reporter ? b.reporter.name : SOURCE[b.source]}`,
+    `- **Server:** ${c.service || "–"}${c.task ? ` (${c.task})` : ""}`,
+    c.world ? `- **Ort:** ${c.world} ${[c.x, c.y, c.z].map(n => Number(n).toFixed(1)).join(" ")}` : null,
+    c.client ? `- **Client:** ${[c.client.version, c.client.brand, c.client.labymod ? "LabyMod" : ""].filter(Boolean).join(" · ")}` : null,
+    c.tps !== undefined ? `- **TPS/Ping:** ${Number(c.tps).toFixed(1)} / ${c.ping ?? "?"} ms` : null,
+    `- **Gemeldet:** ${new Date(b.createdAt).toLocaleString("de-DE")}`, "",
+    "### Beschreibung", "", b.description || "_keine_", "",
+  ].filter(l => l !== null);
+  if ((c.logs || []).length) lines.push("### Logs", "", "```", ...c.logs, "```", "");
+  return lines.join("\n");
+}
+async function copyMarkdown() {
+  const text = markdown();
+  try { await navigator.clipboard.writeText(text); Helix.toast("Markdown kopiert"); }
+  catch (e) {
+    const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); Helix.toast("Markdown kopiert"); } catch (e2) { Helix.toast("Kopieren nicht erlaubt"); }
+    ta.remove();
+  }
+}
+
+// ------------------------------------------------------------------ ranking
+async function loadTop() {
+  const r = await call("feedback.top", "50");
+  const list = parse(r, []);
+  $("top").innerHTML = list.length ? `<table><thead><tr><th>Platz</th><th>Tester</th><th>Punkte</th></tr></thead><tbody>${
+    list.map(e => `<tr><td><strong>${e.rank}</strong>${e.rank <= 3 ? " " + ["🥇", "🥈", "🥉"][e.rank - 1] : ""}</td><td>${esc(e.name)}</td><td><span class="badge good">${e.points}</span></td></tr>`).join("")
+  }</tbody></table>` : '<div class="empty">Noch keine Punkte vergeben.</div>';
+}
+
+// ------------------------------------------------------------------ tool log
+async function loadTools() {
+  const uuid = $("t-uuid").value.trim() || "-";
+  const r = await call("feedback.toollog.list", uuid, "300");
+  const list = parse(r, []).slice().reverse();
+  $("tools").innerHTML = list.length ? `<table><thead><tr><th>Zeit</th><th>Tester</th><th>Werkzeug</th><th>Details</th><th>Server</th></tr></thead><tbody>${
+    list.map(e => `<tr><td class="muted">${esc(new Date(e.at).toLocaleString("de-DE"))}</td><td>${esc(e.name || e.uuid)}</td><td><span class="chip">${esc(e.action)}</span></td>
+      <td class="mono">${esc(typeof e.details === "object" ? Object.entries(e.details || {}).map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : v}`).join(" ") : e.details)}</td><td class="muted">${esc(e.service || "–")}</td></tr>`).join("")
+  }</tbody></table>` : '<div class="empty">Keine Einträge.</div>';
+}
+$("t-load").onclick = loadTools;
+
+// ------------------------------------------------------------------ settings
+let rewards = [];
+async function loadSettings() {
+  const r = await call("feedback.settings");
+  if (!r.success) return;
+  settings = parse(r, settings);
+  $("s-testphase").checked = !!settings.testphase;
+  $("s-cooldown").value = settings.cooldownSeconds;
+  $("s-perday").value = settings.maxPerDay;
+  $("s-agreement").value = settings.agreementVersion;
+  $("s-logmin").value = settings.logMinutes;
+  $("s-loglines").value = settings.logMaxLines;
+  $("s-maxatt").value = Math.round(settings.maxAttachmentBytes / 1024);
+  $("s-zone").value = settings.zone;
+  $("s-points").innerHTML = Object.keys(SEVERITY).map(k => `<div><label>${esc(SEVERITY[k])}</label><input type="number" min="0" data-points="${k}" value="${(settings.points || {})[k] ?? 0}"></div>`).join("");
+  const rt = await call("feedback.rewards.table");
+  rewards = parse(rt, []) || [];
+  renderRewards();
+}
+$("s-save").onclick = async () => {
+  const num = id => Number($(id).value);
+  const points = {}; document.querySelectorAll("[data-points]").forEach(i => points[i.dataset.points] = Number(i.value));
+  const patch = {
+    testphase: $("s-testphase").checked, cooldownSeconds: num("s-cooldown"), maxPerDay: num("s-perday"),
+    agreementVersion: num("s-agreement"), logMinutes: num("s-logmin"), logMaxLines: num("s-loglines"),
+    maxAttachmentBytes: num("s-maxatt") * 1024, zone: $("s-zone").value.trim() || "Europe/Berlin", points,
+  };
+  if (settings && patch.agreementVersion > settings.agreementVersion && !confirm("Vereinbarungs-Version erhöhen? Alle Tester müssen die Regeln neu annehmen.")) return;
+  if (settings && settings.testphase && !patch.testphase && !confirm("Testphase beenden? Tester können dann keine Meldungen mehr abgeben.")) return;
+  const r = await call("feedback.settings", JSON.stringify(patch));
+  if (r.success) { settings = parse(r, settings); Helix.toast("Einstellungen gespeichert"); }
+};
+function renderRewards() {
+  $("rewards").innerHTML = rewards.length ? `<table><thead><tr><th>ab Punkten</th><th>Kronen</th><th>Schlüssel (kommagetrennt)</th><th>Items/Cosmetics (kommagetrennt)</th><th>Notiz</th><th></th></tr></thead><tbody>${
+    rewards.map((t, i) => `<tr><td><input type="number" min="0" data-r="${i}" data-f="minPoints" value="${t.minPoints ?? 0}"></td>
+      <td><input type="number" min="0" data-r="${i}" data-f="kronen" value="${t.kronen ?? 0}"></td>
+      <td><input data-r="${i}" data-f="keys" value="${esc((t.keys || []).join(", "))}"></td>
+      <td><input data-r="${i}" data-f="items" value="${esc((t.items || []).join(", "))}"></td>
+      <td><input data-r="${i}" data-f="note" value="${esc(t.note || "")}"></td>
+      <td><button class="btn sm danger" data-del="${i}">✕</button></td></tr>`).join("")
+  }</tbody></table>` : '<div class="empty">Noch keine Belohnungs-Stufen.</div>';
+  $("rewards").querySelectorAll("[data-r]").forEach(inp => inp.oninput = () => {
+    const t = rewards[Number(inp.dataset.r)], f = inp.dataset.f;
+    if (f === "keys" || f === "items") t[f] = inp.value.split(",").map(s => s.trim()).filter(Boolean);
+    else if (f === "note") t[f] = inp.value;
+    else t[f] = Number(inp.value);
+  });
+  $("rewards").querySelectorAll("[data-del]").forEach(b => b.onclick = () => { rewards.splice(Number(b.dataset.del), 1); renderRewards(); });
+}
+$("r-add").onclick = () => { rewards.push({ minPoints: 0, kronen: 0, keys: [], items: [], note: "" }); renderRewards(); };
+$("r-save").onclick = async () => {
+  const sorted = rewards.slice().sort((a, b) => (a.minPoints || 0) - (b.minPoints || 0));
+  const r = await call("feedback.rewards.table", JSON.stringify(sorted));
+  if (r.success) { rewards = parse(r, sorted); renderRewards(); Helix.toast("Belohnungen gespeichert"); }
+};
+
+// ------------------------------------------------------------------ start
+Helix.ready(async () => {
+  const who = await Helix.action("feedback.whoami");
+  if (who.success) me = parse(who, me);
+  if (me.admin) {
+    $("tab-settings").classList.remove("hidden");
+    const s = await Helix.action("feedback.settings");
+    if (s.success) settings = parse(s, null);
+  }
+  loadSummary();
+  loadList();
+});
 </script>

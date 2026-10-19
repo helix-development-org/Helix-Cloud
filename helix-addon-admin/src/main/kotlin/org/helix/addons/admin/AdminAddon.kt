@@ -2,6 +2,8 @@ package org.helix.addons.admin
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.helix.addon.sdk.AddonBase
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
@@ -122,6 +124,12 @@ class AdminAddon : AddonBase() {
             val list = presence.services().map { mapOf("service" to it.service, "tps" to "%.1f".format(it.tps), "players" to it.players.size.toString()) }
             ActionResult.ok(json.encodeToString(list))
         }
+        action(
+            "admin.teleport.location",
+            "Sends a player to a position on any Paper service (switches server first when needed).",
+            "admin.teleport.location <player|@self> <service> <world> <x> <y> <z> [yaw] [pitch]",
+            permission = "helix.staff.menu",
+        ) { inv -> teleportToLocation(inv) }
         action("admin.kick", "Kicks a player (staff).", "admin.kick <player> [reason…]", permission = "helix.staff.kick") { inv ->
             val player = inv.arguments.firstOrNull() ?: return@action ActionResult.error("usage: admin.kick <player> [reason…]")
             val reason = inv.arguments.drop(1).joinToString(" ").ifBlank { "Kicked by ${actor(inv)}" }
@@ -187,6 +195,33 @@ class AdminAddon : AddonBase() {
     }
 
     /** The signed-in caller (REST session name); console/system calls are attributed to "console". */
+    /**
+     * Queues an `arrive` job carrying a position on the target service and, when the player is elsewhere, a
+     * `connect` job on the player's current service; `@self` resolves to the invoking panel user.
+     */
+    private fun teleportToLocation(inv: ActionInvocation): ActionResult {
+        val usage = "usage: admin.teleport.location <player|@self> <service> <world> <x> <y> <z> [yaw] [pitch]"
+        val args = inv.arguments
+        if (args.size < 6) return ActionResult.error(usage)
+        val player = if (args[0] == "@self") inv.actor?.takeIf { it.isNotBlank() } ?: return ActionResult.error("no panel user to teleport") else args[0]
+        val target = args[1]
+        val coords = args.subList(3, 6).map { it.toDoubleOrNull() ?: return ActionResult.error(usage) }
+        val current = presence.serviceOf(player) ?: return ActionResult.error("$player is not online")
+        val payload = buildJsonObject {
+            put("player", player)
+            put("mode", "location")
+            put("world", args[2])
+            put("x", coords[0]); put("y", coords[1]); put("z", coords[2])
+            args.getOrNull(6)?.toFloatOrNull()?.let { put("yaw", it) }
+            args.getOrNull(7)?.toFloatOrNull()?.let { put("pitch", it) }
+        }
+        jobs.push(target, "arrive", payload)
+        if (!current.equals(target, ignoreCase = true)) {
+            jobs.push(current, "connect", buildJsonObject { put("player", player); put("service", target) })
+        }
+        return ActionResult.ok(json.encodeToString(mapOf("player" to player, "from" to current, "to" to target)))
+    }
+
     private fun actor(invocation: ActionInvocation): String = invocation.actor?.takeIf { it.isNotBlank() } ?: "console"
 
     private fun forward(action: String, arguments: List<String>, invocation: ActionInvocation): ActionResult =

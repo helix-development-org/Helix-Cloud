@@ -107,4 +107,26 @@ class AdminAddonTest {
         assertFalse(context.run("admin.staff", "Guest", "admin.players").success)
         assertFalse(context.run("admin.staff", "Mod", "admin.panelurl", "x").success, "only staff actions are relayed")
     }
+
+    @Test
+    fun `teleport to a location switches service only when needed`() {
+        context.run("admin.presence", report("Game-1", "Alice"))
+        val same = context.run("admin.teleport.location", "Alice", "Game-1", "world", "10", "64", "-5", "90", "0")
+        assertTrue(same.success, same.lines.toString())
+        val onGame = Json.parseToJsonElement(context.run("admin.jobs", "Game-1", "0").lines.single()).jsonObject["jobs"]!!.jsonArray
+        assertEquals(listOf("arrive"), onGame.map { it.jsonObject["type"]!!.jsonPrimitive.content })
+        val payload = onGame.single().jsonObject["payload"]!!.jsonObject
+        assertEquals("location", payload["mode"]!!.jsonPrimitive.content)
+        assertEquals(64.0, payload["y"]!!.jsonPrimitive.content.toDouble())
+
+        assertTrue(context.run("admin.teleport.location", "Alice", "CityBuild-2", "plots", "1", "2", "3").success)
+        val city = Json.parseToJsonElement(context.run("admin.jobs", "CityBuild-2", "0").lines.single()).jsonObject["jobs"]!!.jsonArray
+        assertEquals(listOf("arrive"), city.map { it.jsonObject["type"]!!.jsonPrimitive.content })
+        val again = Json.parseToJsonElement(context.run("admin.jobs", "Game-1", "1").lines.single()).jsonObject["jobs"]!!.jsonArray
+        assertEquals(listOf("connect"), again.map { it.jsonObject["type"]!!.jsonPrimitive.content })
+
+        assertFalse(context.run("admin.teleport.location", "Ghost", "Game-1", "world", "0", "0", "0").success)
+        assertFalse(context.run("admin.teleport.location", "Alice", "Game-1", "world", "x", "0", "0").success)
+        assertFalse(context.run("admin.teleport.location", "@self", "Game-1", "world", "0", "0", "0").success)
+    }
 }
