@@ -2,8 +2,8 @@ package org.helix.api.design
 
 /**
  * The network wordmark (design concept §19) as pixel glyphs of the shared GUI pack (`helix_guis:wordmark`): gold
- * cartoon lettering with ink outline and hard shadow, painted in Blockbench from the working title "Kronland".
- * When the network name is decided the two glyph images are repainted; the placeholders stay the same.
+ * cartoon lettering with ink outline and hard shadow plus a red "MC" plaque, painted in Blockbench as "KronlandMC"
+ * (release name of the network). Repainting the two glyph images changes the mark; the placeholders stay the same.
  */
 object Wordmark {
     /** Font of the wordmark glyphs. */

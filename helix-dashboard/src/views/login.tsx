@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { CodeInput } from "@/components/code-input"
 import { Wordmark } from "@/components/brand/wordmark"
+import { NETWORK_DOMAIN } from "@/lib/brand"
 import { Knoepfchen } from "@/components/brand/knoepfchen"
 
 /** Two-step Minecraft-account login with an admin-token fallback. */
@@ -126,6 +127,10 @@ export function LoginView({ establish }: { establish: (token: string) => Promise
           </CardContent>
         </Card>
       </div>
+      <a href={`https://${NETWORK_DOMAIN}`} target="_blank" rel="noreferrer"
+        className="text-sm font-bold text-[var(--parchment)] opacity-80 underline decoration-[var(--gold-lo)] decoration-2 underline-offset-4 hover:opacity-100">
+        {NETWORK_DOMAIN}
+      </a>
     </div>
   )
 }

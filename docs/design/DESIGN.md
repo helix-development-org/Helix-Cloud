@@ -1,9 +1,15 @@
 # Designkonzept des Netzwerks
 
-> Version 1.0 · Stand 04.10.2026 · Richtung 2a „Kronland“. Quelle: Claude Design (`design-konzept/export/Designkonzept.html`). **Verbindlich** für alle Oberflächen. Abweichungen werden hier eingetragen, nicht im Einzelfall entschieden. „[Name]“ = Netzwerkname (offen); „Helix“ ist intern und für Spieler nie sichtbar.
+> Version 1.0 · Stand 04.10.2026 · Richtung 2a „Kronland“. Quelle: Claude Design (`design-konzept/export/Designkonzept.html`). **Verbindlich** für alle Oberflächen. Abweichungen werden hier eingetragen, nicht im Einzelfall entschieden. „[Name]“ = Netzwerkname, entschieden: **KronlandMC** (Website kronland.de); „Helix“ ist intern und für Spieler nie sichtbar.
 
 
 ## 1 · Leitidee
+
+**Name (entschieden 19.10.2026):** Das Netzwerk heißt **KronlandMC**, Website **kronland.de**. Das Reich der Spielwelt heißt **Kronland**.
+
+- **Marke = „KronlandMC“**, wo der Server gemeint ist: `{network}`/`network.name`, Chat-Präfix, MOTD, Tablist, Scoreboard, Wortmarke, Join-/Kick-/Bann-/Wartungs-Texte, Webpanel, LabyMod-Addon, Discord.
+- **Lore = „Kronland“**, wo das Land der Spielwelt gemeint ist: Designrichtung „Kronland“, „Kronland-Schmiede“, „Kronland-Verzauberungen“, „Kronland-Huhn“, Kronstadt usw. Im Zweifel: Spielwelt → Kronland, Server → KronlandMC.
+- **Domain** kronland.de steht in MOTD-Zeile 2, im Tablist-Fuß, im Webpanel und in der LabyMod-Beschreibung.
 
 Ein verspieltes Mittelalter-Königreich im Cartoon-Stil. Materialien: dunkles Holz, Pergament, rotes Band mit Goldkante, Eisenbeschläge. Formensprache plastisch und freundlich: dicke dunkle Konturen, runde Ecken, Flächen mit Glanzkante oben und dunkler Unterkante. Villager mit Persönlichkeit sind das Gesicht des Servers. Ton: episch im Rahmen, humorvoll im Detail.
 
@@ -166,7 +172,7 @@ Ist-Stand Währungs-Icons: Form bleibt, Kontur auf Tinte umstellen, Glanzpixel o
 
 | Art | Regel | MiniMessage |
 |---|---|---|
-| Prefix | [Name] in Gold, danach » in Holz-hell. Kurzform für Actionbar/Scoreboard: Initiale in Gold. | `<#ffcf4a>[Name]</#ffcf4a> <#7a4a24>»</#7a4a24> ` |
+| Prefix | KronlandMC in Gold, danach » in Holz-hell. Kurzform für Actionbar/Scoreboard: Initiale in Gold. | `<#ffcf4a>KronlandMC</#ffcf4a> <#7a4a24>»</#7a4a24> ` |
 | Standardtext | Pergament. Hervorhebungen (Namen, Zahlen) in Gold. | `<#f1e2c2>Du hast <#ffcf4a>30 Rosen</#ffcf4a> erhalten.` |
 | Info | Diamant-Blau, beginnt mit „Hinweis:“ nur wenn nötig. | `<#5ab4ff>…` |
 | Erfolg | Smaragd-Grün, kurz, Vergangenheitsform. | `<#4ac85e>Karte gekauft: <#ffcf4a>Hexe` |
@@ -195,10 +201,10 @@ Ist-Stand Währungs-Icons: Form bleibt, Kontur auf Tinte umstellen, Glanzpixel o
 |---|---|---|
 | Actionbar | Währungen dauerhaft: Icon + Zahl, getrennt durch zwei Leerzeichen. Bei Spielmodus-Info (Krieg) wechselt sie für 3 s und kehrt zurück. | `<emerald> 1.240  <diamond> 35  <rose> 620` |
 | Bossbar | Farbe nach Inhalt: Tutorial gelb, Turm-Stand nach Team, Countdown blau. Text: Titel in Gold, Wert in Pergament. | `Schritt 2/6 · Deck ansehen` |
-| Tablist | Kopf: Wortmarke als Glyph + Zeile „[Name] · {online} Spieler“. Fuß: Server + Discord in Holz-hell. Max. 2 Animationsframes pro Sekunde. | `{network} · {online}/{max}` |
+| Tablist | Kopf: Wortmarke als Glyph + Zeile „KronlandMC · {online} Spieler“. Fuß: kronland.de in Gold + Discord in Holz-hell. Max. 2 Animationsframes pro Sekunde. | `{network} · {online}/{max}` |
 | Scoreboard | Titel = Wortmarke-Glyph. Zeilen: Label in Holz-hell, Wert in Pergament, Trenner leer. Max. 9 Zeilen in der Lobby. | `Rosen » 620` |
 | Nametag | Zeile 1: Rang-Prefix + Name in Rangfarbe, Clan-Tag in Grau dahinter. Zeile 2 (Untertitel): kursiv, Pergament-dunkel. | `[Mod] Steve [ABC]` |
-| MOTD | Zeile 1: Wortmarke in Gold + Kurzslogan. Zeile 2: Aktuelles (Event, Update) in Pergament mit Rot als Akzent. Wartung: Zeile 2 in Orange. | `<#ffcf4a>[Name] <#7a4a24>· <#f1e2c2>Das Kartenturnier beginnt` |
+| MOTD | Zeile 1: Wortmarke in Gold + Kurzslogan. Zeile 2: Aktuelles (Event, Update) in Pergament mit Rot als Akzent. Wartung: Zeile 2 in Orange. | `<#ffcf4a>KronlandMC <#7a4a24>· <#f1e2c2>Das Kartenturnier beginnt` |
 | Titel/Untertitel | Nur für Meilensteine (Sieg, Truhe Boss, Level-Up). Titel Gold, Untertitel Pergament. Einblenden 10, Stehen 40, Ausblenden 10 Ticks. | `SIEG! · +30 Rosen` |
 
 ## 11 · MineClash
@@ -640,13 +646,13 @@ Das lila Primary entfällt. Dunkelmodus (Holz) ist Standard, Hellmodus ist Perga
 
 ## 19 · Logo und Wortmarke
 
-- **Wortmarke**: [Name] in Lilita-artiger, dicker Cartoon-Schrift; Gold-Füllung, 3 px Tinten-Kontur, 4 px Schlagschatten. Ingame als eigene Pixel-Glyph (max. 128×32).
+- **Wortmarke**: „Kronland“ in Lilita-artiger, dicker Cartoon-Schrift; Gold-Füllung, 3 px Tinten-Kontur, 4 px Schlagschatten, dahinter „MC“ als kleine Plakette in Band-Rot (Tinten-Kontur, Glanzkante oben, Pergament-Buchstaben). Ingame als eigene Pixel-Glyph (groß 148×27, klein 81×18; Breite wegen der Plakette über 128 px). Web: Schriftzug „KronlandMC“.
 - **Bildmarke**: Ein Wappen/Schild (Form aus navigator/shield.png) mit dem Zentrum der Lore als Motiv. Wird erst gestaltet, wenn der Name feststeht.
 - **Varianten**: Voll (Bildmarke + Wortmarke), nur Wortmarke, nur Bildmarke (Favicon, Tab-Icon, Discord).
 - **Größen**: Ingame 16, 32, 64 px Höhe; Web min. 24 px Höhe.
 - **Schutzraum**: Mindestens eine Konturbreite × 4 rundum.
 - **Hintergründe**: Auf Holz, Pergament und Band-Rot; nie auf Fotos ohne Holzplakette dahinter.
-- **Slogan**: Kurz, im Ton der Villager. Vorschläge folgen mit dem Namen.
+- **Slogan**: Kurz, im Ton der Villager. Standard-MOTD: „Das Königreich wartet auf dich“.
 
 ## 20 · Do und Don’t
 
@@ -672,7 +678,7 @@ Das lila Primary entfällt. Dunkelmodus (Holz) ist Standard, Hellmodus ist Perga
 
 ## 21 · Offene Entscheidungen
 
-- [ ] Name des Netzwerks und des Reichs (ersetzt [Name])
+- [x] Name des Netzwerks und des Reichs: Netzwerk **KronlandMC** (kronland.de), Reich **Kronland** (19.10.2026)
 - [ ] Zentrum der Lore (ersetzt Arbeitstitel „Ankerstein“) und damit die Bildmarke
 - [ ] Spieler-Ränge (Premium/VIP) neben den Team-Rängen (CityBuild nutzt bis dahin Platzhalter-Stufen `citybuild.tier.1..3`)
 - [ ] Ob Villager-Rede im Chat erscheint oder nur als Hologramm über dem Villager
@@ -681,7 +687,7 @@ Das lila Primary entfällt. Dunkelmodus (Holz) ist Standard, Hellmodus ist Perga
 
 ## Abweichungen
 
-- **Stufe A (Text/Chat)**: Solange die Wortmarke als Glyph fehlt, zeigen Tablist-Kopf und Scoreboard-Titel den Netzwerknamen fett in Gold (`<#ffcf4a><bold>{network}`). Der Netzwerkname ist Arbeitstitel „Kronland“ (`network.name` in `node.toml` bzw. Panel); der Prefix nutzt `{network}` und folgt dem Namen automatisch.
+- **Stufe A (Text/Chat)**: Solange die Wortmarke als Glyph fehlt, zeigen Tablist-Kopf und Scoreboard-Titel den Netzwerknamen fett in Gold (`<#ffcf4a><bold>{network}`). Der Netzwerkname ist **KronlandMC** (`network.name` in `node.toml` bzw. Panel, Default im Node); der Prefix nutzt `{network}` und folgt dem Namen automatisch.
 - **Stufe A**: Die Befehle `/helix language` (Node) und `/helix link` (Discord-Bot) heißen technisch noch „helix“ und tauchen deshalb in Hinweistexten auf; ein Umbenennen der Befehle ist ein eigener Schritt.
 - **Stufe A**: Der Team-Chat (`[Team]`) zeigt noch keinen Rang-Tag des Absenders, weil das Addon dafür keinen Platzhalter hat.
 - **§6 Titelband**: Text im Fenstertitel lässt sich technisch nicht über y = 5 (Container-Pixel) setzen (Font-Ascent ≤ Höhe). Das Band liegt deshalb oben am Pergament (y 1–17) statt 6 px über dem Rahmen.

@@ -31,8 +31,8 @@ data class NodeConfig(
     ) {
         /** Defaults of the network settings. */
         companion object {
-            /** Working title of the network (design concept "Kronland"); the one place to change the default. */
-            const val DEFAULT_NAME: String = "Kronland"
+            /** Release name of the network ("KronlandMC", realm "Kronland" in the lore); the one place to change the default. */
+            const val DEFAULT_NAME: String = "KronlandMC"
         }
     }
 
