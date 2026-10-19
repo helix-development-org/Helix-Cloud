@@ -109,5 +109,8 @@
   "tools.point.deleted": "<#4ac85e>Testpunkt <#ffcf4a>{name}</#ffcf4a> gelöscht.",
   "tools.point.invalid": "<#ff5a4a>Name ungültig: nur Buchstaben, Zahlen, - und _ (max. 24).",
   "tools.closed": "<#ff5a4a>Die Test-Werkzeuge gibt es nur in der Testphase.",
-  "tools.extra.unhandled": "<#ffb43a>Achtung: Dieses Werkzeug ist auf diesem Server nicht verfügbar."
+  "tools.extra.unhandled": "<#ffb43a>Achtung: Dieses Werkzeug ist auf diesem Server nicht verfügbar.",
+  "screenshot.attached": "<#4ac85e>Screenshot an Meldung <#ffcf4a>#{nr}</#ffcf4a> angehängt.",
+  "screenshot.failed": "<#ffb43a>Achtung: Der Screenshot konnte nicht aufgenommen werden. Deine Meldung ist trotzdem angekommen – häng ein Bild gern im Discord-Thread an.",
+  "screenshot.disabled": "<#ffb43a>Achtung: Screenshots sind in deinem KronlandMC-Addon ausgeschaltet. Deine Meldung ist trotzdem angekommen."
 }

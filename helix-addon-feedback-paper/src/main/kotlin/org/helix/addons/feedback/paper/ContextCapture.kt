@@ -80,6 +80,12 @@ class ContextCapture(private val service: String, private val task: String) {
      */
     fun isLabyMod(player: Player): Boolean = player.listeningPluginChannels.any { it.startsWith("labymod") }
 
+    /**
+     * @param player a player.
+     * @return true when the client's Helix LabyMod addon accepts screenshot requests (channel `helix:feedback`).
+     */
+    fun canScreenshot(player: Player): Boolean = FeedbackPlugin.SCREENSHOT_CHANNEL in player.listeningPluginChannels
+
     /** Plugin versions, read once (manifests of the plugin jars). */
     private fun pluginVersions(): Map<String, String> = versions ?: Bukkit.getPluginManager().plugins
         .associate { it.name to ContextBuilder.versionOf(it.pluginMeta.version, manifestOf(it)) }
