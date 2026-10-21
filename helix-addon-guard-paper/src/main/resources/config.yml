@@ -52,6 +52,15 @@ sampler:
   max-players-per-tick: 256
   # Hard main-thread safety cap: the sampler yields the tick once it has spent this many nanos.
   max-nanos-per-tick: 2000000
+# Trace recorder (/iguard trace, IGuardApi.startTrace): JSONL files under plugins/IGuard/traces/.
+# A recording stops itself at whichever limit it reaches first.
+trace:
+  max-bytes: 67108864
+  max-seconds: 900
+  queue-capacity: 50000
+# /iguard debug: minimum gap between two debug lines of the same viewer, player and check.
+debug:
+  rate-limit-millis: 200
 detection:
   incident-gap-millis: 30000
   replay-pre-millis: 10000

@@ -167,6 +167,12 @@ object GuardConfig {
         // sampler.*
         plain("sampler.max-players-per-tick", GuardValueType.INT, "256"),
         plain("sampler.max-nanos-per-tick", GuardValueType.INT, "2000000"),
+        // trace.* — recorder limits, read once on startup
+        plain("trace.max-bytes", GuardValueType.INT, "67108864", static = true),
+        plain("trace.max-seconds", GuardValueType.INT, "900", static = true),
+        plain("trace.queue-capacity", GuardValueType.INT, "50000", static = true),
+        // debug.*
+        plain("debug.rate-limit-millis", GuardValueType.INT, "200"),
         // detection.*
         plain("detection.incident-gap-millis", GuardValueType.INT, "30000"),
         plain("detection.replay-pre-millis", GuardValueType.INT, "10000"),

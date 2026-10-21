@@ -55,7 +55,7 @@
   "panel.case.no-incident": "<#f1e2c2>Kein aktiver Vorfall</#f1e2c2>",
   "panel.case.vls-header": "<#ffcf4a>Verstoß-Level:</#ffcf4a>",
   "panel.case.vl-entry": "<#a89a84>  {check}: {value}</#a89a84>",
-  "cmd.usage": "<#ffcf4a>/iguard <panel|spectate|alerts|clients|info|history|cases|case|replay|confidence|ban|unban|bans|banhistory|status|reload></#ffcf4a>",
+  "cmd.usage": "<#ffcf4a>/iguard <panel|spectate|alerts|clients|info|history|cases|case|replay|confidence|ban|unban|bans|banhistory|debug|trace|status|reload></#ffcf4a>",
   "cmd.no-permission": "<#ff5a4a>Dafür hast du keine Berechtigung.",
   "cmd.not-online": "<#ff5a4a>Der Spieler ist nicht online. Prüfe den Namen.",
   "cmd.alerts.players-only": "<#ff5a4a>Nur Spieler können Alerts umschalten",
@@ -176,5 +176,17 @@
   "panel.action.ban.denied": "<#a89a84>Gesperrt: keine Bann-Berechtigung</#a89a84>",
   "panel.action.replay.missing": "<#a89a84>Gesperrt: kein Replay aufgezeichnet</#a89a84>",
   "panel.empty.alerts": "Alles ruhig. Zu ruhig. Ich mag das.",
-  "panel.empty.bans": "Keine Banns! Alle benehmen sich. Langweilig!"
+  "panel.empty.bans": "Keine Banns! Alle benehmen sich. Langweilig!",
+  "cmd.debug.usage": "<#f1e2c2>Nutzung: <#ffcf4a>/iguard debug <Spieler> [Check|all] [on|off]",
+  "cmd.debug.unknown-check": "<#ff5a4a>Unbekannter Check: <#ffcf4a>{check}",
+  "cmd.debug.enabled": "<#4ac85e>Debug für <#ffcf4a>{player}</#ffcf4a> aktiv <#a89a84>({checks}) – auch Verstöße unter der Alert-Schwelle, mit Evidenz",
+  "cmd.debug.disabled": "<#4ac85e>Debug für <#ffcf4a>{player}</#ffcf4a> aus <#a89a84>({checks}; weiter beobachtet: {remaining})",
+  "cmd.trace.usage": "<#f1e2c2>Nutzung: <#ffcf4a>/iguard trace start <Spieler> <Label> | stop [Spieler] | marker [Spieler] <Text> | list",
+  "cmd.trace.started": "<#4ac85e>Trace <#ffcf4a>{label}</#ffcf4a> für <#ffcf4a>{player}</#ffcf4a> läuft <#a89a84>→ traces/{file}",
+  "cmd.trace.stopped": "<#4ac85e>Trace für <#ffcf4a>{player}</#ffcf4a> gespeichert <#a89a84>→ {file}",
+  "cmd.trace.marker": "<#4ac85e>Marker für <#ffcf4a>{player}</#ffcf4a>: <#f1e2c2>{text}",
+  "cmd.trace.none": "<#ff5a4a>Keine laufende Trace gefunden.",
+  "cmd.trace.failed": "<#ff5a4a>Trace konnte nicht gestartet werden: {error}",
+  "cmd.trace.list.header": "<#ffcf4a>Laufende Traces: {count}",
+  "cmd.trace.list.entry": "<#a89a84>- <#ffcf4a>{player}</#ffcf4a> <#f1e2c2>{label}</#f1e2c2> <#a89a84>({frames} Frames)"
 }

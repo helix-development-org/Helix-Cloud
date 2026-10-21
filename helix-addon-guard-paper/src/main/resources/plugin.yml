@@ -9,7 +9,7 @@ softdepend: [ViaVersion]
 commands:
   iguard:
     description: IGuard administration
-    usage: /iguard <panel|spectate|alerts|clients|info|history|cases|case|replay|confidence|ban|status|reload>
+    usage: /iguard <panel|spectate|alerts|clients|info|history|cases|case|replay|confidence|ban|debug|trace|status|reload>
 permissions:
   iguard.panel:
     default: op
@@ -36,6 +36,10 @@ permissions:
   iguard.status:
     default: op
   iguard.reload:
+    default: op
+  iguard.debug:
+    default: op
+  iguard.trace:
     default: op
   iguard.bypass:
     default: false

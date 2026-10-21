@@ -147,7 +147,10 @@ interface IGuardTraceSession {
     /** Writes a marker line (for example "now sprinting on ice"); false when no longer active. */
     fun marker(text: String): Boolean
 
-    /** Stops the recording and returns its file, or null when it was already stopped. */
+    /**
+     * Stops the recording and returns its file, or null when it was already stopped. The file is
+     * completed asynchronously; it is finished once its last line is the `{"type":"end",…}` line.
+     */
     fun stop(): Path?
 }
 

@@ -55,7 +55,7 @@
   "panel.case.no-incident": "<#f1e2c2>No active incident</#f1e2c2>",
   "panel.case.vls-header": "<#ffcf4a>Violation levels:</#ffcf4a>",
   "panel.case.vl-entry": "<#a89a84>  {check}: {value}</#a89a84>",
-  "cmd.usage": "<#ffcf4a>/iguard <panel|spectate|alerts|clients|info|history|cases|case|replay|confidence|ban|unban|bans|banhistory|status|reload></#ffcf4a>",
+  "cmd.usage": "<#ffcf4a>/iguard <panel|spectate|alerts|clients|info|history|cases|case|replay|confidence|ban|unban|bans|banhistory|debug|trace|status|reload></#ffcf4a>",
   "cmd.no-permission": "<#ff5a4a>You do not have permission to do that.",
   "cmd.not-online": "<#ff5a4a>Player is not online. Check the name.",
   "cmd.alerts.players-only": "<#ff5a4a>Only players can toggle alerts",
@@ -176,5 +176,17 @@
   "panel.action.ban.denied": "<#a89a84>Locked: no ban permission</#a89a84>",
   "panel.action.replay.missing": "<#a89a84>Locked: no replay recorded</#a89a84>",
   "panel.empty.alerts": "All quiet. Too quiet. I like it.",
-  "panel.empty.bans": "No bans! Everyone behaves. Boring!"
+  "panel.empty.bans": "No bans! Everyone behaves. Boring!",
+  "cmd.debug.usage": "<#f1e2c2>Usage: <#ffcf4a>/iguard debug <player> [check|all] [on|off]",
+  "cmd.debug.unknown-check": "<#ff5a4a>Unknown check: <#ffcf4a>{check}",
+  "cmd.debug.enabled": "<#4ac85e>Debug for <#ffcf4a>{player}</#ffcf4a> enabled <#a89a84>({checks}) – including failures below the alert level, with evidence",
+  "cmd.debug.disabled": "<#4ac85e>Debug for <#ffcf4a>{player}</#ffcf4a> disabled <#a89a84>({checks}; still watching: {remaining})",
+  "cmd.trace.usage": "<#f1e2c2>Usage: <#ffcf4a>/iguard trace start <player> <label> | stop [player] | marker [player] <text> | list",
+  "cmd.trace.started": "<#4ac85e>Trace <#ffcf4a>{label}</#ffcf4a> for <#ffcf4a>{player}</#ffcf4a> running <#a89a84>→ traces/{file}",
+  "cmd.trace.stopped": "<#4ac85e>Trace for <#ffcf4a>{player}</#ffcf4a> saved <#a89a84>→ {file}",
+  "cmd.trace.marker": "<#4ac85e>Marker for <#ffcf4a>{player}</#ffcf4a>: <#f1e2c2>{text}",
+  "cmd.trace.none": "<#ff5a4a>No running trace found.",
+  "cmd.trace.failed": "<#ff5a4a>Could not start the trace: {error}",
+  "cmd.trace.list.header": "<#ffcf4a>Running traces: {count}",
+  "cmd.trace.list.entry": "<#a89a84>- <#ffcf4a>{player}</#ffcf4a> <#f1e2c2>{label}</#f1e2c2> <#a89a84>({frames} frames)"
 }

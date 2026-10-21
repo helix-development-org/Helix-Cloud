@@ -8,6 +8,8 @@ import de.tytoss.iguard.config.IGuardConfig
 import de.tytoss.iguard.config.IGuardConfigLoader
 import de.tytoss.iguard.snapshot.MainThreadSampler
 import de.tytoss.iguard.storage.GuardStore
+import de.tytoss.iguard.trace.DebugRouter
+import de.tytoss.iguard.trace.TraceHub
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import net.kyori.adventure.text.Component
@@ -26,7 +28,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.atomic.AtomicReference
 
-/** `/iguard` command handler (status, history, cases, replays, bans, panel, reload) + tab completion. */
+/** `/iguard` command handler (status, history, cases, replays, bans, panel, debug, trace, reload) + tab completion. */
 class IGuardCommand(
     private val plugin: JavaPlugin,
     private val config: IGuardConfig,
@@ -42,8 +44,12 @@ class IGuardCommand(
     private val bans: de.tytoss.iguard.ban.BanCoordinator,
     private val scope: CoroutineScope,
     private val translations: NodeTranslations,
+    private val traces: TraceHub,
 ) : CommandExecutor, TabCompleter {
     private val miniMessage = MiniMessage.miniMessage()
+
+    // The player whose trace each sender started last (stop/marker without a player name use it).
+    private val lastTraced = java.util.concurrent.ConcurrentHashMap<String, java.util.UUID>()
 
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
         when (args.firstOrNull()?.lowercase()) {
@@ -64,6 +70,8 @@ class IGuardCommand(
             "unban" -> unban(sender, args)
             "bans" -> bans(sender)
             "banhistory" -> banHistory(sender, args)
+            "debug" -> debug(sender, args)
+            "trace" -> trace(sender, args)
             else -> sender.sendMessage(chat(sender, "cmd.usage"))
         }
         return true
@@ -71,11 +79,19 @@ class IGuardCommand(
 
     override fun onTabComplete(sender: CommandSender, command: Command, alias: String, args: Array<out String>): List<String> {
         if (args.size == 1) {
-            return listOf("panel", "spectate", "unspectate", "alerts", "clients", "info", "history", "cases", "case", "replay", "confidence", "ban", "unban", "bans", "banhistory", "status", "reload")
+            return listOf("panel", "spectate", "unspectate", "alerts", "clients", "info", "history", "cases", "case", "replay", "confidence", "ban", "unban", "bans", "banhistory", "debug", "trace", "status", "reload")
                 .filter { it.startsWith(args[0], true) && sender.hasPermission("iguard.${permFor(it)}") }
         }
-        if (args.size == 2 && args[0].lowercase() in setOf("info", "history", "cases", "confidence", "panel", "spectate", "ban", "unban", "banhistory")) {
+        if (args.size == 2 && args[0].lowercase() in setOf("info", "history", "cases", "confidence", "panel", "spectate", "ban", "unban", "banhistory", "debug")) {
             return Bukkit.getOnlinePlayers().map(Player::getName).filter { it.startsWith(args[1], true) }
+        }
+        if (args.size == 3 && args[0].equals("debug", true)) {
+            return (listOf(DEBUG_ALL) + IGuardConfig.checkIds.sorted()).filter { it.startsWith(args[2], true) }
+        }
+        if (args.size == 4 && args[0].equals("debug", true)) return listOf("on", "off").filter { it.startsWith(args[3], true) }
+        if (args.size == 2 && args[0].equals("trace", true)) return listOf("start", "stop", "marker", "list").filter { it.startsWith(args[1], true) }
+        if (args.size == 3 && args[0].equals("trace", true) && args[1].lowercase() in setOf("start", "stop", "marker")) {
+            return Bukkit.getOnlinePlayers().map(Player::getName).filter { it.startsWith(args[2], true) }
         }
         if (args.size == 4 && args[0].equals("history", true)) return listOf(config.serverId, "all").filter { it.startsWith(args[3], true) }
         if (args.size == 2 && args[0].equals("replay", true)) return listOf("pause", "speed", "follow", "trail", "stop").filter { it.startsWith(args[1], true) }
@@ -90,6 +106,87 @@ class IGuardCommand(
         storage.enqueueAlertPreference(player.name, enabled)
         sender.sendMessage(chat(sender, if (enabled) "cmd.alerts.enabled" else "cmd.alerts.disabled"))
     }
+
+    /** `/iguard debug <player> [check|all] [on|off]` — failures (also below alert-vl) with evidence. */
+    private fun debug(sender: CommandSender, args: Array<out String>) {
+        if (!permission(sender, "iguard.debug")) return
+        val name = args.getOrNull(1) ?: return sender.sendMessage(chat(sender, "cmd.debug.usage"))
+        val target = Bukkit.getPlayerExact(name) ?: return sender.sendMessage(chat(sender, "cmd.not-online"))
+        val selection = args.getOrNull(2)?.lowercase()?.takeUnless { it == DEBUG_ALL }
+        if (selection != null && selection !in IGuardConfig.checkIds) {
+            return sender.sendMessage(chat(sender, "cmd.debug.unknown-check", "check" to selection))
+        }
+        val viewer = (sender as? Player)?.uniqueId?.toString() ?: DebugRouter.CONSOLE
+        val enabled = when (args.getOrNull(3)?.lowercase()) {
+            "on" -> true
+            "off" -> false
+            null -> !traces.debug.isWatching(viewer, target.uniqueId, selection)
+            else -> return sender.sendMessage(chat(sender, "cmd.debug.usage"))
+        }
+        val watched = traces.debug.set(viewer, target.uniqueId, selection, enabled)
+        val checks = selection ?: DEBUG_ALL
+        if (enabled) {
+            sender.sendMessage(chat(sender, "cmd.debug.enabled", "player" to target.name, "checks" to checks))
+        } else {
+            sender.sendMessage(
+                chat(sender, "cmd.debug.disabled", "player" to target.name, "checks" to checks, "remaining" to watched.joinToString().ifEmpty { "-" }),
+            )
+        }
+    }
+
+    /** `/iguard trace start <player> <label> | stop [player] | marker [player] <text> | list`. */
+    private fun trace(sender: CommandSender, args: Array<out String>) {
+        if (!permission(sender, "iguard.trace")) return
+        when (args.getOrNull(1)?.lowercase()) {
+            "start" -> {
+                val name = args.getOrNull(2) ?: return sender.sendMessage(chat(sender, "cmd.trace.usage"))
+                val target = Bukkit.getPlayerExact(name) ?: return sender.sendMessage(chat(sender, "cmd.not-online"))
+                val label = args.drop(3).joinToString("-").ifBlank { target.name }
+                runCatching { api.startTrace(target.uniqueId, label) }
+                    .onSuccess { session ->
+                        lastTraced[sender.name] = target.uniqueId
+                        sender.sendMessage(chat(sender, "cmd.trace.started", "player" to target.name, "label" to session.label, "file" to "${session.file.fileName}"))
+                    }
+                    .onFailure { sender.sendMessage(chat(sender, "cmd.trace.failed", "error" to "${it.message}")) }
+            }
+            "stop" -> {
+                val target = traceTarget(sender, args.getOrNull(2)) ?: return sender.sendMessage(chat(sender, "cmd.trace.none"))
+                val file = api.stopTrace(target) ?: return sender.sendMessage(chat(sender, "cmd.trace.none"))
+                sender.sendMessage(chat(sender, "cmd.trace.stopped", "player" to playerName(target), "file" to "$file"))
+            }
+            "marker" -> {
+                // `marker <player> <text>` when the first word names a traced player, else `marker <text>`.
+                val named = args.getOrNull(2)?.let(Bukkit::getPlayerExact)?.uniqueId?.takeIf { traces.active(it) != null }
+                val target = named ?: traceTarget(sender, null) ?: return sender.sendMessage(chat(sender, "cmd.trace.none"))
+                val text = args.drop(if (named != null) 3 else 2).joinToString(" ")
+                if (text.isBlank()) return sender.sendMessage(chat(sender, "cmd.trace.usage"))
+                if (api.traceMarker(target, text)) {
+                    sender.sendMessage(chat(sender, "cmd.trace.marker", "player" to playerName(target), "text" to text))
+                } else {
+                    sender.sendMessage(chat(sender, "cmd.trace.none"))
+                }
+            }
+            "list" -> {
+                val sessions = traces.activeSessions()
+                sender.sendMessage(chat(sender, "cmd.trace.list.header", "count" to "${sessions.size}"))
+                sessions.forEach { session ->
+                    sender.sendMessage(
+                        chat(sender, "cmd.trace.list.entry", "player" to playerName(session.playerId), "label" to session.label, "frames" to "${session.frames}"),
+                    )
+                }
+            }
+            else -> sender.sendMessage(chat(sender, "cmd.trace.usage"))
+        }
+    }
+
+    // Named player, else the sender's last traced player, else the only running trace.
+    private fun traceTarget(sender: CommandSender, name: String?): java.util.UUID? {
+        if (name != null) return Bukkit.getPlayerExact(name)?.uniqueId ?: Bukkit.getOfflinePlayerIfCached(name)?.uniqueId
+        lastTraced[sender.name]?.takeIf { traces.active(it) != null }?.let { return it }
+        return traces.activeSessions().singleOrNull()?.playerId
+    }
+
+    private fun playerName(playerId: java.util.UUID): String = Bukkit.getPlayer(playerId)?.name ?: playerId.toString()
 
     private fun info(sender: CommandSender, args: Array<out String>) {
         if (!permission(sender, "iguard.info")) return
@@ -442,6 +539,9 @@ class IGuardCommand(
         miniMessage.deserialize(LegacyToMini.translate(text)).decoration(TextDecoration.ITALIC, false)
 
     companion object {
+        /** `/iguard debug` selection for every check. */
+        private const val DEBUG_ALL = "all"
+
         private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
             .withZone(ZoneId.systemDefault())
     }

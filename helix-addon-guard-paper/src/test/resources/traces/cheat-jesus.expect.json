@@ -1,0 +1,1 @@
+{ "flags": ["movement.jesus.a"], "clean": ["movement.timer.a", "movement.fastladder.a", "movement.highjump.a"], "minCounted": { "movement.jesus.a": 3 } }

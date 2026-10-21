@@ -53,18 +53,19 @@ class GuardAddonTest {
 
     @Test
     fun `registry mirrors the full iguard schema`() {
-        // 45 plain settings + 32 checks x 4 fields; server-id and storage.mode
+        // 49 plain settings + 32 checks x 4 fields; server-id and storage.mode
         // are fixed and not editable
-        assertEquals(45 + 32 * 4, GuardConfig.settings.size)
+        assertEquals(49 + 32 * 4, GuardConfig.settings.size)
         assertEquals(GuardConfig.settings.size, GuardConfig.byPath.size)
         assertFalse("server-id" in GuardConfig.byPath)
         assertFalse("storage.mode" in GuardConfig.byPath)
         assertFalse("database.pool-size" in GuardConfig.byPath)
 
-        assertEquals(5, GuardConfig.settings.count { it.static })
+        assertEquals(8, GuardConfig.settings.count { it.static })
         listOf(
             "workers.stripes", "workers.queue-capacity",
             "history.queue-capacity", "history.batch-size", "history.flush-millis",
+            "trace.max-bytes", "trace.max-seconds", "trace.queue-capacity",
         ).forEach { path -> assertTrue(GuardConfig.byPath.getValue(path).static, path) }
         listOf(
             "history.retention-days", "alerts.enabled", "alerts.message", "bans.provider",
@@ -149,6 +150,10 @@ class GuardAddonTest {
         assertEquals("    alert-vl: 4.0", lines[fly + 2])
         assertEquals("    setback-vl: 7.0", lines[fly + 3])
         assertEquals("    decay-per-second: 4.0", lines[fly + 4])
+        assertContains(lines, "trace:")
+        assertContains(lines, "  max-bytes: 67108864")
+        assertContains(lines, "debug:")
+        assertContains(lines, "  rate-limit-millis: 200")
     }
 
     @Test

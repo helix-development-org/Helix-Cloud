@@ -1,0 +1,1 @@
+{ "flags": ["movement.fly.a"], "clean": ["movement.speed.a", "movement.timer.a"], "minCounted": { "movement.fly.a": 3 } }
