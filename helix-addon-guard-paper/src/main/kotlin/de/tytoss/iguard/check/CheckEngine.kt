@@ -128,6 +128,10 @@ internal class PlayerState {
     var lastGroundSlipperiness = 0.6
     // Sustained-speed window: observed vs. vanilla-possible horizontal distance over clean frames.
     var speedWindowFrames = 0
+    // Movement packets since the last tick-end packet (blink: held packets arrive as one burst) and the
+    // teleport confirmations in between (each answers with one extra position packet).
+    var movesSinceTick = 0
+    var teleportConfirmsSinceTick = 0
     var speedWindowObserved = 0.0
     var speedWindowVanilla = 0.0
     var predictedVertical = 0.0
@@ -405,12 +409,15 @@ class CheckEngine(
         }
         state.observation = observation
         when (frame) {
-            is MovementFrame -> if (view != null && profile != null) processMovement(frame, state, view.current, profile, view.playerName)
+            is MovementFrame -> {
+                state.movesSinceTick++
+                if (view != null && profile != null) processMovement(frame, state, view.current, profile, view.playerName)
+            }
             is AttackFrame -> if (view != null && profile != null) processAttack(frame, state, view.current, profile, view.playerName)
             is SwingFrame -> state.lastSwingAt = frame.receivedAt
             is ClientActionFrame -> processAction(frame, state)
             is ClientAbilitiesFrame -> processClientAbilities(frame, state)
-            is ClientTickFrame -> processClientTick(frame, state, view?.current, view?.playerName)
+            is ClientTickFrame -> processClientTick(frame, state, view?.current, view?.playerName, version)
             is ClientIdentityFrame -> processIdentity(frame, state, view?.playerName)
             is ServerVelocityFrame -> processVelocity(frame, state)
             is ServerTeleportFrame -> processTeleport(frame, state)
@@ -788,7 +795,14 @@ class CheckEngine(
         }
     }
 
-    private fun processClientTick(frame: ClientTickFrame, state: PlayerState, environment: EnvironmentFrame?, playerName: String?) {
+    private fun processClientTick(
+        frame: ClientTickFrame,
+        state: PlayerState,
+        environment: EnvironmentFrame?,
+        playerName: String?,
+        version: ClientVersion?,
+    ) {
+        checkMovementBurst(frame, state, environment, playerName, version)
         if (!state.explicitClientTicks) {
             // The first tick-end packet switches the timer from the movement-packet fallback to the
             // explicit tick clock; mixing both sources would double-count the window.
@@ -804,6 +818,34 @@ class CheckEngine(
             state.airTicks = if (state.physicalSupporting) 0 else state.airTicks + 1
         }
         recordClientTick(frame, state, environment, playerName, "tick-end")
+    }
+
+    /**
+     * Blink check: a 1.21.2+ client ends every tick with a tick-end packet and sends at most one movement packet
+     * per tick (plus one per teleport it confirms). TCP keeps the order, so lag delays both alike; a burst of
+     * movement packets between two tick-ends only happens when a client held them back (blink, fake lag).
+     * Older clients behind ViaVersion and Bedrock players are not judged.
+     */
+    private fun checkMovementBurst(
+        frame: ClientTickFrame,
+        state: PlayerState,
+        environment: EnvironmentFrame?,
+        playerName: String?,
+        version: ClientVersion?,
+    ) {
+        val moves = state.movesSinceTick
+        val allowed = 1 + state.teleportConfirmsSinceTick
+        state.movesSinceTick = 0
+        state.teleportConfirmsSinceTick = 0
+        if (!state.explicitClientTicks || environment == null || playerName == null || state.bedrock == true) return
+        if (version == null || !version.isNewerThanOrEquals(ClientVersion.V_1_21_2)) return
+        if (moves - allowed < MOVE_BURST_MIN_EXTRA) return
+        val burst = CheckFailure(
+            "protocol.badpackets.a", 1.0,
+            mapOf("reason" to "movement-burst", "moves" to moves, "allowed" to allowed),
+            deterministic = true,
+        )
+        applyResults(frame, state, environment, playerName, listOf(burst), setOf("protocol.badpackets.a"))
     }
 
     /**
@@ -881,6 +923,7 @@ class CheckEngine(
     }
 
     private fun processTeleportConfirm(frame: TeleportConfirmFrame, state: PlayerState) {
+        state.teleportConfirmsSinceTick++
         if (state.pendingTeleportId == frame.teleportId) {
             state.pendingTeleportId = null
             state.teleportExemption?.cancel()
@@ -909,6 +952,8 @@ class CheckEngine(
         state.pendingVelocity = null
         state.clientTickTimes.clear()
         state.lastInteractionSequence = -1
+        state.movesSinceTick = 0
+        state.teleportConfirmsSinceTick = 0
         // Respawns/world changes reset everything; a short full exemption covers the reload.
         exemptions.exempt(
             frame.playerId, Duration.ofMillis(exemptionConfig.respawnMillis.coerceAtLeast(1)), frame.reason,
@@ -1374,6 +1419,10 @@ private const val TIMER_MIN_SPAN_MILLIS = 9_000L
 private const val TIMER_MIN_SAMPLES = 190
 private const val TIMER_RATE_LIMIT = 21.2
 private val TIMER_CHECKS = setOf("movement.timer.a")
+
+// Extra movement packets between two tick-ends before the blink check flags (vanilla sends at most one per
+// tick plus one per confirmed teleport; four or more held packets cannot come from a vanilla client).
+private const val MOVE_BURST_MIN_EXTRA = 3
 
 private const val PUBLISH_INTERVAL_MILLIS = 200L
 
