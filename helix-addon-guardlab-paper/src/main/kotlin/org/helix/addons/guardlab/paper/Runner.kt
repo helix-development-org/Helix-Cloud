@@ -131,6 +131,10 @@ class LabRunner(
         var error: String? = null
         var skipped: String? = null
         var spiking = false
+        var effectsAt = -1
+        var blockClicks = 0
+        var blocksPlaced = 0
+        var placesCancelled = 0
         val pings = mutableListOf<Int>()
         val entities = mutableListOf<Entity>()
         val notes = mutableListOf<String>()
@@ -346,6 +350,47 @@ class LabRunner(
         mark(active, "death")
     }
 
+    /**
+     * Notes a block click of the run's client during playback. Together with [onBlockPlace] this shows where a
+     * placement gets lost: no click at all → vanilla dropped the packet before Bukkit (reach, pending teleport,
+     * spawn protection); a click without a place → the item or an obstruction (the player's own hitbox);
+     * a cancelled place → a plugin.
+     *
+     * @param player the clicking player.
+     * @param x clicked block x.
+     * @param y clicked block y.
+     * @param z clicked block z.
+     * @param face clicked face.
+     * @param item material in the hand.
+     * @param cancelled whether the interaction was cancelled.
+     */
+    fun onBlockClick(player: Player, x: Int, y: Int, z: Int, face: String, item: String, cancelled: Boolean) {
+        val active = playback(player) ?: return
+        active.blockClicks++
+        mark(active, "block_click", "$x $y $z $face item=$item${if (cancelled) " cancelled" else ""}")
+    }
+
+    /**
+     * Notes a block placement of the run's client during playback (see [onBlockClick]).
+     *
+     * @param player the placing player.
+     * @param x placed block x.
+     * @param y placed block y.
+     * @param z placed block z.
+     * @param cancelled whether a plugin cancelled it (or building is not allowed there).
+     */
+    fun onBlockPlace(player: Player, x: Int, y: Int, z: Int, cancelled: Boolean) {
+        val active = playback(player) ?: return
+        if (cancelled) active.placesCancelled++ else active.blocksPlaced++
+        mark(active, if (cancelled) "place_cancelled" else "placed", "$x $y $z")
+    }
+
+    private fun playback(player: Player): Active? {
+        val current = run ?: return null
+        if (player.uniqueId != current.client.playerId) return null
+        return current.active?.takeIf { it.phase in PLAYBACK }
+    }
+
     /** Where a dying client respawns: the waiting spot of the lab. */
     fun respawnLocation() = Stations.resolve(WAIT_SPOT)?.let { lab.location(it) }
 
@@ -435,9 +480,17 @@ class LabRunner(
             complete(player, active)
             return
         }
-        // Playback: effects (timed ones like levitation must not run out during setup), baseline, frame
-        // collector, trace, message.
-        applyEffects(player, active)
+        // Effects right before playback (timed ones like levitation must not run out during setup), but a few
+        // ticks ahead: IGuard samples its environment a tick behind, and a jump boost applied in the start tick
+        // was still missing in the first jump's snapshot (step false positive in legit_jump_boost).
+        if (active.scenario.setup.effects.isNotEmpty()) {
+            if (active.effectsAt < 0) {
+                applyEffects(player, active)
+                active.effectsAt = active.phaseTicks
+            }
+            if (active.phaseTicks < active.effectsAt + EFFECT_LEAD_TICKS) return
+        }
+        // Playback: baseline, frame collector, trace, message.
         val baseline = probe.levels(player.uniqueId)
         active.tracker.start(baseline)
         active.frames = FrameStats(player.uniqueId, baseline).also { frameStats = it }
@@ -600,7 +653,7 @@ class LabRunner(
         active.scenario.setup.effects.forEach { effect ->
             val type = Registry.EFFECT.get(NamespacedKey.minecraft(effect.type))
             if (type == null) active.notes += "unbekannter Effekt ${effect.type}" else {
-                player.addPotionEffect(PotionEffect(type, effect.seconds * 20, effect.amplifier, false, false))
+                player.addPotionEffect(PotionEffect(type, effect.seconds * 20 + EFFECT_LEAD_TICKS, effect.amplifier, false, false))
             }
         }
     }
@@ -729,6 +782,10 @@ class LabRunner(
         val checks = if (stats == null || frames == null) active.tracker.observations() else {
             val evaluated = frames.checks.map { it.check }.toSet()
             (stats.observations() + active.tracker.observations().filter { it.check !in evaluated }).sortedBy { it.check }
+        }
+        if (active.blockClicks > 0 && active.blocksPlaced == 0) {
+            active.notes += "Server hat keinen der ${active.blockClicks} Block-Klicks platziert" +
+                if (active.placesCancelled > 0) " (${active.placesCancelled}× von einem Plugin abgebrochen)" else " – Hand leer oder Ziel blockiert (eigene Hitbox)"
         }
         val observation = ScenarioObservation(
             checks = checks,
@@ -885,6 +942,7 @@ class LabRunner(
         const val REDSTONE_BLOCK = "minecraft:redstone_block"
         const val AIR = "minecraft:air"
         const val MOUNT_TICK = 5
+        const val EFFECT_LEAD_TICKS = 5
         const val LAG_WAIT_TICKS = 100
         const val START_TIMEOUT_TICKS = 100
         const val PLAY_GRACE_TICKS = 100

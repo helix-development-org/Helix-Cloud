@@ -898,7 +898,7 @@
         {"ticks": 140, "lookAt": "target"}
       ],
       "cheat": {"mode": "autoclicker", "params": {"cps": 16, "jitter": 2}},
-      "expect": {"checks": ["combat.autoclicker.a"], "note": "Grenzfall – menschenähnliche Streuung"}
+      "expect": {"checks": ["combat.autoclicker.a"], "knownGap": true, "note": "Grenzfall – 16 CPS mit menschenähnlicher Streuung (Abweichung ~0,39) sind auch für schnelle Jitter-Klicker erreichbar; IGuard meldet bewusst erst gleichmäßigere Klicks"}
     },
     {
       "id": "cheat_noswing",

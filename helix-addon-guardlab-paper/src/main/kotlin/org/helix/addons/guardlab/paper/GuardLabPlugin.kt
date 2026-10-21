@@ -14,7 +14,12 @@ import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
+import org.bukkit.event.Event
+import org.bukkit.event.block.Action
+import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.entity.PlayerDeathEvent
+import org.bukkit.event.player.PlayerInteractEvent
+import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.player.PlayerRegisterChannelEvent
@@ -236,6 +241,23 @@ class GuardLabPlugin : JavaPlugin(), Listener, PluginMessageListener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     fun onTeleport(event: PlayerTeleportEvent) {
         if (active) runner.onTeleport(event)
+    }
+
+    /** Placement diagnostics: block clicks of the run's client. */
+    @EventHandler(priority = EventPriority.MONITOR)
+    fun onInteract(event: PlayerInteractEvent) {
+        if (!active || event.action != Action.RIGHT_CLICK_BLOCK || event.hand != EquipmentSlot.HAND) return
+        val block = event.clickedBlock ?: return
+        runner.onBlockClick(
+            event.player, block.x, block.y, block.z, event.blockFace.name, event.item?.type?.name ?: "AIR",
+            event.useItemInHand() == Event.Result.DENY,
+        )
+    }
+
+    /** Placement diagnostics: placements of the run's client. */
+    @EventHandler(priority = EventPriority.MONITOR)
+    fun onPlace(event: BlockPlaceEvent) {
+        if (active) runner.onBlockPlace(event.player, event.block.x, event.block.y, event.block.z, event.isCancelled || !event.canBuild())
     }
 
     /** Notes deaths during a scenario. */

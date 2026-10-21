@@ -40,7 +40,7 @@ class SuitesTest {
         val snap = bundled.scenarios.getValue("cheat_killaura_snap")
         assertTrue(snap.expect.checks.containsAll(listOf("combat.snapaim.a", "combat.rotation.a", "combat.autoclicker.a")))
         assertFalse(snap.expect.knownGap)
-        assertEquals(listOf("cheat_killaura_smooth"), bundled.scenarios.values.filter { it.expect.knownGap }.map { it.id })
+        assertEquals(listOf("cheat_killaura_smooth", "cheat_autoclicker_jitter"), bundled.scenarios.values.filter { it.expect.knownGap }.map { it.id })
         val reach = bundled.scenarios.getValue("cheat_reach")
         val player = Stations.resolve(reach.setup.spot)!!
         val dummy = Stations.resolve(reach.setup.dummy!!)!!
