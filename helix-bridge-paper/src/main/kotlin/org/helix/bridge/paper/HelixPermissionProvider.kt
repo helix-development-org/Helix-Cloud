@@ -40,6 +40,10 @@ class HelixPermissionProvider(private val plugin: Plugin) {
         diff.toGrant.forEach { node -> attachment.setPermission(node, true) }
         diff.toRevoke.forEach { node -> attachment.unsetPermission(node) }
         granted[player.uniqueId] = nodes
+        // The client got its command tree at join, before the node's permissions arrived: without a resend,
+        // permission-gated commands (/test of MineClash, admin commands …) stay unknown in its chat and
+        // tab completion although the server would run them.
+        player.updateCommands()
     }
 
     /**
