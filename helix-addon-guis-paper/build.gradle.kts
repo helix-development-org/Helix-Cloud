@@ -69,6 +69,8 @@ sourceSets {
 dependencies {
     // pure screen helpers (fonts, ascents) shared with the GUI library
     "packImplementation"(project(":helix-gui"))
+    // rank badge codepoints (RankBadges) shared with the prefixes
+    "packImplementation"(project(":helix-api"))
 }
 
 val generatePack by tasks.registering(JavaExec::class) {
@@ -84,6 +86,7 @@ val generatePack by tasks.registering(JavaExec::class) {
     inputs.dir(layout.projectDirectory.dir("src/pack/resources/villagers"))
     inputs.dir(layout.projectDirectory.dir("src/pack/resources/wordmark"))
     inputs.dir(layout.projectDirectory.dir("src/pack/resources/icons"))
+    inputs.dir(layout.projectDirectory.dir("src/pack/resources/ranks"))
     inputs.dir(layout.projectDirectory.dir("src/pack/resources/sounds"))
     outputs.file(output)
 }

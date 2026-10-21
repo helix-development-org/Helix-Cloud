@@ -34,15 +34,14 @@ class TesterAccess(
             return false
         }
         val rank = PlayerRanks.TESTER
-        val color = "<#%06x>".format(rank.color)
         store.saveGroup(
             PermissionGroup(
                 name = GROUP,
                 weight = rank.weight,
                 default = false,
                 permissions = PERMISSIONS,
-                prefix = "$color${rank.tag}</#%06x> ".format(rank.color),
-                color = color,
+                prefix = rank.prefix,
+                color = rank.colorTag,
             ),
         )
         return true
@@ -132,15 +131,15 @@ class TesterAccess(
         if (store.group(BADGE_GROUP) != null) {
             return false
         }
-        val rank = PlayerRanks.TESTER
+        val rank = PlayerRanks.BETA
         store.saveGroup(
             PermissionGroup(
                 name = BADGE_GROUP,
-                weight = 1,
+                weight = rank.weight,
                 default = false,
                 permissions = listOf(PlayerRanks.BETA_TESTER_BADGE),
-                prefix = "<#%06x>[Beta]</#%06x> ".format(rank.color, rank.color),
-                color = "<#%06x>".format(rank.color),
+                prefix = rank.prefix,
+                color = rank.colorTag,
             ),
         )
         return true

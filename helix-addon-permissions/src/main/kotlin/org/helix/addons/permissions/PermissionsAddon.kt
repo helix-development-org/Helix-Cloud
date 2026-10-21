@@ -26,6 +26,7 @@ class PermissionsAddon : AddonBase() {
     private lateinit var store: PermissionStore
     private lateinit var catalog: PermissionCatalog
     private lateinit var tester: TesterAccess
+    private lateinit var badges: RankBadgeUpgrade
 
     /**
      * Registers the resolver and all `perm.*` actions.
@@ -38,6 +39,8 @@ class PermissionsAddon : AddonBase() {
         }
         tester = TesterAccess(store, loadMessages())
         tester.seedGroup()
+        badges = RankBadgeUpgrade(store, context.storage())
+        badges.upgradeOnce()
         context.registerPermissionResolver { request -> store.has(request.name, request.permission, request.uuid) }
         // Group prefixes are DISPLAY state, deliberately decoupled from permission nodes: the
         // player's highest-weight group with a prefix wins, so a `*` grant never changes looks.
@@ -89,7 +92,7 @@ class PermissionsAddon : AddonBase() {
             ActionResult.ok(
                 "name: ${group.name}",
                 "weight: ${group.weight}, default: ${group.default}",
-                "prefix: '${group.prefix}'${if (group.color.isNotEmpty()) ", color: '${group.color}'" else ""}",
+                "prefix: '${org.helix.api.design.RankBadges.plain(group.prefix)}'${if (group.color.isNotEmpty()) ", color: '${group.color}'" else ""}",
                 "parents: ${group.parents.joinToString().ifEmpty { "-" }}",
                 "permissions: ${group.permissions.joinToString().ifEmpty { "-" }}",
             )
@@ -197,6 +200,16 @@ class PermissionsAddon : AddonBase() {
                 ?: return@action ActionResult.error("usage: perm.release.reset <plan|run> [--remove-testers]")
             ActionResult.ok(tester.release(dryRun, ReleaseReset.FLAG_REMOVE_TESTERS in inv.arguments).toJson())
         }
+        action(
+            "perm.ranks.apply-badges",
+            "Replaces the old text rank prefixes ([Owner] …) of the standard groups by the rank badges; --force also " +
+                "replaces prefixes the team changed.",
+            "perm.ranks.apply-badges [--force]",
+            permission = RankBadgeUpgrade.PERMISSION,
+        ) { inv ->
+            val changed = badges.apply(force = "--force" in inv.arguments)
+            if (changed.isEmpty()) ActionResult.ok("no group prefix changed") else ActionResult.ok("badge prefix set for: ${changed.joinToString()}")
+        }
         action("perm.export", "Exports all groups and users as JSON (used by the dashboard).", "perm.export") {
             ActionResult.ok(json.encodeToString(store.document()))
         }
@@ -253,14 +266,14 @@ class PermissionsAddon : AddonBase() {
             val name = rank.tag.trim('[', ']').lowercase()
             val isDefault = rank.weight == 0
             if (!isDefault && !fresh) return@forEach
-            val color = "<#%06x>".format(rank.color)
+            // Rank badges (DESIGN §9 AC3): staff groups show the badge glyph, default players no badge (grey name).
             store.saveGroup(
                 PermissionGroup(
                     name = if (isDefault) "default" else name,
                     weight = rank.weight,
                     default = isDefault,
-                    prefix = "$color${rank.tag}</#%06x> ".format(rank.color),
-                    color = color,
+                    prefix = rank.prefix,
+                    color = rank.colorTag,
                 ),
             )
         }

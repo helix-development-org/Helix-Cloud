@@ -31,6 +31,7 @@ fun main(args: Array<String>) {
     entries.putAll(ledger(Path.of(args[1])))
     entries.putAll(wordmark(Path.of(args[1]).resolveSibling("wordmark")))
     entries.putAll(icons(Path.of(args[1]).resolveSibling("icons")))
+    entries.putAll(rankBadges(Path.of(args[1]).resolveSibling("ranks")))
     entries.putAll(sprites(NAMESPACE, Path.of(args[1]).resolveSibling("anim"), de.tytoss.igui.screen.LedgerLayout.SPRITES))
     entries["assets/$NAMESPACE/items/empty.json"] = """{"model":{"type":"minecraft:empty"}}""".toByteArray()
     // Text at any height for full-window screens (helix-gui `textAt`): one font per text top
@@ -237,5 +238,19 @@ private fun icons(art: Path): Map<String, ByteArray> {
         """{"type":"bitmap","file":"$NAMESPACE:font/icon_$name.png","height":8,"ascent":7,"chars":["\u%04X"]}""".format(glyph)
     }
     out["assets/$NAMESPACE/font/icons.json"] = """{"providers":[${providers.joinToString(",")}]}""".toByteArray()
+    return out
+}
+
+/**
+ * Rank badges of the shared font `helix_guis:ranks` (helix-api `RankBadges`, DESIGN §9 AC3): one pixel-art pill per
+ * rank, drawn at native size on the 9 px text line (height 9, ascent 8). Codepoints come from `RankBadges`.
+ */
+private fun rankBadges(art: Path): Map<String, ByteArray> {
+    val out = linkedMapOf<String, ByteArray>()
+    val providers = org.helix.api.design.RankBadges.ALL.map { badge ->
+        out["assets/$NAMESPACE/textures/font/rank_${badge.key}.png"] = Files.readAllBytes(art.resolve("${badge.key}.png"))
+        """{"type":"bitmap","file":"$NAMESPACE:font/rank_${badge.key}.png","height":9,"ascent":8,"chars":["\u%04X"]}""".format(badge.glyph.code)
+    }
+    out["assets/$NAMESPACE/font/ranks.json"] = """{"providers":[${providers.joinToString(",")}]}""".toByteArray()
     return out
 }

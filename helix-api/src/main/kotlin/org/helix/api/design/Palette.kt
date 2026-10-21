@@ -100,11 +100,23 @@ object Palette {
 /**
  * A staff rank of the design concept (§9).
  *
- * @property tag chat tag including brackets.
+ * @property tag plain chat tag including brackets (used where no resource pack is shown, e.g. Discord).
  * @property color rank colour (RGB).
  * @property weight sort weight (higher = more important).
  */
-data class StaffRank(val tag: String, val color: Int, val weight: Int)
+data class StaffRank(val tag: String, val color: Int, val weight: Int) {
+    /** The rank badge glyph (§9 „Rang-Abzeichen AC3“), `null` for ranks without a badge (default players). */
+    val badge: RankBadges.Badge? get() = RankBadges.of(tag)
+
+    /** Group prefix of this rank: the badge plus a space, empty for ranks without a badge. */
+    val prefix: String get() = badge?.prefix ?: ""
+
+    /** MiniMessage colour tag of [color], e.g. `<#d8382e>`. */
+    val colorTag: String get() = "<#%06x>".format(color)
+
+    /** The former text prefix (`<#rrggbb>[Tag]</#rrggbb> `) – recognised when upgrading old installations. */
+    val legacyPrefix: String get() = "$colorTag$tag</#%06x> ".format(color)
+}
 
 /** The staff ranks of the design concept, highest first. */
 object StaffRanks {
@@ -131,6 +143,9 @@ object PlayerRanks {
      * permissions; see `docs/TESTPHASE.md`.
      */
     val TESTER: StaffRank = StaffRank("[Tester]", 0x5AB4FF, 10)
+
+    /** Former testers (badge group `betatester`, weight 1): same colour as testers, badge „BETA“. */
+    val BETA: StaffRank = StaffRank("[Beta]", 0x5AB4FF, 1)
 
     /**
      * Permanent badge node for former testers (`badge.betatester`). It is

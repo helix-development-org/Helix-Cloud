@@ -27,7 +27,7 @@ class TesterAccessTest {
         val group = store.group(TesterAccess.GROUP)!!
         assertEquals(10, group.weight)
         assertTrue("helix.maintenance.bypass" in group.permissions)
-        assertTrue(group.prefix.contains("[Tester]"))
+        assertEquals(org.helix.api.design.RankBadges.TESTER.prefix, group.prefix)
     }
 
     @Test

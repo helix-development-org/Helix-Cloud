@@ -65,6 +65,10 @@
 
 <script>
 "use strict";
+// Rank badge glyphs (helix-api RankBadges, font helix_guis:ranks) shown as readable labels – the browser has no pack.
+const RANK_LABELS = { "\uE000": "Owner", "\uE001": "Manager", "\uE002": "Developer", "\uE003": "Admin", "\uE004": "Mod", "\uE005": "Support", "\uE006": "Tester", "\uE007": "Beta" };
+const rankPlain = s => String(s ?? "").replace(/(?:<white>)?<font:helix_guis:ranks>([\s\S]*?)<\/font>(?:<\/white>)?/g,
+  (_, g) => [...g].map(c => RANK_LABELS[c] ? `[${RANK_LABELS[c]}]` : c).join(""));
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 let doc = { groups: [], users: [] };
 let catalog = [];
@@ -163,7 +167,7 @@ function renderGroups() {
     sorted.map(g => `<tr>
       <td><strong>${esc(g.name)}</strong></td>
       <td class="mono">${g.weight||0}</td>
-      <td class="mono">${g.prefix ? esc(g.prefix) : '<span class="muted">—</span>'}</td>
+      <td class="mono">${g.prefix ? (rankPlain(g.prefix) !== g.prefix ? `<span class="tag">${esc(rankPlain(g.prefix).trim())}</span> <span class="muted">Abzeichen</span>` : esc(g.prefix)) : '<span class="muted">—</span>'}</td>
       <td>${g.default ? '<span class="badge good">default</span>' : '<span class="muted">—</span>'}</td>
       <td>${(g.parents||[]).length ? (g.parents||[]).map(p=>`<span class="tag">${esc(p)}</span>`).join(" ") : '<span class="muted">—</span>'}</td>
       <td>${(g.permissions||[]).length ? `<span class="tag">${(g.permissions||[]).length} nodes</span>` : '<span class="muted">—</span>'}</td>
