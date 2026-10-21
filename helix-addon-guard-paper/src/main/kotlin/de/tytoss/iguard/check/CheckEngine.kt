@@ -928,13 +928,16 @@ class CheckEngine(
         // (flight, vehicle, liquid …) and movement-only exemptions do NOT suspend them.
         if (actionExempt(frame, state, environment)) return
         val failures = ArrayList<CheckFailure>()
-        if (frame.interactionSequence >= 0 && state.lastInteractionSequence >= 0 && frame.interactionSequence < state.lastInteractionSequence - 4) {
+        // Sequence 0 means "not predicted": the vanilla client numbers predicted interactions from 1 and sends
+        // every unpredicted one (abort digging, item use release, drops …) with 0 – never a regression.
+        val sequenced = frame.interactionSequence > 0
+        if (sequenced && state.lastInteractionSequence > 0 && frame.interactionSequence < state.lastInteractionSequence - 4) {
             failures += CheckFailure(
                 "protocol.badpackets.a", 1.0,
                 mapOf("reason" to "interaction-sequence-regression", "sequence" to frame.interactionSequence, "previous" to state.lastInteractionSequence),
             )
         }
-        if (frame.interactionSequence >= 0) state.lastInteractionSequence = max(state.lastInteractionSequence, frame.interactionSequence)
+        if (sequenced) state.lastInteractionSequence = max(state.lastInteractionSequence, frame.interactionSequence)
         if (frame.action == BlockAction.PLACE && listOf(frame.cursorX, frame.cursorY, frame.cursorZ).any { it !in 0.0f..1.0f || !it.isFinite() }) {
             failures += CheckFailure(
                 "protocol.badpackets.a", 2.0, mapOf("reason" to "invalid-block-cursor"),

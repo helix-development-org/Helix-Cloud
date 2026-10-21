@@ -66,6 +66,9 @@ class TraceHubTest {
         val hub = hub(TraceConfig(4_000, 600, 1_000))
         val session = hub.start(PLAYER, "big")
         repeat(20) { hub.observe(trace(now + it * 50L, now + it * 50L - 5)) }
+        // The writer thread enforces the limit; shutting down before it got there would end the file with "shutdown".
+        val deadline = System.nanoTime() + 5_000_000_000L
+        while (session.active && System.nanoTime() < deadline) Thread.sleep(5)
         hub.shutdown()
 
         assertFalse(session.active)
