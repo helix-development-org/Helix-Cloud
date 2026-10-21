@@ -18,16 +18,11 @@ object CheckCatalog {
         "inventory.impossible.a", "inventory.move.a",
     )
 
-    /** Checks without a cheat scenario, with the reason (they are still covered by legit scenarios). */
-    val NOT_PROVOKED: Map<String, String> = mapOf(
-        "client.identity.a" to "braucht einen gefälschten Client-Fingerabdruck (kein Cheat-Modus im Vertrag)",
-        "client.brand_spoof.a" to "braucht eine gefälschte Client-Brand (kein Cheat-Modus im Vertrag)",
-        "movement.phase.a" to "braucht einen Noclip-Modus (Vertragserweiterung `phase`)",
-        "movement.sprintbackwards.a" to "braucht Omni-Sprint (Vertragserweiterung `omnisprint`)",
-        "combat.inventory.a" to "braucht Angriffe bei offenem Inventar (Vertragserweiterung)",
-        "inventory.impossible.a" to "braucht unmögliche Inventar-Klicks (Vertragserweiterung)",
-        "inventory.move.a" to "braucht Inventar-Klicks während der Bewegung (Vertragserweiterung)",
-    )
+    /**
+     * Checks without a cheat scenario, with the reason (they are still covered by legit scenarios). Empty since
+     * the client contract gained `phase`, `omnisprint`, `inventory`, `identity`, `brandspoof` and `badpackets`.
+     */
+    val NOT_PROVOKED: Map<String, String> = emptyMap()
 }
 
 /**
@@ -190,7 +185,9 @@ object Reports {
     fun coverage(scenarios: Map<String, Scenario>, results: List<ScenarioResult>): List<CoverageRow> = CheckCatalog.ALL.map { check ->
         val ran = results.filter { it.status != Status.SKIP }
         val legit = ran.filter { scenarios[it.id]?.let { s -> s.expect.none && check in s.covers } == true }.map { it.id }
-        val expecting = ran.filter { scenarios[it.id]?.let { s -> check in s.expect.checks || check in s.expect.all } == true }
+        // Known gaps are listed on their own; they must not turn a check into "nicht erkannt".
+        val expecting = ran.filter { it.status != Status.GAP }
+            .filter { scenarios[it.id]?.let { s -> check in s.expect.checks || check in s.expect.all } == true }
         val detected = expecting.filter { r ->
             val min = scenarios[r.id]?.expect?.minVl ?: 1.0
             (r.observation.checks.firstOrNull { it.check == check }?.total ?: 0.0) >= min
@@ -215,7 +212,7 @@ object Reports {
      * Legit scenarios count when the check rose there or IGuard evaluated it (without frame reports: when
      * they cover it); `pass (exempt)` scenarios do not count. A cheat scenario counts for every check of
      * `expect.all`; for `expect.checks` ("one of") only for the checks that rose, or for all of them when
-     * none did. Skipped scenarios and client errors are ignored.
+     * none did. Skipped scenarios, client errors and known gaps ([Status.GAP]) are ignored.
      *
      * @param scenarios scenarios of the run (id → scenario).
      * @param results their results.
@@ -223,7 +220,7 @@ object Reports {
      * @return one row per check with data, in catalogue order.
      */
     fun calibration(scenarios: Map<String, Scenario>, results: List<ScenarioResult>, alertVl: (String) -> Double): List<CalibrationRow> {
-        val ran = results.filter { it.status != Status.SKIP && it.observation.error == null }
+        val ran = results.filter { it.status != Status.SKIP && it.status != Status.GAP && it.observation.error == null }
         val seen = ran.flatMap { r -> r.observation.checks.map { it.check } + r.observation.frames?.checks.orEmpty().map { it.check } }
         val checks = (CheckCatalog.ALL + seen.sorted()).distinct()
         return checks.mapNotNull { check ->
@@ -306,11 +303,11 @@ object Reports {
      */
     fun summary(report: RunReport): String =
         "suite=${report.info.suite} passed=${report.count(Status.PASS)} warned=${report.count(Status.WARN)} " +
-            "failed=${report.count(Status.FAIL)} skipped=${report.count(Status.SKIP)} exempt=${report.exemptPasses}" +
+            "failed=${report.count(Status.FAIL)} skipped=${report.count(Status.SKIP)} exempt=${report.exemptPasses} gaps=${report.count(Status.GAP)}" +
             (report.info.aborted?.let { " aborted=\"$it\"" } ?: "")
 
     /**
-     * Renders `report.md` (German): header, result, failures, `pass (exempt)` scenarios, the scenario
+     * Renders `report.md` (German): header, result, failures, known gaps, `pass (exempt)` scenarios, the scenario
      * table, per-scenario details (expected vs. actual checks, max. VL, exemptions and tags with their
      * share of ticks, trace paths), check coverage and the threshold calibration.
      *
@@ -336,7 +333,8 @@ object Reports {
         appendLine(
             "**Ergebnis:** ${report.count(Status.PASS)} bestanden" +
                 (if (exempt > 0) " (davon $exempt nur, weil IGuard kaum prüfte – `pass (exempt)`)" else "") +
-                ", ${report.count(Status.WARN)} mit Warnung, ${report.count(Status.FAIL)} fehlgeschlagen, ${report.count(Status.SKIP)} übersprungen",
+                ", ${report.count(Status.WARN)} mit Warnung, ${report.count(Status.FAIL)} fehlgeschlagen, ${report.count(Status.SKIP)} übersprungen" +
+                (if (report.count(Status.GAP) > 0) ", ${report.count(Status.GAP)} bekannte Lücke(n)" else ""),
         )
         appendLine()
         val failed = report.results.filter { it.status == Status.FAIL }
@@ -347,6 +345,19 @@ object Reports {
                 appendLine("- **${r.id}** (${r.category}, ${r.cheat}, Lag ${r.lag}) – ${r.title}")
                 r.reasons.forEach { appendLine("  - $it") }
                 r.trace?.let { appendLine("  - Trace: `$it`") }
+                r.iguardTrace?.let { appendLine("  - IGuard-Trace: `$it`") }
+            }
+            appendLine()
+        }
+        val gaps = report.results.filter { it.status == Status.GAP }
+        if (gaps.isNotEmpty()) {
+            appendLine("## Bekannte Lücken")
+            appendLine()
+            appendLine("Szenarien mit `knownGap`: IGuard erkennt das (noch) nicht – keine Regression, aber offen.")
+            appendLine()
+            gaps.forEach { r ->
+                appendLine("- **${r.id}** (${r.cheat}) – ${r.title}")
+                r.reasons.filter { it != "bekannte Lücke" }.forEach { appendLine("  - $it") }
                 r.iguardTrace?.let { appendLine("  - IGuard-Trace: `$it`") }
             }
             appendLine()
@@ -477,6 +488,7 @@ object Reports {
         Status.WARN -> "⚠️ Warnung"
         Status.FAIL -> "❌ Fehler"
         Status.SKIP -> "⏭ übersprungen"
+        Status.GAP -> "🕳 bekannte Lücke"
     }
 
     private const val MAX_SHARES = 6

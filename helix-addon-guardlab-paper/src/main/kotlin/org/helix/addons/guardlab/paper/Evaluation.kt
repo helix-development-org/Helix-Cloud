@@ -112,8 +112,11 @@ data class ScenarioObservation(
     val frames: FrameSummary? = null,
 )
 
-/** Outcome of one scenario. */
-enum class Status { PASS, WARN, FAIL, SKIP }
+/**
+ * Outcome of one scenario. [GAP] is a missed detection of a scenario marked [Expectation.knownGap]: listed as
+ * a known IGuard gap, not counted as a failure.
+ */
+enum class Status { PASS, WARN, FAIL, SKIP, GAP }
 
 /**
  * Verdict of one scenario.
@@ -132,7 +135,8 @@ data class Verdict(val status: Status, val reasons: List<String>, val exempt: Bo
  * - legit (`expect.none`): no rise → pass; rises that stayed below the check's alert level → warn
  *   (noise that still feeds confidence); any alert-level rise or an unexpected setback → fail;
  * - cheat: any of `checks` (or every one of `all`) must sum at least `minVl`; `setback` true/false is
- *   enforced when set.
+ *   enforced when set. A miss of a [Expectation.knownGap] scenario becomes [Status.GAP], its detection a pass
+ *   with the hint that the gap may be closed.
  * A client error starting with `unsupported` skips the scenario (the dev client lacks the mode). A passing
  * lag scenario whose measured ping stays far below the profile becomes a warning: the client is probably
  * not connected through Toxiproxy.
@@ -264,6 +268,13 @@ object Evaluator {
         val others = byCheck.values.filter { it.flags > 0 && it.check !in expect.checks && it.check !in expect.all }
         if (others.isNotEmpty()) reasons += "außerdem gemeldet: " + others.joinToString { "${it.check} (%.2f)".format(it.total) }
         if (expect.note.isNotBlank()) reasons += "Hinweis: ${expect.note}"
+        if (expect.knownGap) {
+            return if (ok) {
+                Verdict(Status.PASS, reasons + "bekannte Lücke erkannt – geschlossen? Dann `knownGap` entfernen")
+            } else {
+                Verdict(Status.GAP, listOf("bekannte Lücke") + reasons)
+            }
+        }
         return Verdict(if (ok) Status.PASS else Status.FAIL, reasons)
     }
 }

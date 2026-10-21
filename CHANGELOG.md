@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### IGuard: Abbauzeit, Mehrfachziele auf Mobs, Autoclicker-Schwellen
+
+- **`world.fastbreak.a` prüft die Vanilla-Abbauzeit**: Der Server misst beim
+  Abbauen jeden Tick `Block.getBreakSpeed` (Härte, Werkzeug, Effizienz,
+  Eile/Abbaumüdigkeit, `block_break_speed`, Wasser/Luft) und hängt das an den
+  FINISH-Frame; gezählt werden die Client-Ticks zwischen START und FINISH
+  (ältere Clients: Millisekunden mit `tolerance-millis` + ¼ Ping).
+  Sofort-Abbau und Creative bleiben ausgenommen. Neu: `checks.world.fastbreak.a.min-ratio`
+  (0.7) und `.tolerance-millis` (60).
+- **`combat.multitarget.a` für jedes Ziel**: zwei verschiedene Entities im
+  selben Client-Tick (Spieler, Mobs …); ohne Tick-End-Pakete nur Spielerpaare.
+- **`combat.autoclicker.a` konfigurierbar**: `min-cps` (9.5, vorher fest 13),
+  `max-deviation` (0.035), `min-samples` (25, vorher 40).
+- **`combat.reach.a`** misst Treffer jenseits von Reichweite + 1 über den
+  kürzesten Abstand zur Hitbox (vorher unbewertet).
+- **GuardLab**: 97 Szenarien (neu u. a. Phase, Omni-Sprint, Inventar,
+  Bad-Packets, Client-Kennung/Brand), Suiten `inventory` und `client`,
+  `knownGap` für bekannte Lücken (eigener Berichtsabschnitt).
+
 ### Sicherheit: Bridge-Aktionen höchstens einmal, Task-Bindung
 
 - **Idempotente Bridge-Aktionen**: `ActionInvocation.requestId` (setzt

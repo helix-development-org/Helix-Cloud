@@ -87,7 +87,9 @@ data class ScenarioSetup(
  * @property all cheat: every one of these checks must reach [minVl].
  * @property minVl minimum summed violation increase per expected check.
  * @property setback `true` requires at least one setback, `false` forbids one, `null` ignores setbacks.
- * @property note shown in the report (known gap, reasoning …).
+ * @property note shown in the report (reasoning, limits …).
+ * @property knownGap cheat: IGuard is known not to detect this yet – a miss is listed as a known gap (status
+ *   [Status.GAP]) instead of a failure, a detection as a hint that the gap may be closed.
  */
 @Serializable
 data class Expectation(
@@ -97,6 +99,7 @@ data class Expectation(
     val minVl: Double = 1.0,
     val setback: Boolean? = null,
     val note: String = "",
+    val knownGap: Boolean = false,
 )
 
 /**
@@ -159,14 +162,16 @@ data class SuiteCatalog(val scenarios: Map<String, Scenario>, val suites: Map<St
 /**
  * Parses and validates the suite file (`suites.json`).
  *
- * Suites list scenario ids or category selectors (`@legit`, `@cheat`, `@lag`); unknown ids, duplicate ids,
- * unknown spots, cheat modes, lag profiles or step fields are errors, so a broken file fails loudly at start.
+ * Suites list scenario ids or category selectors (`@legit`, `@cheat`, `@lag`); a scenario listed more than once
+ * runs at its last position (`all` moves the once-per-connection client scenarios behind `@lag` that way).
+ * Unknown ids, duplicate ids, unknown spots, cheat modes, lag profiles or step fields are errors, so a broken
+ * file fails loudly at start.
  */
 object SuiteParser {
     /** Cheat modes of the client contract. */
     val CHEAT_MODES = setOf(
         "none", "speed", "fly", "timer", "reach", "killaura", "nofall", "step", "scaffold", "fastbreak",
-        "autoclicker", "antiknockback", "blink",
+        "autoclicker", "antiknockback", "blink", "phase", "omnisprint", "inventory", "identity", "brandspoof", "badpackets",
     )
 
     /** Lag profiles understood by [LagProfiles]. */
@@ -217,8 +222,9 @@ object SuiteParser {
                     if (entry !in scenarios) errors += "suite $suiteId: unknown scenario $entry"
                     listOf(entry)
                 }
-            }.distinct()
-            suites[suiteId] = ids
+            }
+            // Keep the last occurrence: an id listed after a selector moves the scenario there.
+            suites[suiteId] = ids.asReversed().distinct().asReversed()
         }
         require(errors.isEmpty()) { "suite file invalid:\n" + errors.joinToString("\n") }
         return SuiteCatalog(scenarios, suites)
@@ -245,6 +251,7 @@ object SuiteParser {
         if (!expect.none && expect.checks.isEmpty() && expect.all.isEmpty()) errors += "$id: expect needs none or checks"
         if (expect.none && (expect.checks.isNotEmpty() || expect.all.isNotEmpty())) errors += "$id: expect none excludes checks"
         if (category == Category.CHEAT && expect.none) errors += "$id: a cheat scenario must expect checks"
+        if (expect.knownGap && expect.none) errors += "$id: knownGap needs expected checks"
         val scriptTicks = script.sumOf { ((it as? JsonObject)?.get("ticks") as? JsonPrimitive)?.intOrNull ?: 0 }
         val duration = obj.int("durationTicks") ?: (scriptTicks + 20)
         if (duration < scriptTicks) errors += "$id: durationTicks $duration shorter than the script ($scriptTicks)"

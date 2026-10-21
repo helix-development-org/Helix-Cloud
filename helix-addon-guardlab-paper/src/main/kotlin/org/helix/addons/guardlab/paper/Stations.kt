@@ -115,7 +115,7 @@ class StationBuilder(private val originX: Int, private val sink: BlockSink) {
  */
 object Stations {
     /** Layout version; a different stored version triggers a rebuild. */
-    const val VERSION = 1
+    const val VERSION = 2
 
     /** Distance between station origins along x. */
     const val SPACING = 64
@@ -277,10 +277,15 @@ object Stations {
                 "player" to Spot(0, 0, 0),
                 "mob" to Spot(0, 0, 2, yaw = 180f),
                 "dummy" to Spot(0, 0, 3, yaw = 180f),
-                "dummyfar" to Spot(0, 0, 5, yaw = 180f),
+                // Hitbox 3.7 blocks from the attacker's eyes: beyond vanilla reach (3.0), within a reach cheat's.
+                "dummyfar" to Spot(0, 0, 4, yaw = 180f),
             ),
         ),
         StationDef("seat", mapOf("seat" to Spot(0, 0, 0))),
+        StationDef("wall", mapOf("front" to Spot(0, 0, 0))) {
+            // One block thick, two blocks ahead and higher than a jump: getting past it means phasing.
+            fill(-3, 0, 2, 3, 3, 2, STONE)
+        },
     )
 
     private val byName = ALL.withIndex().associate { (index, def) -> def.name to (index to def) }

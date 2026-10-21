@@ -80,7 +80,7 @@ Every mode honours `startTick` (cheat inactive before that playback tick).
 | `fly` | `vy` – vertical motion forced every tick (0 = hover). `jumpVy` – only replace the jump impulse (high jump). `airJump: true` – allow jumping in mid-air. `liquidOnly: true` – only while above/in liquid (jesus). Used for fly, spider, high jump, air jump, fast ladder, jesus and elytra fly. |
 | `timer` | `rate` – game speed multiplier (1.5, 1.1). |
 | `reach` | `range` – attack/interaction distance. `target`: `player` (default) or `block` (interaction reach). |
-| `killaura` | `range`, `cps`, `snap: true` (instant rotations), `multi: true` (switch between targets), `target`: `player`, `mob`, `all`. |
+| `killaura` | `range`, `cps`, `jitter`, `snap: true` (instant rotations), `multi: true` (every target in range in the same tick), `target`: `player`, `mob`, `all`. Without `snap` it turns at most 40° per tick. |
 | `nofall` | – (claims on-ground while falling). |
 | `step` | `height` – step height in blocks. |
 | `scaffold` | `cps`, `facing: false` (place without looking at the block), `target: "crosshair"` (fast place at the crosshair instead of below). |
@@ -88,18 +88,22 @@ Every mode honours `startTick` (cheat inactive before that playback tick).
 | `autoclicker` | `cps`, `jitter`, `swing: false` (no arm swing packets). |
 | `antiknockback` | – (ignores server velocity). |
 | `blink` | `holdTicks` – buffer movement packets, then flush. |
+| `phase` | `distance` – blocks moved into a wall per tick while walking against it (noclip). |
+| `omnisprint` | – (keeps sprinting backwards and sideways). |
+| `inventory` | `action`: `move` (clicks while walking), `attack` (attack right after each click), `impossible` (invalid mouse button); `cps`. |
+| `identity` | `family` – registers the plugin channel of a known cheat client (`meteor`, `wurst` …). |
+| `brandspoof` | – (brand `vanilla` plus a mod-loader channel). |
+| `badpackets` | `cps` – block clicks with the cursor outside the clicked block. |
 
-Proposed extensions (not used yet; the matching checks are covered by legit scenarios only): `phase`
-(noclip → `movement.phase.a`), `omnisprint` (→ `movement.sprintbackwards.a`), inventory clicks while moving
-or with an open inventory (→ `inventory.*`, `combat.inventory.a`), brand/fingerprint spoofing
-(→ `client.*`), invalid packets (→ `protocol.badpackets.a`).
+`identity` and `brandspoof` are reported by IGuard once per connection: the suites run them last (`all`,
+`client`); reconnect before running them again.
 
 ## Suite file
 
 `helix-addon-guardlab-paper/src/main/resources/suites.json` (override without rebuilding:
 `plugins/GuardLab/suites.json` on the test server). `suites` maps ids to scenario ids or category selectors
-(`@legit`, `@cheat`, `@lag`). Shipped suites: `all`, `legit`, `cheats`, `lag`, `smoke`, `movement`,
-`combat`, `world`.
+(`@legit`, `@cheat`, `@lag`); a scenario listed twice runs at its last position. Shipped suites: `all`,
+`legit`, `cheats`, `lag`, `smoke`, `movement`, `combat`, `world`, `inventory`, `client`.
 
 A scenario: `id`, `title`, `category` (`legit|cheat|lag`), `setup`, `script`, optional `dummyScript`,
 `cheat`, `lag` (`none|ping100|ping250_jitter50|loss2|spike`), `setupTicks` (default 60),
@@ -111,7 +115,8 @@ A scenario: `id`, `title`, `category` (`legit|cheat|lag`), `setup`, `script`, op
   target mob), `dummy` (spot of the dummy client – skipped without one), `knockback {everyTicks, strength,
   upward}`, `pistonPulseTicks`, `resetStation`.
 - `expect`: `none: true` (legit) **or** `checks` (any of them) / `all` (every one) reaching `minVl`
-  (summed violation rises, default 1), optional `setback: true|false`, `note`.
+  (summed violation rises, default 1), optional `setback: true|false`, `note`, `knownGap: true` (IGuard is
+  known to miss it: a miss is reported as a known gap, not as a failure).
 
 ## Judgement
 
@@ -121,7 +126,8 @@ as a flag (levels decay, so only rises are summed). Sampling runs from the `scen
 
 - **legit**: no rise → pass; rises below the check's `alert-vl` → warn (noise); a rise reaching
   `alert-vl` or a setback → fail.
-- **cheat**: an expected check summed ≥ `minVl` → pass, otherwise fail (missed detection).
+- **cheat**: an expected check summed ≥ `minVl` → pass, otherwise fail (missed detection); with `knownGap`
+  a miss is `gap` (own report section „Bekannte Lücken“, not counted as failed).
 - no `started` within 5 s, or playback beyond `durationTicks` + 5 s → fail; `error unsupported…`, missing
   dummy, missing Toxiproxy → skip.
 - a passing `ping100`/`ping250_jitter50` scenario with less than half the expected ping → warn (client not

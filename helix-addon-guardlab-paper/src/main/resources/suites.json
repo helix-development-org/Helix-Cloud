@@ -1,14 +1,16 @@
 {
   "_comment": "GuardLab-Szenarien (von Hand gepflegt). Format siehe helix-addon-guardlab/CONTRACT.md. Eigene Fassung ohne Neubau: plugins/GuardLab/suites.json auf dem Testserver.",
   "suites": {
-    "all": ["@legit", "@cheat", "@lag"],
+    "all": ["@legit", "@cheat", "@lag", "cheat_identity", "cheat_brandspoof"],
     "legit": ["@legit"],
     "cheats": ["@cheat"],
     "lag": ["@lag"],
     "smoke": ["legit_walk", "cheat_speed", "lag_walk_ping100"],
-    "movement": ["legit_walk", "legit_sprint", "legit_sprint_jump", "legit_strafe_circle", "legit_sneak", "legit_backwards", "legit_parcours", "legit_head_hit", "legit_ice", "legit_packed_ice", "legit_blue_ice", "legit_ice_tunnel", "legit_slime_fall", "legit_slime_walk", "legit_honey", "legit_soulspeed", "legit_swim", "legit_water_exit", "legit_bubble_column", "legit_lava", "legit_ladder", "legit_vine", "legit_scaffolding", "legit_stairs", "legit_slabs", "legit_steps_jump", "legit_small_steps", "legit_piston", "legit_fall_damage", "legit_fall_water", "legit_cobweb", "legit_powder_snow", "legit_berries", "legit_elytra", "legit_speed_potion", "legit_jump_boost", "legit_levitation", "legit_knockback", "legit_minecart", "legit_boat", "legit_iceboat", "legit_horse", "legit_seat", "legit_idle", "cheat_speed", "cheat_speed_small", "cheat_fly_hover", "cheat_fly_up", "cheat_nofall", "cheat_timer", "cheat_timer_small", "cheat_step", "cheat_spider", "cheat_highjump", "cheat_airjump", "cheat_fastladder", "cheat_jesus", "cheat_elytrafly", "cheat_antiknockback", "cheat_blink"],
-    "combat": ["legit_combat_mob", "legit_combat_player", "cheat_reach", "cheat_killaura", "cheat_killaura_snap", "cheat_multitarget", "cheat_autoclicker", "cheat_autoclicker_jitter", "cheat_noswing", "lag_combat_jitter"],
-    "world": ["legit_bridge", "legit_break", "legit_place_wall", "cheat_scaffold", "cheat_scaffold_nofacing", "cheat_fastplace", "cheat_fastbreak", "cheat_nuker", "cheat_interactionreach"]
+    "movement": ["legit_walk", "legit_sprint", "legit_sprint_jump", "legit_strafe_circle", "legit_sneak", "legit_backwards", "legit_wall_push", "legit_parcours", "legit_head_hit", "legit_ice", "legit_packed_ice", "legit_blue_ice", "legit_ice_tunnel", "legit_slime_fall", "legit_slime_walk", "legit_honey", "legit_soulspeed", "legit_swim", "legit_water_exit", "legit_bubble_column", "legit_lava", "legit_ladder", "legit_vine", "legit_scaffolding", "legit_stairs", "legit_slabs", "legit_steps_jump", "legit_small_steps", "legit_piston", "legit_fall_damage", "legit_fall_water", "legit_cobweb", "legit_powder_snow", "legit_berries", "legit_elytra", "legit_speed_potion", "legit_jump_boost", "legit_levitation", "legit_knockback", "legit_minecart", "legit_boat", "legit_iceboat", "legit_horse", "legit_seat", "legit_idle", "cheat_speed", "cheat_speed_small", "cheat_fly_hover", "cheat_fly_up", "cheat_nofall", "cheat_timer", "cheat_timer_small", "cheat_step", "cheat_spider", "cheat_highjump", "cheat_airjump", "cheat_fastladder", "cheat_jesus", "cheat_elytrafly", "cheat_antiknockback", "cheat_blink", "cheat_phase", "cheat_omnisprint", "cheat_inventory_move"],
+    "combat": ["legit_combat_mob", "legit_combat_player", "cheat_reach", "cheat_killaura_snap", "cheat_killaura_smooth", "cheat_multitarget", "cheat_autoclicker", "cheat_autoclicker_jitter", "cheat_noswing", "cheat_inventory_attack", "lag_combat_jitter"],
+    "world": ["legit_bridge", "legit_break", "legit_place_wall", "cheat_scaffold", "cheat_scaffold_nofacing", "cheat_fastplace", "cheat_fastbreak", "cheat_nuker", "cheat_interactionreach", "cheat_badpackets"],
+    "inventory": ["cheat_inventory_move", "cheat_inventory_attack", "cheat_inventory_impossible"],
+    "client": ["legit_walk", "cheat_identity", "cheat_brandspoof"]
   },
   "scenarios": [
     {
@@ -83,6 +85,20 @@
       ],
       "expect": {"none": true},
       "covers": ["movement.sprintbackwards.a", "movement.speed.a"]
+    },
+    {
+      "id": "legit_wall_push",
+      "title": "Gegen eine Wand laufen, springen und daran entlang streifen",
+      "category": "legit",
+      "setup": {"spot": "wall.front"},
+      "script": [
+        {"ticks": 40, "keys": ["forward", "sprint"]},
+        {"ticks": 40, "keys": ["forward", "jump"]},
+        {"ticks": 40, "keys": ["forward", "left"], "yaw": "+1"},
+        {"ticks": 40, "keys": ["forward", "right"], "yaw": "-1"}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.phase.a", "movement.speed.a", "movement.fly.a", "movement.step.a"]
     },
     {
       "id": "legit_parcours",
@@ -793,7 +809,7 @@
     },
     {
       "id": "cheat_reach",
-      "title": "Reach 4,6 gegen Dummy",
+      "title": "Reach 5,0 gegen Dummy (Hitbox 3,7 Blöcke entfernt)",
       "category": "cheat",
       "setup": {"spot": "combat.player", "dummy": "combat.dummyfar", "items": [{"slot": "hotbar0", "material": "iron_sword"}]},
       "script": [
@@ -802,25 +818,8 @@
       "dummyScript": [
         {"ticks": 160}
       ],
-      "cheat": {"mode": "reach", "params": {"range": 4.6}},
-      "expect": {"checks": ["combat.reach.a"]}
-    },
-    {
-      "id": "cheat_killaura",
-      "title": "KillAura im Kreis um den Dummy",
-      "category": "cheat",
-      "setup": {"spot": "combat.player", "dummy": "combat.dummy", "items": [{"slot": "hotbar0", "material": "iron_sword"}]},
-      "script": [
-        {"ticks": 160, "keys": ["forward", "left"], "yaw": "+4"}
-      ],
-      "dummyScript": [
-        {"ticks": 40, "keys": ["left"]},
-        {"ticks": 40, "keys": ["right"]},
-        {"ticks": 40, "keys": ["left"]},
-        {"ticks": 40, "keys": ["right"]}
-      ],
-      "cheat": {"mode": "killaura", "params": {"range": 3.5, "cps": 12, "target": "player"}},
-      "expect": {"checks": ["combat.rotation.a", "combat.snapaim.a", "combat.reach.a", "combat.autoclicker.a"]}
+      "cheat": {"mode": "reach", "params": {"range": 5.0}},
+      "expect": {"checks": ["combat.reach.a"], "note": "Dummy auf combat.dummyfar: Hitbox 3,7 Blöcke vor den Augen – jenseits von Vanilla (3,0), innerhalb der Cheat-Reichweite"}
     },
     {
       "id": "cheat_killaura_snap",
@@ -838,8 +837,29 @@
         {"ticks": 40, "keys": ["left"]},
         {"ticks": 40, "keys": ["right"]}
       ],
-      "cheat": {"mode": "killaura", "params": {"range": 3.5, "cps": 10, "snap": true, "target": "player"}},
-      "expect": {"checks": ["combat.snapaim.a", "combat.rotation.a"]}
+      "cheat": {"mode": "killaura", "params": {"range": 3.5, "cps": 10, "jitter": 0, "snap": true, "target": "player"}},
+      "expect": {"checks": ["combat.snapaim.a", "combat.rotation.a", "combat.autoclicker.a"]}
+    },
+    {
+      "id": "cheat_killaura_smooth",
+      "title": "KillAura im Kreis um den Dummy, sanft gedreht (max. 40°/Tick)",
+      "category": "cheat",
+      "setup": {"spot": "combat.player", "dummy": "combat.dummy", "items": [{"slot": "hotbar0", "material": "iron_sword"}]},
+      "script": [
+        {"ticks": 160, "keys": ["forward", "left"], "yaw": "+4"}
+      ],
+      "dummyScript": [
+        {"ticks": 40, "keys": ["left"]},
+        {"ticks": 40, "keys": ["right"]},
+        {"ticks": 40, "keys": ["left"]},
+        {"ticks": 40, "keys": ["right"]}
+      ],
+      "cheat": {"mode": "killaura", "params": {"range": 3.5, "cps": 12, "target": "player"}},
+      "expect": {
+        "checks": ["combat.rotation.a", "combat.snapaim.a", "combat.reach.a", "combat.autoclicker.a"],
+        "knownGap": true,
+        "note": "Drehung unter der Snap-Schwelle, Treffer innerhalb der Reichweite, 12 CPS im 50-ms-Tick-Raster streuen für die Konsistenzprüfung zu stark (Varianzkoeffizient ~0,28)"
+      }
     },
     {
       "id": "cheat_multitarget",
@@ -856,7 +876,7 @@
         {"ticks": 40, "keys": ["right"]}
       ],
       "cheat": {"mode": "killaura", "params": {"range": 3.5, "cps": 12, "multi": true, "target": "all"}},
-      "expect": {"checks": ["combat.multitarget.a"], "note": "IGuard wertet Positions-Checks nur gegen Spieler – mit einem Dummy und einem Mob vermutlich nicht erkennbar"}
+      "expect": {"checks": ["combat.multitarget.a"], "note": "Spieler und Mob im selben Client-Tick – IGuard wertet Mehrfachziele für jeden Ziel-Typ"}
     },
     {
       "id": "cheat_autoclicker",
@@ -956,6 +976,94 @@
       ],
       "cheat": {"mode": "reach", "params": {"range": 8.0, "target": "block"}},
       "expect": {"checks": ["world.interactionreach.a"]}
+    },
+    {
+      "id": "cheat_phase",
+      "title": "Phase: durch eine 1 Block dicke Wand laufen",
+      "category": "cheat",
+      "setup": {"spot": "wall.front"},
+      "script": [
+        {"ticks": 60, "keys": ["forward"]}
+      ],
+      "cheat": {"mode": "phase", "params": {"distance": 0.5}},
+      "expect": {"checks": ["movement.phase.a"]}
+    },
+    {
+      "id": "cheat_omnisprint",
+      "title": "Omni-Sprint: rückwärts sprinten",
+      "category": "cheat",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 100, "keys": ["back", "sprint"]}
+      ],
+      "cheat": {"mode": "omnisprint"},
+      "expect": {"checks": ["movement.sprintbackwards.a"]}
+    },
+    {
+      "id": "cheat_inventory_move",
+      "title": "Inventar-Klicks beim Sprinten (8 CPS)",
+      "category": "cheat",
+      "setup": {"spot": "flat.start", "items": [{"slot": "hotbar0", "material": "stone", "amount": 16}]},
+      "script": [
+        {"ticks": 100, "keys": ["forward", "sprint"]}
+      ],
+      "cheat": {"mode": "inventory", "params": {"action": "move", "cps": 8}},
+      "expect": {"checks": ["inventory.move.a"]}
+    },
+    {
+      "id": "cheat_inventory_attack",
+      "title": "Angriffe direkt nach Inventar-Klicks (6 CPS)",
+      "category": "cheat",
+      "setup": {"spot": "combat.player", "mob": "combat.mob", "items": [{"slot": "hotbar0", "material": "iron_sword"}]},
+      "script": [
+        {"ticks": 120, "lookAt": "target"}
+      ],
+      "cheat": {"mode": "inventory", "params": {"action": "attack", "cps": 6}},
+      "expect": {"checks": ["combat.inventory.a"]}
+    },
+    {
+      "id": "cheat_inventory_impossible",
+      "title": "Inventar-Klicks mit ungültiger Maustaste",
+      "category": "cheat",
+      "setup": {"spot": "flat.start", "items": [{"slot": "hotbar0", "material": "stone", "amount": 16}]},
+      "script": [
+        {"ticks": 60}
+      ],
+      "cheat": {"mode": "inventory", "params": {"action": "impossible", "cps": 4}},
+      "expect": {"checks": ["inventory.impossible.a"]}
+    },
+    {
+      "id": "cheat_badpackets",
+      "title": "Block-Klicks mit Cursor außerhalb des Blocks",
+      "category": "cheat",
+      "setup": {"spot": "build.placewall", "resetStation": true},
+      "script": [
+        {"ticks": 60, "pitch": 10}
+      ],
+      "cheat": {"mode": "badpackets", "params": {"cps": 4}},
+      "expect": {"checks": ["protocol.badpackets.a"]}
+    },
+    {
+      "id": "cheat_identity",
+      "title": "Kanal eines Cheat-Clients (Meteor) anmelden",
+      "category": "cheat",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 40}
+      ],
+      "cheat": {"mode": "identity", "params": {"family": "meteor"}},
+      "expect": {"checks": ["client.identity.a"], "note": "IGuard meldet das einmal pro Verbindung – vor einem weiteren Lauf neu verbinden (deshalb am Ende von all und in der Suite client)"}
+    },
+    {
+      "id": "cheat_brandspoof",
+      "title": "Brand vanilla mit Mod-Loader-Kanal",
+      "category": "cheat",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 40}
+      ],
+      "cheat": {"mode": "brandspoof"},
+      "expect": {"checks": ["client.brand_spoof.a"], "note": "IGuard meldet das einmal pro Verbindung – vor einem weiteren Lauf neu verbinden (deshalb am Ende von all und in der Suite client)"}
     },
     {
       "id": "lag_walk_ping100",

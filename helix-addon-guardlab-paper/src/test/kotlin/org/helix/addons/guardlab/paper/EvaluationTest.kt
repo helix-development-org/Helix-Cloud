@@ -79,6 +79,19 @@ class EvaluationTest {
     }
 
     @Test
+    fun `a missed known gap is a gap, a detected one a pass with a hint`() {
+        val gap = scenario(Category.CHEAT, Expectation(checks = listOf("combat.snapaim.a"), knownGap = true, note = "zu sanft"))
+        val missed = Evaluator.judge(gap, observed(), alert)
+        assertEquals(Status.GAP, missed.status)
+        assertEquals("bekannte Lücke", missed.reasons.first())
+        assertTrue("Hinweis: zu sanft" in missed.reasons)
+        val closed = Evaluator.judge(gap, observed(CheckObservation("combat.snapaim.a", 2, 2.0, 2.0)), alert)
+        assertEquals(Status.PASS, closed.status)
+        assertTrue(closed.reasons.last().contains("knownGap"))
+        assertEquals(Status.FAIL, Evaluator.judge(gap, ScenarioObservation(error = "boom"), alert).status, "client errors stay failures")
+    }
+
+    @Test
     fun `all-of and setback expectations are enforced`() {
         val both = scenario(Category.CHEAT, Expectation(all = listOf("movement.fly.a", "movement.nofall.a"), setback = true))
         val onlyFly = observed(CheckObservation("movement.fly.a", 3, 3.0, 3.0), setbacks = 1)

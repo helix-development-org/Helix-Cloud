@@ -59,7 +59,7 @@ class ReportTest {
         assertEquals("nur legit", rows.getValue("movement.fly.a").state)
         assertEquals("ungetestet", rows.getValue("combat.reach.a").state) // skipped scenario does not count
         assertEquals("ungetestet", rows.getValue("movement.phase.a").state)
-        assertTrue(rows.getValue("movement.phase.a").note.isNotBlank())
+        assertTrue(rows.getValue("movement.phase.a").note.isBlank(), "every check has a cheat mode now")
     }
 
     @Test
@@ -78,7 +78,7 @@ class ReportTest {
         assertTrue("Grund \\| mit Strich" in markdown, "pipes must be escaped in table cells")
         assertTrue("## Abdeckung der Checks" in markdown)
         assertTrue("| `movement.speed.a` | Fehlalarm |" in markdown)
-        assertEquals("suite=t passed=2 warned=0 failed=1 skipped=1 exempt=0", Reports.summary(report))
+        assertEquals("suite=t passed=2 warned=0 failed=1 skipped=1 exempt=0 gaps=0", Reports.summary(report))
         val json = Json.parseToJsonElement(Reports.json(report)).jsonObject
         assertEquals(4, json["results"]!!.jsonArray.size)
         assertEquals("FAIL", json["results"]!!.jsonArray[1].jsonObject["status"]!!.jsonPrimitive.content)
@@ -87,6 +87,21 @@ class ReportTest {
         val aborted = report.copy(info = report.info.copy(aborted = "Client getrennt"))
         assertTrue(Reports.summary(aborted).endsWith("aborted=\"Client getrennt\""))
         assertTrue("**Abgebrochen**" in Reports.markdown(aborted))
+    }
+
+    @Test
+    fun `known gaps get their own section and do not count as missed detections`() {
+        val gap = listOf(result("walk", 0, Status.PASS), result("speed", 1, Status.GAP))
+        val run = RunReport(RunInfo(suite = "t", player = "GuardLab"), gap, Reports.coverage(catalog.scenarios, gap))
+        val markdown = Reports.markdown(run)
+        assertTrue("## Bekannte Lücken" in markdown)
+        assertTrue("- **speed** (speed)" in markdown)
+        assertFalse("## Fehlgeschlagen" in markdown)
+        assertTrue("1 bekannte Lücke(n)" in markdown)
+        assertTrue("🕳 bekannte Lücke" in markdown)
+        assertTrue("failed=0" in Reports.summary(run) && "gaps=1" in Reports.summary(run))
+        assertEquals("nur legit", run.coverage.first { it.check == "movement.speed.a" }.state)
+        assertEquals(null, Reports.calibration(catalog.scenarios, gap, alert).first { it.check == "movement.speed.a" }.cheatScenario)
     }
 
     private val alert = { _: String -> 5.0 }
