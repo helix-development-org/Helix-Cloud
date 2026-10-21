@@ -95,3 +95,20 @@ Erwartung daneben schreibt. Die synthetischen Traces (`legit-*`, `cheat-*`) erze
 FINISH_DIG-Frames tragen die Messung des Servers (`packet.dig`: `progress` = höchster
 Abbaufortschritt pro Tick aus `Block.getBreakSpeed`, `samples`, `block`); damit prüft
 `world.fastbreak.a` auch in Replays gegen die Vanilla-Abbauzeit.
+
+## GuardLab-Lauf offline nachspielen
+
+Jede IGuard-Änderung lässt sich gegen einen kompletten GuardLab-Lauf prüfen, ohne ihn neu
+zu spielen: `RunReplayTest` schickt jede IGuard-Aufnahme des Laufs durch die aktuelle
+`CheckEngine`, urteilt wie GuardLab (legit: keine Meldung auf Alarm-Niveau, darunter
+Warnung; cheat: ein erwarteter Check mit Σ ≥ 1,0) und stellt das dem Lauf gegenüber.
+
+```
+IGUARD_REPLAY_RUN=<…/plugins/GuardLab/reports/<ts>-<suite>> \
+  ./gradlew :helix-addon-guard-paper:test --tests '*RunReplayTest*'
+```
+
+Ergebnis: `helix-addon-guard-paper/build/reports/iguard-replay.md` (Zusammenfassung,
+geänderte Szenarien, alle Szenarien mit den Meldungen des Replays). Grenze: `movement.timer.a`
+hängt an echter Paket-Zeit und weicht im Replay ab – Timer-Szenarien im Spiel prüfen.
+

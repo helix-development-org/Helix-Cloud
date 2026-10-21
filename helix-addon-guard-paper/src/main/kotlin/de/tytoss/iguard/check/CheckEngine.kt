@@ -123,6 +123,13 @@ internal class PlayerState {
     var serverVelocity = Vec3(0.0, 0.0, 0.0)
     var velocityAt = 0L
     var predictedHorizontal = 0.0
+    // Slipperiness of the block last stood on: vanilla applies the START-of-tick block's friction, which
+    // the takeoff frame (already above air) can no longer sample.
+    var lastGroundSlipperiness = 0.6
+    // Sustained-speed window: observed vs. vanilla-possible horizontal distance over clean frames.
+    var speedWindowFrames = 0
+    var speedWindowObserved = 0.0
+    var speedWindowVanilla = 0.0
     var predictedVertical = 0.0
     var lastSpeedFailureTick = -1000L
     var speedFailureStreak = 0
