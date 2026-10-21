@@ -33,7 +33,7 @@ class NickAddonTest {
         context.run("nick", "Steve", "Herobrine")
 
         assertEquals("&7Spieler ", resolve("Steve")?.prefix)
-        assertEquals("&7Spieler Herobrine", resolve("Steve")?.displayName("Steve"))
+        assertEquals("&7Spieler <#c8bca8>Herobrine", resolve("Steve")?.displayName("Steve"))
 
         assertTrue(context.run("nick.disguise", "clear").success)
         assertEquals("", resolve("Steve")?.prefix)
@@ -92,5 +92,15 @@ class NickAddonTest {
 
         assertTrue(context.run("nick.clear", "Steve").success)
         assertNull(restartedResolver.resolve("Steve"))
+    }
+
+    @Test
+    fun `disguise defaults to the Spieler look and upgrades former defaults only`() {
+        val spieler = org.helix.api.design.StaffRanks.ALL.first { it.weight == 0 }
+        assertEquals(NickConfig(prefix = spieler.prefix, color = spieler.colorTag), NickConfig())
+        assertEquals(NickConfig(), NickConfig.upgrade(NickConfig(prefix = "", color = "")))
+        assertEquals(NickConfig(), NickConfig.upgrade(NickConfig(prefix = "[Spieler] ", color = "")))
+        val custom = NickConfig(prefix = "<gold>VIP</gold> ", color = "<#ffcf4a>")
+        assertEquals(custom, NickConfig.upgrade(custom))
     }
 }

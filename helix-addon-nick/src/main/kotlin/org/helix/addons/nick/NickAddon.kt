@@ -83,7 +83,7 @@ class NickAddon : AddonBase() {
                     ActionResult.ok("disguise prefix: '${config.prefix}'", "disguise color: '${config.color}'")
                 invocation.arguments.first() == "clear" -> {
                     saveConfig(NickConfig())
-                    ActionResult.ok("disguise prefix cleared — nicked players appear plain")
+                    ActionResult.ok("disguise reset — nicked players appear as default players (Spieler)")
                 }
                 else -> {
                     // Trailing space separates the prefix from the name, mirroring the chat rules.
@@ -148,8 +148,12 @@ class NickAddon : AddonBase() {
         context.storage().write("nicks", json.encodeToString(mapSerializer, updated))
     }
 
-    private fun loadConfig(): NickConfig =
-        context.storage().read("config")?.let { json.decodeFromString<NickConfig>(it) } ?: NickConfig()
+    private fun loadConfig(): NickConfig {
+        val stored = context.storage().read("config")?.let { json.decodeFromString<NickConfig>(it) } ?: return NickConfig()
+        val upgraded = NickConfig.upgrade(stored)
+        if (upgraded != stored) saveConfig(upgraded)
+        return upgraded
+    }
 
     private fun saveConfig(updated: NickConfig) {
         config = updated
@@ -166,14 +170,32 @@ class NickAddon : AddonBase() {
 }
 
 /**
- * Disguise settings for nicked players.
+ * Disguise settings for nicked players. By default a nicked player looks exactly like a default player (rank
+ * „Spieler“, design §9): no badge, name in the Spieler grey.
  *
- * @property prefix prefix shown instead of the real group prefix, for
- *   example `&7Spieler &f` — empty appears as a plain default player.
- * @property color name color code for the assumed name.
+ * @property prefix prefix shown instead of the real group prefix — empty (the Spieler rank has no badge).
+ * @property color name color of the assumed name, the Spieler rank colour.
  */
 @kotlinx.serialization.Serializable
 data class NickConfig(
-    val prefix: String = "",
-    val color: String = "",
-)
+    val prefix: String = SPIELER.prefix,
+    val color: String = SPIELER.colorTag,
+) {
+    companion object {
+        /** The default player rank of the design concept. */
+        private val SPIELER = org.helix.api.design.StaffRanks.ALL.first { it.weight == 0 }
+
+        /** Former default prefixes (text tag era) that are replaced by the Spieler look. */
+        private val LEGACY_PREFIXES = setOf("", "[Spieler] ", "&7Spieler &f", SPIELER.legacyPrefix)
+
+        /**
+         * Moves a stored config that still uses a former default onto the Spieler look; team-chosen
+         * prefixes/colours stay untouched.
+         *
+         * @param stored the stored config.
+         * @return the upgraded config (same instance values when nothing changed).
+         */
+        fun upgrade(stored: NickConfig): NickConfig =
+            if (stored.prefix in LEGACY_PREFIXES && stored.color.isEmpty()) NickConfig() else stored
+    }
+}
