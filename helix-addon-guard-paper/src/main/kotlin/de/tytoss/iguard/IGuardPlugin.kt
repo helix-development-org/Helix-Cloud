@@ -189,7 +189,7 @@ class IGuardPlugin : JavaPlugin(), Listener {
         packetListener = packets
         val mainSampler = MainThreadSampler(this, snapshots, exemptions, loaded.exemptions, loaded.sampler)
         sampler = mainSampler
-        val api = IGuardApiImpl(checkEngine, exemptions, banCoordinatorLocal)
+        val api = IGuardApiImpl(checkEngine, exemptions, banCoordinatorLocal, PendingTraceControl)
         server.servicesManager.register(IGuardApi::class.java, api, this, ServicePriority.Normal)
         val spectateService = SpectateService(this, nodeTranslations)
         spectate = spectateService
@@ -210,6 +210,20 @@ class IGuardPlugin : JavaPlugin(), Listener {
         helixStore.start()
         guiService.install()
         registeredPacketListener = PacketEvents.getAPI().eventManager.registerListener(packets)
+    }
+
+    /** Placeholder until the trace recorder is wired: every trace call reports it as unavailable. */
+    private object PendingTraceControl : de.tytoss.iguard.trace.TraceControl {
+        override fun start(playerId: java.util.UUID, label: String): de.tytoss.iguard.api.IGuardTraceSession =
+            throw UnsupportedOperationException("IGuard trace recorder is not available yet")
+
+        override fun stop(playerId: java.util.UUID): java.nio.file.Path? = null
+
+        override fun marker(playerId: java.util.UUID, text: String) = false
+
+        override fun active(playerId: java.util.UUID): de.tytoss.iguard.api.IGuardTraceSession? = null
+
+        override fun addListener(listener: de.tytoss.iguard.api.IGuardTraceListener) = AutoCloseable {}
     }
 
     private companion object {
