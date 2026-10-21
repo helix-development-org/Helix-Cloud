@@ -131,6 +131,9 @@ data class Scenario(
 ) {
     /** Cheat mode (`none` for legit scenarios). */
     val cheatMode: String get() = (cheat["mode"] as? JsonPrimitive)?.content ?: "none"
+
+    /** Client tick at which the cheat switches on (`params.startTick`, 0 = from the start). */
+    val cheatStartTick: Int get() = ((cheat["params"] as? JsonObject)?.get("startTick") as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
 }
 
 /**

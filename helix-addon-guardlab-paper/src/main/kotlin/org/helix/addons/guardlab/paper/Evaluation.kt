@@ -3,15 +3,28 @@ package org.helix.addons.guardlab.paper
 import kotlinx.serialization.Serializable
 
 /**
- * What one check did during a scenario: summed violation increases relative to the scenario start.
+ * What one check did during a scenario.
+ *
+ * From IGuard's frame reports ([FrameStats]): [flags] are the counted failures, [total] their summed
+ * weight, [failed] all failures including those the signal cooldown did not count. Without frame reports
+ * ([ViolationTracker]): [flags] are ticks in which the level rose and [total] the summed increase.
  *
  * @property check check id.
- * @property flags ticks in which the violation level rose.
- * @property total summed increase.
+ * @property flags counted failures (or ticks in which the violation level rose).
+ * @property total summed violation weight (or summed increase).
  * @property peak highest level above the start baseline.
+ * @property failed failures including uncounted ones (0 without frame reports).
+ * @property maxVl highest absolute level (0 without frame reports).
  */
 @Serializable
-data class CheckObservation(val check: String, val flags: Int, val total: Double, val peak: Double)
+data class CheckObservation(
+    val check: String,
+    val flags: Int,
+    val total: Double,
+    val peak: Double,
+    val failed: Int = 0,
+    val maxVl: Double = 0.0,
+)
 
 /**
  * Accumulates per-tick violation levels into [CheckObservation]s.
@@ -83,6 +96,7 @@ class ViolationTracker {
  * @property avgPing mean server-side ping during playback (ms).
  * @property maxPing highest ping during playback (ms).
  * @property notes runner remarks (death, mount failure …) appended to the verdict.
+ * @property frames IGuard frame-report summary (null when IGuard delivered no frame reports).
  */
 @Serializable
 data class ScenarioObservation(
@@ -95,6 +109,7 @@ data class ScenarioObservation(
     val avgPing: Double = 0.0,
     val maxPing: Int = 0,
     val notes: List<String> = emptyList(),
+    val frames: FrameSummary? = null,
 )
 
 /** Outcome of one scenario. */
@@ -105,9 +120,11 @@ enum class Status { PASS, WARN, FAIL, SKIP }
  *
  * @property status outcome.
  * @property reasons German explanations.
+ * @property exempt a passing legit scenario that passed only because IGuard hardly checked
+ *   (shown as `pass (exempt)`).
  */
 @Serializable
-data class Verdict(val status: Status, val reasons: List<String>)
+data class Verdict(val status: Status, val reasons: List<String>, val exempt: Boolean = false)
 
 /**
  * Compares observations with a scenario's expectation.
@@ -119,8 +136,17 @@ data class Verdict(val status: Status, val reasons: List<String>)
  * A client error starting with `unsupported` skips the scenario (the dev client lacks the mode). A passing
  * lag scenario whose measured ping stays far below the profile becomes a warning: the client is probably
  * not connected through Toxiproxy.
+ *
+ * A passing legit scenario is marked [Verdict.exempt] (`pass (exempt)`) when IGuard hardly checked it:
+ * an ALL-scope exemption over more than [EXEMPT_SHARE] of the checked ticks, or – for scenarios that
+ * exercise movement checks – skipped movement checks over more than [EXEMPT_SHARE] of the movement ticks
+ * (or no movement frame at all). Alert levels reported in IGuard's frames take precedence over [judge]'s
+ * `alertVl`.
  */
 object Evaluator {
+    /** Exempt share above which a passing legit scenario counts as not really checked. */
+    const val EXEMPT_SHARE = 0.8
+
     /**
      * Judges one scenario.
      *
@@ -130,7 +156,8 @@ object Evaluator {
      * @return the verdict.
      */
     fun judge(scenario: Scenario, observation: ScenarioObservation, alertVl: (String) -> Double): Verdict {
-        val judged = judgeBehaviour(scenario, observation, alertVl)
+        val alert = { check: String -> observation.frames?.activity(check)?.alertVl?.takeUnless(Double::isNaN) ?: alertVl(check) }
+        val judged = markExempt(scenario, observation, judgeBehaviour(scenario, observation, alert))
         val verdict = if (observation.notes.isEmpty()) judged else judged.copy(reasons = judged.reasons + observation.notes)
         val expected = LagProfiles.expectedPing(scenario.lag) ?: return verdict
         if (verdict.status != Status.PASS || observation.avgPing >= expected * LAG_EFFECTIVE) return verdict
@@ -141,6 +168,49 @@ object Evaluator {
     }
 
     private const val LAG_EFFECTIVE = 0.5
+
+    /**
+     * Why a scenario was hardly checked, empty when IGuard checked it normally.
+     *
+     * @param scenario the scenario (its `covers` decide whether movement exemptions matter).
+     * @param frames the frame summary.
+     * @return German reasons.
+     */
+    fun notChecked(scenario: Scenario, frames: FrameSummary): List<String> {
+        if (frames.frames == 0L) return emptyList()
+        val why = mutableListOf<String>()
+        if (frames.allExemptShare > EXEMPT_SHARE) why += "alle Checks ausgesetzt in ${percent(frames.allExemptShare)} der Ticks"
+        val movement = scenario.covers.isEmpty() || scenario.covers.any { it.startsWith("movement.") }
+        if (movement) {
+            val share = frames.movementExemptShare
+            when {
+                share == null -> why += "keine Bewegungs-Frames – Bewegungs-Checks liefen nicht"
+                share > EXEMPT_SHARE -> why += "Bewegungs-Checks ausgesetzt in ${percent(share)} der Ticks"
+            }
+        }
+        return why
+    }
+
+    /**
+     * Formats a share as percent.
+     *
+     * @param share 0..1.
+     * @return e.g. `96 %`.
+     */
+    fun percent(share: Double): String = "%.0f %%".format(share * 100)
+
+    private fun markExempt(scenario: Scenario, observation: ScenarioObservation, verdict: Verdict): Verdict {
+        if (verdict.status != Status.PASS || !scenario.expect.none) return verdict
+        val frames = observation.frames ?: return verdict
+        val why = notChecked(scenario, frames)
+        if (why.isEmpty()) return verdict
+        val top = frames.exemptions.take(TOP_REASONS).joinToString { "${it.name} ${percent(it.share)}" }
+        val detail = why.joinToString("; ") + if (top.isEmpty()) "" else " (exempt: $top)"
+        return Verdict(Status.PASS, listOf("keine Meldung, aber kaum geprüft: $detail") + verdict.reasons.filter { it != NO_FLAG }, exempt = true)
+    }
+
+    private const val TOP_REASONS = 3
+    private const val NO_FLAG = "keine Meldung"
 
     private fun judgeBehaviour(scenario: Scenario, observation: ScenarioObservation, alertVl: (String) -> Double): Verdict {
         observation.skipped?.let { return Verdict(Status.SKIP, listOf(it)) }
@@ -167,7 +237,7 @@ object Evaluator {
         if (flagged.isNotEmpty()) {
             return Verdict(Status.WARN, flagged.map { "Rauschen ${it.check}: %d×, Summe %.2f, Spitze %.2f (unter Alarm %.1f)".format(it.flags, it.total, it.peak, alertVl(it.check)) })
         }
-        return Verdict(Status.PASS, listOf("keine Meldung"))
+        return Verdict(Status.PASS, listOf(NO_FLAG))
     }
 
     private fun judgeCheat(expect: Expectation, byCheck: Map<String, CheckObservation>, observation: ScenarioObservation): Verdict {

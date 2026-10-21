@@ -298,6 +298,7 @@ class GuardLabPlugin : JavaPlugin(), Listener, PluginMessageListener {
             put("warned", report.count(Status.WARN))
             put("failed", report.count(Status.FAIL))
             put("skipped", report.count(Status.SKIP))
+            put("exempt", report.exemptPasses)
             put("report", "plugins/GuardLab/reports/$dir/report.md")
             put("service", service)
         }

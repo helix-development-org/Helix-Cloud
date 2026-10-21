@@ -5,10 +5,11 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class EvaluationTest {
-    private fun scenario(category: Category, expect: Expectation, lag: String = "none") = Scenario(
+    private fun scenario(category: Category, expect: Expectation, lag: String = "none", covers: List<String> = emptyList()) = Scenario(
         id = "s",
         title = "S",
         category = category,
@@ -20,7 +21,7 @@ class EvaluationTest {
         durationTicks = 100,
         lag = lag,
         expect = expect,
-        covers = emptyList(),
+        covers = covers,
     )
 
     private val legit = scenario(Category.LEGIT, Expectation(none = true))
@@ -115,5 +116,59 @@ class EvaluationTest {
         val verdict = Evaluator.judge(legit, observed().copy(notes = listOf("Spieler ist gestorben")), alert)
         assertEquals(Status.PASS, verdict.status)
         assertEquals(listOf("keine Meldung", "Spieler ist gestorben"), verdict.reasons)
+    }
+
+    private fun frames(all: Double = 0.0, movement: Double? = 0.0, exemptions: List<Share> = emptyList()) = FrameSummary(
+        frames = 400, ticks = 200, movementTicks = if (movement == null) 0 else 200, allExemptShare = all,
+        movementExemptShare = movement, exemptions = exemptions, tags = emptyList(), checks = emptyList(),
+    )
+
+    @Test
+    fun `legit pass without real checking is marked exempt`() {
+        val boat = scenario(Category.LEGIT, Expectation(none = true), covers = listOf("movement.speed.a"))
+        val riding = Evaluator.judge(boat, observed().copy(frames = frames(movement = 0.96, exemptions = listOf(Share("vehicle (MOVEMENT)", 192, 0.96)))), alert)
+        assertEquals(Status.PASS, riding.status)
+        assertTrue(riding.exempt)
+        assertTrue(riding.reasons.single().contains("Bewegungs-Checks ausgesetzt in 96 %"), riding.reasons.toString())
+        assertTrue(riding.reasons.single().contains("exempt: vehicle (MOVEMENT) 96 %"))
+        val seated = Evaluator.judge(boat, observed().copy(frames = frames(movement = null)), alert)
+        assertTrue(seated.exempt)
+        assertTrue(seated.reasons.single().contains("keine Bewegungs-Frames"))
+        val checked = Evaluator.judge(boat, observed().copy(frames = frames(movement = 0.5)), alert)
+        assertFalse(checked.exempt)
+        assertEquals(listOf("keine Meldung"), checked.reasons)
+    }
+
+    @Test
+    fun `movement exemptions do not matter for combat scenarios but all-scope ones do`() {
+        val combat = scenario(Category.LEGIT, Expectation(none = true), covers = listOf("combat.reach.a"))
+        assertFalse(Evaluator.judge(combat, observed().copy(frames = frames(movement = 1.0)), alert).exempt)
+        val cutscene = Evaluator.judge(combat, observed().copy(frames = frames(all = 0.9)), alert)
+        assertTrue(cutscene.exempt)
+        assertTrue(cutscene.reasons.single().contains("alle Checks ausgesetzt in 90 %"))
+    }
+
+    @Test
+    fun `exempt marking leaves failures, warnings and cheats alone`() {
+        val boat = scenario(Category.LEGIT, Expectation(none = true), covers = listOf("movement.speed.a"))
+        val noisy = observed(CheckObservation("movement.speed.a", 1, 0.5, 0.5)).copy(frames = frames(movement = 0.9))
+        val warn = Evaluator.judge(boat, noisy, alert)
+        assertEquals(Status.WARN, warn.status)
+        assertFalse(warn.exempt)
+        val cheat = Evaluator.judge(speedCheat, observed(CheckObservation("movement.speed.a", 3, 3.0, 3.0)).copy(frames = frames(all = 1.0)), alert)
+        assertFalse(cheat.exempt)
+        val noFrames = Evaluator.judge(boat, observed().copy(frames = frames(movement = 1.0).copy(frames = 0)), alert)
+        assertFalse(noFrames.exempt)
+    }
+
+    @Test
+    fun `alert levels from frame reports win over the config`() {
+        val withAlert = FrameSummary(
+            frames = 10, ticks = 10, movementTicks = 10, allExemptShare = 0.0, movementExemptShare = 0.0, exemptions = emptyList(), tags = emptyList(),
+            checks = listOf(CheckActivity("movement.speed.a", 10, 2, 2, 3.0, 3.0, 2.0)),
+        )
+        val verdict = Evaluator.judge(legit, observed(CheckObservation("movement.speed.a", 2, 3.0, 3.0)).copy(frames = withAlert), alert)
+        assertEquals(Status.FAIL, verdict.status) // the config's 5.0 would only have made it noise
+        assertTrue(verdict.reasons.first().startsWith("Fehlalarm movement.speed.a"))
     }
 }

@@ -48,11 +48,14 @@ data class RunnerSettings(val cooldownTicks: Int = 60, val maxCooldownTicks: Int
 /**
  * Runs a suite scenario by scenario against one GuardLab client.
  *
- * Per scenario: prepare the player (spot, game mode, effects, items, vehicle, target mob, dummy, lag
- * profile) → wait `setupTicks` (teleport exemptions expire) → send `scenario` → sample IGuard's levels
- * every tick into the trace until `finished` (+ a short tail for late flags) → judge → clean up → cool
- * down until the levels decayed → next. Setbacks are IGuard's plugin teleports during playback.
- * Everything runs on the main thread; Toxiproxy calls run async.
+ * Per scenario: start IGuard's trace (`<suite>-<scenario>`) → prepare the player (spot, game mode,
+ * effects, items, vehicle, target mob, dummy, lag profile) → wait `setupTicks` (teleport exemptions
+ * expire) → send `scenario` → collect IGuard's frame reports ([FrameStats]: failed/counted per check,
+ * exemptions, tags) and sample every tick into GuardLab's trace until `finished` (+ a short tail for late
+ * flags) → stop IGuard's trace and copy it next to GuardLab's → judge → clean up → cool down until the
+ * levels decayed → next. Phase changes (setup, playback, cheat on/off, lag spikes, setbacks …) are marked
+ * in both traces. Setbacks are IGuard's plugin teleports during playback. Everything runs on the main
+ * thread except the frame listener (IGuard's worker threads), Toxiproxy calls and trace copies.
  *
  * @property plugin the plugin.
  * @property lab the lab world.
@@ -82,6 +85,10 @@ class LabRunner(
         val startedAt: Instant = Instant.now()
         var trace: TraceWriter? = null
         var traceName: String? = null
+        var iguard: ProbeTrace? = null
+        var iguardName: String? = null
+        var frames: FrameStats? = null
+        var cheatOn = false
         var phase = Phase.SETUP
         var phaseTicks = 0
         var playTick = 0
@@ -121,6 +128,10 @@ class LabRunner(
 
     private var run: Run? = null
     private var selfTeleport = false
+    private var frameListener: AutoCloseable? = null
+
+    /** Collector of the scenario in playback; written by IGuard's worker threads through [frameListener]. */
+    @Volatile private var frameStats: FrameStats? = null
 
     /** Whether a run is in progress. */
     val running: Boolean get() = run != null
@@ -163,6 +174,10 @@ class LabRunner(
         val dirName = DIR_FORMAT.format(now) + "-" + suite
         val started = Run(suite, scenarios, catalog, client, dirName, now, dummy() != null, toxiproxyStatus)
         run = started
+        frameListener = runCatching { probe.onFrames { frame -> frameStats?.record(frame) } }
+            .onFailure { plugin.logger.warning("GuardLab: IGuard-Frame-Berichte nicht verfügbar: ${it.message}") }
+            .getOrNull()
+        if (frameListener == null) plugin.logger.warning("GuardLab: keine IGuard-Frame-Berichte – Auswertung über VL-Anstiege")
         plugin.logger.info("GuardLab: starte Suite $suite (${scenarios.size} Szenarien) für ${client.name}")
         started.task = plugin.server.scheduler.runTaskTimer(plugin, Runnable { tick() }, 1L, 1L)
         return null
@@ -218,17 +233,20 @@ class LabRunner(
                 active.phase = Phase.PLAYING
                 active.phaseTicks = 0
                 active.playTick = 0
-                active.trace?.marker(0, "started")
+                mark(active, "started")
+                switchCheat(active)
             }
             is ClientMessage.Finished -> if (message.id == active.scenario.id && active.phase in PLAYBACK) {
                 active.finished = true
                 active.clientTicks = message.ticks
-                active.trace?.marker(active.playTick, "finished", "${message.ticks} ticks")
+                if (active.cheatOn) mark(active, "cheat_off")
+                active.cheatOn = false
+                mark(active, "finished", "${message.ticks} ticks")
                 toTail(active)
             }
             is ClientMessage.Error -> if ((message.id.isEmpty() || message.id == active.scenario.id) && active.phase != Phase.TAIL) {
                 active.error = message.reason.ifBlank { "unbekannter Fehler" }
-                active.trace?.marker(active.playTick, "error", active.error.orEmpty())
+                mark(active, "error", active.error.orEmpty())
                 toTail(active)
             }
             is ClientMessage.Ready -> Unit
@@ -248,7 +266,7 @@ class LabRunner(
         if (active.phase == Phase.SETUP) return
         active.setbacks++
         val to = event.to
-        active.trace?.marker(active.playTick, "setback", "%.2f %.2f %.2f".format(to.x, to.y, to.z))
+        mark(active, "setback", "%.2f %.2f %.2f".format(to.x, to.y, to.z))
     }
 
     /**
@@ -261,7 +279,7 @@ class LabRunner(
         if (player.uniqueId != current.client.playerId) return
         val active = current.active ?: return
         active.notes += "Spieler ist gestorben (Tick ${active.playTick}) – Szenario-Geometrie prüfen"
-        active.trace?.marker(active.playTick, "death")
+        mark(active, "death")
     }
 
     /** Where a dying client respawns: the waiting spot of the lab. */
@@ -353,14 +371,17 @@ class LabRunner(
             complete(player, active)
             return
         }
-        // Playback: effects (timed ones like levitation must not run out during setup), baseline, trace, message.
+        // Playback: effects (timed ones like levitation must not run out during setup), baseline, frame
+        // collector, trace, message.
         applyEffects(player, active)
-        active.tracker.start(probe.levels(player.uniqueId))
+        val baseline = probe.levels(player.uniqueId)
+        active.tracker.start(baseline)
+        active.frames = FrameStats(player.uniqueId, baseline).also { frameStats = it }
         active.traceName = "traces/%03d_%s.jsonl".format(active.index + 1, active.scenario.id)
         active.trace = runCatching { TraceWriter(File(reportsDir, current.dirName + "/" + active.traceName)) }
             .onFailure { plugin.logger.warning("GuardLab: Trace nicht schreibbar: ${it.message}") }
             .getOrNull()
-        active.trace?.marker(0, "scenario", "${active.scenario.id} cheat=${active.scenario.cheatMode} lag=${active.scenario.lag}")
+        mark(active, "scenario", "${active.scenario.id} cheat=${active.scenario.cheatMode} lag=${active.scenario.lag}", 0)
         val scenario = active.scenario
         send(player, Protocol.scenario(scenario.id, active.index, scenario.setupTicks, scenario.script, scenario.cheat, scenario.durationTicks))
         if (setup.dummy != null && scenario.dummyScript.isNotEmpty()) {
@@ -381,11 +402,33 @@ class LabRunner(
             return
         }
         active.playTick++
+        switchCheat(active)
         mechanics(player, active)
         if (active.playTick > active.scenario.durationTicks + PLAY_GRACE_TICKS) {
-            active.trace?.marker(active.playTick, "timeout")
+            mark(active, "timeout")
             toTail(active)
         }
+    }
+
+    /** Marks the moment the client's cheat switches on (`params.startTick`, approximated in server ticks). */
+    private fun switchCheat(active: Active) {
+        val scenario = active.scenario
+        if (active.cheatOn || scenario.cheatMode == "none" || active.playTick < scenario.cheatStartTick) return
+        active.cheatOn = true
+        mark(active, "cheat_on", scenario.cheatMode + if (scenario.cheatStartTick > 0) " ab Client-Tick ${scenario.cheatStartTick}" else "")
+    }
+
+    /**
+     * Writes a marker into GuardLab's trace and IGuard's recording (`guardlab:<marker> t=<tick> <detail>`).
+     *
+     * @param active the scenario.
+     * @param marker marker name.
+     * @param detail optional detail.
+     * @param tick playback tick (default: the current one).
+     */
+    private fun mark(active: Active, marker: String, detail: String = "", tick: Int = active.playTick) {
+        active.trace?.let { trace -> runCatching { trace.marker(tick, marker, detail) } }
+        active.iguard?.let { trace -> runCatching { trace.marker("guardlab:$marker t=$tick" + if (detail.isEmpty()) "" else " $detail") } }
     }
 
     private fun toTail(active: Active) {
@@ -419,7 +462,7 @@ class LabRunner(
                 val facing = player.location.direction.setY(0)
                 val horizontal = if (facing.lengthSquared() < 1e-6) Vector(0, 0, 1) else facing.normalize()
                 player.velocity = horizontal.multiply(-kb.strength).setY(kb.upward)
-                active.trace?.marker(tick, "knockback")
+                mark(active, "knockback")
             }
         }
         setup.pistonPulseTicks?.let { every ->
@@ -427,7 +470,7 @@ class LabRunner(
             when (tick % every.coerceAtLeast(PULSE_LENGTH + 1)) {
                 0 -> {
                     points.forEach { (x, y, z) -> lab.setWithPhysics(x, y, z, REDSTONE_BLOCK) }
-                    active.trace?.marker(tick, "pulse")
+                    mark(active, "pulse")
                 }
                 PULSE_LENGTH -> points.forEach { (x, y, z) -> lab.setWithPhysics(x, y, z, AIR) }
             }
@@ -437,7 +480,7 @@ class LabRunner(
             val spiking = phase in LagProfiles.SPIKE_EVERY_TICKS - LagProfiles.SPIKE_TICKS until LagProfiles.SPIKE_EVERY_TICKS
             if (spiking != active.spiking) {
                 active.spiking = spiking
-                active.trace?.marker(tick, if (spiking) "spike" else "spike_end")
+                mark(active, if (spiking) "spike" else "spike_end")
                 async { toxiproxy.apply("spike", spiking) }
             }
         }
@@ -453,6 +496,8 @@ class LabRunner(
 
     private fun prepare(player: Player, active: Active) {
         val setup = active.scenario.setup
+        startIGuardTrace(player, active)
+        mark(active, "setup", "spot=${setup.spot} gamemode=${setup.gamemode}" + (setup.vehicle?.let { " vehicle=$it" } ?: ""), 0)
         resetPlayer(player)
         player.gameMode = when (setup.gamemode) {
             "creative" -> GameMode.CREATIVE
@@ -559,7 +604,7 @@ class LabRunner(
         }
         active.entities += vehicle
         if (!vehicle.addPassenger(player)) active.notes += "Aufsteigen auf ${active.scenario.setup.vehicle} fehlgeschlagen"
-        active.trace?.marker(0, "mount", active.scenario.setup.vehicle.orEmpty())
+        mark(active, "mount", active.scenario.setup.vehicle.orEmpty(), 0)
     }
 
     private fun cleanup(player: Player?, active: Active) {
@@ -610,10 +655,19 @@ class LabRunner(
 
     private fun complete(player: Player?, active: Active) {
         val current = run ?: return
+        if (frameStats === active.frames) frameStats = null
+        stopIGuardTrace(current, active)
         runCatching { active.trace?.close() }
         val pings = active.pings
+        val stats = active.frames?.takeIf { it.frameCount > 0 }
+        val frames = stats?.summary()
+        // Frame reports decide; VL rises of checks IGuard never reported in a frame still count.
+        val checks = if (stats == null || frames == null) active.tracker.observations() else {
+            val evaluated = frames.checks.map { it.check }.toSet()
+            (stats.observations() + active.tracker.observations().filter { it.check !in evaluated }).sortedBy { it.check }
+        }
         val observation = ScenarioObservation(
-            checks = active.tracker.observations(),
+            checks = checks,
             setbacks = active.setbacks,
             clientFinished = active.finished,
             clientTicks = active.clientTicks,
@@ -622,9 +676,10 @@ class LabRunner(
             avgPing = if (pings.isEmpty()) 0.0 else pings.average(),
             maxPing = pings.maxOrNull() ?: 0,
             notes = active.notes.toList(),
+            frames = frames,
         )
         val verdict = Evaluator.judge(active.scenario, observation, probe::alertVl)
-        current.results += result(active.scenario, active.index, verdict, observation, active.traceName, active.startedAt)
+        current.results += result(active.scenario, active.index, verdict, observation, active.traceName, active.startedAt, active.iguardName)
         plugin.logger.info("GuardLab: ${active.index + 1}/${current.scenarios.size} ${active.scenario.id} → ${verdict.status} (${verdict.reasons.firstOrNull().orEmpty()})")
         runCatching { cleanup(player, active) }.onFailure { plugin.logger.warning("GuardLab: Aufräumen fehlgeschlagen: ${it.message}") }
         current.active = null
@@ -634,9 +689,46 @@ class LabRunner(
         current.stableTicks = 0
     }
 
+    /** Starts IGuard's recording of the scenario (`<suite>-<scenario>`); without it only GuardLab's trace exists. */
+    private fun startIGuardTrace(player: Player, active: Active) {
+        val suite = run?.suite ?: return
+        active.iguard = runCatching { probe.startTrace(player.uniqueId, "$suite-${active.scenario.id}") }
+            .onFailure { plugin.logger.warning("GuardLab: IGuard-Trace nicht gestartet: ${it.message}") }
+            .getOrNull()
+        if (active.iguard != null) active.iguardName = "traces/%03d_%s.iguard.jsonl".format(active.index + 1, active.scenario.id)
+    }
+
+    /**
+     * Stops IGuard's recording and copies it into the report directory (async; IGuard completes the file
+     * asynchronously). While the plugin shuts down the copy runs inline with a short wait.
+     */
+    private fun stopIGuardTrace(current: Run, active: Active) {
+        val trace = active.iguard ?: return
+        val name = active.iguardName ?: return
+        mark(active, "end")
+        if (!trace.active) active.notes += "IGuard-Trace vorzeitig beendet (trace.max-bytes/max-seconds) – nur der Anfang ist aufgezeichnet"
+        runCatching { trace.stop() }
+        active.iguard = null
+        val source = trace.file
+        val target = File(reportsDir, current.dirName + "/" + name).toPath()
+        val copy = { wait: Long ->
+            runCatching { IGuardTraceCopy.copy(source, target, wait) }
+                .onSuccess { complete -> if (!complete) plugin.logger.warning("GuardLab: IGuard-Trace $source unvollständig kopiert") }
+                .onFailure { plugin.logger.warning("GuardLab: IGuard-Trace $source nicht kopiert: ${it.message}") }
+        }
+        if (plugin.isEnabled) {
+            plugin.server.scheduler.runTaskAsynchronously(plugin, Runnable { copy(TRACE_COPY_WAIT_MILLIS) })
+        } else {
+            copy(TRACE_COPY_SHUTDOWN_WAIT_MILLIS)
+        }
+    }
+
     private fun finish(current: Run, aborted: String?) {
         current.task?.cancel()
         run = null
+        frameStats = null
+        runCatching { frameListener?.close() }
+        frameListener = null
         val report = writeReport(current, aborted)
         plugin.server.getPlayer(current.client.playerId)?.let { player ->
             val passed = report.count(Status.PASS) + report.count(Status.WARN)
@@ -667,7 +759,10 @@ class LabRunner(
             sanctions = probe.sanctionsMode,
         )
         val results = current.results.sortedBy { it.index }
-        val report = RunReport(info, results, Reports.coverage(current.catalog, results))
+        // Alert levels as IGuard reported them in its frames; the config file is the fallback.
+        val alerts = results.flatMap { it.observation.frames?.checks.orEmpty() }.filter { !it.alertVl.isNaN() }.associate { it.check to it.alertVl }
+        val calibration = Reports.calibration(current.catalog, results) { check -> alerts[check] ?: probe.alertVl(check) }
+        val report = RunReport(info, results, Reports.coverage(current.catalog, results), calibration)
         runCatching {
             val dir = File(reportsDir, current.dirName).also { it.mkdirs() }
             File(dir, "report.md").writeText(Reports.markdown(report))
@@ -679,7 +774,15 @@ class LabRunner(
         return report
     }
 
-    private fun result(scenario: Scenario, index: Int, verdict: Verdict, observation: ScenarioObservation, trace: String?, startedAt: Instant) =
+    private fun result(
+        scenario: Scenario,
+        index: Int,
+        verdict: Verdict,
+        observation: ScenarioObservation,
+        trace: String?,
+        startedAt: Instant,
+        iguardTrace: String? = null,
+    ) =
         ScenarioResult(
             index = index,
             id = scenario.id,
@@ -694,6 +797,10 @@ class LabRunner(
             trace = trace,
             startedAt = startedAt.toString(),
             durationMs = Instant.now().toEpochMilli() - startedAt.toEpochMilli(),
+            exempt = verdict.exempt,
+            iguardTrace = iguardTrace,
+            expectation = Reports.expectation(scenario),
+            covers = if (scenario.expect.none) scenario.covers else (scenario.expect.checks + scenario.expect.all).distinct(),
         )
 
     private fun skippedResult(scenario: Scenario, index: Int, reason: String) =
@@ -723,6 +830,8 @@ class LabRunner(
         const val DECAYED = 0.5
         const val SETTLE_TICKS = 20
         const val QUIT_DELAY_TICKS = 40L
+        const val TRACE_COPY_WAIT_MILLIS = 5_000L
+        const val TRACE_COPY_SHUTDOWN_WAIT_MILLIS = 1_000L
         const val TARGET_HEALTH = 1024.0
         const val HORSE_SPEED = 0.3
         const val HORSE_JUMP = 0.7

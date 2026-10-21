@@ -5,6 +5,10 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import java.io.BufferedWriter
 import java.io.File
+import java.io.RandomAccessFile
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import kotlin.math.round
 
 /**
@@ -92,5 +96,57 @@ class TraceWriter(private val file: File) : AutoCloseable {
 
     private companion object {
         const val PRECISION = 10_000.0
+    }
+}
+
+/**
+ * Copies IGuard's trace file of a scenario into the report directory.
+ *
+ * IGuard completes a stopped recording asynchronously; the file is finished once its last line is the
+ * `{"type":"end",…}` line. The copy waits for that (bounded) so the report holds the whole recording.
+ */
+object IGuardTraceCopy {
+    private const val TAIL_BYTES = 4096
+    private const val POLL_MILLIS = 100L
+
+    /**
+     * Whether the trace file is complete.
+     *
+     * @param file the IGuard trace.
+     * @return true when its last line is the `end` line.
+     */
+    fun finished(file: Path): Boolean {
+        if (!Files.isRegularFile(file)) return false
+        val tail = RandomAccessFile(file.toFile(), "r").use { raf ->
+            val length = raf.length()
+            val size = minOf(length, TAIL_BYTES.toLong()).toInt()
+            val bytes = ByteArray(size)
+            raf.seek(length - size)
+            raf.readFully(bytes)
+            String(bytes, Charsets.UTF_8)
+        }
+        val last = tail.trimEnd().substringAfterLast('\n')
+        return last.contains("\"type\":\"end\"")
+    }
+
+    /**
+     * Waits until the trace is finished (at most [timeoutMillis]) and copies it.
+     *
+     * @param source IGuard's trace file.
+     * @param target copy in the report directory (parent directories are created).
+     * @param timeoutMillis longest wait for the `end` line.
+     * @param sleep pause between polls (tests pass a no-op).
+     * @return true when a finished trace was copied, false when the copy is incomplete or the source is missing.
+     */
+    fun copy(source: Path, target: Path, timeoutMillis: Long, sleep: (Long) -> Unit = Thread::sleep): Boolean {
+        var waited = 0L
+        while (!finished(source) && waited < timeoutMillis) {
+            sleep(POLL_MILLIS)
+            waited += POLL_MILLIS
+        }
+        if (!Files.isRegularFile(source)) return false
+        target.parent?.let { Files.createDirectories(it) }
+        Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING)
+        return finished(target)
     }
 }

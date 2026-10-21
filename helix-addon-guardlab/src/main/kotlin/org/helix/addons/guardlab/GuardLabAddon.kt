@@ -41,7 +41,7 @@ class GuardLabAddon(private val clock: Clock = Clock.systemUTC()) : AddonBase() 
             ActionResult.ok(
                 "token: ${if (s.token.isBlank()) "(none)" else "set (${s.token.length} chars)"}",
                 "suite: ${s.suite}, autostart: ${s.autostart}",
-                "latest: " + (latest?.let { "${it.suite} ${it.passed} passed, ${it.warned} warned, ${it.failed} failed, ${it.skipped} skipped (${it.finishedAt})" } ?: "none"),
+                "latest: " + (latest?.let { "${it.suite} ${it.passed} passed (${it.exempt} exempt), ${it.warned} warned, ${it.failed} failed, ${it.skipped} skipped (${it.finishedAt})" } ?: "none"),
             )
         }
         action(
@@ -175,6 +175,7 @@ data class RunRequest(val suite: String, val player: String = "", val nonce: Str
  * @property skipped scenarios skipped (missing dummy client, unsupported cheat mode …).
  * @property report report path relative to the test server workspace.
  * @property service the test service id.
+ * @property exempt passed scenarios IGuard hardly checked (`pass (exempt)`, part of [passed]).
  */
 @Serializable
 data class RunSummary(
@@ -188,4 +189,5 @@ data class RunSummary(
     val skipped: Int = 0,
     val report: String = "",
     val service: String = "",
+    val exempt: Int = 0,
 )
