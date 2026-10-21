@@ -59,5 +59,7 @@ include(
     "helix-addon-citybuild",
     "helix-addon-feedback",
     "helix-addon-feedback-paper",
-    "helix-addon-mobs"
+    "helix-addon-mobs",
+    "helix-addon-guardlab",
+    "helix-addon-guardlab-paper"
 )

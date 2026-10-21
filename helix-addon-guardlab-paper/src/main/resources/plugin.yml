@@ -1,0 +1,16 @@
+name: GuardLab
+version: '${version}'
+main: org.helix.addons.guardlab.paper.GuardLabPlugin
+api-version: '1.21'
+description: Automated IGuard test lab – scenario suites on the IGuard-Test task, driven by the GuardLab dev client (dormant on every other task).
+depend: [Helix-GUIs]
+softdepend: [IGuard]
+commands:
+  guardlab:
+    description: GuardLab test runs.
+    usage: /guardlab <run <suite> [player]|stop|status|suites|rebuild>
+    permission: guardlab.admin
+permissions:
+  guardlab.admin:
+    description: Start, stop and inspect GuardLab runs and rebuild the test world.
+    default: op
