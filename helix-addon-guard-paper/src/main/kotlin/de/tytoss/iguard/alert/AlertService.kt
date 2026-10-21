@@ -1,5 +1,6 @@
 package de.tytoss.iguard.alert
 
+import de.tytoss.iguard.check.AlertSink
 import de.tytoss.iguard.config.DynamicConfig
 import de.tytoss.iguard.model.ViolationRecord
 import net.kyori.adventure.text.Component
@@ -32,7 +33,7 @@ class AlertService(
     private val plugin: JavaPlugin,
     private val dynamic: AtomicReference<DynamicConfig>,
     private val translations: NodeTranslations,
-) {
+) : AlertSink {
     private val miniMessage = MiniMessage.miniMessage()
     private val pending = ConcurrentHashMap<AlertKey, PendingAlert>()
     private val subscribers = ConcurrentHashMap.newKeySet<UUID>()
@@ -59,7 +60,7 @@ class AlertService(
     }
 
     /** Queues a violation for the next alert flush (coalesced per player+check). */
-    fun record(record: ViolationRecord) {
+    override fun record(record: ViolationRecord) {
         val key = AlertKey(record.playerId, record.checkId)
         pending.compute(key) { _, current ->
             if (current == null) PendingAlert(record.createdAt, 1, record)

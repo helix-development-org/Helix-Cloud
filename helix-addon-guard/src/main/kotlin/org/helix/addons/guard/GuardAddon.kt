@@ -48,7 +48,13 @@ class GuardAddon : AddonBase() {
             replayRetentionDays = { effectiveInt("detection.replay-retention-days", 7) },
         )
         msg = loadMessages()
-        storeActions = GuardStoreActions(context, guardStore, msg)
+        storeActions = GuardStoreActions(
+            context,
+            guardStore,
+            msg,
+            alertsEnabled = { effective("alerts.enabled")?.toBooleanStrictOrNull() ?: true },
+            alertCooldownMillis = { effectiveInt("alerts.network-cooldown-millis", 30_000).toLong() },
+        )
         storeActions.register()
         context.registerJoinGate { request ->
             guardStore.activeBan(request.uuid, request.name)
@@ -94,10 +100,10 @@ class GuardAddon : AddonBase() {
      * @param fallback used when neither an override nor a known default parses.
      * @return the live effective value.
      */
-    private fun effectiveInt(path: String, fallback: Int): Int {
-        val raw = store.overrides()[path] ?: GuardConfig.byPath[path]?.default
-        return raw?.toIntOrNull() ?: fallback
-    }
+    private fun effectiveInt(path: String, fallback: Int): Int = effective(path)?.toIntOrNull() ?: fallback
+
+    /** The effective (override or default) raw value of a config path, or null when unknown. */
+    private fun effective(path: String): String? = store.overrides()[path] ?: GuardConfig.byPath[path]?.default
 
     private fun configGet(): ActionResult {
         val overrides = store.overrides()

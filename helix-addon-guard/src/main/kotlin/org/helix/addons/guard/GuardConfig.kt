@@ -20,47 +20,47 @@ object GuardConfig {
     /** Fixed value rendered for `storage.mode`; IGuard persists through the node. */
     const val STORAGE_MODE_VALUE: String = "helix"
 
-    /** Per-check default values copied from IGuard's bundled config.yml. */
+    /** Per-check default values copied from IGuard's bundled config.yml (decay is per second). */
     private data class CheckDefaults(
         val id: String,
         val alertVl: String,
         val setbackVl: String,
-        val decay: String,
+        val decayPerSecond: String,
     )
 
     private val checkDefaults = listOf(
         CheckDefaults("client.identity.a", "1.0", "-1.0", "0.0"),
         CheckDefaults("client.brand_spoof.a", "1.0", "-1.0", "0.0"),
         CheckDefaults("protocol.badpackets.a", "1.0", "-1.0", "0.0"),
-        CheckDefaults("movement.fly.a", "4.0", "7.0", "0.2"),
-        CheckDefaults("movement.speed.a", "5.0", "9.0", "0.2"),
-        CheckDefaults("movement.nofall.a", "4.0", "-1.0", "0.25"),
-        CheckDefaults("movement.timer.a", "3.0", "-1.0", "0.1"),
-        CheckDefaults("movement.phase.a", "3.0", "-1.0", "0.15"),
-        CheckDefaults("movement.step.a", "3.0", "-1.0", "0.2"),
-        CheckDefaults("movement.spider.a", "3.0", "-1.0", "0.2"),
-        CheckDefaults("movement.jesus.a", "4.0", "-1.0", "0.2"),
-        CheckDefaults("movement.velocity.a", "4.0", "-1.0", "0.1"),
-        CheckDefaults("combat.reach.a", "4.0", "-1.0", "0.25"),
-        CheckDefaults("combat.rotation.a", "5.0", "-1.0", "0.25"),
-        CheckDefaults("combat.multitarget.a", "3.0", "-1.0", "0.25"),
-        CheckDefaults("combat.autoclicker.a", "5.0", "-1.0", "0.1"),
-        CheckDefaults("combat.inventory.a", "3.0", "-1.0", "0.2"),
-        CheckDefaults("world.interactionreach.a", "3.0", "-1.0", "0.2"),
-        CheckDefaults("world.scaffold.a", "4.0", "-1.0", "0.2"),
-        CheckDefaults("world.fastplace.a", "4.0", "-1.0", "0.2"),
-        CheckDefaults("world.fastbreak.a", "4.0", "-1.0", "0.2"),
-        CheckDefaults("world.nuker.a", "4.0", "-1.0", "0.2"),
+        CheckDefaults("movement.fly.a", "4.0", "7.0", "4.0"),
+        CheckDefaults("movement.speed.a", "5.0", "9.0", "4.0"),
+        CheckDefaults("movement.nofall.a", "4.0", "-1.0", "5.0"),
+        CheckDefaults("movement.timer.a", "3.0", "-1.0", "2.0"),
+        CheckDefaults("movement.phase.a", "3.0", "-1.0", "3.0"),
+        CheckDefaults("movement.step.a", "3.0", "-1.0", "4.0"),
+        CheckDefaults("movement.spider.a", "3.0", "-1.0", "4.0"),
+        CheckDefaults("movement.jesus.a", "4.0", "-1.0", "4.0"),
+        CheckDefaults("movement.velocity.a", "4.0", "-1.0", "1.0"),
+        CheckDefaults("combat.reach.a", "4.0", "-1.0", "2.5"),
+        CheckDefaults("combat.rotation.a", "5.0", "-1.0", "2.5"),
+        CheckDefaults("combat.multitarget.a", "3.0", "-1.0", "2.5"),
+        CheckDefaults("combat.autoclicker.a", "5.0", "-1.0", "1.0"),
+        CheckDefaults("combat.inventory.a", "3.0", "-1.0", "2.0"),
+        CheckDefaults("world.interactionreach.a", "3.0", "-1.0", "2.0"),
+        CheckDefaults("world.scaffold.a", "4.0", "-1.0", "2.0"),
+        CheckDefaults("world.fastplace.a", "4.0", "-1.0", "2.0"),
+        CheckDefaults("world.fastbreak.a", "4.0", "-1.0", "2.0"),
+        CheckDefaults("world.nuker.a", "4.0", "-1.0", "2.0"),
         CheckDefaults("inventory.impossible.a", "1.0", "-1.0", "0.0"),
-        CheckDefaults("inventory.move.a", "4.0", "-1.0", "0.2"),
-        CheckDefaults("movement.airjump.a", "4.0", "-1.0", "0.2"),
-        CheckDefaults("movement.sprintbackwards.a", "5.0", "-1.0", "0.2"),
-        CheckDefaults("combat.noswing.a", "5.0", "-1.0", "0.2"),
-        CheckDefaults("combat.snapaim.a", "4.0", "-1.0", "0.25"),
-        CheckDefaults("world.nofacing.a", "4.0", "-1.0", "0.2"),
-        CheckDefaults("movement.fastladder.a", "5.0", "-1.0", "0.2"),
-        CheckDefaults("movement.highjump.a", "4.0", "-1.0", "0.2"),
-        CheckDefaults("movement.elytrafly.a", "4.0", "-1.0", "0.2"),
+        CheckDefaults("inventory.move.a", "4.0", "-1.0", "2.0"),
+        CheckDefaults("movement.airjump.a", "4.0", "-1.0", "4.0"),
+        CheckDefaults("movement.sprintbackwards.a", "5.0", "-1.0", "4.0"),
+        CheckDefaults("combat.noswing.a", "5.0", "-1.0", "2.0"),
+        CheckDefaults("combat.snapaim.a", "4.0", "-1.0", "2.5"),
+        CheckDefaults("world.nofacing.a", "4.0", "-1.0", "2.0"),
+        CheckDefaults("movement.fastladder.a", "5.0", "-1.0", "4.0"),
+        CheckDefaults("movement.highjump.a", "4.0", "-1.0", "4.0"),
+        CheckDefaults("movement.elytrafly.a", "4.0", "-1.0", "4.0"),
     )
 
     /** All editable settings in the order of IGuard's bundled config.yml. */
@@ -143,6 +143,8 @@ object GuardConfig {
         ),
         plain("alerts.console", GuardValueType.BOOLEAN, "true"),
         plain("alerts.cooldown-millis", GuardValueType.INT, "1000"),
+        // node-side: one network alert per incident/escalation, at most this often per player
+        plain("alerts.network-cooldown-millis", GuardValueType.INT, "30000"),
         // bans.* including command templates
         plain("bans.provider", GuardValueType.STRING, "native"),
         plain("bans.command.ban", GuardValueType.STRING, "ban %player% %reason%"),
@@ -165,6 +167,12 @@ object GuardConfig {
         // sampler.*
         plain("sampler.max-players-per-tick", GuardValueType.INT, "256"),
         plain("sampler.max-nanos-per-tick", GuardValueType.INT, "2000000"),
+        // trace.* — recorder limits, read once on startup
+        plain("trace.max-bytes", GuardValueType.INT, "67108864", static = true),
+        plain("trace.max-seconds", GuardValueType.INT, "900", static = true),
+        plain("trace.queue-capacity", GuardValueType.INT, "50000", static = true),
+        // debug.*
+        plain("debug.rate-limit-millis", GuardValueType.INT, "200"),
         // detection.*
         plain("detection.incident-gap-millis", GuardValueType.INT, "30000"),
         plain("detection.replay-pre-millis", GuardValueType.INT, "10000"),
@@ -210,10 +218,10 @@ object GuardConfig {
                 false,
             ),
             GuardSetting(
-                "checks.${check.id}.decay",
-                listOf("checks", check.id, "decay"),
+                "checks.${check.id}.decay-per-second",
+                listOf("checks", check.id, "decay-per-second"),
                 GuardValueType.DOUBLE,
-                check.decay,
+                check.decayPerSecond,
                 false,
             ),
         )

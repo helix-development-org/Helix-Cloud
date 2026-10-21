@@ -46,6 +46,7 @@ private data class Capture(
     val windowEnd: Long,
     val frames: MutableList<PacketFrame>,
     var incident: IncidentRecord,
+    val tracked: TrackedIncident,
 )
 
 private class TrackedIncident(
@@ -57,6 +58,14 @@ private class TrackedIncident(
     var evidenceCount: Int = 0,
     var playerName: String = "unknown",
     var lastOutboxAction: String? = null,
+    var worldId: UUID? = null,
+    // Write throttling: what the node last received for this incident and whether newer state is pending.
+    var writtenAt: Long = Long.MIN_VALUE,
+    var writtenConfidence: Double = -1.0,
+    var writtenFamilies: Set<EvidenceFamily> = emptySet(),
+    var writtenShadow: String? = null,
+    var latestRecord: IncidentRecord? = null,
+    var dirty: Boolean = false,
 )
 
 private class IncidentPlayerState {
@@ -106,21 +115,35 @@ internal class IncidentTracker(
         }
     }
 
-    /** Folds a check failure into the player's open incident (or a new one) and decides the action. */
-    fun assign(frame: PacketFrame, playerName: String, failure: CheckFailure): IncidentAssignment {
+    /**
+     * Folds a check failure into the player's open incident (or a new one) and decides the action.
+     *
+     * @param frame the failing frame.
+     * @param playerName player name.
+     * @param failure the failure.
+     * @param evidenceWeight `VL / alert-vl` clamped to 0..1: below the alert level the failure only
+     *   contributes proportionally and never opens an incident on its own.
+     * @param worldId world of the failure (recorded with the incident for the replay terrain).
+     * @return the assignment, or null when the sub-threshold failure was not folded into any incident.
+     */
+    fun assign(frame: PacketFrame, playerName: String, failure: CheckFailure, evidenceWeight: Double = 1.0, worldId: UUID? = null): IncidentAssignment? {
         val state = states.computeIfAbsent(frame.playerId) { IncidentPlayerState() }
         synchronized(state) {
             var incident = state.incident
             if (incident == null || frame.receivedAt - incident.updatedAt > config.incidentGapMillis) {
+                if (evidenceWeight < 1.0) return null
+                incident?.let(::flush)
                 incident = TrackedIncident(UUID.randomUUID(), frame.receivedAt, frame.receivedAt)
                 state.incident = incident
             }
             incident.updatedAt = frame.receivedAt
             incident.playerName = playerName
+            if (worldId != null) incident.worldId = worldId
             incident.evidenceCount++
-            incident.deterministic = incident.deterministic || failure.deterministic
+            incident.deterministic = incident.deterministic || (failure.deterministic && evidenceWeight >= 1.0)
             val confidenceConfig = dynamic.get().confidence
-            incident.familyScores.merge(failure.family, ConfidenceModel.signalConfidence(confidenceConfig, failure.checkId), ::maxOf)
+            val score = ConfidenceModel.signalConfidence(confidenceConfig, failure.checkId) * evidenceWeight.coerceIn(0.0, 1.0)
+            incident.familyScores.merge(failure.family, score, ::maxOf)
             val confidence = ConfidenceModel.provisionalConfidence(confidenceConfig, incident.familyScores.values, incident.deterministic)
             val eligible = confidence >= config.shadowThreshold &&
                 (incident.familyScores.size >= config.minimumIndependentFamilies || incident.deterministic)
@@ -149,8 +172,16 @@ internal class IncidentTracker(
                 ConfidenceModel.RECIPE_VERSION,
             )
             latest[frame.playerId] = snapshot
-            val incidentRecord = snapshot.toRecord()
-            storage.enqueueIncident(incidentRecord)
+            val incidentRecord = snapshot.toRecord(incident.worldId)
+            incident.latestRecord = incidentRecord
+            // One upsert per meaningful change instead of one per failure: new incident, new action,
+            // new family, a real confidence step, or at most every few seconds while it keeps growing.
+            val changed = incident.writtenAt == Long.MIN_VALUE ||
+                shadowAction != incident.writtenShadow ||
+                incident.familyScores.keys != incident.writtenFamilies ||
+                confidence >= incident.writtenConfidence + CONFIDENCE_WRITE_STEP ||
+                frame.receivedAt - incident.writtenAt >= INCIDENT_WRITE_INTERVAL_MILLIS
+            if (changed) write(incident, incidentRecord, frame.receivedAt) else incident.dirty = true
             if (incident.id !in state.captures) {
                 state.captures[incident.id] = Capture(
                     incident.id,
@@ -158,6 +189,7 @@ internal class IncidentTracker(
                     frame.receivedAt + config.replayPostMillis,
                     state.replay.filterTo(ArrayList()) { it.receivedAt >= frame.receivedAt - config.replayPreMillis },
                     incidentRecord,
+                    incident,
                 )
             } else {
                 state.captures[incident.id]?.incident = incidentRecord
@@ -222,18 +254,45 @@ internal class IncidentTracker(
         synchronized(state) {
             state.captures.values.forEach { persistReplay(it, System.currentTimeMillis()) }
             state.captures.clear()
+            state.incident?.let(::flush)
         }
         latest.remove(playerId)
     }
 
+    private fun write(incident: TrackedIncident, record: IncidentRecord, now: Long) {
+        storage.enqueueIncident(record)
+        incident.writtenAt = now
+        incident.writtenConfidence = record.confidence
+        incident.writtenFamilies = record.families
+        incident.writtenShadow = record.shadowAction
+        incident.dirty = false
+    }
+
+    // Writes the final state of an incident whose last updates were throttled away.
+    private fun flush(incident: TrackedIncident) {
+        val record = incident.latestRecord ?: return
+        if (incident.dirty) write(incident, record, incident.updatedAt)
+    }
+
     private fun persistReplay(capture: Capture, capturedAt: Long) {
         // Snapshot the mutable capture under the caller's lock; format (describe) + compress + enqueue
-        // off the worker so neither string building nor GZIP runs on the stripe.
+        // off the worker so neither string building nor GZIP runs on the stripe. The incident row only
+        // rides along when throttling left newer state unwritten (otherwise it is already stored).
         val frames = capture.frames.toList()
         val incidentId = capture.incidentId
         val windowStart = capture.windowStart
         val windowEnd = capture.windowEnd
-        val incident = capture.incident
+        val tracked = capture.tracked
+        val incident = if (tracked.dirty) {
+            tracked.dirty = false
+            tracked.writtenAt = capture.incident.updatedAt
+            tracked.writtenConfidence = capture.incident.confidence
+            tracked.writtenFamilies = capture.incident.families
+            tracked.writtenShadow = capture.incident.shadowAction
+            capture.incident
+        } else {
+            null
+        }
         replayExecutor.execute {
             val raw = frames.joinToString("\n") { "${it.receivedAt}\t${describe(it)}" }.encodeToByteArray()
             val compressed = ByteArrayOutputStream().use { output ->
@@ -264,9 +323,9 @@ internal class IncidentTracker(
         if (!replayExecutor.awaitTermination(2, TimeUnit.SECONDS)) replayExecutor.shutdownNow()
     }
 
-    private fun IncidentSnapshot.toRecord() = IncidentRecord(
+    private fun IncidentSnapshot.toRecord(worldId: UUID?) = IncidentRecord(
         incidentId, openedAt.toEpochMilli(), updatedAt.toEpochMilli(), serverId, playerId, playerName,
-        confidence, calibrated, families, evidenceCount, shadowAction, recipeVersion,
+        confidence, calibrated, families, evidenceCount, shadowAction, recipeVersion, worldId,
     )
 
     private fun describe(frame: PacketFrame): String = when (frame) {
@@ -282,3 +341,9 @@ internal class IncidentTracker(
 }
 
 private fun Double.fmt() = "%.5f".format(java.util.Locale.ROOT, this)
+
+// Minimum confidence increase that justifies another incident upsert on its own.
+private const val CONFIDENCE_WRITE_STEP = 0.05
+
+// While an incident keeps growing, its row is refreshed at most this often.
+private const val INCIDENT_WRITE_INTERVAL_MILLIS = 5_000L
