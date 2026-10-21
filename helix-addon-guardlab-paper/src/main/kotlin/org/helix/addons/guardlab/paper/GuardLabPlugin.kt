@@ -49,7 +49,8 @@ object MissingProbe : GuardProbe {
  * When a client registers `helix:guardlab` the plugin sends `hello` with the lab token (bridge value
  * `guardlab.settings` of the node addon, or `GUARDLAB_TOKEN`). The client verifies the token and answers
  * `ready`; the configured suite then starts automatically (or on `guardlab.run` / `/guardlab run`). The
- * report lands in `plugins/GuardLab/reports/<timestamp>-<suite>/` and its summary goes to the node.
+ * report lands in `plugins/GuardLab/reports/<timestamp>-<suite>/` and its summary goes to the node. The
+ * [LiveSidebar] replaces the network sidebar with live IGuard debug data for every viewer.
  */
 class GuardLabPlugin : JavaPlugin(), Listener, PluginMessageListener {
     private val json = Json { ignoreUnknownKeys = true }
@@ -58,6 +59,7 @@ class GuardLabPlugin : JavaPlugin(), Listener, PluginMessageListener {
     private lateinit var runner: LabRunner
     private var node: ServiceNodeApi? = null
     private var toxiproxy: ToxiproxyClient? = null
+    private var sidebar: LiveSidebar? = null
     private var service = "local"
     private var active = false
     private val enabledAt = System.currentTimeMillis()
@@ -120,6 +122,10 @@ class GuardLabPlugin : JavaPlugin(), Listener, PluginMessageListener {
             dummy = { dummyPlayer() },
             onReport = { report, dir -> pushSummary(report, dir) },
         )
+        if (config.getBoolean("sidebar.enabled", true)) {
+            val interval = config.getLong("sidebar.interval-ticks", SIDEBAR_INTERVAL_TICKS).coerceAtLeast(1L)
+            sidebar = LiveSidebar(this, probe, { runner.live() }, interval).also { it.start() }
+        }
 
         server.messenger.registerOutgoingPluginChannel(this, Protocol.CHANNEL)
         server.messenger.registerIncomingPluginChannel(this, Protocol.CHANNEL, this)
@@ -145,6 +151,7 @@ class GuardLabPlugin : JavaPlugin(), Listener, PluginMessageListener {
     override fun onDisable() {
         if (!active) return
         if (::runner.isInitialized) runCatching { runner.abort("Server stoppt") }
+        sidebar?.let { runCatching { it.stop() } }
         toxiproxy?.let { client -> runCatching { client.clear() } }
         node?.close()
     }
@@ -222,6 +229,7 @@ class GuardLabPlugin : JavaPlugin(), Listener, PluginMessageListener {
         if (!active) return
         ready.remove(event.player.uniqueId)
         helloSent.remove(event.player.uniqueId)
+        sidebar?.forget(event.player.uniqueId)
     }
 
     /** Counts IGuard setbacks. */
@@ -419,6 +427,7 @@ class GuardLabPlugin : JavaPlugin(), Listener, PluginMessageListener {
         const val HELLO_SWEEP_TICKS = 40L
         const val REQUEST_MAX_AGE_MS = 300_000L
         const val AUTOSTART_DELAY_TICKS = 100L
+        const val SIDEBAR_INTERVAL_TICKS = 4L
         val SUITE_ID = Regex("^[a-z0-9_-]{1,32}$")
     }
 }

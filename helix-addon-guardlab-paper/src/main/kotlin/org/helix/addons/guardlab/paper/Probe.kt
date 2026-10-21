@@ -145,7 +145,17 @@ class IGuardApiProbe(private val api: IGuardApi, private val configFile: File) :
             exempt = exempt,
             exemptions = exemptions,
             tags = environmentTags,
-            results = results.map { CheckSample(it.checkId, it.failed, it.counted, it.weight, it.violationLevel, it.alertLevel) },
+            results = results.map {
+                CheckSample(
+                    it.checkId, it.failed, it.counted, it.weight, it.violationLevel, it.alertLevel,
+                    if (it.failed) it.evidence.mapValues { (_, value) -> evidenceText(value) } else emptyMap(),
+                )
+            },
         )
+
+        private fun evidenceText(value: Any?): String = when (value) {
+            is Double, is Float -> String.format(java.util.Locale.ROOT, "%.3f", (value as Number).toDouble())
+            else -> value.toString()
+        }
     }
 }

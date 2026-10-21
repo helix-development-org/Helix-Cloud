@@ -24,3 +24,11 @@ max-cooldown-ticks: 400
 
 # Nach dem Lauf „quit“ an die Clients senden (sie dürfen sich dann trennen).
 quit-after-run: true
+
+# Live-Debug-Sidebar: ersetzt auf dem Testserver die Netzwerk-Sidebar durch das, was IGuard gerade sieht
+# (Ping, Frames/Fails pro Sekunde, Exemptions, Umgebungs-Tags, höchste VLs, letzter Flag mit Evidence) und den
+# Stand der laufenden Suite. Die Tablist bleibt unverändert.
+sidebar:
+  enabled: true
+  # Aktualisierung alle N Ticks (4 = fünfmal pro Sekunde).
+  interval-ticks: 4

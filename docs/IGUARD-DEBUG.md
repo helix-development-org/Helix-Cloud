@@ -16,6 +16,23 @@ höchstens eine Zeile je `debug.rate-limit-millis` (Standard 200 ms); zurückgeh
 Zeilen zählen als `(+n)` in der nächsten. Farben: rot = ab Alert-Schwelle, gelb =
 darunter, hell = im Signal-Cooldown („held“, erhöht den VL nicht).
 
+## Live-Debug-Sidebar (GuardLab-Testserver)
+
+Auf dem Task `IGuard-Test` ersetzt GuardLab die Netzwerk-Sidebar durch Live-Daten – für
+jeden Betrachter seine eigenen, fünfmal pro Sekunde (`sidebar.interval-ticks: 4` in
+`plugins/GuardLab/config.yml`, abschalten mit `sidebar.enabled: false`):
+
+- laufende Suite: Fortschritt, Ergebnisse (✔ ⚠ ✖ ◇ Lücke, » übersprungen), aktuelles
+  Szenario, Cheat an/aus, Lag-Profil, Phase mit Tick, Setbacks;
+- Ping und TPS, IGuard-Frames und fehlgeschlagene Checks pro Sekunde;
+- aktive Exemptions mit Scope und Umgebungs-Tags;
+- die drei höchsten VLs mit Alarm-Schwelle (rot ab Alarm, gelb ab halber Schwelle);
+- der letzte Flag mit Gewicht (oder „Cooldown“), Alter und den ersten Evidenz-Werten.
+
+Die Tablist bleibt unverändert: Die Sidebar ist ein eigenes Objective auf dem Scoreboard
+des Spielers, Rang-Prefixe und Teams darauf bleiben erhalten. Auf allen anderen Servern
+ruht GuardLab.
+
 ## Trace-Recorder
 
 ```

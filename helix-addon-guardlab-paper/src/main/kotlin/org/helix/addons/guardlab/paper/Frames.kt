@@ -12,6 +12,7 @@ import java.util.UUID
  * @property weight violation weight the failure added (0 when passed or not counted).
  * @property level the check's violation level after the frame.
  * @property alertLevel the check's configured `alert-vl`.
+ * @property evidence the failure's evidence as text (`horizontal` → `0.509` …), empty when the check passed.
  */
 data class CheckSample(
     val check: String,
@@ -20,6 +21,7 @@ data class CheckSample(
     val weight: Double,
     val level: Double,
     val alertLevel: Double,
+    val evidence: Map<String, String> = emptyMap(),
 )
 
 /**

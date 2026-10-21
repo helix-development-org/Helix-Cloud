@@ -46,6 +46,39 @@ data class ClientInfo(val playerId: UUID, val name: String, val version: String,
 data class RunnerSettings(val cooldownTicks: Int = 60, val maxCooldownTicks: Int = 400, val quitAfterRun: Boolean = true)
 
 /**
+ * Snapshot of the running suite for the live sidebar ([LiveSidebar]).
+ *
+ * @property suite suite id.
+ * @property client the run's client.
+ * @property done scenarios with a result.
+ * @property total scenarios of the suite.
+ * @property counts results so far by status.
+ * @property scenario id of the scenario in progress, null during the pause between scenarios.
+ * @property cheat cheat mode of that scenario (`none` for legit ones).
+ * @property cheatOn the cheat is switched on right now.
+ * @property lag lag profile of that scenario (`none` without lag).
+ * @property phase readable phase (`Aufbau`, `Start`, `läuft`, `Nachlauf`, `Pause`).
+ * @property playTick playback tick of the scenario.
+ * @property durationTicks planned playback length.
+ * @property setbacks IGuard setbacks during this scenario.
+ */
+data class LiveRun(
+    val suite: String,
+    val client: UUID,
+    val done: Int,
+    val total: Int,
+    val counts: Map<Status, Int>,
+    val scenario: String?,
+    val cheat: String,
+    val cheatOn: Boolean,
+    val lag: String,
+    val phase: String,
+    val playTick: Int,
+    val durationTicks: Int,
+    val setbacks: Int,
+)
+
+/**
  * Runs a suite scenario by scenario against one GuardLab client.
  *
  * Per scenario: start IGuard's trace (`<suite>-<scenario>`) → prepare the player (spot, game mode,
@@ -151,6 +184,37 @@ class LabRunner(
             "Suite ${run.suite} für ${run.client.name}: ${run.results.size}/${run.scenarios.size} fertig",
             active?.let { "aktuell: ${it.scenario.id} (${it.phase.name.lowercase()}, Tick ${it.playTick})" } ?: "Pause zwischen Szenarien",
             "bisher: " + Status.entries.joinToString { s -> "${s.name.lowercase()} ${run.results.count { it.status == s }}" },
+        )
+    }
+
+    /**
+     * The running suite for the live sidebar.
+     *
+     * @return the snapshot, null when no run is in progress.
+     */
+    fun live(): LiveRun? {
+        val run = run ?: return null
+        val active = run.active
+        return LiveRun(
+            suite = run.suite,
+            client = run.client.playerId,
+            done = run.results.size,
+            total = run.scenarios.size,
+            counts = run.results.groupingBy { it.status }.eachCount(),
+            scenario = active?.scenario?.id,
+            cheat = active?.scenario?.cheatMode ?: "none",
+            cheatOn = active?.cheatOn == true,
+            lag = active?.scenario?.lag ?: "none",
+            phase = when (active?.phase) {
+                null -> "Pause"
+                Phase.SETUP -> "Aufbau"
+                Phase.WAIT_START -> "Start"
+                Phase.PLAYING -> "läuft"
+                Phase.TAIL -> "Nachlauf"
+            },
+            playTick = active?.playTick ?: 0,
+            durationTicks = active?.scenario?.durationTicks ?: 0,
+            setbacks = active?.setbacks ?: 0,
         )
     }
 
