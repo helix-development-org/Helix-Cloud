@@ -93,6 +93,22 @@ class DockerServiceExecutorTest {
     }
 
     @Test
+    fun `backend ports are published when configured`() {
+        val runner = FakeRunner()
+        DockerServiceExecutor(NodeConfig.DockerSettings(publishBackends = true), runner).start(spec(Environment.PAPER))
+        val run = runner.commands.first { it.take(2) == listOf("docker", "run") }
+        assertTrue(run.containsAll(listOf("-p", "30000:30000")))
+    }
+
+    @Test
+    fun `publish address is used when not all interfaces`() {
+        val runner = FakeRunner()
+        DockerServiceExecutor(NodeConfig.DockerSettings(publishAddress = "127.0.0.1"), runner).start(spec(Environment.VELOCITY))
+        val run = runner.commands.first { it.take(2) == listOf("docker", "run") }
+        assertTrue(run.containsAll(listOf("-p", "127.0.0.1:30000:30000")))
+    }
+
+    @Test
     fun `network is created when missing`() {
         val runner = FakeRunner { command ->
             if (command.getOrNull(2) == "inspect" && command.getOrNull(1) == "network") {

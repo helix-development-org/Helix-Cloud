@@ -1245,7 +1245,7 @@ class HelixNode(
     private fun bridgeEnvironment(service: ManagedService): Map<String, String> {
         val host = when (service.task.executor) {
             ExecutorType.PROCESS -> "127.0.0.1"
-            ExecutorType.DOCKER -> "host.docker.internal"
+            ExecutorType.DOCKER -> config.docker.controlHost
         }
         // A per-service token, not the static admin token: any plugin on the
         // managed game server can read its own process's environment, so

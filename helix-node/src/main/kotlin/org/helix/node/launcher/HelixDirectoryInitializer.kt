@@ -61,6 +61,9 @@ class HelixDirectoryInitializer(private val root: Path) {
             [docker]
             network = "helix"                      # docker network joined by all Helix containers
             image = "eclipse-temurin:24-jre"       # base image for service containers
+            # controlHost = "host.docker.internal"  # how containers reach the node (node in a container: its name)
+            # publishBackends = false               # also publish Paper backend ports to the host
+            # publishAddress = "0.0.0.0"            # host interface for published ports
 
             [storage]
             mode = "json"                          # "json" (files), "postgres" or "mongodb"
