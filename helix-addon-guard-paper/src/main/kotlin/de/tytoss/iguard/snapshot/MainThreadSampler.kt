@@ -1,11 +1,14 @@
 package de.tytoss.iguard.snapshot
 
 import de.tytoss.iguard.api.ExemptionManager
+import de.tytoss.iguard.api.IGuardExemptionScope
 import de.tytoss.iguard.config.ExemptionConfig
 import de.tytoss.iguard.config.SamplerConfig
 import de.tytoss.iguard.model.Box
 import de.tytoss.iguard.model.EnvironmentFrame
+import de.tytoss.iguard.model.EnvironmentTags
 import de.tytoss.iguard.model.Vec3
+import de.tytoss.iguard.setback.SetbackMarks
 import org.bukkit.Bukkit
 import org.bukkit.GameMode
 import org.bukkit.Location
@@ -46,6 +49,7 @@ class MainThreadSampler(
     private val exemptions: ExemptionManager,
     private val config: ExemptionConfig,
     private val samplerConfig: SamplerConfig,
+    private val setbackMarks: SetbackMarks,
 ) : Listener {
     private val tick = AtomicLong()
 
@@ -147,7 +151,7 @@ class MainThreadSampler(
             player.ping,
             tps,
             player.velocity.let { Vec3(it.x, it.y, it.z) },
-            environmentTags.any { it !in TELEMETRY_ONLY_TAGS },
+            environmentTags.any { it !in EnvironmentTags.NON_EXEMPTING },
             environmentTags,
             chunkLoaded,
         )
@@ -226,11 +230,14 @@ class MainThreadSampler(
         if (player.isSleeping) add("sleeping")
         if (player.gameMode == GameMode.CREATIVE || player.gameMode == GameMode.SPECTATOR) add("game-mode")
         if (player.allowFlight || player.isFlying) add("flight")
-        if (player.isGliding) add("elytra")
+        if (player.isGliding) add(EnvironmentTags.ELYTRA)
         if (player.isRiptiding) add("riptide")
-        if (player.isInsideVehicle) add("vehicle")
-        if (block.isLiquid) add("liquid")
-        if (Tag.CLIMBABLE.isTagged(type)) add("climbable")
+        if (player.isInsideVehicle) add(EnvironmentTags.VEHICLE)
+        if (block.isLiquid) add(EnvironmentTags.LIQUID)
+        // Feet in air right above a liquid: where a Jesus cheat walks. Context only (non-exempting),
+        // the dry-land checks keep running and the surface Jesus check is added on top.
+        if (!block.isLiquid && block.getRelative(0, -1, 0).isLiquid) add(EnvironmentTags.LIQUID_SURFACE)
+        if (Tag.CLIMBABLE.isTagged(type)) add(EnvironmentTags.CLIMBABLE)
         if (type == Material.COBWEB) add("cobweb")
         // Beds bounce (a legit upward impulse while "airborne"); the bed is at the player's feet, so
         // both the occupied block and the one below must be checked.
@@ -244,7 +251,7 @@ class MainThreadSampler(
         if (below == Material.SOUL_SAND || below == Material.SOUL_SOIL) add("soul-speed")
         if (player.hasPotionEffect(PotionEffectType.LEVITATION)) add("levitation")
         if (player.hasPotionEffect(PotionEffectType.SLOW_FALLING)) add("slow-falling")
-        if (tps < config.lowTpsThreshold) add("low-tps")
+        if (tps < config.lowTpsThreshold) add(EnvironmentTags.LOW_TPS)
         if (nearDynamic) add("dynamic-block")
     }
 
@@ -274,39 +281,42 @@ class MainThreadSampler(
         }
     }
 
-    /** Grants the teleport grace window. */
+    /**
+     * Grants the movement grace window of a plugin/command teleport. IGuard's own setbacks get none:
+     * the check engine exempts them only until the client confirms the teleport, so being set back
+     * never opens a check-free window.
+     */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    fun onTeleport(event: PlayerTeleportEvent) = exempt(event.player, config.teleportMillis, "teleport")
+    fun onTeleport(event: PlayerTeleportEvent) {
+        if (setbackMarks.isRecent(event.player.uniqueId, System.currentTimeMillis())) return
+        exempt(event.player, config.teleportMillis, "teleport", IGuardExemptionScope.MOVEMENT)
+    }
 
-    /** Grants the respawn grace window. */
+    /** Grants the respawn grace window (all checks: the player is rebuilt from scratch). */
     @EventHandler(priority = EventPriority.MONITOR)
-    fun onRespawn(event: PlayerRespawnEvent) = exempt(event.player, config.respawnMillis, "respawn")
+    fun onRespawn(event: PlayerRespawnEvent) = exempt(event.player, config.respawnMillis, "respawn", IGuardExemptionScope.ALL)
 
-    /** Grants the world-change grace window. */
+    /** Grants the world-change grace window (all checks: targets and positions belong to the old world). */
     @EventHandler(priority = EventPriority.MONITOR)
-    fun onWorldChange(event: PlayerChangedWorldEvent) = exempt(event.player, config.worldChangeMillis, "world-change")
+    fun onWorldChange(event: PlayerChangedWorldEvent) = exempt(event.player, config.worldChangeMillis, "world-change", IGuardExemptionScope.ALL)
 
-    /** Grants the knockback/velocity grace window. */
+    /** Grants the knockback/velocity grace window (movement only: the hit player can still be judged for combat). */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    fun onVelocity(event: PlayerVelocityEvent) = exempt(event.player, config.velocityMillis, "velocity")
+    fun onVelocity(event: PlayerVelocityEvent) = exempt(event.player, config.velocityMillis, "velocity", IGuardExemptionScope.MOVEMENT)
 
     /** Clears the quitting player's snapshot, exemption and scan-cache state. */
     @EventHandler
     fun onQuit(event: PlayerQuitEvent) {
         store.remove(event.player.uniqueId)
         exemptions.remove(event.player.uniqueId)
+        setbackMarks.remove(event.player.uniqueId)
         lastScan.remove(event.player.uniqueId)
     }
 
-    private fun exempt(player: Player, millis: Long, reason: String) {
-        exemptions.exempt(player.uniqueId, Duration.ofMillis(millis.coerceAtLeast(1)), reason)
+    private fun exempt(player: Player, millis: Long, reason: String, scope: IGuardExemptionScope) {
+        exemptions.exempt(player.uniqueId, Duration.ofMillis(millis.coerceAtLeast(1)), reason, scope)
     }
 }
-
-// Tags that describe server health rather than a per-player physics modifier. They must NOT force a
-// movement exemption (that would disable detection server-wide under load); they stay in the tag set
-// for telemetry and are consumed as tolerance hints by the evaluator instead.
-private val TELEMETRY_ONLY_TAGS = setOf("low-tps")
 
 private data class LocalScan(val collisions: List<Box>, val nearDynamic: Boolean)
 

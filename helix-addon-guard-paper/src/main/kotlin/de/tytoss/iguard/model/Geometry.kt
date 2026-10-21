@@ -28,12 +28,15 @@ data class Vec3(val x: Double, val y: Double, val z: Double) {
     }
 
     companion object {
-        /** Unit view direction for the given yaw/pitch (Minecraft convention). */
+        /**
+         * Unit view direction for the given yaw/pitch, exactly like vanilla's
+         * `Entity.calculateViewVector`: yaw 0 looks south (+z), yaw 90 west (-x), pitch -90 straight up.
+         */
         fun direction(yaw: Float, pitch: Float): Vec3 {
-            val yawRadians = Math.toRadians(-yaw - 90.0)
-            val pitchRadians = Math.toRadians((-pitch).toDouble())
+            val yawRadians = Math.toRadians(yaw.toDouble())
+            val pitchRadians = Math.toRadians(pitch.toDouble())
             val horizontal = cos(pitchRadians)
-            return Vec3(cos(yawRadians) * horizontal, sin(pitchRadians), sin(yawRadians) * horizontal).normalized()
+            return Vec3(-sin(yawRadians) * horizontal, -sin(pitchRadians), cos(yawRadians) * horizontal).normalized()
         }
     }
 }

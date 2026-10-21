@@ -205,18 +205,51 @@ class GuardStore(
             .take(limit.coerceIn(1, QUERY_LIMIT))
 
     /**
-     * Appends an incident to the player's incident log and the global
-     * recent-incidents ring.
+     * Upserts an incident by id into the player's incident log and the
+     * global recent-incidents ring: IGuard re-reports an incident while it
+     * grows, and every report replaces the previous version in place.
      *
      * @param incident the reported incident.
+     * @return the previously stored version, or `null` for a new incident.
      */
     @Synchronized
-    fun addIncident(incident: GuardIncident) {
+    fun addIncident(incident: GuardIncident): GuardIncident? {
         val key = "incidents.${incident.uuid.lowercase()}"
-        val entries = readList<GuardIncident>(key) + incident
+        val (entries, previous) = upsert(readList(key), incident)
         storage.write(key, json.encodeToString(entries.takeLast(INCIDENT_CAP)))
-        val recent = readList<GuardIncident>(RECENT_DOCUMENT) + incident
+        val (recent, _) = upsert(readList(RECENT_DOCUMENT), incident)
         storage.write(RECENT_DOCUMENT, json.encodeToString(recent.takeLast(RECENT_CAP)))
+        return previous
+    }
+
+    /**
+     * Records whether a staff member muted network-wide incident alerts
+     * (mirrors their `/iguard alerts` toggle).
+     *
+     * @param name staff member's name, any case.
+     * @param muted true to stop alerts, false to resume them.
+     */
+    @Synchronized
+    fun setAlertsMuted(name: String, muted: Boolean) {
+        val current = readList<String>(MUTED_DOCUMENT).toMutableSet()
+        if (muted) current += name.lowercase() else current -= name.lowercase()
+        storage.write(MUTED_DOCUMENT, json.encodeToString(current.sorted()))
+    }
+
+    /**
+     * Whether a staff member muted network-wide incident alerts.
+     *
+     * @param name staff member's name, any case.
+     * @return true when muted.
+     */
+    @Synchronized
+    fun alertsMuted(name: String): Boolean = name.lowercase() in readList<String>(MUTED_DOCUMENT)
+
+    // Replaces the entry with the incident's id (keeping its position) or appends a new one.
+    private fun upsert(entries: List<GuardIncident>, incident: GuardIncident): Pair<List<GuardIncident>, GuardIncident?> {
+        val index = entries.indexOfFirst { it.id == incident.id }
+        if (index < 0) return (entries + incident) to null
+        return entries.toMutableList().also { it[index] = incident } to entries[index]
     }
 
     /**
@@ -379,6 +412,9 @@ class GuardStore(
         /** Document holding the global recent-incidents ring. */
         const val RECENT_DOCUMENT = "incidents.recent"
 
+        /** Document holding the lowercase names of staff who muted incident alerts. */
+        const val MUTED_DOCUMENT = "alerts.muted"
+
         /** Document holding the punishment audit log. */
         const val PUNISHMENTS_DOCUMENT = "punishments"
 
@@ -420,8 +456,14 @@ class GuardStoreActions(
     private val context: AddonContext,
     private val store: GuardStore,
     private val messages: Messages,
+    private val alertsEnabled: () -> Boolean = { true },
+    private val alertCooldownMillis: () -> Long = { DEFAULT_ALERT_COOLDOWN_MILLIS },
+    private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
+
+    // Last network alert per player uuid (alert throttle).
+    private val lastAlertAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     /**
      * Registers all `guard.store.*` and `guard.query.*` actions.
@@ -437,6 +479,11 @@ class GuardStoreActions(
             "Persists one anticheat incident and alerts online staff network-wide.",
             "guard.store.incident <json>",
         ) { invocation -> storeIncident(invocation) }
+        register(
+            "guard.store.alerts",
+            "Mirrors a staff member's /iguard alerts toggle for network-wide incident alerts.",
+            "guard.store.alerts <name> <true|false>",
+        ) { invocation -> storeAlertPreference(invocation) }
         register(
             "guard.store.replay",
             "Persists the base64 replay payload of an incident.",
@@ -509,10 +556,44 @@ class GuardStoreActions(
     private fun storeIncident(invocation: ActionInvocation): ActionResult {
         val incident = parse<GuardIncident>(invocation)
             ?: return ActionResult.error("usage: guard.store.incident <json>")
-        store.addIncident(incident)
-        alertStaff(incident)
+        val previous = store.addIncident(incident)
+        if (shouldAlert(previous, incident)) alertStaff(incident)
         return ActionResult.ok(OK)
     }
+
+    private fun storeAlertPreference(invocation: ActionInvocation): ActionResult {
+        val name = invocation.arguments.getOrNull(0)?.takeIf { it.isNotBlank() }
+        val enabled = invocation.arguments.getOrNull(1)?.toBooleanStrictOrNull()
+        if (name == null || enabled == null) return ActionResult.error("usage: guard.store.alerts <name> <true|false>")
+        store.setAlertsMuted(name, !enabled)
+        return ActionResult.ok(OK)
+    }
+
+    /**
+     * Network alerts go out once per incident and again only when it escalates (new evidence
+     * family or a new shadow action), never more often than `alerts.network-cooldown-millis` per
+     * player, and not at all while `alerts.enabled` is off.
+     */
+    private fun shouldAlert(previous: GuardIncident?, incident: GuardIncident): Boolean {
+        if (!alertsEnabled()) return false
+        val escalated = previous == null ||
+            families(incident) - families(previous) != emptySet<String>() ||
+            shadow(incident) != shadow(previous)
+        if (!escalated) return false
+        val now = clock()
+        val key = incident.uuid.lowercase()
+        val last = lastAlertAt[key]
+        if (last != null && now - last < alertCooldownMillis()) return false
+        lastAlertAt[key] = now
+        return true
+    }
+
+    private fun families(incident: GuardIncident): Set<String> =
+        incident.check.split(',').map(String::trim).filter(String::isNotEmpty).toSet()
+
+    // IGuard ships the shadow action inside the summary (`... shadow=WOULD_BAN_24H ...`).
+    private fun shadow(incident: GuardIncident): String? =
+        incident.summary.split(' ').firstOrNull { it.startsWith("shadow=") }?.removePrefix("shadow=")?.takeUnless { it == "none" }
 
     private fun storeReplay(invocation: ActionInvocation): ActionResult {
         val incidentId = invocation.arguments.getOrNull(0)
@@ -630,13 +711,13 @@ class GuardStoreActions(
     }
 
     /**
-     * Alerts every online staff member holding [ALERT_PERMISSION] about an
-     * incident, in each receiver's own language.
+     * Alerts every online staff member holding [ALERT_PERMISSION] who did
+     * not mute alerts about an incident, in each receiver's own language.
      */
     private fun alertStaff(incident: GuardIncident) {
         val confidence = (incident.confidence * 100).roundToInt().toString()
         context.onlinePlayers()
-            .filter { context.hasPermission(it.name, ALERT_PERMISSION) }
+            .filter { context.hasPermission(it.name, ALERT_PERMISSION) && !store.alertsMuted(it.name) }
             .forEach { staff ->
                 val text = messages.formatFor(
                     staff.name,
@@ -677,5 +758,8 @@ class GuardStoreActions(
 
         /** Query limit used when the caller sends none. */
         const val DEFAULT_LIMIT = 100
+
+        /** Default `alerts.network-cooldown-millis`. */
+        const val DEFAULT_ALERT_COOLDOWN_MILLIS = 30_000L
     }
 }

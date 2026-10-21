@@ -5,6 +5,7 @@ import de.tytoss.iguard.api.IGuardApi
 import de.tytoss.iguard.check.CheckEngine
 import de.tytoss.iguard.config.DynamicConfig
 import de.tytoss.iguard.config.IGuardConfig
+import de.tytoss.iguard.config.IGuardConfigLoader
 import de.tytoss.iguard.snapshot.MainThreadSampler
 import de.tytoss.iguard.storage.GuardStore
 import kotlinx.coroutines.CoroutineScope
@@ -85,6 +86,8 @@ class IGuardCommand(
         if (!permission(sender, "iguard.alerts")) return
         val player = sender as? Player ?: return sender.sendMessage(chat(sender, "cmd.alerts.players-only"))
         val enabled = alerts.toggle(player.uniqueId)
+        // The node's network-wide incident alerts follow the same toggle.
+        storage.enqueueAlertPreference(player.name, enabled)
         sender.sendMessage(chat(sender, if (enabled) "cmd.alerts.enabled" else "cmd.alerts.disabled"))
     }
 
@@ -305,7 +308,7 @@ class IGuardCommand(
 
     private fun reload(sender: CommandSender) {
         if (!permission(sender, "iguard.reload")) return
-        runCatching { IGuardConfig.reloadDynamic(plugin) }
+        runCatching { IGuardConfigLoader.reloadDynamic(plugin) }
             .onSuccess {
                 dynamic.set(it)
                 sender.sendMessage(chat(sender, "cmd.reload.success"))

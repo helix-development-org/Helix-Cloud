@@ -9,10 +9,11 @@ import de.tytoss.iguard.api.IGuardApiImpl
 import de.tytoss.iguard.check.CheckEngine
 import de.tytoss.iguard.check.Enforcement
 import de.tytoss.iguard.command.IGuardCommand
-import de.tytoss.iguard.config.IGuardConfig
+import de.tytoss.iguard.config.IGuardConfigLoader
 import de.tytoss.iguard.gui.GuiService
 import de.tytoss.iguard.packet.IGuardPacketListener
 import de.tytoss.iguard.replay.ReplayService
+import de.tytoss.iguard.setback.SetbackMarks
 import de.tytoss.iguard.setback.SetbackService
 import de.tytoss.iguard.snapshot.MainThreadSampler
 import de.tytoss.iguard.snapshot.SnapshotStore
@@ -126,7 +127,7 @@ class IGuardPlugin : JavaPlugin(), Listener {
             ?: error("PacketEvents is not installed")
         require(packetPlugin.pluginMeta.version == "2.13.0") { "PacketEvents 2.13.0 is required, found ${packetPlugin.pluginMeta.version}" }
         require(PacketEvents.getAPI().isInitialized) { "PacketEvents is not initialized" }
-        val loaded = IGuardConfig.load(this)
+        val loaded = IGuardConfigLoader.load(this)
         val dynamic = AtomicReference(loaded.dynamic)
         val snapshots = SnapshotStore()
         val exemptions = ExemptionManager()
@@ -153,7 +154,9 @@ class IGuardPlugin : JavaPlugin(), Listener {
         alerts = alertService
         val notificationService = de.tytoss.iguard.notify.NotificationService(dynamic, logger)
         notifications = notificationService
-        val setbackService = SetbackService(this, snapshots)
+        val setbackMarks = SetbackMarks()
+        val setbackService = SetbackService(this, snapshots, setbackMarks)
+
         // Ban enforcement is pluggable (config bans.provider): IGuard always writes its own audit +
         // notifications via the coordinator, then delegates the actual ban to the selected provider —
         // helix (the default; `native` is an alias) posts guard.store.ban/unban and the node kicks +
@@ -187,7 +190,7 @@ class IGuardPlugin : JavaPlugin(), Listener {
         engine = checkEngine
         val packets = IGuardPacketListener(checkEngine)
         packetListener = packets
-        val mainSampler = MainThreadSampler(this, snapshots, exemptions, loaded.exemptions, loaded.sampler)
+        val mainSampler = MainThreadSampler(this, snapshots, exemptions, loaded.exemptions, loaded.sampler, setbackMarks)
         sampler = mainSampler
         val api = IGuardApiImpl(checkEngine, exemptions, banCoordinatorLocal, PendingTraceControl)
         server.servicesManager.register(IGuardApi::class.java, api, this, ServicePriority.Normal)

@@ -1,8 +1,5 @@
 package de.tytoss.iguard.config
 
-import org.bukkit.configuration.file.FileConfiguration
-import org.bukkit.plugin.java.JavaPlugin
-
 /** Check-engine worker pool sizing (static: the pool is built once on startup). */
 data class WorkerConfig(val stripes: Int, val queueCapacity: Int)
 
@@ -43,12 +40,19 @@ data class DetectionConfig(
     val minimumIndependentFamilies: Int,
 )
 
-/** Per-check thresholds (enable flag, alert/setback VLs, decay), hot-reloadable. */
+/**
+ * Per-check thresholds, hot-reloadable.
+ *
+ * @property enabled whether failures count at all.
+ * @property alertVl violation level from which staff are alerted and the check feeds incident confidence fully.
+ * @property setbackVl violation level from which movement checks set the player back (`< 0` = never).
+ * @property decayPerSecond how much the violation level drops per second while the check passes.
+ */
 data class CheckConfig(
     val enabled: Boolean,
     val alertVl: Double,
     val setbackVl: Double,
-    val decay: Double,
+    val decayPerSecond: Double,
 )
 
 /** Staff alert formatting and throttling, hot-reloadable. */
@@ -77,12 +81,20 @@ data class NotificationConfig(
     val cooldownMillis: Long,
 )
 
+/**
+ * `/iguard debug` output pacing, hot-reloadable.
+ *
+ * @property rateLimitMillis minimum gap between two debug lines of the same viewer, player and check.
+ */
+data class DebugConfig(val rateLimitMillis: Long)
+
 /** The hot-reloadable slice of the configuration (swapped atomically on `/iguard reload`). */
 data class DynamicConfig(
     val checks: Map<String, CheckConfig>,
     val alerts: AlertConfig,
     val confidence: ConfidenceConfig,
     val notifications: NotificationConfig,
+    val debug: DebugConfig = DebugConfig(DEFAULT_DEBUG_RATE_LIMIT_MILLIS),
 )
 
 /** Enforcement policy (static: infra changes need a restart). */
@@ -102,6 +114,63 @@ data class BansConfig(
 )
 
 /**
+ * Trace recorder limits (static).
+ *
+ * @property maxBytes a recording stops itself once its file reaches this size.
+ * @property maxSeconds a recording stops itself after this many seconds.
+ * @property queueCapacity lines buffered per recording before frames are dropped (counted in the end line).
+ */
+data class TraceConfig(val maxBytes: Long, val maxSeconds: Long, val queueCapacity: Int)
+
+/**
+ * Read access to a configuration tree with typed defaults — implemented over Bukkit's
+ * `FileConfiguration` in the plugin and over a plain map in tests and trace replays.
+ */
+interface ConfigSource {
+    /** The string at [path], or null when unset. */
+    fun string(path: String): String?
+
+    /** The int at [path], or [default] when unset. */
+    fun int(path: String, default: Int): Int
+
+    /** The long at [path], or [default] when unset. */
+    fun long(path: String, default: Long): Long
+
+    /** The double at [path], or [default] when unset. */
+    fun double(path: String, default: Double): Double
+
+    /** The boolean at [path], or [default] when unset. */
+    fun boolean(path: String, default: Boolean): Boolean
+}
+
+/**
+ * [ConfigSource] over dotted-path values (`checks.movement.fly.a.alert-vl` → `3.0`).
+ *
+ * @property values dotted path to value; numbers and booleans may also be given as strings.
+ */
+class MapConfigSource(private val values: Map<String, Any?> = emptyMap()) : ConfigSource {
+    override fun string(path: String): String? = values[path]?.toString()
+
+    override fun int(path: String, default: Int): Int = number(path)?.toInt() ?: default
+
+    override fun long(path: String, default: Long): Long = number(path)?.toLong() ?: default
+
+    override fun double(path: String, default: Double): Double = number(path)?.toDouble() ?: default
+
+    override fun boolean(path: String, default: Boolean): Boolean = when (val value = values[path]) {
+        is Boolean -> value
+        is String -> value.toBooleanStrictOrNull() ?: default
+        else -> default
+    }
+
+    private fun number(path: String): Number? = when (val value = values[path]) {
+        is Number -> value
+        is String -> value.toDoubleOrNull()
+        else -> null
+    }
+}
+
+/**
  * The full static IGuard configuration. Persistence always goes through a Helix-Cloud node
  * ([de.tytoss.iguard.storage.HelixNodeStore]); the node addon renders this config from its registry.
  */
@@ -115,44 +184,53 @@ data class IGuardConfig(
     val sanctions: SanctionConfig,
     val bans: BansConfig,
     val dynamic: DynamicConfig,
+    val trace: TraceConfig = TraceConfig(DEFAULT_TRACE_MAX_BYTES, DEFAULT_TRACE_MAX_SECONDS, DEFAULT_TRACE_QUEUE),
 ) {
     companion object {
-        val checkIds = setOf(
-            "client.identity.a",
-            "client.brand_spoof.a",
-            "protocol.badpackets.a",
-            "movement.fly.a",
-            "movement.speed.a",
-            "movement.nofall.a",
-            "movement.timer.a",
-            "movement.phase.a",
-            "movement.step.a",
-            "movement.spider.a",
-            "movement.jesus.a",
-            "movement.velocity.a",
-            "combat.reach.a",
-            "combat.rotation.a",
-            "combat.multitarget.a",
-            "combat.autoclicker.a",
-            "combat.inventory.a",
-            "world.interactionreach.a",
-            "world.scaffold.a",
-            "world.fastplace.a",
-            "world.fastbreak.a",
-            "world.nuker.a",
-            "world.nofacing.a",
-            "inventory.impossible.a",
-            "inventory.move.a",
-            "movement.airjump.a",
-            "movement.sprintbackwards.a",
-            "combat.noswing.a",
-            "combat.snapaim.a",
-            "movement.fastladder.a",
-            "movement.highjump.a",
-            "movement.elytrafly.a",
+        /**
+         * Built-in per-check defaults, identical to the bundled config.yml and the node registry.
+         * Decay is per second; the defaults keep the former per-packet tuning at the usual
+         * evaluation rate (movement 20 frames/s, combat/world/inventory about 10/s).
+         */
+        val checkDefaults: Map<String, CheckConfig> = linkedMapOf(
+            "client.identity.a" to CheckConfig(true, 1.0, -1.0, 0.0),
+            "client.brand_spoof.a" to CheckConfig(true, 1.0, -1.0, 0.0),
+            "protocol.badpackets.a" to CheckConfig(true, 1.0, -1.0, 0.0),
+            "movement.fly.a" to CheckConfig(true, 4.0, 7.0, 4.0),
+            "movement.speed.a" to CheckConfig(true, 5.0, 9.0, 4.0),
+            "movement.nofall.a" to CheckConfig(true, 4.0, -1.0, 5.0),
+            "movement.timer.a" to CheckConfig(true, 3.0, -1.0, 2.0),
+            "movement.phase.a" to CheckConfig(true, 3.0, -1.0, 3.0),
+            "movement.step.a" to CheckConfig(true, 3.0, -1.0, 4.0),
+            "movement.spider.a" to CheckConfig(true, 3.0, -1.0, 4.0),
+            "movement.jesus.a" to CheckConfig(true, 4.0, -1.0, 4.0),
+            "movement.velocity.a" to CheckConfig(true, 4.0, -1.0, 1.0),
+            "combat.reach.a" to CheckConfig(true, 4.0, -1.0, 2.5),
+            "combat.rotation.a" to CheckConfig(true, 5.0, -1.0, 2.5),
+            "combat.multitarget.a" to CheckConfig(true, 3.0, -1.0, 2.5),
+            "combat.autoclicker.a" to CheckConfig(true, 5.0, -1.0, 1.0),
+            "combat.inventory.a" to CheckConfig(true, 3.0, -1.0, 2.0),
+            "world.interactionreach.a" to CheckConfig(true, 3.0, -1.0, 2.0),
+            "world.scaffold.a" to CheckConfig(true, 4.0, -1.0, 2.0),
+            "world.fastplace.a" to CheckConfig(true, 4.0, -1.0, 2.0),
+            "world.fastbreak.a" to CheckConfig(true, 4.0, -1.0, 2.0),
+            "world.nuker.a" to CheckConfig(true, 4.0, -1.0, 2.0),
+            "world.nofacing.a" to CheckConfig(true, 4.0, -1.0, 2.0),
+            "inventory.impossible.a" to CheckConfig(true, 1.0, -1.0, 0.0),
+            "inventory.move.a" to CheckConfig(true, 4.0, -1.0, 2.0),
+            "movement.airjump.a" to CheckConfig(true, 4.0, -1.0, 4.0),
+            "movement.sprintbackwards.a" to CheckConfig(true, 5.0, -1.0, 4.0),
+            "combat.noswing.a" to CheckConfig(true, 5.0, -1.0, 2.0),
+            "combat.snapaim.a" to CheckConfig(true, 4.0, -1.0, 2.5),
+            "movement.fastladder.a" to CheckConfig(true, 5.0, -1.0, 4.0),
+            "movement.highjump.a" to CheckConfig(true, 4.0, -1.0, 4.0),
+            "movement.elytrafly.a" to CheckConfig(true, 4.0, -1.0, 4.0),
         )
 
-        // Fallback per-signal confidence (0..1) when confidence.signal.<id> is not set in config.
+        /** Every check id IGuard knows. */
+        val checkIds: Set<String> = checkDefaults.keys
+
+        /** Fallback per-signal confidence (0..1) when `confidence.signal.<id>` is not set in config. */
         val defaultSignalConfidence = mapOf(
             "client.brand_spoof.a" to 0.25,
             "client.identity.a" to 0.65,
@@ -182,121 +260,130 @@ data class IGuardConfig(
         )
 
         /**
-         * Loads the static configuration from the plugin's `config.yml`. Persistence always runs
-         * through the Helix node, so the HELIX_CONTROL_URL and HELIX_CONTROL_TOKEN environment
-         * variables must be present (the Helix wrapper provides them); anything else fails fast
-         * with a clear error instead of starting half-configured.
+         * Parses the static configuration (server id already resolved by the caller).
+         *
+         * @param source configuration values.
+         * @param serverId this service's id.
+         * @return the parsed configuration with every default applied.
          */
-        fun load(plugin: JavaPlugin): IGuardConfig {
-            plugin.saveDefaultConfig()
-            val source = plugin.config
-            val serverId = value(source, "server-id")
-            require(System.getenv("HELIX_CONTROL_URL").isNullOrBlank().not()) {
-                "IGuard persists through a Helix-Cloud node: the HELIX_CONTROL_URL environment variable is required"
-            }
-            require(System.getenv("HELIX_CONTROL_TOKEN").isNullOrBlank().not()) {
-                "IGuard persists through a Helix-Cloud node: the HELIX_CONTROL_TOKEN environment variable is required"
-            }
+        fun parse(source: ConfigSource, serverId: String): IGuardConfig {
             val workers = WorkerConfig(
-                source.getInt("workers.stripes", 8).coerceIn(1, 64),
-                source.getInt("workers.queue-capacity", 4096).coerceIn(64, 65536),
+                source.int("workers.stripes", 8).coerceIn(1, 64),
+                source.int("workers.queue-capacity", 4096).coerceIn(64, 65536),
             )
             val history = HistoryConfig(
-                source.getInt("history.queue-capacity", 10000).coerceIn(100, 1000000),
-                source.getInt("history.batch-size", 250).coerceIn(1, 1000),
-                source.getLong("history.flush-millis", 250).coerceIn(25, 5000),
-                source.getInt("history.retention-days", 30).coerceIn(1, 3650),
+                source.int("history.queue-capacity", 10000).coerceIn(100, 1000000),
+                source.int("history.batch-size", 250).coerceIn(1, 1000),
+                source.long("history.flush-millis", 250).coerceIn(25, 5000),
+                source.int("history.retention-days", 30).coerceIn(1, 3650),
             )
             val exemptions = ExemptionConfig(
-                source.getLong("exemptions.overload-millis", 2000),
-                source.getLong("exemptions.teleport-millis", 1500),
-                source.getLong("exemptions.velocity-millis", 1000),
-                source.getLong("exemptions.respawn-millis", 2000),
-                source.getLong("exemptions.world-change-millis", 2000),
-                source.getDouble("exemptions.low-tps-threshold", 18.0),
+                source.long("exemptions.overload-millis", 2000),
+                source.long("exemptions.teleport-millis", 1500),
+                source.long("exemptions.velocity-millis", 1000),
+                source.long("exemptions.respawn-millis", 2000),
+                source.long("exemptions.world-change-millis", 2000),
+                source.double("exemptions.low-tps-threshold", 18.0),
                 // Must be >= the sampler's worst-case per-player refresh interval
                 // (ceil(players / sampler.max-players-per-tick) * 50ms) plus jitter, otherwise
                 // budgeted sampling makes far-cursor players look permanently stale.
-                source.getLong("exemptions.snapshot-max-age-millis", 300),
+                source.long("exemptions.snapshot-max-age-millis", 300),
             )
             val sampler = SamplerConfig(
-                source.getInt("sampler.max-players-per-tick", 200).coerceIn(1, 4096),
-                source.getLong("sampler.max-nanos-per-tick", 2_000_000).coerceIn(100_000, 40_000_000),
+                source.int("sampler.max-players-per-tick", 200).coerceIn(1, 4096),
+                source.long("sampler.max-nanos-per-tick", 2_000_000).coerceIn(100_000, 40_000_000),
             )
             val detection = DetectionConfig(
-                source.getLong("detection.incident-gap-millis", 30000).coerceIn(5000, 300000),
-                source.getLong("detection.replay-pre-millis", 10000).coerceIn(1000, 60000),
-                source.getLong("detection.replay-post-millis", 5000).coerceIn(1000, 30000),
-                source.getInt("detection.replay-retention-days", 7).coerceIn(1, 90),
-                source.getInt("detection.replay-max-bytes", 524288).coerceIn(65536, 4194304),
-                source.getLong("detection.signal-cooldown-millis", 500).coerceIn(50, 5000),
-                source.getDouble("sanctions.shadow-threshold", 0.80).coerceIn(0.5, 0.99),
-                source.getInt("sanctions.minimum-independent-families", 2).coerceIn(2, 5),
+                source.long("detection.incident-gap-millis", 30000).coerceIn(5000, 300000),
+                source.long("detection.replay-pre-millis", 10000).coerceIn(1000, 60000),
+                source.long("detection.replay-post-millis", 5000).coerceIn(1000, 30000),
+                source.int("detection.replay-retention-days", 7).coerceIn(1, 90),
+                source.int("detection.replay-max-bytes", 524288).coerceIn(65536, 4194304),
+                source.long("detection.signal-cooldown-millis", 500).coerceIn(50, 5000),
+                source.double("sanctions.shadow-threshold", 0.80).coerceIn(0.5, 0.99),
+                source.int("sanctions.minimum-independent-families", 2).coerceIn(2, 5),
             )
             val sanctions = SanctionConfig(
-                source.getString("sanctions.mode")?.trim()?.lowercase().takeIf { it == "enforce" } ?: "shadow",
-                source.getString("sanctions.calibrated-recipe")?.trim().orEmpty(),
-                source.getInt("sanctions.first-ban-hours", 24).coerceIn(1, 8760),
-                source.getInt("sanctions.repeat-ban-hours", 168).coerceIn(1, 8760),
+                source.string("sanctions.mode")?.trim()?.lowercase().takeIf { it == "enforce" } ?: "shadow",
+                source.string("sanctions.calibrated-recipe")?.trim().orEmpty(),
+                source.int("sanctions.first-ban-hours", 24).coerceIn(1, 8760),
+                source.int("sanctions.repeat-ban-hours", 168).coerceIn(1, 8760),
             )
             val bans = BansConfig(
-                source.getString("bans.provider")?.trim()?.lowercase().takeIf { it in setOf("native", "command", "service") } ?: "native",
-                source.getString("bans.command.ban")?.trim().orEmpty(),
-                source.getString("bans.command.tempban")?.trim().orEmpty(),
-                source.getString("bans.command.unban")?.trim().orEmpty(),
+                source.string("bans.provider")?.trim()?.lowercase().takeIf { it in setOf("native", "command", "service") } ?: "native",
+                source.string("bans.command.ban")?.trim().orEmpty(),
+                source.string("bans.command.tempban")?.trim().orEmpty(),
+                source.string("bans.command.unban")?.trim().orEmpty(),
             )
-            return IGuardConfig(serverId, workers, history, exemptions, sampler, detection, sanctions, bans, dynamic(source))
+            val trace = TraceConfig(
+                source.long("trace.max-bytes", DEFAULT_TRACE_MAX_BYTES).coerceIn(1L shl 20, 1L shl 32),
+                source.long("trace.max-seconds", DEFAULT_TRACE_MAX_SECONDS).coerceIn(10, 86_400),
+                source.int("trace.queue-capacity", DEFAULT_TRACE_QUEUE).coerceIn(1_000, 1_000_000),
+            )
+            return IGuardConfig(serverId, workers, history, exemptions, sampler, detection, sanctions, bans, dynamic(source), trace)
         }
 
-        /** Re-reads config.yml and returns the hot-reloadable (dynamic) part only. */
-        fun reloadDynamic(plugin: JavaPlugin): DynamicConfig {
-            plugin.reloadConfig()
-            return dynamic(plugin.config)
-        }
-
-        private fun dynamic(source: FileConfiguration): DynamicConfig {
-            val checks = checkIds.associateWith { id ->
+        /**
+         * Parses the hot-reloadable part of the configuration.
+         *
+         * @param source configuration values.
+         * @return the dynamic configuration with every default applied.
+         */
+        fun dynamic(source: ConfigSource): DynamicConfig {
+            val checks = checkDefaults.mapValues { (id, fallback) ->
                 CheckConfig(
-                    source.getBoolean("checks.$id.enabled", true),
-                    source.getDouble("checks.$id.alert-vl", 5.0).coerceAtLeast(0.0),
-                    source.getDouble("checks.$id.setback-vl", -1.0),
-                    source.getDouble("checks.$id.decay", 0.2).coerceIn(0.0, 10.0),
+                    source.boolean("checks.$id.enabled", fallback.enabled),
+                    source.double("checks.$id.alert-vl", fallback.alertVl).coerceAtLeast(0.0),
+                    source.double("checks.$id.setback-vl", fallback.setbackVl),
+                    source.double("checks.$id.decay-per-second", fallback.decayPerSecond).coerceIn(0.0, 100.0),
                 )
             }
             val alerts = AlertConfig(
-                source.getBoolean("alerts.enabled", true),
-                source.getString("alerts.message") ?: "&8[&cIGuard&8] &f%player% &7failed &c%check% &8(&7VL %vl%&8)",
-                source.getBoolean("alerts.console", true),
-                source.getLong("alerts.cooldown-millis", 1000).coerceAtLeast(100),
+                source.boolean("alerts.enabled", true),
+                source.string("alerts.message") ?: "&8[&cIGuard&8] &f%player% &7failed &c%check% &8(&7VL %vl%&8)",
+                source.boolean("alerts.console", true),
+                source.long("alerts.cooldown-millis", 1000).coerceAtLeast(100),
             )
-            val defaultSignal = source.getDouble("confidence.default-signal", 0.50).coerceIn(0.0, 0.99)
+            val defaultSignal = source.double("confidence.default-signal", 0.50).coerceIn(0.0, 0.99)
             val signal = checkIds.associateWith { id ->
-                source.getDouble("confidence.signal.$id", defaultSignalConfidence[id] ?: defaultSignal).coerceIn(0.0, 0.99)
+                source.double("confidence.signal.$id", defaultSignalConfidence[id] ?: defaultSignal).coerceIn(0.0, 0.99)
             }
             val confidence = ConfidenceConfig(
                 signal,
                 defaultSignal,
-                source.getDouble("confidence.single-family-cap", 0.79).coerceIn(0.0, 0.99),
-                source.getDouble("confidence.multi-family-cap", 0.95).coerceIn(0.0, 0.99),
-                source.getDouble("confidence.deterministic", 0.85).coerceIn(0.0, 0.99),
+                source.double("confidence.single-family-cap", 0.79).coerceIn(0.0, 0.99),
+                source.double("confidence.multi-family-cap", 0.95).coerceIn(0.0, 0.99),
+                source.double("confidence.deterministic", 0.85).coerceIn(0.0, 0.99),
             )
             val notifications = NotificationConfig(
-                source.getBoolean("notifications.discord.enabled", false),
-                source.getString("notifications.discord.webhook-url")?.trim().orEmpty(),
-                source.getDouble("notifications.discord.min-confidence", 0.80).coerceIn(0.0, 1.0),
-                source.getBoolean("notifications.discord.notify-bans", true),
-                source.getLong("notifications.discord.cooldown-millis", 30_000).coerceAtLeast(0),
+                source.boolean("notifications.discord.enabled", false),
+                source.string("notifications.discord.webhook-url")?.trim().orEmpty(),
+                source.double("notifications.discord.min-confidence", 0.80).coerceIn(0.0, 1.0),
+                source.boolean("notifications.discord.notify-bans", true),
+                source.long("notifications.discord.cooldown-millis", 30_000).coerceAtLeast(0),
             )
-            return DynamicConfig(checks, alerts, confidence, notifications)
+            val debug = DebugConfig(source.long("debug.rate-limit-millis", DEFAULT_DEBUG_RATE_LIMIT_MILLIS).coerceIn(0, 60_000))
+            return DynamicConfig(checks, alerts, confidence, notifications, debug)
         }
 
-        private fun value(source: FileConfiguration, path: String): String {
-            val raw = source.getString(path)?.trim().orEmpty()
-            require(raw.isNotEmpty()) { "$path must not be empty" }
-            return Regex("\\$\\{([A-Za-z_][A-Za-z0-9_]*)}").replace(raw) { match ->
-                System.getenv(match.groupValues[1])
-                    ?: throw IllegalArgumentException("Environment variable ${match.groupValues[1]} is not set")
-            }
-        }
+        /**
+         * The configuration with every built-in default (trace replays, tests).
+         *
+         * @param serverId server id to report.
+         * @return the default configuration.
+         */
+        fun defaults(serverId: String = "local"): IGuardConfig = parse(MapConfigSource(), serverId)
     }
 }
+
+/** Default `debug.rate-limit-millis`. */
+const val DEFAULT_DEBUG_RATE_LIMIT_MILLIS: Long = 200L
+
+/** Default `trace.max-bytes` (64 MiB). */
+const val DEFAULT_TRACE_MAX_BYTES: Long = 64L * 1024 * 1024
+
+/** Default `trace.max-seconds` (15 minutes). */
+const val DEFAULT_TRACE_MAX_SECONDS: Long = 900L
+
+/** Default `trace.queue-capacity`. */
+const val DEFAULT_TRACE_QUEUE: Int = 50_000

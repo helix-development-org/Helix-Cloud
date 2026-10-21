@@ -76,159 +76,167 @@ confidence:
   single-family-cap: 0.79
   multi-family-cap: 0.95
   deterministic: 0.85
+# Per-check thresholds. alert-vl also gates incident confidence: below it a check only contributes
+# proportionally (VL / alert-vl) and never opens an incident on its own. decay-per-second is how much
+# the violation level drops per second while the check passes.
 checks:
   client.identity.a:
     enabled: true
     alert-vl: 1.0
     setback-vl: -1.0
-    decay: 0.0
+    decay-per-second: 0.0
   client.brand_spoof.a:
     enabled: true
     alert-vl: 1.0
     setback-vl: -1.0
-    decay: 0.0
+    decay-per-second: 0.0
   protocol.badpackets.a:
     enabled: true
     alert-vl: 1.0
     setback-vl: -1.0
-    decay: 0.0
+    decay-per-second: 0.0
   movement.fly.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: 7.0
-    decay: 0.2
+    decay-per-second: 4.0
   movement.speed.a:
     enabled: true
     alert-vl: 5.0
     setback-vl: 9.0
-    decay: 0.2
+    decay-per-second: 4.0
   movement.nofall.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.25
+    decay-per-second: 5.0
   movement.timer.a:
     enabled: true
     alert-vl: 3.0
     setback-vl: -1.0
-    decay: 0.1
+    decay-per-second: 2.0
   movement.phase.a:
     enabled: true
     alert-vl: 3.0
     setback-vl: -1.0
-    decay: 0.15
+    decay-per-second: 3.0
   movement.step.a:
     enabled: true
     alert-vl: 3.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 4.0
   movement.spider.a:
     enabled: true
     alert-vl: 3.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 4.0
   movement.jesus.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 4.0
   movement.velocity.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.1
+    decay-per-second: 1.0
   combat.reach.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.25
+    decay-per-second: 2.5
   combat.rotation.a:
     enabled: true
     alert-vl: 5.0
     setback-vl: -1.0
-    decay: 0.25
+    decay-per-second: 2.5
   combat.multitarget.a:
     enabled: true
     alert-vl: 3.0
     setback-vl: -1.0
-    decay: 0.25
+    decay-per-second: 2.5
   combat.autoclicker.a:
     enabled: true
     alert-vl: 5.0
     setback-vl: -1.0
-    decay: 0.1
+    decay-per-second: 1.0
   combat.inventory.a:
     enabled: true
     alert-vl: 3.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 2.0
   world.interactionreach.a:
     enabled: true
     alert-vl: 3.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 2.0
   world.scaffold.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 2.0
   world.fastplace.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 2.0
   world.fastbreak.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 2.0
   world.nuker.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 2.0
   inventory.impossible.a:
     enabled: true
     alert-vl: 1.0
     setback-vl: -1.0
-    decay: 0.0
+    decay-per-second: 0.0
   inventory.move.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 2.0
   movement.airjump.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 4.0
   movement.sprintbackwards.a:
     enabled: true
     alert-vl: 5.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 4.0
   combat.noswing.a:
     enabled: true
     alert-vl: 5.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 2.0
   combat.snapaim.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.25
+    decay-per-second: 2.5
   world.nofacing.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 2.0
   movement.fastladder.a:
     enabled: true
     alert-vl: 5.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 4.0
   movement.highjump.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 4.0
+  movement.elytrafly.a:
+    enabled: true
+    alert-vl: 4.0
+    setback-vl: -1.0
+    decay-per-second: 4.0

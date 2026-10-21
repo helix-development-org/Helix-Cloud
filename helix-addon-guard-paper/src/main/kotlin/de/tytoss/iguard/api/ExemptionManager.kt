@@ -124,7 +124,9 @@ class ExemptionManager(private val clock: () -> Long = System::currentTimeMillis
     private fun active(key: Key, now: Long): Entry? {
         val entry = entries[key] ?: return null
         if (entry.expiresAtMillis > now) return entry
-        entries.remove(key, entry)
+        // Prune lazily, but only what has expired for real: a query about a later moment must not
+        // drop an exemption that is still running now.
+        if (entry.expiresAtMillis <= minOf(now, clock())) entries.remove(key, entry)
         return null
     }
 

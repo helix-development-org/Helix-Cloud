@@ -53,9 +53,9 @@ class GuardAddonTest {
 
     @Test
     fun `registry mirrors the full iguard schema`() {
-        // 44 plain settings + 32 checks x 4 fields; server-id and storage.mode
+        // 45 plain settings + 32 checks x 4 fields; server-id and storage.mode
         // are fixed and not editable
-        assertEquals(44 + 32 * 4, GuardConfig.settings.size)
+        assertEquals(45 + 32 * 4, GuardConfig.settings.size)
         assertEquals(GuardConfig.settings.size, GuardConfig.byPath.size)
         assertFalse("server-id" in GuardConfig.byPath)
         assertFalse("storage.mode" in GuardConfig.byPath)
@@ -75,7 +75,9 @@ class GuardAddonTest {
         ).forEach { path -> assertFalse(GuardConfig.byPath.getValue(path).static, path) }
 
         assertEquals("7.0", GuardConfig.byPath.getValue("checks.movement.fly.a.setback-vl").default)
-        assertEquals(GuardValueType.DOUBLE, GuardConfig.byPath.getValue("checks.combat.reach.a.decay").type)
+        assertEquals(GuardValueType.DOUBLE, GuardConfig.byPath.getValue("checks.combat.reach.a.decay-per-second").type)
+        assertEquals("4.0", GuardConfig.byPath.getValue("checks.movement.fly.a.decay-per-second").default)
+        assertFalse("checks.movement.fly.a.decay" in GuardConfig.byPath)
         assertEquals("0.80", GuardConfig.byPath.getValue("notifications.discord.min-confidence").default)
     }
 
@@ -146,7 +148,7 @@ class GuardAddonTest {
         assertEquals("    enabled: false", lines[fly + 1])
         assertEquals("    alert-vl: 4.0", lines[fly + 2])
         assertEquals("    setback-vl: 7.0", lines[fly + 3])
-        assertEquals("    decay: 0.2", lines[fly + 4])
+        assertEquals("    decay-per-second: 4.0", lines[fly + 4])
     }
 
     @Test
@@ -271,6 +273,76 @@ class GuardAddonTest {
         val ring = all.jsonObject.getValue("incidents").jsonArray
         assertEquals(1, ring.size)
         assertEquals("inc-1", ring.single().jsonObject.getValue("id").jsonPrimitive.content)
+    }
+
+    private fun incidentJson(id: String, uuid: String, families: String, shadow: String, confidence: Double = 0.7) =
+        """{"id":"$id","serverId":"paper-1","uuid":"$uuid","name":"Steve","check":"$families",""" +
+            """"confidence":$confidence,"epochMs":1000,"summary":"opened=1 evidence=3 shadow=$shadow recipe=r calibrated=false"}"""
+
+    @Test
+    fun `repeated incident reports upsert in place and alert only on escalation`() {
+        recording.online += OnlinePlayer("Mod")
+        recording.permissionCheck = { player, permission -> player == "Mod" && permission == "iguard.alerts" }
+        // no throttle for this test: escalation alone decides
+        assertTrue(recording.run("guard.config.set", "alerts.network-cooldown-millis", "0").success)
+        val uuid = "44444444-4444-4444-4444-444444444444"
+        fun alerts() = recording.invocations.count { it.action == "player.message" }
+
+        assertTrue(recording.run("guard.store.incident", incidentJson("inc-a", uuid, "MOVEMENT", "none")).success)
+        assertEquals(1, alerts())
+        // same incident, higher confidence, same families/action: stored, no new alert
+        assertTrue(recording.run("guard.store.incident", incidentJson("inc-a", uuid, "MOVEMENT", "none", 0.75)).success)
+        assertEquals(1, alerts())
+        // new evidence family = escalation
+        assertTrue(recording.run("guard.store.incident", incidentJson("inc-a", uuid, "MOVEMENT,COMBAT", "none", 0.9)).success)
+        assertEquals(2, alerts())
+        // shadow action appears = escalation
+        assertTrue(recording.run("guard.store.incident", incidentJson("inc-a", uuid, "MOVEMENT,COMBAT", "WOULD_BAN_24H", 0.9)).success)
+        assertEquals(3, alerts())
+
+        // four reports of one incident = one stored row, carrying the latest state
+        val perPlayer = json.parseToJsonElement(recording.run("guard.query.incidents", uuid, "10").lines.single())
+        val rows = perPlayer.jsonObject.getValue("incidents").jsonArray
+        assertEquals(1, rows.size)
+        assertEquals("MOVEMENT,COMBAT", rows.single().jsonObject.getValue("check").jsonPrimitive.content)
+        val ring = json.parseToJsonElement(recording.run("guard.query.incidents", "all", "10").lines.single())
+        assertEquals(1, ring.jsonObject.getValue("incidents").jsonArray.size)
+    }
+
+    @Test
+    fun `network alerts are throttled per player and respect the toggle and alerts enabled`() {
+        recording.online += OnlinePlayer("Mod")
+        recording.online += OnlinePlayer("Admin")
+        recording.permissionCheck = { _, permission -> permission == "iguard.alerts" }
+        val uuid = "55555555-5555-5555-5555-555555555555"
+        fun alertsTo(name: String) = recording.invocations.count { it.action == "player.message" && it.arguments.first() == name }
+
+        // the default 30 s throttle swallows a second incident of the same player right away
+        assertTrue(recording.run("guard.store.incident", incidentJson("inc-1", uuid, "MOVEMENT", "none")).success)
+        assertTrue(recording.run("guard.store.incident", incidentJson("inc-2", uuid, "COMBAT", "none")).success)
+        assertEquals(1, alertsTo("Mod"))
+        assertEquals(1, alertsTo("Admin"))
+
+        // Mod switches alerts off in-game: only Admin is alerted from now on
+        assertTrue(recording.run("guard.config.set", "alerts.network-cooldown-millis", "0").success)
+        assertTrue(recording.run("guard.store.alerts", "mod", "false").success)
+        assertTrue(recording.run("guard.store.incident", incidentJson("inc-3", uuid, "WORLD", "none")).success)
+        assertEquals(1, alertsTo("Mod"))
+        assertEquals(2, alertsTo("Admin"))
+
+        // and back on
+        assertTrue(recording.run("guard.store.alerts", "Mod", "true").success)
+        assertTrue(recording.run("guard.store.incident", incidentJson("inc-4", uuid, "CLIENT", "none")).success)
+        assertEquals(2, alertsTo("Mod"))
+
+        // alerts.enabled=false silences the node completely
+        assertTrue(recording.run("guard.config.set", "alerts.enabled", "false").success)
+        assertTrue(recording.run("guard.store.incident", incidentJson("inc-5", uuid, "PROTOCOL", "none")).success)
+        assertEquals(2, alertsTo("Mod"))
+        assertEquals(3, alertsTo("Admin"))
+
+        assertFalse(recording.run("guard.store.alerts", "Mod").success)
+        assertFalse(recording.run("guard.store.alerts", "Mod", "maybe").success)
     }
 
     @Test
