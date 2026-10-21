@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>GuardLab</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 16px; color: var(--fg, #f1e2c2); background: transparent; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,.12); }
+  .pass { color: #4ac85e; } .fail { color: #ff5a4a; } .warn { color: #ffb43a; }
+  code { font-family: "JetBrains Mono", monospace; }
+</style>
+</head>
+<body>
+<h2>GuardLab – IGuard-Testläufe</h2>
+<p id="status">lädt …</p>
+<table>
+  <thead><tr><th>Zeit</th><th>Suite</th><th>Spieler</th><th>Bestanden</th><th>Warnungen</th><th>Fehlgeschlagen</th><th>Übersprungen</th><th>Bericht</th></tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+<script>
+  function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+  async function load() {
+    const status = await Helix.action("guardlab.status");
+    document.getElementById("status").textContent = (status.lines || []).join(" · ");
+    const res = await Helix.action("guardlab.reports", "20");
+    const list = JSON.parse((res.lines || ["[]"])[0] || "[]");
+    document.getElementById("rows").innerHTML = list.map(r =>
+      `<tr><td>${esc(r.finishedAt)}</td><td>${esc(r.suite)}</td><td>${esc(r.player)}</td>` +
+      `<td class="pass">${esc(r.passed)}</td><td class="warn">${esc(r.warned)}</td><td class="fail">${esc(r.failed)}</td>` +
+      `<td>${esc(r.skipped)}</td><td><code>${esc(r.report)}</code></td></tr>`).join("");
+  }
+  load();
+</script>
+</body>
+</html>

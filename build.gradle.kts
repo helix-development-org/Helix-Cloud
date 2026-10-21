@@ -98,6 +98,7 @@ val addonModules = listOf(
     "helix-addon-citybuild",
     "helix-addon-feedback",
     "helix-addon-mobs",
+    "helix-addon-guardlab",
 )
 
 tasks.register("releaseBundle") {
