@@ -88,6 +88,27 @@ data class NotificationConfig(
  */
 data class DebugConfig(val rateLimitMillis: Long)
 
+/**
+ * Detection thresholds inside individual checks, hot-reloadable (`checks.<id>.<key>` next to the check's VL settings).
+ *
+ * @property autoclickerMinCps `combat.autoclicker.a.min-cps`: click rate from which the interval consistency is judged.
+ * @property autoclickerMaxDeviation `combat.autoclicker.a.max-deviation`: coefficient of variation (interval standard
+ *   deviation / mean) below which the clicking counts as machine-regular.
+ * @property autoclickerMinSamples `combat.autoclicker.a.min-samples`: attacks within the 3-second window needed before
+ *   judging (the window must also span at least 2 seconds).
+ * @property fastbreakMinRatio `world.fastbreak.a.min-ratio`: share of the vanilla break time a dig must at least take
+ *   (vanilla's own server tolerance is 0.7).
+ * @property fastbreakToleranceMillis `world.fastbreak.a.tolerance-millis`: extra jitter allowance for clients without
+ *   tick-end packets, whose dig time is measured in wall-clock time (a quarter of the ping is added on top).
+ */
+data class TuningConfig(
+    val autoclickerMinCps: Double = 9.5,
+    val autoclickerMaxDeviation: Double = 0.035,
+    val autoclickerMinSamples: Int = 25,
+    val fastbreakMinRatio: Double = 0.7,
+    val fastbreakToleranceMillis: Long = 60,
+)
+
 /** The hot-reloadable slice of the configuration (swapped atomically on `/iguard reload`). */
 data class DynamicConfig(
     val checks: Map<String, CheckConfig>,
@@ -95,6 +116,7 @@ data class DynamicConfig(
     val confidence: ConfidenceConfig,
     val notifications: NotificationConfig,
     val debug: DebugConfig = DebugConfig(DEFAULT_DEBUG_RATE_LIMIT_MILLIS),
+    val tuning: TuningConfig = TuningConfig(),
 )
 
 /** Enforcement policy (static: infra changes need a restart). */
@@ -363,7 +385,15 @@ data class IGuardConfig(
                 source.long("notifications.discord.cooldown-millis", 30_000).coerceAtLeast(0),
             )
             val debug = DebugConfig(source.long("debug.rate-limit-millis", DEFAULT_DEBUG_RATE_LIMIT_MILLIS).coerceIn(0, 60_000))
-            return DynamicConfig(checks, alerts, confidence, notifications, debug)
+            val tuningDefaults = TuningConfig()
+            val tuning = TuningConfig(
+                source.double("checks.combat.autoclicker.a.min-cps", tuningDefaults.autoclickerMinCps).coerceIn(1.0, 40.0),
+                source.double("checks.combat.autoclicker.a.max-deviation", tuningDefaults.autoclickerMaxDeviation).coerceIn(0.0, 1.0),
+                source.int("checks.combat.autoclicker.a.min-samples", tuningDefaults.autoclickerMinSamples).coerceIn(10, 120),
+                source.double("checks.world.fastbreak.a.min-ratio", tuningDefaults.fastbreakMinRatio).coerceIn(0.1, 1.0),
+                source.long("checks.world.fastbreak.a.tolerance-millis", tuningDefaults.fastbreakToleranceMillis).coerceIn(0, 1_000),
+            )
+            return DynamicConfig(checks, alerts, confidence, notifications, debug, tuning)
         }
 
         /**

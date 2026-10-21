@@ -10,6 +10,7 @@ import de.tytoss.iguard.model.AttackFrame
 import de.tytoss.iguard.model.BlockAction
 import de.tytoss.iguard.model.BlockActionFrame
 import de.tytoss.iguard.model.Box
+import de.tytoss.iguard.model.DigSample
 import de.tytoss.iguard.model.InventoryClickFrame
 import de.tytoss.iguard.model.MovementFrame
 import de.tytoss.iguard.model.ServerTeleportFrame
@@ -329,6 +330,63 @@ class CheckEngineTest {
     }
 
     @Test
+    fun `a hit from beyond reach plus one is still measured`() {
+        val harness = EngineHarness()
+        harness.tick(harness.position, onGround = true)
+        placeTarget(harness, distance = 4.6)
+        harness.send(AttackFrame(PLAYER, harness.nextSequence(), harness.now, harness.clientVersion, 42))
+
+        assertTrue(harness.failed("combat.reach.a"), "the view ray stops at reach + 1, the closest-point distance takes over")
+    }
+
+    @Test
+    fun `two different mobs in one client tick flag multi-target, consecutive ticks do not`() {
+        val aura = EngineHarness()
+        aura.tick(aura.position, onGround = true)
+        attackMob(aura, 900)
+        attackMob(aura, 901)
+        assertTrue(aura.failed("combat.multitarget.a"))
+
+        val legit = EngineHarness()
+        legit.tick(legit.position, onGround = true)
+        repeat(6) { index ->
+            attackMob(legit, 900 + index % 2)
+            legit.tick(legit.position, onGround = true)
+        }
+        assertFalse(legit.failed("combat.multitarget.a"))
+        assertTrue(legit.results("combat.multitarget.a").isNotEmpty(), "evaluated for mob targets")
+    }
+
+    @Test
+    fun `without tick-end packets standing still does not merge two mob hits into one tick`() {
+        val harness = EngineHarness()
+        harness.move(harness.position, onGround = true)
+        attackMob(harness, 900)
+        harness.now += 400
+        attackMob(harness, 901)
+
+        assertFalse(harness.failed("combat.multitarget.a"))
+    }
+
+    @Test
+    fun `machine-regular clicking flags from ten cps, tick-raster twelve cps does not`() {
+        val ten = EngineHarness()
+        ten.tick(ten.position, onGround = true)
+        clickMob(ten, List(36) { 100L })
+        assertTrue(ten.failed("combat.autoclicker.a"))
+
+        val twelve = EngineHarness()
+        twelve.tick(twelve.position, onGround = true)
+        clickMob(twelve, List(42) { listOf(100L, 50L, 100L)[it % 3] })
+        assertFalse(twelve.failed("combat.autoclicker.a"), "50/100ms alternation has a coefficient of variation of ~0.28")
+
+        val strict = EngineHarness(tweak = { it.copy(tuning = it.tuning.copy(autoclickerMinCps = 13.0)) })
+        strict.tick(strict.position, onGround = true)
+        clickMob(strict, List(36) { 100L })
+        assertFalse(strict.failed("combat.autoclicker.a"), "min-cps is configurable")
+    }
+
+    @Test
     fun `attacks without arm swings flag no-swing`() {
         val harness = EngineHarness()
         harness.tick(harness.position, onGround = true)
@@ -366,6 +424,59 @@ class CheckEngineTest {
         }
 
         assertTrue(harness.failed("world.nuker.a"))
+    }
+
+    @Test
+    fun `fastbreak compares client ticks with the measured vanilla break time`() {
+        val stone = DigSample(8.0 / 1.5 / 30.0, 4, "minecraft:stone")
+        val legit = EngineHarness().apply { pitch = 30f }
+        legit.tick(legit.position, onGround = true)
+        mine(legit, stone, ticks = 5)
+        assertFalse(legit.failed("world.fastbreak.a"))
+        assertTrue(legit.results("world.fastbreak.a").isNotEmpty())
+
+        val cheat = EngineHarness().apply { pitch = 30f }
+        cheat.tick(cheat.position, onGround = true)
+        mine(cheat, stone, ticks = 1)
+        assertTrue(cheat.failed("world.fastbreak.a"))
+        val evidence = cheat.results("world.fastbreak.a").first { it.failed }.evidence
+        assertEquals(5, evidence["minimumTicks"])
+        assertEquals("tick-end", evidence["source"])
+    }
+
+    @Test
+    fun `fastbreak spares instant blocks, creative players and unmeasured slow digs`() {
+        val instant = EngineHarness().apply { pitch = 30f }
+        instant.tick(instant.position, onGround = true)
+        mine(instant, DigSample(1.4, 1, "minecraft:short_grass"), ticks = 0)
+        assertFalse(instant.failed("world.fastbreak.a"))
+
+        val creative = EngineHarness().apply { pitch = 30f; tags = setOf("game-mode") }
+        creative.tick(creative.position, onGround = true)
+        mine(creative, DigSample(0.05, 3, "minecraft:obsidian"), ticks = 0)
+        assertTrue(creative.results("world.fastbreak.a").isEmpty())
+
+        val unmeasured = EngineHarness().apply { pitch = 30f }
+        unmeasured.tick(unmeasured.position, onGround = true)
+        mine(unmeasured, null, ticks = 1)
+        assertFalse(unmeasured.failed("world.fastbreak.a"), "50ms without a measurement is not judged")
+        mine(unmeasured, null, ticks = 0)
+        assertTrue(unmeasured.failed("world.fastbreak.a"), "a FINISH in the START flush still is")
+    }
+
+    @Test
+    fun `fastbreak times legacy clients in milliseconds with a ping allowance`() {
+        val stone = DigSample(8.0 / 1.5 / 30.0, 4, "minecraft:stone")
+        val fast = EngineHarness().apply { pitch = 30f }
+        fast.move(fast.position, onGround = true)
+        mineLegacy(fast, stone, millis = 100)
+        assertTrue(fast.failed("world.fastbreak.a"))
+        assertEquals("millis", fast.results("world.fastbreak.a").first { it.failed }.evidence["source"])
+
+        val slow = EngineHarness().apply { pitch = 30f }
+        slow.move(slow.position, onGround = true)
+        mineLegacy(slow, stone, millis = 130)
+        assertFalse(slow.failed("world.fastbreak.a"), "130ms + 60ms tolerance reaches 70% of 250ms")
     }
 
     @Test
@@ -412,6 +523,34 @@ class CheckEngineTest {
             harness.position.x.toInt(), 65, harness.position.z.toInt() + 2, "UP", harness.nextInteraction(),
         ),
     )
+
+    private fun attackMob(harness: EngineHarness, entityId: Int) {
+        harness.send(AttackFrame(PLAYER, harness.nextSequence(), harness.now, harness.clientVersion, entityId))
+        harness.send(SwingFrame(PLAYER, harness.nextSequence(), harness.now, harness.clientVersion))
+    }
+
+    // Attacks a mob after each of the given intervals (ms), with arm swings.
+    private fun clickMob(harness: EngineHarness, intervals: List<Long>) = intervals.forEach { interval ->
+        attackMob(harness, 99)
+        harness.now += interval
+    }
+
+    // START on the block in front, [ticks] client ticks, FINISH carrying [sample].
+    private fun mine(harness: EngineHarness, sample: DigSample?, ticks: Int) {
+        val z = harness.position.z.toInt() + 2
+        harness.send(BlockActionFrame(PLAYER, harness.nextSequence(), harness.now, harness.clientVersion, BlockAction.START_DIG, 0, 64, z, "NORTH", harness.nextInteraction()))
+        repeat(ticks) { harness.tick(harness.position, onGround = true) }
+        harness.send(BlockActionFrame(PLAYER, harness.nextSequence(), harness.now, harness.clientVersion, BlockAction.FINISH_DIG, 0, 64, z, "NORTH", harness.nextInteraction(), dig = sample))
+        repeat(5) { harness.tick(harness.position, onGround = true) }
+    }
+
+    // START, [millis] later FINISH carrying [sample] – no tick-end packets.
+    private fun mineLegacy(harness: EngineHarness, sample: DigSample, millis: Long) {
+        val z = harness.position.z.toInt() + 2
+        harness.send(BlockActionFrame(PLAYER, harness.nextSequence(), harness.now, harness.clientVersion, BlockAction.START_DIG, 0, 64, z, "NORTH", harness.nextInteraction()))
+        harness.now += millis
+        harness.send(BlockActionFrame(PLAYER, harness.nextSequence(), harness.now, harness.clientVersion, BlockAction.FINISH_DIG, 0, 64, z, "NORTH", harness.nextInteraction(), dig = sample))
+    }
 
     // A target player [distance] blocks in front (+z) of the attacker's eyes.
     private fun placeTarget(harness: EngineHarness, distance: Double) {

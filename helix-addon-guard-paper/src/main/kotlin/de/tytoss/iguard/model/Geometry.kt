@@ -57,6 +57,14 @@ data class Box(
     fun intersects(other: Box) = maxX > other.minX && minX < other.maxX &&
         maxY > other.minY && minY < other.maxY && maxZ > other.minZ && minZ < other.maxZ
 
+    /** Distance from [point] to the closest point of the box (0 when the point lies inside). */
+    fun distanceTo(point: Vec3): Double {
+        val dx = max(0.0, max(minX - point.x, point.x - maxX))
+        val dy = max(0.0, max(minY - point.y, point.y - maxY))
+        val dz = max(0.0, max(minZ - point.z, point.z - maxZ))
+        return sqrt(dx * dx + dy * dy + dz * dz)
+    }
+
     /** Slab-test ray/box intersection distance from [origin] along [direction], or null past [maximum]. */
     fun rayDistance(origin: Vec3, direction: Vec3, maximum: Double): Double? {
         var near = 0.0

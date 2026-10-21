@@ -72,4 +72,9 @@ Check-Workern – schnell bleiben, keine Bukkit-Aufrufe.
 `minCounted` verlangt eine Mindestzahl VL-erhöhender Verstöße. Eine Aufnahme vom
 Testserver wird zum Regressionstest, indem man die `.jsonl` dort ablegt und die
 Erwartung daneben schreibt. Die synthetischen Traces (`legit-*`, `cheat-*`) erzeugt
-`IGUARD_REGENERATE_TRACES=1 ./gradlew :helix-addon-guard-paper:test --tests '*GoldenTraceTest*'`.
+`IGUARD_REGENERATE_TRACES=1 ./gradlew :helix-addon-guard-paper:test --tests '*GoldenTraceTest*'`
+(nur einzelne: `IGUARD_REGENERATE_TRACES=legit-mining,cheat-fastbreak-3x`).
+
+FINISH_DIG-Frames tragen die Messung des Servers (`packet.dig`: `progress` = höchster
+Abbaufortschritt pro Tick aus `Block.getBreakSpeed`, `samples`, `block`); damit prüft
+`world.fastbreak.a` auch in Replays gegen die Vanilla-Abbauzeit.

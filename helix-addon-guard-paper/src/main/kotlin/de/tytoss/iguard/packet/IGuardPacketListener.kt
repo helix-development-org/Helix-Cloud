@@ -48,12 +48,19 @@ import de.tytoss.iguard.model.TeleportConfirmFrame
 import de.tytoss.iguard.model.TimelineFrame
 import de.tytoss.iguard.model.TimelineKind
 import de.tytoss.iguard.model.Vec3
+import de.tytoss.iguard.snapshot.DigProbe
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
-/** PacketEvents listener translating client/server packets into [PacketFrame]s for the [CheckEngine]. */
-class IGuardPacketListener(private val engine: CheckEngine) : PacketListenerAbstract(PacketListenerPriority.NORMAL) {
+/**
+ * PacketEvents listener translating client/server packets into [PacketFrame]s for the [CheckEngine]. Digs are
+ * registered with the [digProbe] and its measurement travels on the FINISH_DIG frame.
+ */
+class IGuardPacketListener(
+    private val engine: CheckEngine,
+    private val digProbe: DigProbe? = null,
+) : PacketListenerAbstract(PacketListenerPriority.NORMAL) {
     private val sequences = ConcurrentHashMap<UUID, AtomicLong>()
 
     override fun onPacketReceive(event: PacketReceiveEvent) {
@@ -121,6 +128,7 @@ class IGuardPacketListener(private val engine: CheckEngine) : PacketListenerAbst
     /** Drops the player's sequence counter and engine state (on quit). */
     fun remove(playerId: UUID) {
         sequences.remove(playerId)
+        digProbe?.cancel(playerId)
         engine.remove(playerId)
     }
 
@@ -176,7 +184,13 @@ class IGuardPacketListener(private val engine: CheckEngine) : PacketListenerAbst
             else -> return null
         }
         val pos = wrapper.blockPosition
-        return BlockActionFrame(playerId, nextSequence(playerId), now, version, action, pos.x, pos.y, pos.z, wrapper.blockFace.name, wrapper.sequence)
+        if (action == BlockAction.START_DIG) digProbe?.start(playerId, pos.x, pos.y, pos.z, now)
+        if (action == BlockAction.CANCEL_DIG) digProbe?.cancel(playerId)
+        val dig = if (action == BlockAction.FINISH_DIG) digProbe?.finish(playerId, pos.x, pos.y, pos.z) else null
+        return BlockActionFrame(
+            playerId, nextSequence(playerId), now, version, action, pos.x, pos.y, pos.z, wrapper.blockFace.name, wrapper.sequence,
+            dig = dig,
+        )
     }
 
     private fun placement(event: PacketReceiveEvent, playerId: UUID, now: Long, version: String): BlockActionFrame {

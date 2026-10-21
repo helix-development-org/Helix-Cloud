@@ -15,6 +15,7 @@ import de.tytoss.iguard.packet.IGuardPacketListener
 import de.tytoss.iguard.replay.ReplayService
 import de.tytoss.iguard.setback.SetbackMarks
 import de.tytoss.iguard.setback.SetbackService
+import de.tytoss.iguard.snapshot.DigProbe
 import de.tytoss.iguard.snapshot.MainThreadSampler
 import de.tytoss.iguard.snapshot.SnapshotStore
 import de.tytoss.iguard.spectate.SpectateService
@@ -208,9 +209,10 @@ class IGuardPlugin : JavaPlugin(), Listener {
             hub,
         )
         engine = checkEngine
-        val packets = IGuardPacketListener(checkEngine)
+        val digProbe = DigProbe()
+        val packets = IGuardPacketListener(checkEngine, digProbe)
         packetListener = packets
-        val mainSampler = MainThreadSampler(this, snapshots, exemptions, loaded.exemptions, loaded.sampler, setbackMarks)
+        val mainSampler = MainThreadSampler(this, snapshots, exemptions, loaded.exemptions, loaded.sampler, setbackMarks, digProbe)
         sampler = mainSampler
         val api = IGuardApiImpl(checkEngine, exemptions, banCoordinatorLocal, hub)
         server.servicesManager.register(IGuardApi::class.java, api, this, ServicePriority.Normal)

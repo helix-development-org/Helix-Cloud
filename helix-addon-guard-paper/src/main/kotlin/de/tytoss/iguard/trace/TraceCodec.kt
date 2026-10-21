@@ -11,6 +11,7 @@ import de.tytoss.iguard.model.ClientAction
 import de.tytoss.iguard.model.ClientActionFrame
 import de.tytoss.iguard.model.ClientIdentityFrame
 import de.tytoss.iguard.model.ClientTickFrame
+import de.tytoss.iguard.model.DigSample
 import de.tytoss.iguard.model.EnvironmentFrame
 import de.tytoss.iguard.model.InventoryClickFrame
 import de.tytoss.iguard.model.MovementFrame
@@ -282,6 +283,7 @@ object TraceCodec {
                 packet.long("x").toInt(), packet.long("y").toInt(), packet.long("z").toInt(), packet.string("face"),
                 packet.long("sequence").toInt(),
                 packet.vector("cursor").x.toFloat(), packet.vector("cursor").y.toFloat(), packet.vector("cursor").z.toFloat(),
+                packet["dig"]?.jsonObject?.let { dig -> DigSample(dig.double("progress"), dig.long("samples").toInt(), dig.string("block")) },
             )
             "inventory" -> InventoryClickFrame(
                 playerId, sequence, at, version, packet.long("window").toInt(),
@@ -347,6 +349,13 @@ object TraceCodec {
                 put("face", frame.face)
                 put("sequence", frame.interactionSequence)
                 put("cursor", vector(Vec3(frame.cursorX.toDouble(), frame.cursorY.toDouble(), frame.cursorZ.toDouble())))
+                frame.dig?.let { dig ->
+                    putJsonObject("dig") {
+                        put("progress", number(dig.progressPerTick))
+                        put("samples", dig.samples)
+                        put("block", dig.block)
+                    }
+                }
             }
             is InventoryClickFrame -> {
                 put("window", frame.windowId)

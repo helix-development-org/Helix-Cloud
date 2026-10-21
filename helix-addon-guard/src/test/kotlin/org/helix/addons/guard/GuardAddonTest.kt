@@ -53,9 +53,15 @@ class GuardAddonTest {
 
     @Test
     fun `registry mirrors the full iguard schema`() {
-        // 49 plain settings + 32 checks x 4 fields; server-id and storage.mode
-        // are fixed and not editable
-        assertEquals(49 + 32 * 4, GuardConfig.settings.size)
+        // 49 plain settings + 32 checks x 4 fields + 5 check thresholds (autoclicker 3,
+        // fastbreak 2); server-id and storage.mode are fixed and not editable
+        assertEquals(49 + 32 * 4 + 5, GuardConfig.settings.size)
+        assertEquals("9.5", GuardConfig.byPath.getValue("checks.combat.autoclicker.a.min-cps").default)
+        assertEquals(GuardValueType.INT, GuardConfig.byPath.getValue("checks.world.fastbreak.a.tolerance-millis").type)
+        assertEquals(
+            listOf("checks", "world.fastbreak.a", "min-ratio"),
+            GuardConfig.byPath.getValue("checks.world.fastbreak.a.min-ratio").segments,
+        )
         assertEquals(GuardConfig.settings.size, GuardConfig.byPath.size)
         assertFalse("server-id" in GuardConfig.byPath)
         assertFalse("storage.mode" in GuardConfig.byPath)

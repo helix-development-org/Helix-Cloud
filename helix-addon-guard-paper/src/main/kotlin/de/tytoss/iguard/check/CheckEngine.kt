@@ -74,6 +74,9 @@ internal data class CheckFailure(
     val deterministic: Boolean = false,
 )
 
+/** A started dig: packet time, client tick and whether that tick came from tick-end packets. */
+internal data class DigStart(val at: Long, val tick: Long, val explicitTicks: Boolean)
+
 internal class PlayerState {
     var lastSequence = 0L
     var lastMovement: MovementFrame? = null
@@ -83,6 +86,7 @@ internal class PlayerState {
     var clientTick = 0L
     var attackTick = -1L
     var attackTarget = -1
+    var attackTargetPlayer = false
     var rotationMisses = 0
     var lastAttackAt = 0L
     var noSwingStreak = 0
@@ -136,7 +140,7 @@ internal class PlayerState {
     val pendingKeepAlives = LinkedHashMap<Long, Long>()
     var confirmedRttMillis = 0L
     var lastInteractionSequence = -1
-    val digStarts = HashMap<String, Long>()
+    val digStarts = HashMap<String, DigStart>()
     val digTimes = ArrayDeque<Long>()
     val placementTimes = ArrayDeque<Long>()
     val attackTimes = ArrayDeque<Long>()
@@ -970,7 +974,7 @@ class CheckEngine(
         val key = "${frame.blockX},${frame.blockY},${frame.blockZ}"
         when (frame.action) {
             BlockAction.START_DIG -> {
-                state.digStarts[key] = frame.receivedAt
+                state.digStarts[key] = DigStart(frame.receivedAt, state.clientTick, state.explicitClientTicks)
                 state.digTimes.addLast(frame.receivedAt)
                 trimTimes(state.digTimes, frame.receivedAt, 1_000)
                 if (state.digTimes.size >= 12) failures += CheckFailure("world.nuker.a", 1.0, mapOf("startsPerSecond" to state.digTimes.size))
@@ -986,12 +990,28 @@ class CheckEngine(
                 }
             }
             BlockAction.FINISH_DIG -> state.digStarts.remove(key)?.let { started ->
-                val duration = frame.receivedAt - started
-                state.observation?.metrics?.put("digMillis", duration)
-                // Only a FINISH in the same client flush as its START is cheat evidence. A legit 1-2
-                // tick break (haste + efficiency) sends FINISH 50-100ms later, and network jitter can
-                // compress that gap — the old 74ms window fastbreak-flagged exactly those players.
-                if (duration in 0..24) failures += CheckFailure("world.fastbreak.a", 0.5, mapOf("durationMillis" to duration, "block" to key))
+                val duration = frame.receivedAt - started.at
+                val ticks = if (started.explicitTicks && state.explicitClientTicks) state.clientTick - started.tick else null
+                val dig = frame.dig
+                state.observation?.metrics?.apply {
+                    put("digMillis", duration)
+                    ticks?.let { put("digTicks", it) }
+                    dig?.let {
+                        put("digProgress", it.progressPerTick.rounded())
+                        put("digBlock", it.block)
+                    }
+                }
+                if (dig != null) {
+                    // Measured by the server while digging: compare with the vanilla break time.
+                    DigTiming.judge(dig, ticks, duration, environment.ping, dynamic.get().tuning)?.let { evidence ->
+                        failures += CheckFailure("world.fastbreak.a", 1.0, evidence)
+                    }
+                } else if (duration in 0..24) {
+                    // Unmeasured (FINISH before the first server sample): only a FINISH in the same client
+                    // flush as its START is evidence. A legit 1-2 tick break sends FINISH 50-100ms later and
+                    // jitter can compress that gap — the old 74ms window flagged exactly those players.
+                    failures += CheckFailure("world.fastbreak.a", 0.5, mapOf("durationMillis" to duration, "block" to key))
+                }
             }
             BlockAction.CANCEL_DIG -> state.digStarts.remove(key)
             else -> Unit
@@ -1053,7 +1073,8 @@ class CheckEngine(
         // perfectly regular "autoclicker".
         state.attackTimes.addLast(frame.receivedAt)
         trimTimes(state.attackTimes, frame.receivedAt, 3_000)
-        if (state.attackTimes.size >= 40) {
+        val tuning = dynamic.get().tuning
+        if (state.attackTimes.size >= tuning.autoclickerMinSamples) {
             val duration = state.attackTimes.last() - state.attackTimes.first()
             if (duration >= 2_000) {
                 val intervals = state.attackTimes.zipWithNext { first, second -> (second - first).toDouble() }
@@ -1065,7 +1086,9 @@ class CheckEngine(
                     put("cps", cps.rounded())
                     put("intervalDeviation", (deviation / mean.coerceAtLeast(1.0)).rounded())
                 }
-                if (cps > 13.0 && deviation / mean.coerceAtLeast(1.0) < 0.035) {
+                // Machine regularity from min-cps on (a metronome at 10 CPS is as suspicious as at 20). Tick
+                // aligned rates such as 12 CPS alternate 50/100ms intervals and stay above the threshold.
+                if (cps >= tuning.autoclickerMinCps && deviation / mean.coerceAtLeast(1.0) < tuning.autoclickerMaxDeviation) {
                     failures += CheckFailure(
                         "combat.autoclicker.a", 1.0,
                         mapOf("cps" to cps.rounded(), "meanInterval" to mean.rounded(), "deviation" to deviation.rounded(), "samples" to intervals.size),
@@ -1094,10 +1117,22 @@ class CheckEngine(
             }
         }
         val target = snapshots.target(frame.targetEntityId)
-        if (target == null || target.playerId == frame.playerId || target.current.worldId != environment.worldId) {
-            // Cadence/no-swing/inventory apply to any attack (mobs included); the positional checks
-            // below need a tracked player target.
-            applyResults(frame, state, environment, playerName, failures, setOf("combat.autoclicker.a", "combat.noswing.a", "combat.inventory.a"))
+        val playerTarget = target != null && target.playerId != frame.playerId && target.current.worldId == environment.worldId
+        // Multi-target: vanilla attacks at most what the crosshair hits, so two different entities in one client
+        // tick (any type: players, mobs, armor stands …) are aura evidence. Without tick-end packets the tick
+        // clock is the movement stream, which idles for standing players – only player pairs count there.
+        if (state.attackTick == state.clientTick && state.attackTarget != -1 && state.attackTarget != frame.targetEntityId &&
+            (state.explicitClientTicks || (playerTarget && state.attackTargetPlayer))
+        ) {
+            failures += CheckFailure("combat.multitarget.a", 1.5, mapOf("firstTarget" to state.attackTarget, "secondTarget" to frame.targetEntityId, "clientTick" to state.clientTick))
+        }
+        state.attackTick = state.clientTick
+        state.attackTarget = frame.targetEntityId
+        state.attackTargetPlayer = playerTarget
+        if (target == null || !playerTarget) {
+            // Cadence/no-swing/inventory/multi-target apply to any attack (mobs included); the positional
+            // checks below need a tracked player target.
+            applyResults(frame, state, environment, playerName, failures, setOf("combat.autoclicker.a", "combat.noswing.a", "combat.inventory.a", "combat.multitarget.a"))
             return
         }
         // Lag compensation: the attacker acted roughly one-way latency before the packet arrived and
@@ -1112,7 +1147,12 @@ class CheckEngine(
         val origin = actorPosition(movement, environment) + Vec3(0.0, eyeHeight, 0.0)
         val direction = Vec3.direction(movement.yaw, movement.pitch)
         val tolerance = 0.1 + environment.ping.coerceIn(0, 300) * 0.0005
-        val distance = targetFrames.mapNotNull { it.entityBox.expand(tolerance).rayDistance(origin, direction, profile.reach + 1.0) }.minOrNull()
+        // Where the view ray misses a frame (or hits beyond reach + 1), the closest-point distance stands in: a
+        // lower bound of any hit, so a hit from 4+ blocks no longer escapes the check.
+        val distance = targetFrames.minOfOrNull { sample ->
+            val box = sample.entityBox.expand(tolerance)
+            box.rayDistance(origin, direction, profile.reach + 1.0) ?: box.distanceTo(origin)
+        }
         state.observation?.apply {
             targets += TraceTarget(frame.targetEntityId, target.playerId, target.playerName, targetFrames.sortedBy(EnvironmentFrame::capturedAt))
             distance?.let { metrics["reachDistance"] = it.rounded() }
@@ -1130,11 +1170,6 @@ class CheckEngine(
         if (state.bedrock != true && state.rotationMisses >= 3) {
             failures += CheckFailure("combat.rotation.a", 1.0, mapOf("misses" to state.rotationMisses, "target" to target.playerName))
         }
-        if (state.attackTick == state.clientTick && state.attackTarget != -1 && state.attackTarget != frame.targetEntityId) {
-            failures += CheckFailure("combat.multitarget.a", 1.5, mapOf("firstTarget" to state.attackTarget, "secondTarget" to frame.targetEntityId, "clientTick" to state.clientTick))
-        }
-        state.attackTick = state.clientTick
-        state.attackTarget = frame.targetEntityId
         // Snap-aim: attacks right after huge single-tick rotations. High-sensitivity players flick past
         // 60°/tick legitimately, so this needs a larger angle AND a repeat before it becomes evidence.
         val snapped = frame.receivedAt - state.lastRotationAt <= SNAP_AIM_WINDOW_MILLIS && state.lastYawDelta > SNAP_AIM_DEGREES

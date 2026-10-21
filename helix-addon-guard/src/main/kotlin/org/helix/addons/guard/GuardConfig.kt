@@ -63,6 +63,21 @@ object GuardConfig {
         CheckDefaults("movement.elytrafly.a", "4.0", "-1.0", "4.0"),
     )
 
+    /** Check-specific thresholds rendered after a check's VL settings (`checks.<id>.<key>`), all hot-reloadable. */
+    private data class CheckTuning(val key: String, val type: GuardValueType, val default: String)
+
+    private val checkTuning = mapOf(
+        "combat.autoclicker.a" to listOf(
+            CheckTuning("min-cps", GuardValueType.DOUBLE, "9.5"),
+            CheckTuning("max-deviation", GuardValueType.DOUBLE, "0.035"),
+            CheckTuning("min-samples", GuardValueType.INT, "25"),
+        ),
+        "world.fastbreak.a" to listOf(
+            CheckTuning("min-ratio", GuardValueType.DOUBLE, "0.7"),
+            CheckTuning("tolerance-millis", GuardValueType.INT, "60"),
+        ),
+    )
+
     /** All editable settings in the order of IGuard's bundled config.yml. */
     val settings: List<GuardSetting> = baseSettings() + checkSettings()
 
@@ -224,6 +239,8 @@ object GuardConfig {
                 check.decayPerSecond,
                 false,
             ),
-        )
+        ) + checkTuning[check.id].orEmpty().map { tuning ->
+            GuardSetting("checks.${check.id}.${tuning.key}", listOf("checks", check.id, tuning.key), tuning.type, tuning.default, false)
+        }
     }
 }

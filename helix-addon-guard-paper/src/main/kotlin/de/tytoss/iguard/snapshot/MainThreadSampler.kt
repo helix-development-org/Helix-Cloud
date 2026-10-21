@@ -40,7 +40,8 @@ import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Per-tick, budgeted main-thread sampler: captures each player's [EnvironmentFrame] (round-robin,
- * bounded per tick) into the [SnapshotStore] and grants event-driven exemptions (teleport, respawn,
+ * bounded per tick) into the [SnapshotStore], measures active digs for the fastbreak check ([DigProbe],
+ * every tick, outside the round-robin budget) and grants event-driven exemptions (teleport, respawn,
  * world change, velocity) so the async workers never touch Bukkit themselves.
  */
 class MainThreadSampler(
@@ -50,6 +51,7 @@ class MainThreadSampler(
     private val config: ExemptionConfig,
     private val samplerConfig: SamplerConfig,
     private val setbackMarks: SetbackMarks,
+    private val digProbe: DigProbe? = null,
 ) : Listener {
     private val tick = AtomicLong()
 
@@ -90,6 +92,7 @@ class MainThreadSampler(
         val currentTick = tick.incrementAndGet()
         val now = System.currentTimeMillis()
         val tps = Bukkit.getTPS().firstOrNull() ?: 20.0
+        measureDigs(now)
         val players = Bukkit.getOnlinePlayers().toList()
         if (players.isEmpty()) {
             lastScan.clear()
@@ -156,6 +159,20 @@ class MainThreadSampler(
             chunkLoaded,
         )
         store.update(player.uniqueId, player.name, player.entityId, frame)
+    }
+
+    // One cheap Block.getBreakSpeed call per digging player and tick: the vanilla break formula (hardness, tool,
+    // efficiency, haste/mining fatigue, block_break_speed and mining attributes, water and air factors).
+    private fun measureDigs(now: Long) {
+        val probe = digProbe ?: return
+        if (probe.size() == 0) return
+        probe.measure(now) { playerId, x, y, z ->
+            val player = Bukkit.getPlayer(playerId) ?: return@measure null
+            val world = player.world
+            if (!world.isChunkLoaded(x shr 4, z shr 4)) return@measure null
+            val block = world.getBlockAt(x, y, z)
+            if (block.type.isAir || block.isLiquid) null else block.type.key.toString() to block.getBreakSpeed(player).toDouble()
+        }
     }
 
     // Reuse the last collision scan while the player stays within the same block; only re-scan the
@@ -311,6 +328,7 @@ class MainThreadSampler(
         exemptions.remove(event.player.uniqueId)
         setbackMarks.remove(event.player.uniqueId)
         lastScan.remove(event.player.uniqueId)
+        digProbe?.cancel(event.player.uniqueId)
     }
 
     private fun exempt(player: Player, millis: Long, reason: String, scope: IGuardExemptionScope) {

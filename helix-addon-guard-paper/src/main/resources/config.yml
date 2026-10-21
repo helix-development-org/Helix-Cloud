@@ -169,6 +169,11 @@ checks:
     alert-vl: 5.0
     setback-vl: -1.0
     decay-per-second: 1.0
+    # Machine-regular clicking: from min-cps on, intervals whose coefficient of variation stays below
+    # max-deviation flag; judged once min-samples attacks fall into 3 seconds (spanning at least 2).
+    min-cps: 9.5
+    max-deviation: 0.035
+    min-samples: 25
   combat.inventory.a:
     enabled: true
     alert-vl: 3.0
@@ -194,6 +199,11 @@ checks:
     alert-vl: 4.0
     setback-vl: -1.0
     decay-per-second: 2.0
+    # A dig must take at least min-ratio of the vanilla break time (block hardness, tool, enchantments,
+    # effects, attributes, water/air - measured by the server while digging). Clients without tick-end
+    # packets are timed in milliseconds with tolerance-millis plus a quarter of the ping as jitter allowance.
+    min-ratio: 0.7
+    tolerance-millis: 60
   world.nuker.a:
     enabled: true
     alert-vl: 4.0

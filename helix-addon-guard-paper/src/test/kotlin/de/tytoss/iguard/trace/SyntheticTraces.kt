@@ -4,8 +4,13 @@ import de.tytoss.iguard.EngineHarness
 import de.tytoss.iguard.PLAYER
 import de.tytoss.iguard.config.IGuardConfig
 import de.tytoss.iguard.config.TraceConfig
+import de.tytoss.iguard.model.AttackFrame
+import de.tytoss.iguard.model.BlockAction
+import de.tytoss.iguard.model.BlockActionFrame
 import de.tytoss.iguard.model.ClientAction
 import de.tytoss.iguard.model.ClientActionFrame
+import de.tytoss.iguard.model.DigSample
+import de.tytoss.iguard.model.SwingFrame
 import de.tytoss.iguard.model.Vec3
 import java.nio.file.Files
 import java.nio.file.Path
@@ -13,6 +18,7 @@ import java.nio.file.StandardCopyOption
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 import java.util.logging.Logger
+import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.pow
 import kotlin.math.sin
@@ -80,12 +86,15 @@ internal object SyntheticTraces {
         "cheat-fly" to ::fly,
         "cheat-fastladder" to ::fastLadder,
         "cheat-jesus" to ::jesus,
+        "legit-mining" to { harness -> mining(harness, speedFactor = 1.0) },
+        "cheat-fastbreak-3x" to { harness -> mining(harness, speedFactor = 3.0) },
+        "cheat-multitarget-mobs" to ::multiTarget,
     )
 
-    /** Writes every scenario as `<name>.jsonl` into [directory]. */
-    fun writeAll(directory: Path) {
+    /** Writes every scenario (or only those named in [only]) as `<name>.jsonl` into [directory]. */
+    fun writeAll(directory: Path, only: Collection<String>? = null) {
         Files.createDirectories(directory)
-        scenarios.forEach { (name, driver) -> write(directory, name, driver) }
+        scenarios.filterKeys { only == null || it in only }.forEach { (name, driver) -> write(directory, name, driver) }
     }
 
     private fun write(directory: Path, name: String, driver: (EngineHarness) -> Unit) {
@@ -179,6 +188,53 @@ internal object SyntheticTraces {
             harness.tick(position, onGround = false)
         }
         harness.tags = emptySet()
+    }
+
+    // Mining stone with a diamond pickaxe (server measures 8 / 1.5 / 30 = 0.178 progress per tick, so vanilla
+    // needs five ticks between START and FINISH) with the 5-tick destroy delay between blocks; the client breaks
+    // [speedFactor] times as fast. Legit runs also break a grass block instantly (START only) and a hasted block
+    // in one tick.
+    private fun mining(harness: EngineHarness, speedFactor: Double) {
+        val position = harness.position
+        harness.pitch = 30f
+        repeat(5) { harness.tick(position, onGround = true) }
+        val stone = DigSample(8.0 / 1.5 / 30.0, 1, "minecraft:stone")
+        val ticks = ceil(1.0 / (stone.progressPerTick * speedFactor) - 1.0E-6).toInt() - 1
+        repeat(8) { index ->
+            val x = index % 3 - 1
+            val y = 64 + (index / 3) % 2
+            dig(harness, BlockAction.START_DIG, x, y, 2)
+            repeat(ticks) { harness.tick(position, onGround = true) }
+            dig(harness, BlockAction.FINISH_DIG, x, y, 2, stone.copy(samples = ticks.coerceAtLeast(1)))
+            repeat(5) { harness.tick(position, onGround = true) }
+        }
+        if (speedFactor == 1.0) {
+            dig(harness, BlockAction.START_DIG, 0, 64, 3)
+            repeat(5) { harness.tick(position, onGround = true) }
+            dig(harness, BlockAction.START_DIG, 1, 64, 3)
+            harness.tick(position, onGround = true)
+            dig(harness, BlockAction.FINISH_DIG, 1, 64, 3, DigSample(0.6, 1, "minecraft:dirt"))
+            repeat(5) { harness.tick(position, onGround = true) }
+        }
+    }
+
+    private fun dig(harness: EngineHarness, action: BlockAction, x: Int, y: Int, z: Int, sample: DigSample? = null) = harness.send(
+        BlockActionFrame(PLAYER, harness.nextSequence(), harness.now, harness.clientVersion, action, x, y, z, "NORTH", harness.nextInteraction(), dig = sample),
+    )
+
+    // KillAura hitting two mobs (no tracked players) in the same client tick, every other tick.
+    private fun multiTarget(harness: EngineHarness) {
+        val position = harness.position
+        repeat(5) { harness.tick(position, onGround = true) }
+        repeat(40) { index ->
+            if (index % 2 == 0) {
+                listOf(900, 901).forEach { mob ->
+                    harness.send(AttackFrame(PLAYER, harness.nextSequence(), harness.now, harness.clientVersion, mob))
+                    harness.send(SwingFrame(PLAYER, harness.nextSequence(), harness.now, harness.clientVersion))
+                }
+            }
+            harness.tick(position, onGround = true)
+        }
     }
 
     // Walk across open water, feet resting on the surface, claiming ground.

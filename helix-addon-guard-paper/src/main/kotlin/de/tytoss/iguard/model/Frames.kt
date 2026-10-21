@@ -133,7 +133,17 @@ data class TimelineFrame(
 /** Block interaction kinds observed from digging/placement packets. */
 enum class BlockAction { START_DIG, CANCEL_DIG, FINISH_DIG, PLACE, USE_ITEM }
 
-/** Client block dig/place/use packet with the targeted block and cursor position. */
+/**
+ * The server's measurement of a dig, attached to its FINISH_DIG frame.
+ *
+ * @property progressPerTick highest vanilla break progress per tick measured while the dig was active
+ *   (`Block.getBreakSpeed(player)`: hardness, tool, enchantments, effects, attributes, water and air factors).
+ * @property samples server ticks measured.
+ * @property block block type key, e.g. `minecraft:stone`.
+ */
+data class DigSample(val progressPerTick: Double, val samples: Int, val block: String)
+
+/** Client block dig/place/use packet with the targeted block and cursor position ([dig]: FINISH_DIG only, when measured). */
 data class BlockActionFrame(
     override val playerId: UUID,
     override val sequence: Long,
@@ -148,6 +158,7 @@ data class BlockActionFrame(
     val cursorX: Float = 0.5f,
     val cursorY: Float = 0.5f,
     val cursorZ: Float = 0.5f,
+    val dig: DigSample? = null,
 ) : PacketFrame
 
 /** Client inventory click packet (window/slot/button), feeding the inventory checks. */

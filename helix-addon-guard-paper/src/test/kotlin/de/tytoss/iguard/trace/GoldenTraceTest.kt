@@ -46,8 +46,9 @@ class GoldenTraceTest {
 
     @Test
     fun `regenerate synthetic traces on request`() {
-        Assumptions.assumeTrue(System.getenv("IGUARD_REGENERATE_TRACES") == "1", "set IGUARD_REGENERATE_TRACES=1 to regenerate")
-        SyntheticTraces.writeAll(Paths.get("src/test/resources/traces"))
+        val selection = System.getenv("IGUARD_REGENERATE_TRACES").orEmpty()
+        Assumptions.assumeTrue(selection.isNotBlank(), "set IGUARD_REGENERATE_TRACES=1 (all) or =name,name to regenerate")
+        SyntheticTraces.writeAll(Paths.get("src/test/resources/traces"), selection.takeIf { it != "1" }?.split(',')?.map(String::trim))
     }
 
     private fun verify(trace: Path) {
