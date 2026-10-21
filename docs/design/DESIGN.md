@@ -183,18 +183,29 @@ Ist-Stand Währungs-Icons: Form bleibt, Kontur auf Tinte umstellen, Glanzpixel o
 | Staff-Chat | Prefix [Team] in Rot, danach Rang-Tag des Absenders (Owner, Manager, Developer, Admin, Mod, Support), Inhalt Pergament. | `<#d8382e>[Team]</#d8382e> …` |
 | Spieler-Chat | {prefix}{color}{name}{suffix} » {message}; Pfeil in Holz-hell, Nachricht Pergament. | `{prefix}<color>{name}</color> <#7a4a24>»</#7a4a24> <#f1e2c2>{message}` |
 
-### Team-Ränge
+### Ränge
 
-| Tag | Farbe | Gewicht |
-|---|---|---|
-| [Owner] | `#d8382e` | 100 |
-| [Manager] | `#ff6a8a` | 95 |
-| [Developer] | `#a05ae8` | 90 |
-| [Admin] | `#ff5a4a` | 80 |
-| [Mod] | `#ffb43a` | 70 |
-| [Support] | `#4ac85e` | 60 |
-| [Tester] | `#5ab4ff` | 10 |
-| [Spieler] | `#c8bca8` | 0 |
+| Rang | Abzeichen (Glyph) | Farbe | Gewicht | Klartext |
+|---|---|---|---|---|
+| Owner | U+E000, 38×9, mit Krone | `#d8382e` | 100 | [Owner] |
+| Manager | U+E001, 38×9 | `#ff6a8a` | 95 | [Manager] |
+| Developer | U+E002, 44×9 | `#a05ae8` | 90 | [Developer] |
+| Admin | U+E003, 30×9 | `#ff5a4a` | 80 | [Admin] |
+| Mod | U+E004, 22×9 | `#ffb43a` | 70 | [Mod] |
+| Support | U+E005, 36×9 | `#4ac85e` | 60 | [Support] |
+| Tester | U+E006, 31×9 | `#5ab4ff` | 10 | [Tester] |
+| Beta (ehem. Tester) | U+E007, 23×9 | `#5ab4ff` | 1 | [Beta] |
+| Spieler | – (kein Abzeichen) | `#c8bca8` | 0 | – |
+
+### Rang-Abzeichen „AC3“ (entschieden 2026-10-21)
+
+- **Form:** Pixel-Pille in Rangfarbe mit **goldenem Rahmen rundum** (statt Tinten-Kontur), innen Licht oben links, Text in 5-px-Großbuchstaben hell (dunkel auf Gold/Orange); Owner zusätzlich mit kleiner Krone links. Höhe 9 px, Breite je Rang (Tabelle).
+- **Technik:** Font `helix_guis:ranks` (Netzwerk-Pack aus `helix-addon-guis-paper`, Quellen `src/pack/resources/ranks/<rang>.png`), Bitmap-Provider `height 9`, `ascent 8` – bündig zur 9-px-Textzeile. Konstanten: helix-api `RankBadges` (Codepoint, Klartext, Farbe, `prefix`).
+- **Prefix:** `<white><font:helix_guis:ranks>{glyph}</font></white> ` (weiß = Glyph-Farben unverfälscht), danach der Name in Rangfarbe. Gilt für Chat, Tablist, Nametag, Scoreboard-Teams.
+- **Klartext statt Glyph:** überall ohne Ressourcenpaket – Discord, Webpanel, Logs, Kick-Screens, Konsolen-/Aktionsausgaben (`RankBadges.plain(text)` macht aus dem Glyph `[Owner]`).
+- **Spieler** ohne Rang bekommen kein Abzeichen, nur einen grauen Namen.
+- **Bestehende Installationen:** Das Permissions-Addon ersetzt einmalig nur Prefixe, die noch dem alten Standardtext (`[Owner]` …) entsprechen; vom Team geänderte bleiben. Manuell: `perm.ranks.apply-badges [--force]` (Recht `helix.permissions.badges`).
+- Vorlagen der Abzeichen: `docs/design/brand/ranks/`.
 
 **[Tester]** ist ein Spieler-Rang der geschlossenen Testphase (keine Team-Rechte; Gruppe `tester` mit Wartungs-Bypass, Feedback- und Test-Werkzeug-Rechten, Vergabe per `/tester`). Ehemalige Tester behalten nach dem Release das dauerhafte Abzeichen-Recht `badge.betatester` (Profil/Prefix-Variante), die Gruppe selbst endet mit der Testphase. Siehe `docs/TESTPHASE.md`.
 
