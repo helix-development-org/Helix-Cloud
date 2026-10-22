@@ -4,6 +4,9 @@ Addons erweitern die Node um eigene Actions und Logik. Sie werden als
 `.hxa` Datei in `Helix/addons/` installiert und beim Node-Start geladen —
 mit eigenem Classloader und sauberem Lifecycle.
 
+Welche Addons voneinander abhängen (Actions, Bridge-Werte, Paper-Plugins, geteilte Ressourcen) steht in
+[ADDON-DEPENDENCIES.md](ADDON-DEPENDENCIES.md).
+
 ## HXA-Format
 
 Eine `.hxa` Datei ist ein Zip mit genau zwei Einträgen:
