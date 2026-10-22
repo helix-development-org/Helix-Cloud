@@ -10,6 +10,14 @@
    "audience": "Spieler"
   },
   {
+   "id": "net-hub",
+   "mode": "Netzwerk",
+   "command": "/hub",
+   "summary": "Kurzform von /lobby: bringt dich von jedem Server zurück in die Lobby.",
+   "expected": "Wie /lobby – du landest am Lobby-Spawn.",
+   "audience": "Spieler"
+  },
+  {
    "id": "net-server",
    "mode": "Netzwerk",
    "command": "/server <Name>",
