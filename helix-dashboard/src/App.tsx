@@ -37,6 +37,8 @@ export function App() {
   const [panels, setPanels] = useState<PanelInfo[]>([])
   const [version, setVersion] = useState("")
   const [view, setView] = useState("overview")
+  // Deep link (`…/#view=panel:testguide`, e.g. from the in-game /befehle): opened right after sign-in when allowed
+  const [wanted] = useState(() => new URLSearchParams(location.hash.replace(/^#/, "")).get("view"))
   // In-game (Helix Admin mod): quick menu first, the full dashboard on request
   const [ingame] = useState(isIngame)
   const [fullDashboard, setFullDashboard] = useState(false)
@@ -56,7 +58,7 @@ export function App() {
     setVersion(ov?.version ?? "")
     setIdentity(me)
     const first = me.admin ? "overview" : me.views[0] ?? (pnls[0] ? "panel:" + pnls[0].id : "overview")
-    setView(first)
+    setView(wanted ?? first)
   }
 
   useEffect(() => {
