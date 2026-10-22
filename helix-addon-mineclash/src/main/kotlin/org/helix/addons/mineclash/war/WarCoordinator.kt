@@ -4,6 +4,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import org.helix.addons.mineclash.clan.ClanRead
 import org.helix.addons.mineclash.clan.ClanSource
 import org.helix.addons.mineclash.clan.ClanView
 import org.helix.api.player.OnlinePlayer
@@ -54,7 +55,13 @@ class WarCoordinator(
 ) {
     private class Server(val bootId: String, val capacity: Int, val pool: PoolStatus, val lastPollAt: Long, val hosted: Set<String>)
 
-    private class Live(var lastReportedAt: Long, var points: Map<String, Int> = emptyMap(), var present: Map<String, Int> = emptyMap())
+    private class Live(var lastReportedAt: Long, var points: Map<String, Int> = emptyMap(), var present: Map<String, Int> = emptyMap()) {
+        /** Team id → epoch millis since which nobody of the team is in the war world (RUNNING only). */
+        val absentSince = HashMap<String, Long>()
+
+        /** Team id → warning thresholds (minutes) already announced for the current absence. */
+        val warned = HashMap<String, MutableSet<Int>>()
+    }
 
     private class PendingCancel(val cancel: WarCancel, var polls: Int = 0)
 
@@ -64,6 +71,9 @@ class WarCoordinator(
     private val servers = LinkedHashMap<String, Server>()
     private val skips = HashMap<String, Long>()
     private val cancels = HashMap<String, MutableList<PendingCancel>>()
+
+    /** `warId|clanId` → consecutive membership checks that found the clan missing (3 → DISBANDED). */
+    private val missingClans = HashMap<String, Int>()
     private var lastServiceStart = Long.MIN_VALUE / 2
     private var lastMembershipCheck: Long
 
@@ -304,12 +314,17 @@ class WarCoordinator(
         val now = clock()
         val effects = mutableListOf<WarEffect>()
         val previous = servers[serviceId]
-        if (previous != null && previous.bootId != status.bootId) {
-            wars.values.filter { it.serviceId == serviceId && it.state in WarState.HOSTED }.forEach {
-                cancelWar(it, WarProtocol.CancelReason.SERVER_LOST, now, effects, tellServer = false)
+        if (previous != null && previous.bootId != status.bootId) cancels.remove(serviceId)
+        // A different boot id than the one a war was handed to means that server restarted and lost its worlds –
+        // also after a node restart, when [servers] starts empty (contract §4).
+        wars.values.filter { it.serviceId == serviceId && it.state in WarState.HOSTED && it.bootId != null && it.bootId != status.bootId }
+            .forEach { war ->
+                if (war.state == WarState.ASSIGNED) {
+                    requeue(war, now, skip = false)
+                } else {
+                    cancelWar(war, WarProtocol.CancelReason.SERVER_LOST, now, effects, tellServer = false)
+                }
             }
-            cancels.remove(serviceId)
-        }
         servers[serviceId] = Server(status.bootId, status.capacity.coerceAtLeast(1), status.pool, now, status.wars.map { it.warId }.toSet())
         status.wars.forEach { hosted -> applyReport(serviceId, hosted, now, effects) }
         status.rejected.forEach { warId ->
@@ -365,11 +380,11 @@ class WarCoordinator(
         val now = clock()
         val war = wars[result.warId] ?: return FinishAnswer(DUPLICATE, emptyList())
         val effects = mutableListOf<WarEffect>()
-        wars.remove(war.warId)
-        live.remove(war.warId)
         if (result.reason == WarProtocol.EndReason.CANCELLED) {
             val record = war.copy(state = WarState.CANCELLED, reason = result.reason, endedAt = result.endedAt, points = result.points, participants = result.participants)
+            // Persist first: a failing save leaves the war in memory, the server's outbox retries.
             store.save(record)
+            forget(war.warId)
             war.teams.forEach { team ->
                 val other = war.teams.first { it.id != team.id }
                 notifyTeam(team, Msg("clanwar.cancelled", mapOf("tag" to other.tag, "name" to other.name), mapOf("reason" to "clanwar.reason.CANCELLED")), effects)
@@ -386,11 +401,8 @@ class WarCoordinator(
             endedAt = result.endedAt.takeIf { it > 0 } ?: now,
         )
         store.save(record)
-        val roster = result.participants.takeIf { it.isNotEmpty() }?.associate { it.uuid to it.team }
-            ?: war.teams.flatMap { team -> team.members.map { it.uuid to team.id } }.toMap()
-        val names = result.participants.associate { it.uuid to it.name } +
-            war.teams.flatMap { it.members }.associate { it.uuid to it.name }
-        effects += WarEffect.PayWar(war.warId, roster.filterKeys { it.isNotBlank() }, names, record.winner)
+        forget(war.warId)
+        effects += payEffect(record)
         val a = war.teams[0]
         val b = war.teams[1]
         val points = "${result.points[a.id] ?: 0} : ${result.points[b.id] ?: 0}"
@@ -413,6 +425,26 @@ class WarCoordinator(
     }
 
     /**
+     * Marks the payout of a finished war as done (called by [WarEffectRunner] after paying).
+     *
+     * @param warId war id.
+     */
+    @Synchronized
+    fun markPaid(warId: String) {
+        val record = store.load(warId) ?: return
+        if (record.state != WarState.FINISHED || record.paidAt != null) return
+        store.save(record.copy(paidAt = clock()))
+    }
+
+    /**
+     * Payouts of finished wars that did not run before the node stopped (`paidAt` missing).
+     *
+     * @return pay effects to run once at start.
+     */
+    @Synchronized
+    fun pendingPayouts(): List<WarEffect> = store.loadUnpaid().map(::payEffect)
+
+    /**
      * Periodic work (every few seconds): expiries, timeouts, lost servers, membership checks and assignments.
      *
      * @return effects to run.
@@ -432,10 +464,10 @@ class WarCoordinator(
      */
     @Synchronized
     fun adminCancel(warId: String): Outcome {
-        val war = wars[warId] ?: return Outcome(listOf(Msg("no active war $warId")))
+        val war = wars[warId] ?: return Outcome(listOf(Msg("clanwar.admin.no_war", mapOf("warId" to warId))))
         val effects = mutableListOf<WarEffect>()
         cancelWar(war, WarProtocol.CancelReason.ADMIN, clock(), effects)
-        return Outcome(listOf(Msg("war $warId cancelled")), effects)
+        return Outcome(listOf(Msg("clanwar.admin.cancelled", mapOf("warId" to warId))), effects)
     }
 
     /**
@@ -545,7 +577,7 @@ class WarCoordinator(
             }
             if (challenge.from.id !in atWar) {
                 clans.detail(challenge.from.id)?.let { view ->
-                    onlineMembers(view).forEach { effects += WarEffect.Message(it, Msg("clanwar.challenge.expired", refNames(challenge.to))) }
+                    onlineMembers(view).forEach { effects += WarEffect.Message(it, Msg("clanwar.challenge.dropped", refNames(challenge.to))) }
                 }
             }
         } else {
@@ -604,17 +636,27 @@ class WarCoordinator(
             var current = war
             var disbanded = false
             for (team in war.teams) {
-                val view = clans.detail(team.clanId)
-                if (view == null) {
-                    disbanded = true
-                    break
+                val key = "${war.warId}|${team.clanId}"
+                val view = when (val read = clans.read(team.clanId)) {
+                    is ClanRead.Found -> read.view.also { missingClans.remove(key) }
+                    ClanRead.Failed -> null
+                    ClanRead.Missing -> {
+                        // Only a repeated "no such clan" counts – one odd answer must not end a running war.
+                        val misses = (missingClans[key] ?: 0) + 1
+                        missingClans[key] = misses
+                        if (misses >= DISBAND_CONFIRMATIONS) disbanded = true
+                        null
+                    }
                 }
+                if (disbanded) break
+                if (view == null) continue
                 val left = team.members.filter { !view.has(it.name) }
                 if (left.isEmpty()) continue
                 current = current.withTeam(team.copy(members = team.members - left.toSet()))
                 left.forEach { member -> if (isOnline(member.name)) effects += WarEffect.Message(properName(member.name), Msg("clanwar.member_removed")) }
             }
             if (disbanded) {
+                missingClans.keys.removeIf { it.startsWith("${war.warId}|") }
                 cancelWar(current, WarProtocol.CancelReason.DISBANDED, now, effects)
             } else if (current != war) {
                 put(current)
@@ -659,8 +701,17 @@ class WarCoordinator(
     }
 
     private fun applyReport(serviceId: String, hosted: HostedWar, now: Long, effects: MutableList<WarEffect>) {
-        val war = wars[hosted.warId] ?: return
-        if (war.serviceId != serviceId) return
+        var war = wars[hosted.warId] ?: return
+        if (war.serviceId != serviceId) {
+            // A queued war that an alive server already runs (it was requeued while the server hosted it, e.g. after a
+            // node restart or a slow poll): adopt it instead of reassigning it somewhere else.
+            val adoptable = war.state == WarState.QUEUED &&
+                (hosted.phase == WarProtocol.Phase.PREPARE || hosted.phase == WarProtocol.Phase.RUNNING)
+            if (!adoptable) return
+            war = war.copy(state = WarState.ASSIGNED, serviceId = serviceId, bootId = servers[serviceId]?.bootId, assignedAt = now)
+            skips.remove("${war.warId}|$serviceId")
+            put(war)
+        }
         val state = live.getOrPut(war.warId) { Live(now) }
         state.lastReportedAt = now
         state.points = hosted.points
@@ -675,17 +726,39 @@ class WarCoordinator(
                 put(war.copy(state = WarState.RUNNING, runningAt = now))
             }
         }
+        if (hosted.phase == WarProtocol.Phase.RUNNING) warnAbsentTeams(war, state, hosted, now, effects)
     }
 
-    private fun requeue(war: WarRecord, now: Long) {
-        war.serviceId?.let { skips["${war.warId}|$it"] = now + SKIP_MILLIS }
+    /**
+     * Abandon warnings (contract §4): the war server only sees the players on it, but an absent clan is by definition
+     * elsewhere – the node derives the absence from the reported `present` counts and tells the clan's online members
+     * at 5 and 10 minutes (thresholds below the limit only).
+     */
+    private fun warnAbsentTeams(war: WarRecord, state: Live, hosted: HostedWar, now: Long, effects: MutableList<WarEffect>) {
+        val limit = settings().abandonMinutes.coerceAtLeast(1)
+        for (team in war.teams) {
+            if ((hosted.present[team.id] ?: 0) > 0) {
+                state.absentSince.remove(team.id)
+                state.warned.remove(team.id)
+                continue
+            }
+            val since = state.absentSince.getOrPut(team.id) { now }
+            val done = state.warned.getOrPut(team.id) { mutableSetOf() }
+            ABANDON_WARN_MINUTES.filter { it < limit && now - since >= it * 60_000L && done.add(it) }.forEach { minutes ->
+                notifyTeam(team, Msg("war.abandon.warning_own", mapOf("minutes" to minutes.toString(), "limit" to limit.toString())), effects)
+            }
+        }
+    }
+
+    private fun requeue(war: WarRecord, now: Long, skip: Boolean = true) {
+        if (skip) war.serviceId?.let { skips["${war.warId}|$it"] = now + SKIP_MILLIS }
         put(war.copy(state = WarState.QUEUED, serviceId = null, bootId = null, assignedAt = null))
     }
 
     private fun cancelWar(war: WarRecord, reason: String, now: Long, effects: MutableList<WarEffect>, tellServer: Boolean = true) {
-        wars.remove(war.warId)
-        live.remove(war.warId)
+        // Persist first: if the save fails the war stays in memory and the next tick tries again.
         store.save(war.copy(state = WarState.CANCELLED, cancelReason = reason, endedAt = now))
+        forget(war.warId)
         val serviceId = war.serviceId
         if (tellServer && serviceId != null && war.state in WarState.HOSTED) {
             cancels.getOrPut(serviceId) { mutableListOf() } += PendingCancel(WarCancel(war.warId, reason))
@@ -709,6 +782,20 @@ class WarCoordinator(
     private fun spec(war: WarRecord): WarSpec {
         val config = settings()
         return WarSpec(war.warId, config.prepareSeconds, config.maxPlayersPerClan, config.abandonMinutes, war.teams.map { it.spec() })
+    }
+
+    private fun forget(warId: String) {
+        wars.remove(warId)
+        live.remove(warId)
+        missingClans.keys.removeIf { it.startsWith("$warId|") }
+    }
+
+    private fun payEffect(record: WarRecord): WarEffect.PayWar {
+        val roster = record.participants.takeIf { it.isNotEmpty() }?.associate { it.uuid to it.team }
+            ?: record.teams.flatMap { team -> team.members.map { it.uuid to team.id } }.toMap()
+        val names = record.participants.associate { it.uuid to it.name } +
+            record.teams.flatMap { it.members }.associate { it.uuid to it.name }
+        return WarEffect.PayWar(record.warId, roster.filterKeys { it.isNotBlank() }, names, record.winner)
     }
 
     private fun put(record: WarRecord) {
@@ -779,6 +866,12 @@ class WarCoordinator(
 
         /** A cancel is repeated at most this many polls. */
         const val CANCEL_REPEAT_POLLS: Int = 5
+
+        /** Consecutive "no such clan" answers before a war is cancelled as disbanded. */
+        const val DISBAND_CONFIRMATIONS: Int = 3
+
+        /** Absence minutes at which the absent clan is warned (only those below the abandon limit). */
+        val ABANDON_WARN_MINUTES: List<Int> = listOf(5, 10)
 
         private val DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd").withZone(ZoneOffset.UTC)
     }

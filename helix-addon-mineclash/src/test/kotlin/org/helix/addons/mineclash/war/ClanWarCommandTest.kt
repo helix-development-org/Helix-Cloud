@@ -132,7 +132,8 @@ class ClanWarCommandTest {
                 "clanwar.result.reward" to "+{kronen}",
             ),
         )
-        val runner = WarEffectRunner(invoker, messages, KronenRewards(invoker, { 0 }, { 0 }, { 30 }, { 120 })) { it.run() }
+        val paidWars = mutableListOf<String>()
+        val runner = WarEffectRunner(invoker, messages, KronenRewards(invoker, { 0 }, { 0 }, { 30 }, { 120 }), executor = { it.run() }) { paidWars += it }
         runner.run(
             listOf(
                 WarEffect.Message("Alice", Msg("clanwar.cancelled", mapOf("tag" to "ZULU"), mapOf("reason" to "clanwar.cancel_reason.CLAN"))),
@@ -145,6 +146,7 @@ class ClanWarCommandTest {
         assertEquals(listOf("Bob", "move failed"), messagesSent[1])
         assertEquals(listOf(listOf("uuid-a", "150", "mineclash", "war:w-1"), listOf("uuid-b", "30", "mineclash", "war:w-1")), calls.filter { it.action == "eco.api.deposit" }.map { it.arguments })
         assertEquals(listOf(listOf("Alice", "+150"), listOf("Bob", "+30")), messagesSent.drop(2))
+        assertEquals(listOf("w-1"), paidWars, "the payout is marked as paid")
     }
 
     @Test

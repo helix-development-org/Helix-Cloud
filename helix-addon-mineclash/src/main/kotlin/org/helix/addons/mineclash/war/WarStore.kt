@@ -13,6 +13,13 @@ interface WarStore : AutoCloseable {
     fun loadActive(): List<WarRecord>
 
     /**
+     * Finished wars whose Kronen payout has not run yet (`paidAt` missing), oldest first.
+     *
+     * @return the unpaid finished wars.
+     */
+    fun loadUnpaid(): List<WarRecord>
+
+    /**
      * Loads one war.
      *
      * @param warId war id.
@@ -80,6 +87,9 @@ class DocumentWarStore(private val storage: AddonStorage) : WarStore {
 
     override fun loadActive(): List<WarRecord> =
         all().filter { it.state in WarState.ACTIVE }.sortedBy { it.acceptedAt }
+
+    override fun loadUnpaid(): List<WarRecord> =
+        all().filter { it.state == WarState.FINISHED && it.paidAt == null }.sortedBy { it.acceptedAt }
 
     override fun load(warId: String): WarRecord? =
         storage.read(PREFIX + warId)?.let { runCatching { json.decodeFromString(WarRecord.serializer(), it) }.getOrNull() }

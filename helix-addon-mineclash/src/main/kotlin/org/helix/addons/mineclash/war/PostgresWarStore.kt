@@ -25,6 +25,14 @@ class PostgresWarStore(connection: StorageConnection) : WarStore {
     )
 
     init {
+        // A failing DDL (permissions, wrong database) must not leak the pool: close it and let the caller decide.
+        runCatching { createSchema() }.onFailure { failure ->
+            runCatching { pool.close() }
+            throw failure
+        }
+    }
+
+    private fun createSchema() {
         pool.connection.use { c ->
             c.createStatement().use { st ->
                 st.executeUpdate("CREATE SCHEMA IF NOT EXISTS mineclash")
@@ -57,6 +65,17 @@ class PostgresWarStore(connection: StorageConnection) : WarStore {
             ).use { st ->
                 st.executeQuery().use { rs ->
                     buildList { while (rs.next()) decode(rs.getString(1))?.let(::add) }.sortedBy { it.acceptedAt }
+                }
+            }
+        }
+
+    override fun loadUnpaid(): List<WarRecord> =
+        pool.connection.use { c ->
+            c.prepareStatement(
+                "SELECT body FROM mineclash.wars WHERE state = 'FINISHED' AND body->>'paidAt' IS NULL ORDER BY created_at",
+            ).use { st ->
+                st.executeQuery().use { rs ->
+                    buildList { while (rs.next()) decode(rs.getString(1))?.let(::add) }.filter { it.paidAt == null }
                 }
             }
         }

@@ -46,6 +46,22 @@ data class ClanView(val id: String, val name: String, val tag: String, val membe
     fun has(player: String): Boolean = player.lowercase() in members
 }
 
+/** Outcome of reading a clan: found, known not to exist, or the clan addon did not answer properly. */
+sealed interface ClanRead {
+    /**
+     * The clan exists.
+     *
+     * @property view the clan.
+     */
+    data class Found(val view: ClanView) : ClanRead
+
+    /** The clan addon answered that there is no such clan (disbanded or never existed). */
+    data object Missing : ClanRead
+
+    /** No usable answer (addon not installed, exception, unreadable reply) – says nothing about the clan. */
+    data object Failed : ClanRead
+}
+
 /** Clan data the clan-war coordinator needs (implemented by [ClanLookup], faked in tests). */
 interface ClanSource {
     /**
@@ -70,6 +86,15 @@ interface ClanSource {
      * @return true when clans can be read.
      */
     fun reachable(): Boolean = true
+
+    /**
+     * Reads a clan and tells "does not exist" apart from "could not be read" (membership checks must not end a war
+     * because the clan addon hiccuped).
+     *
+     * @param token clan id, tag or name.
+     * @return the outcome; the default maps a null [detail] to [ClanRead.Missing].
+     */
+    fun read(token: String): ClanRead = detail(token)?.let { ClanRead.Found(it) } ?: ClanRead.Missing
 }
 
 /**
@@ -135,11 +160,28 @@ class ClanLookup(
      * @param token clan id, tag or name.
      * @return the clan or null when it does not exist or the clan addon is unavailable.
      */
-    override fun detail(token: String): ClanView? {
-        val result = runCatching { actions.invoke(ActionInvocation("clan.detail", listOf(token))) }.getOrNull() ?: return null
-        if (!result.success) return null
+    override fun detail(token: String): ClanView? = (read(token) as? ClanRead.Found)?.view
+
+    /**
+     * Reads a clan through `clan.detail`: the clan addon's "no such clan" answer is [ClanRead.Missing], every other
+     * failure (unknown action, exception, unreadable JSON) is [ClanRead.Failed].
+     *
+     * @param token clan id, tag or name.
+     * @return the outcome.
+     */
+    override fun read(token: String): ClanRead {
+        val result = runCatching { actions.invoke(ActionInvocation("clan.detail", listOf(token))) }.getOrNull() ?: return ClanRead.Failed
+        if (!result.success) {
+            return if (result.lines.any { it.contains("no such clan", ignoreCase = true) }) ClanRead.Missing else ClanRead.Failed
+        }
+        val view = parse(result.lines.firstOrNull()) ?: return ClanRead.Failed
+        return ClanRead.Found(view)
+    }
+
+    private fun parse(line: String?): ClanView? {
+        if (line == null) return null
         return runCatching {
-            val obj = json.parseToJsonElement(result.lines.first()).jsonObject
+            val obj = json.parseToJsonElement(line).jsonObject
             val id = obj.getValue("id").jsonPrimitive.content
             ClanView(
                 id = id,

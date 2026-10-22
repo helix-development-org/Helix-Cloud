@@ -77,6 +77,8 @@ data class WarTeamRecord(val id: String, val clanId: String, val name: String, v
  * @property points final points per team id.
  * @property participants participants as reported by the war server.
  * @property cancelReason [WarProtocol.CancelReason] of a cancelled war.
+ * @property paidAt epoch millis the Kronen payout of a finished war ran, null while it is still open (paid on the
+ *   next node start when the node stopped in between).
  */
 @Serializable
 data class WarRecord(
@@ -96,6 +98,7 @@ data class WarRecord(
     val points: Map<String, Int> = emptyMap(),
     val participants: List<WarParticipant> = emptyList(),
     val cancelReason: String? = null,
+    val paidAt: Long? = null,
 ) {
     /**
      * The team of a clan.

@@ -1,5 +1,6 @@
 package org.helix.addons.mineclash.war
 
+import org.helix.addons.mineclash.clan.ClanRead
 import org.helix.addons.mineclash.clan.ClanSource
 import org.helix.addons.mineclash.clan.ClanView
 import org.helix.api.player.OnlinePlayer
@@ -15,6 +16,7 @@ class WarCoordinatorTest {
     private class FakeClans : ClanSource {
         val clans = linkedMapOf<String, ClanView>()
         var up = true
+        var failing = false
 
         fun add(id: String, tag: String, members: Map<String, String>) {
             clans[id] = ClanView(id, id.replaceFirstChar { it.uppercase() }, tag, members.mapKeys { it.key.lowercase() })
@@ -26,6 +28,9 @@ class WarCoordinatorTest {
             clans[token.lowercase()] ?: clans.values.firstOrNull { it.tag.equals(token, true) || it.name.equals(token, true) }
 
         override fun reachable(): Boolean = up
+
+        override fun read(token: String): ClanRead =
+            if (failing) ClanRead.Failed else detail(token)?.let { ClanRead.Found(it) } ?: ClanRead.Missing
     }
 
     private var now = 1_792_700_000_000L
@@ -107,7 +112,7 @@ class WarCoordinatorTest {
         assertTrue(war.warId.matches(Regex("w-\\d{8}-0001")))
         assertTrue("clanwar.accepted" in messagesTo(outcome.effects, "Alice"))
         assertTrue("clanwar.challenge.superseded" in messagesTo(outcome.effects, "Alice"), "Kronritter's incoming challenge from Drachen is dropped")
-        assertTrue("clanwar.challenge.expired" in messagesTo(outcome.effects, "Carl"))
+        assertTrue("clanwar.challenge.dropped" in messagesTo(outcome.effects, "Carl"))
         assertTrue("clanwar.service_starting" in messagesTo(outcome.effects, "Bob"))
         assertEquals(listOf("clanwar.challenge.none"), keys(coordinator.accept("Alice", "DRA")))
         assertEquals(listOf("clanwar.busy_target"), keys(coordinator.challenge("Carl", "ZULU")))
@@ -308,6 +313,16 @@ class WarCoordinatorTest {
         coordinator.tick()
         assertEquals(1, coordinator.active().size, "clan addon unreachable: nothing is cancelled")
         clans.up = true
+        clans.failing = true
+        now += 31_000
+        coordinator.poll("MineClash-War-1", status(wars = listOf(HostedWar(war.warId, "RUNNING"))))
+        assertEquals(1, coordinator.active().size, "a failed clan read is no disband")
+        clans.failing = false
+        repeat(2) {
+            now += 31_000
+            coordinator.poll("MineClash-War-1", status(wars = listOf(HostedWar(war.warId, "RUNNING"))))
+            assertEquals(1, coordinator.active().size, "one or two 'no such clan' answers are not enough")
+        }
         now += 31_000
         coordinator.poll("MineClash-War-1", status(wars = listOf(HostedWar(war.warId, "RUNNING"))))
         assertEquals(WarProtocol.CancelReason.DISBANDED, store.load(war.warId)?.cancelReason)
@@ -356,7 +371,7 @@ class WarCoordinatorTest {
         coordinator.challenge("Alice", "ZULU")
         coordinator.accept("Bob", "KRON")
         val second = coordinator.active().single()
-        assertEquals(listOf("war ${second.warId} cancelled"), coordinator.adminCancel(second.warId).replies.map { it.key })
+        assertEquals(listOf("clanwar.admin.cancelled"), coordinator.adminCancel(second.warId).replies.map { it.key })
         assertEquals(WarProtocol.CancelReason.ADMIN, store.load(second.warId)?.cancelReason)
     }
 
@@ -396,5 +411,99 @@ class WarCoordinatorTest {
         assertEquals(mapOf("wars" to 2), store.wipe(dryRun = true))
         assertEquals(mapOf("wars" to 2), store.wipe(dryRun = false))
         assertFalse(storage.keys().any { it.startsWith("war.") })
+    }
+
+    @Test
+    fun `a war server that restarted while the node was down loses its wars`() {
+        val running = acceptedWar()
+        coordinator.poll("MineClash-War-1", status(bootId = "b-1"))
+        coordinator.poll("MineClash-War-1", status(bootId = "b-1", wars = listOf(HostedWar(running.warId, "RUNNING"))))
+        assertEquals(WarState.RUNNING, coordinator.active().single().state)
+
+        coordinator = newCoordinator() // node restart: no known servers
+        coordinator.poll("MineClash-War-1", status(bootId = "b-2"))
+        assertEquals(WarProtocol.CancelReason.SERVER_LOST, store.load(running.warId)?.cancelReason)
+        assertTrue(coordinator.active().isEmpty())
+    }
+
+    @Test
+    fun `an assigned war of a restarted server goes back to the queue`() {
+        val war = acceptedWar()
+        coordinator.poll("MineClash-War-1", status(bootId = "b-1"))
+        assertEquals(WarState.ASSIGNED, coordinator.active().single().state)
+        coordinator = newCoordinator()
+        coordinator.poll("MineClash-War-1", status(bootId = "b-2", ready = 0))
+        val after = coordinator.active().single()
+        assertEquals(war.warId, after.warId)
+        assertEquals(WarState.QUEUED, after.state)
+    }
+
+    @Test
+    fun `a queued war that an alive server already runs is adopted`() {
+        val war = acceptedWar()
+        coordinator.poll("MineClash-War-1", status(ready = 0)) // no spare: stays queued
+        assertEquals(WarState.QUEUED, coordinator.active().single().state)
+        val answer = coordinator.poll("MineClash-War-1", status(ready = 0, wars = listOf(HostedWar(war.warId, "PREPARE", now + 120_000))))
+        val adopted = coordinator.active().single()
+        assertEquals(WarState.PREPARE, adopted.state)
+        assertEquals("MineClash-War-1", adopted.serviceId)
+        assertEquals(listOf(war.warId), answer.state.wars.map { it.warId }, "the server keeps it in its desired state")
+    }
+
+    @Test
+    fun `a result whose save fails keeps the war for the retry`() {
+        val inner = store
+        val failing = object : WarStore by inner {
+            var broken = false
+            override fun save(record: WarRecord) {
+                if (broken && record.state == WarState.FINISHED) error("database down")
+                inner.save(record)
+            }
+        }
+        store = failing
+        coordinator = newCoordinator()
+        val war = acceptedWar()
+        coordinator.poll("MineClash-War-1", status())
+        coordinator.poll("MineClash-War-1", status(wars = listOf(HostedWar(war.warId, "RUNNING"))))
+        val result = WarResult(war.warId, "A", WarProtocol.EndReason.POINT_LIMIT, mapOf("A" to 5000, "B" to 0), now, now + 1, emptyList())
+        failing.broken = true
+        assertTrue(runCatching { coordinator.finish("MineClash-War-1", result) }.isFailure)
+        assertEquals(1, coordinator.active().size, "nothing forgotten while the result is not stored")
+        failing.broken = false
+        assertEquals(WarCoordinator.RECORDED, coordinator.finish("MineClash-War-1", result).answer)
+        assertTrue(coordinator.active().isEmpty())
+    }
+
+    @Test
+    fun `payouts that did not run are paid after a node restart`() {
+        val war = acceptedWar()
+        coordinator.poll("MineClash-War-1", status())
+        coordinator.poll("MineClash-War-1", status(wars = listOf(HostedWar(war.warId, "RUNNING"))))
+        coordinator.finish("MineClash-War-1", WarResult(war.warId, "B", WarProtocol.EndReason.ABANDONED, emptyMap(), now, now + 1, emptyList()))
+        coordinator = newCoordinator()
+        val pending = coordinator.pendingPayouts().filterIsInstance<WarEffect.PayWar>()
+        assertEquals(listOf(war.warId), pending.map { it.warId })
+        coordinator.markPaid(war.warId)
+        assertTrue(coordinator.pendingPayouts().isEmpty())
+    }
+
+    @Test
+    fun `the node warns an absent clan at 5 and 10 minutes`() {
+        val war = acceptedWar()
+        coordinator.poll("MineClash-War-1", status())
+        fun report(presentB: Int) = coordinator.poll(
+            "MineClash-War-1",
+            status(wars = listOf(HostedWar(war.warId, "RUNNING", present = mapOf("A" to 1, "B" to presentB)))),
+        ).effects
+        assertTrue(messagesTo(report(0), "Bob").isEmpty())
+        now += 5 * 60_000
+        assertEquals(listOf("war.abandon.warning_own"), messagesTo(report(0), "Bob"))
+        assertTrue(messagesTo(report(0), "Bob").isEmpty(), "each threshold once")
+        assertTrue(messagesTo(report(0), "Alice").isEmpty(), "the present clan is not warned")
+        now += 5 * 60_000
+        assertEquals(listOf("war.abandon.warning_own"), messagesTo(report(0), "Bob"))
+        report(1)
+        now += 5 * 60_000
+        assertTrue(messagesTo(report(0), "Bob").isEmpty(), "a new absence starts counting again")
     }
 }

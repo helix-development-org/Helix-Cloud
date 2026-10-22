@@ -10,18 +10,23 @@ import java.util.concurrent.Executor
 /**
  * Runs the coordinator's side effects outside its lock, in order, on [executor] (a single thread in production,
  * direct in tests): chat messages in the recipient's language, moves to a war server (a failure is reported to
- * the player), war-server starts (`service.start` blocks while the workspace is prepared) and war payouts.
+ * the player) and war payouts. War-server starts (`service.start` blocks while the workspace is prepared) run on
+ * [blocking], so messages and moves queued behind them are not delayed.
  *
  * @property actions node action invoker.
  * @property messages the addon's localized messages.
  * @property kronen crown payouts.
  * @property executor where effects run.
+ * @property blocking where war-server starts run.
+ * @property onPaid called after the payout of a war ran (marks it paid).
  */
 class WarEffectRunner(
     private val actions: ActionInvoker,
     private val messages: Messages,
     private val kronen: KronenRewards,
     private val executor: Executor,
+    private val blocking: Executor = executor,
+    private val onPaid: (String) -> Unit = {},
 ) {
     private val logger = LoggerFactory.getLogger(WarEffectRunner::class.java)
 
@@ -32,11 +37,13 @@ class WarEffectRunner(
      */
     fun run(effects: List<WarEffect>) {
         if (effects.isEmpty()) return
-        executor.execute {
-            effects.forEach { effect ->
-                runCatching { apply(effect) }.onFailure { logger.warn("clan-war effect {} failed: {}", effect, it.message) }
-            }
-        }
+        val (starts, ordered) = effects.partition { it is WarEffect.StartService }
+        if (ordered.isNotEmpty()) executor.execute { ordered.forEach(::safely) }
+        starts.forEach { start -> blocking.execute { safely(start) } }
+    }
+
+    private fun safely(effect: WarEffect) {
+        runCatching { apply(effect) }.onFailure { logger.warn("clan-war effect {} failed: {}", effect, it.message) }
     }
 
     /**
@@ -75,9 +82,13 @@ class WarEffectRunner(
                 val result = actions.invoke(ActionInvocation("service.start", listOf(effect.task)))
                 logger.info("clan war: service.start {} → {}", effect.task, result.lines.joinToString(" "))
             }
-            is WarEffect.PayWar -> kronen.payWar(effect.warId, effect.players, effect.winner).forEach { (uuid, amount) ->
-                val name = effect.names[uuid] ?: return@forEach
-                actions.invoke(ActionInvocation("player.message", listOf(name, render(name, Msg("clanwar.result.reward", mapOf("kronen" to amount.toString()))))))
+            is WarEffect.PayWar -> {
+                val paid = kronen.payWar(effect.warId, effect.players, effect.winner)
+                runCatching { onPaid(effect.warId) }.onFailure { logger.warn("clan war {}: payout not marked as paid: {}", effect.warId, it.message) }
+                paid.forEach { (uuid, amount) ->
+                    val name = effect.names[uuid] ?: return@forEach
+                    actions.invoke(ActionInvocation("player.message", listOf(name, render(name, Msg("clanwar.result.reward", mapOf("kronen" to amount.toString()))))))
+                }
             }
         }
     }
