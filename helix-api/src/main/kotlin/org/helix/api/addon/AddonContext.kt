@@ -303,6 +303,17 @@ interface AddonContext {
     fun networkPackGeneration(): Int = 0
 
     /**
+     * The active theme of the network (`Helix/themes/<id>/`, see `docs/THEMES.md`): colour tokens, ranks,
+     * global placeholders, sound map, villager cast, navigator, cosmetics and `content/` files.
+     *
+     * Addons must read look and branding from here instead of hard-coding it, so a Helix install without
+     * theme looks neutral and a themed one looks like its network.
+     *
+     * @return the theme view; [org.helix.api.theme.ThemeView.NEUTRAL] when no theme is installed.
+     */
+    fun theme(): org.helix.api.theme.ThemeView = org.helix.api.theme.ThemeView.NEUTRAL
+
+    /**
      * Whether this addon is active for the given task.
      *
      * Tasks can turn addons off individually; addons with per-service

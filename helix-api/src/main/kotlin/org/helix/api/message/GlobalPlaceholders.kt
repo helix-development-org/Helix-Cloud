@@ -25,14 +25,16 @@ object GlobalPlaceholders {
     }
 
     /**
-     * Applies all global placeholders to a text.
+     * Applies all global placeholders to a text, then expands theme colour tokens (`<tc:accent>`, see
+     * [org.helix.api.theme.ThemeTokens]) with the token map installed in this process — placeholders such as
+     * `{wordmark}` may contain tokens themselves.
      *
      * @param text the text after message-specific substitution.
-     * @return the text with every global `{name}` replaced.
+     * @return the text with every global `{name}` replaced and colour tokens resolved to hex colours.
      */
     fun apply(text: String): String {
         var result = text
         values.forEach { (name, value) -> result = result.replace("{$name}", value) }
-        return result
+        return org.helix.api.theme.ThemeTokens.expand(result)
     }
 }

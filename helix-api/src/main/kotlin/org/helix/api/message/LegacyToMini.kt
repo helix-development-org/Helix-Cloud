@@ -25,12 +25,15 @@ object LegacyToMini {
     fun isLegacyCode(code: Char): Boolean = TAGS.containsKey(code.lowercaseChar())
 
     /**
-     * Rewrites all legacy codes in a text as MiniMessage tags.
+     * Rewrites all legacy codes in a text as MiniMessage tags and expands theme colour tokens
+     * (`<tc:accent>`, see [org.helix.api.theme.ThemeTokens]) with the token map installed in this process.
      *
      * @param text the raw text.
-     * @return the text with `&x`/`§x` replaced by MiniMessage tags.
+     * @return the text with `&x`/`§x` replaced by MiniMessage tags and colour tokens by hex colours.
      */
-    fun translate(text: String): String {
+    fun translate(text: String): String = org.helix.api.theme.ThemeTokens.expand(legacy(text))
+
+    private fun legacy(text: String): String {
         val builder = StringBuilder(text.length)
         var i = 0
         while (i < text.length) {

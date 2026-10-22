@@ -35,9 +35,21 @@ object LangResources {
      * @throws IllegalStateException if no language file exists at all —
      *  an addon opting into file-based messages must ship at least one.
      */
-    fun load(owner: Class<*>): Map<String, Map<String, String>> {
+    fun load(owner: Class<*>): Map<String, Map<String, String>> = load(owner, "")
+
+    /**
+     * Loads language files from a sub-directory of `lang/`, for jars that
+     * carry several message bundles (the node: `lang/velocity/`, `lang/network/` …).
+     *
+     * @param owner a class of the jar carrying the resources.
+     * @param directory sub-directory below `lang/` without slashes; empty means `lang/` itself.
+     * @return language code to (message key to template); languages whose file is missing are absent.
+     * @throws IllegalStateException if no language file exists at all.
+     */
+    fun load(owner: Class<*>, directory: String): Map<String, Map<String, String>> {
+        val base = if (directory.isEmpty()) "/lang/" else "/lang/$directory/"
         val loaded = LOCALES.mapNotNull { locale ->
-            val resource = owner.getResourceAsStream("/lang/$locale.json") ?: return@mapNotNull null
+            val resource = owner.getResourceAsStream("$base$locale.json") ?: return@mapNotNull null
             val text = resource.bufferedReader().use { it.readText() }
             val entries = json.parseToJsonElement(text).jsonObject
                 .mapValues { (_, value) -> value.jsonPrimitive.content }
