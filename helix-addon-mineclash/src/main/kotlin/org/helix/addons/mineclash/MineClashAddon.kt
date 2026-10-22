@@ -14,11 +14,27 @@ import org.helix.addons.mineclash.profile.ProfileRepository
 import org.helix.addons.mineclash.profile.KronenRewards
 import org.helix.addons.mineclash.profile.StatsReporter
 import org.helix.addons.mineclash.queue.Matchmaker
+import org.helix.addons.mineclash.war.DocumentWarStore
+import org.helix.addons.mineclash.war.PostgresWarStore
+import org.helix.addons.mineclash.war.ServiceDirectory
+import org.helix.addons.mineclash.war.WarArrival
+import org.helix.addons.mineclash.war.WarCoordinator
+import org.helix.addons.mineclash.war.WarEffectRunner
+import org.helix.addons.mineclash.war.WarProtocol
+import org.helix.addons.mineclash.war.WarSettings
+import org.helix.addons.mineclash.war.WarStore
+import org.helix.api.addon.PlayerListener
+import org.helix.api.message.Messages
+import org.helix.api.player.OnlinePlayer
 import org.helix.api.release.ReleaseReport
 import org.helix.api.release.ReleaseReset
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
 import org.slf4j.LoggerFactory
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 
 /** Permission for the write config actions (panel/REST/console), granted through the permissions addon. */
 private const val ADMIN_PERMISSION = "mineclash.admin"
@@ -32,6 +48,8 @@ private const val ADMIN_PERMISSION = "mineclash.admin"
  *   in the addon document store.
  * - Arena matchmaking: services queue players and poll for matches to host and players to move.
  * - Clan membership resolved through the `helix.clan` addon.
+ * - Clan wars (`/clanwar`): challenges, the war coordinator that hands wars to the `MineClash-War` servers and
+ *   their results (contract `Mineclash/docs/CLANWAR-CONTRACT.md`).
  *
  * All `mineclash.*` actions are bridge-invocable so the Paper component reaches them with its
  * per-service token via `POST /internal/action`.
@@ -45,10 +63,17 @@ class MineClashAddon : AddonBase() {
     private lateinit var clans: ClanLookup
     private lateinit var stats: StatsReporter
     private lateinit var kronen: KronenRewards
+    private lateinit var messages: Messages
+    private lateinit var warStore: WarStore
+    private lateinit var wars: WarCoordinator
+    private lateinit var effects: WarEffectRunner
+    private lateinit var services: ServiceDirectory
+    private var effectThread: ExecutorService? = null
+    private var warTicker: ScheduledExecutorService? = null
 
     /** Registers stores, actions and the dashboard panel. */
     override fun enable() {
-        loadMessages()
+        messages = loadMessages()
         config = ConfigStore(context.storage())
         profiles = openProfiles()
         matchmaker = Matchmaker(timeoutMillis = (config.setting("queue.timeoutSeconds")?.toLongOrNull() ?: 600L) * 1000)
@@ -58,10 +83,13 @@ class MineClashAddon : AddonBase() {
             context.actions,
             perMatch = { config.setting(KronenRewards.PER_MATCH)?.toLongOrNull() ?: 10L },
             perWin = { config.setting(KronenRewards.PER_WIN)?.toLongOrNull() ?: 40L },
+            perWar = { config.setting(KronenRewards.PER_WAR)?.toLongOrNull() ?: 30L },
+            perWarWin = { config.setting(KronenRewards.PER_WAR_WIN)?.toLongOrNull() ?: 120L },
         )
         registerConfigActions()
         registerProfileActions()
         registerQueueActions()
+        registerWar()
         action("mineclash.clan.of", "Machine API: clan membership of a player as JSON or 'null'.", "mineclash.clan.of <player>", bridgeInvocable = true) { inv ->
             val player = inv.arguments.firstOrNull() ?: return@action ActionResult.error("usage: mineclash.clan.of <player>")
             ActionResult.ok(clans.clanOf(player)?.let { json.encodeToString(it) } ?: "null")
@@ -70,9 +98,154 @@ class MineClashAddon : AddonBase() {
         logger.info("MineClash addon enabled: {} settings, collections {}", config.settings().size, config.collectionNames())
     }
 
-    /** Closes the profile repository. */
+    /** Stops the clan-war tasks and closes the repositories. */
     override fun onDisable() {
+        warTicker?.shutdownNow()
+        effectThread?.shutdown()
+        runCatching { effectThread?.awaitTermination(2, TimeUnit.SECONDS) }
+        if (::warStore.isInitialized) warStore.close()
         profiles.close()
+    }
+
+    private fun intSetting(key: String, default: Int): Int = config.setting(key)?.toIntOrNull() ?: default
+
+    private fun warSettings(): WarSettings {
+        return WarSettings(
+            prepareSeconds = intSetting("war.prepareSeconds", 120),
+            maxPlayersPerClan = intSetting("war.maxPlayersPerClan", 10),
+            abandonMinutes = intSetting("war.abandonMinutes", 15),
+            challengeExpirySeconds = intSetting("war.challengeExpirySeconds", 300),
+            queueTimeoutMinutes = intSetting("war.queueTimeoutMinutes", 10),
+            serverLostSeconds = intSetting("war.serverLostSeconds", 60),
+            warTask = config.setting("war.task")?.takeIf { it.isNotBlank() } ?: "MineClash-War",
+            gameTask = config.setting("queue.gameTask")?.takeIf { it.isNotBlank() } ?: "MineClash-Game",
+        )
+    }
+
+    private fun openWarStore(): WarStore {
+        val connection = context.storageConnection()
+        if (connection != null && connection.mode.equals("postgres", ignoreCase = true)) {
+            return runCatching<WarStore> { PostgresWarStore(connection) }
+                .onFailure { logger.warn("PostgreSQL war store unavailable, using document store: {}", it.message) }
+                .getOrElse { DocumentWarStore(context.storage()) }
+        }
+        return DocumentWarStore(context.storage())
+    }
+
+    /** Clan wars: coordinator, effect thread, periodic tick, player command, war-server machine API, join reminder. */
+    private fun registerWar() {
+        val settings = warSettings()
+        warStore = openWarStore()
+        services = ServiceDirectory(context.actions) { warSettings().gameTask }
+        val thread = Executors.newSingleThreadExecutor { runnable -> Thread(runnable, "mineclash-war-effects").apply { isDaemon = true } }
+        effectThread = thread
+        effects = WarEffectRunner(context.actions, messages, kronen, thread)
+        wars = WarCoordinator(
+            store = warStore,
+            clans = clans,
+            online = { context.onlinePlayers() },
+            uuidOf = { name -> context.resolvePlayerUuid(name) },
+            settings = ::warSettings,
+            returnTo = { services.returnTo() },
+        )
+        val ticker = Executors.newSingleThreadScheduledExecutor { runnable -> Thread(runnable, "mineclash-war-tick").apply { isDaemon = true } }
+        warTicker = ticker
+        ticker.scheduleAtFixedRate({ runCatching { effects.run(wars.tick()) }.onFailure { logger.warn("clan-war tick failed: {}", it.message) } }, 5, 5, TimeUnit.SECONDS)
+        ticker.scheduleAtFixedRate({ runCatching { services.refresh() } }, 1, 30, TimeUnit.SECONDS)
+        context.registerPlayerListener(
+            /** Reminds owners/officers of open incoming challenges when they join the network. */
+            object : PlayerListener {
+                override fun onJoin(player: OnlinePlayer) {
+                    runCatching { effects.run(wars.onJoin(player.name)) }
+                }
+            },
+        )
+        val gameAndWar = setOf(settings.gameTask, settings.warTask)
+        val warOnly = setOf(settings.warTask)
+        action(
+            "clanwar",
+            "Clan wars: challenge another clan, accept, deny, cancel, join the war world, show the status.",
+            "clanwar challenge|accept|deny|cancel|join|status [tag]",
+            playerCommand = true,
+            permission = "helix.clan",
+        ) { inv -> runWarCommand(inv.arguments) }
+        action(
+            "mineclash.war.command",
+            "Machine API: /clanwar for the clan menu (player, sub command, tag).",
+            "mineclash.war.command <player> <sub> [tag]",
+            bridgeInvocable = true,
+            bridgeTasks = gameAndWar,
+        ) { inv -> runWarCommand(inv.arguments) }
+        action(
+            "mineclash.clan.command",
+            "Machine API: runs /clan for a player (clan menu buttons).",
+            "mineclash.clan.command <player> <args…>",
+            bridgeInvocable = true,
+            bridgeTasks = gameAndWar,
+        ) { inv ->
+            val player = inv.arguments.firstOrNull() ?: return@action ActionResult.error("usage: mineclash.clan.command <player> <args…>")
+            if (!context.hasPermission(player, "helix.clan")) return@action ActionResult.error("no permission")
+            clans.invalidate()
+            context.actions.invoke(ActionInvocation("clan", inv.arguments))
+        }
+        action(
+            "mineclash.war.poll",
+            "Machine API: a war server's status in, its complete desired state out.",
+            "mineclash.war.poll <serviceId> <statusJson…>",
+            bridgeInvocable = true,
+            bridgeTasks = warOnly,
+        ) { inv ->
+            val service = inv.arguments.firstOrNull() ?: return@action ActionResult.error("usage: mineclash.war.poll <serviceId> <statusJson…>")
+            val status = runCatching { WarProtocol.status(inv.arguments.drop(1).joinToString(" ")) }
+                .getOrElse { return@action ActionResult.error("invalid status json: ${it.message}") }
+            val answer = wars.poll(service, status)
+            effects.run(answer.effects)
+            ActionResult.ok(WarProtocol.encode(answer.state))
+        }
+        action(
+            "mineclash.war.arrive",
+            "Machine API: may a player log in to this war server (rosters clan members within the limit).",
+            "mineclash.war.arrive <serviceId> <uuid> <name>",
+            bridgeInvocable = true,
+            bridgeTasks = warOnly,
+        ) { inv ->
+            val a = inv.arguments
+            if (a.size < 3) return@action ActionResult.error("usage: mineclash.war.arrive <serviceId> <uuid> <name>")
+            val decision = wars.arrive(a[0], a[1], a[2])
+            val arrival = decision.refusal?.let { WarArrival(ok = false, reason = effects.renderScreen(a[2], it)) }
+                ?: WarArrival(ok = true, warId = decision.warId, team = decision.team)
+            ActionResult.ok(WarProtocol.encode(arrival))
+        }
+        action(
+            "mineclash.war.finish",
+            "Machine API: result of a war (idempotent per war id).",
+            "mineclash.war.finish <serviceId> <resultJson…>",
+            bridgeInvocable = true,
+            bridgeTasks = warOnly,
+        ) { inv ->
+            val service = inv.arguments.firstOrNull() ?: return@action ActionResult.error("usage: mineclash.war.finish <serviceId> <resultJson…>")
+            val result = runCatching { WarProtocol.result(inv.arguments.drop(1).joinToString(" ")) }
+                .getOrElse { return@action ActionResult.error("invalid result json: ${it.message}") }
+            val answer = wars.finish(service, result)
+            effects.run(answer.effects)
+            ActionResult.ok(answer.answer)
+        }
+        action("mineclash.war.status", "Active clan wars, open challenges and war servers as JSON.", "mineclash.war.status", permission = ADMIN_PERMISSION) {
+            ActionResult.ok(wars.snapshot().toString())
+        }
+        action("mineclash.war.cancel", "Cancels an active clan war without a result.", "mineclash.war.cancel <warId>", permission = ADMIN_PERMISSION) { inv ->
+            val warId = inv.arguments.firstOrNull() ?: return@action ActionResult.error("usage: mineclash.war.cancel <warId>")
+            val outcome = wars.adminCancel(warId)
+            effects.run(outcome.effects)
+            ActionResult.ok(*outcome.replies.map { it.key }.toTypedArray())
+        }
+    }
+
+    private fun runWarCommand(arguments: List<String>): ActionResult {
+        val player = arguments.firstOrNull() ?: return ActionResult.error("usage: clanwar <sub> [tag]")
+        val outcome = wars.command(player, arguments.drop(1))
+        effects.run(outcome.effects)
+        return ActionResult.ok(*outcome.replies.map { effects.render(player, it) }.toTypedArray())
     }
 
     private fun openProfiles(): ProfileRepository {
@@ -167,7 +340,7 @@ class MineClashAddon : AddonBase() {
                 ReleaseReport(
                     addon = "mineclash",
                     mode = if (dryRun) ReleaseReset.PLAN else ReleaseReset.RUN,
-                    deleted = profiles.wipe(dryRun),
+                    deleted = profiles.wipe(dryRun) + warStore.wipe(dryRun),
                     kept = mapOf("config" to "settings, cards, chests, buildings, perks and servers"),
                 ).toJson(),
             )
