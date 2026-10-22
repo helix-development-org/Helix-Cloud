@@ -41,6 +41,7 @@ class ActionsTest {
     )
     private val routing = ProxyRoutingService(manager)
     private val registry = ActionRegistry()
+    private val commandQueue = org.helix.node.proxy.ProxyCommandQueue()
     private var shutdownCalled = false
 
     init {
@@ -52,6 +53,7 @@ class ActionsTest {
             overviewService = PlatformOverviewService("1.0.0", taskStore, manager),
             versionCatalog = { VersionCatalog(emptyList()) },
             shutdown = { shutdownCalled = true },
+            commandQueue = commandQueue,
         ).registerAll(registry)
     }
 
@@ -83,6 +85,26 @@ class ActionsTest {
         assertTrue(invoke("service.stop", "Lobby-1").success)
         executor.handles.first().exit(0)
         assertTrue(invoke("task.delete", "Lobby").success)
+    }
+
+    @Test
+    fun `player connect validates the target and queues a connect for the proxies`() {
+        assertTrue(invoke("task.create", "Proxy", "velocity", "3.4.0").success)
+        assertTrue(invoke("task.create", "Game", "paper", "1.21.11").success)
+        assertTrue(invoke("service.start", "Proxy").success)
+        assertTrue(invoke("service.start", "Game").success)
+
+        assertFalse(invoke("player.connect", "steve", "Nope-1").success, "unknown service")
+        assertFalse(invoke("player.connect", "steve", "Game-1").success, "not running yet")
+        manager.handleHeartbeat(org.helix.api.bridge.HeartbeatReport("Game-1", 0, 20))
+        assertFalse(invoke("player.connect", "steve", "Proxy-1").success, "a proxy is no destination")
+
+        val queued = invoke("player.connect", "steve", "game-1")
+        assertTrue(queued.success, queued.lines.joinToString())
+        val command = commandQueue.drain("Proxy-1").single()
+        assertEquals("connect", command.type)
+        assertEquals("Game-1", command.target)
+        assertEquals("steve", command.player)
     }
 
     @Test

@@ -442,12 +442,23 @@ class HelixVelocityBridgePlugin @Inject constructor(
     }
 
     /**
-     * Redirects kicked players to a fallback backend when possible.
+     * Redirects kicked players to a fallback backend when possible. A server that refuses a switch (full,
+     * whitelisted, not on a war roster …) does not move the player: they stay where they are and see the reason.
      *
      * @param event the kick event.
      */
     @Subscribe
     fun onKickedFromServer(event: KickedFromServerEvent) {
+        if (event.kickedDuringServerConnect() && event.player.currentServer.isPresent) {
+            val reason = event.serverKickReason.orElse(null) ?: translate(
+                event.player,
+                "helix.translations.velocity.connect.refused",
+                "{server} refused the connection.",
+                mapOf("server" to event.server.serverInfo.name),
+            )
+            event.result = KickedFromServerEvent.Notify.create(reason)
+            return
+        }
         val bypass = hasPermission(event.player.username, "helix.maintenance.bypass")
         val fallback = registry?.fallback(exclude = event.server.serverInfo.name, bypassMaintenance = bypass) ?: return
         event.result = KickedFromServerEvent.RedirectPlayer.create(
@@ -813,7 +824,38 @@ class HelixVelocityBridgePlugin @Inject constructor(
             "broadcast" -> proxy.allPlayers.forEach { player ->
                 player.sendMessage(commandComponent(command, player))
             }
+            "connect" -> proxy.getPlayer(command.player).ifPresent { player -> connect(player, command.target) }
             else -> logger.warn("Unknown proxy command type: {}", command.type)
+        }
+    }
+
+    /**
+     * Moves a player to the backend [targetId] (node action `player.connect`). Already being there is a no-op;
+     * an unknown server or a failed attempt leaves the player where they are and tells them why.
+     *
+     * @param player the player to move.
+     * @param targetId service id of the destination.
+     */
+    private fun connect(player: Player, targetId: String?) {
+        val target = targetId?.let { proxy.getServer(it).orElse(null) }
+        if (target == null) {
+            logger.warn("Connect for {} to unknown server {}", player.username, targetId)
+            player.sendMessage(
+                translate(player, "helix.translations.velocity.connect.unknown", "That server is not available right now."),
+            )
+            return
+        }
+        if (player.currentServer.map { it.serverInfo.name == target.serverInfo.name }.orElse(false)) return
+        player.createConnectionRequest(target).connect().whenComplete { result, error ->
+            if (error == null && result != null && result.isSuccessful) return@whenComplete
+            val reason = result?.reasonComponent?.orElse(null) ?: translate(
+                player,
+                "helix.translations.velocity.connect.failed",
+                "Could not connect you to {server}.",
+                mapOf("server" to target.serverInfo.name),
+            )
+            player.sendMessage(reason)
+            logger.info("Connect {} → {} failed: {}", player.username, target.serverInfo.name, error?.message ?: result?.status)
         }
     }
 

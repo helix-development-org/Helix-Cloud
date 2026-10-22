@@ -33,6 +33,18 @@ class ApiContractsTest {
     }
 
     @Test
+    fun `proxy commands round trip with and without a connect target`() {
+        val json = Json { ignoreUnknownKeys = true }
+        val connect = org.helix.api.proxy.ProxyCommand.connect("steve", "MineClash-War-1")
+        assertEquals(connect, json.decodeFromString<org.helix.api.proxy.ProxyCommand>(Json.encodeToString(connect)))
+        assertEquals("connect", connect.type)
+        // An older node's JSON without the field still decodes; an older bridge ignores the unknown field.
+        val legacy = json.decodeFromString<org.helix.api.proxy.ProxyCommand>("""{"type":"message","player":"steve","reason":"hi"}""")
+        assertEquals(null, legacy.target)
+        assertEquals(org.helix.api.proxy.ProxyCommand.message("steve", "hi"), legacy)
+    }
+
+    @Test
     fun `task definition validates bounds`() {
         assertFailsWith<IllegalArgumentException> {
             TaskDefinition(name = "", environment = Environment.PAPER, version = "1.21.11")

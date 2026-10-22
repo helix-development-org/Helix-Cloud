@@ -8,6 +8,7 @@ import org.helix.api.execution.ExecutorType
 import org.helix.api.message.MapMessages
 import org.helix.api.message.Messages
 import org.helix.api.proxy.ProxyCommand
+import org.helix.api.service.ServiceState
 import org.helix.api.storage.InMemoryAddonStorage
 import org.helix.api.task.AutoScaleSettings
 import org.helix.api.task.TaskDefinition
@@ -335,6 +336,22 @@ class BuiltinActions(
                 ActionResult.error("usage: player.message <player> <text...>")
             } else {
                 deliver(ProxyCommand.message(player, text))
+            }
+        }
+        register(
+            registry,
+            "player.connect",
+            "Moves a player to another backend server through the proxy they are connected to.",
+            "player.connect <player> <service>",
+        ) { invocation ->
+            val player = argument(invocation, 0, "player")
+            val target = argument(invocation, 1, "service")
+            val service = manager.services().firstOrNull { it.id.equals(target, ignoreCase = true) }
+            when {
+                service == null -> ActionResult.error("unknown service: $target")
+                service.environment.proxy -> ActionResult.error("$target is a proxy, not a backend server")
+                service.state != ServiceState.RUNNING -> ActionResult.error("$target is not running (${service.state})")
+                else -> deliver(ProxyCommand.connect(player, service.id))
             }
         }
         register(

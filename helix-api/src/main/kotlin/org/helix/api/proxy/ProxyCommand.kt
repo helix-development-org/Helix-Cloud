@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 /**
  * A command a proxy bridge picks up from the node on its next sync.
  *
- * @property type command type: `kick`, `message` or `broadcast`.
+ * @property type command type: `kick`, `message`, `broadcast` or `connect`.
  * @property player target player name; `*` for broadcasts.
  * @property reason kick reason or message text; `&` color codes are
  *   rendered by the bridge. Used as fallback when [translationKey] is unset
@@ -14,6 +14,8 @@ import kotlinx.serialization.Serializable
  *   each receiving player's language before rendering.
  * @property params placeholder name to value pairs substituted into the
  *   resolved translation.
+ * @property target service id a `connect` command moves the player to;
+ *   `null` for every other type.
  */
 @Serializable
 data class ProxyCommand(
@@ -22,6 +24,7 @@ data class ProxyCommand(
     val reason: String? = null,
     val translationKey: String? = null,
     val params: Map<String, String> = emptyMap(),
+    val target: String? = null,
 ) {
     companion object {
         /**
@@ -44,6 +47,16 @@ data class ProxyCommand(
          */
         fun message(player: String, text: String): ProxyCommand =
             ProxyCommand(type = "message", player = player, reason = text)
+
+        /**
+         * Creates a server switch: the proxy connects the player to [target].
+         *
+         * @param player target player name.
+         * @param target service id of the destination server.
+         * @return the connect [ProxyCommand].
+         */
+        fun connect(player: String, target: String): ProxyCommand =
+            ProxyCommand(type = "connect", player = player, target = target)
 
         /**
          * Creates a network-wide broadcast command.
