@@ -44,15 +44,31 @@ Server prüft jeden Endpunkt selbst.
 | `helix.panel.services.backups` | `POST /services/{id}/backups` |
 | `helix.panel.tasks` / `.tasks.edit` | Lesen / `PUT`, `DELETE /tasks/{name}` |
 | `helix.panel.proxy` / `.proxy.control` | `GET /proxy`, `GET /proxy/whitelist` / Wartung und Whitelist ändern |
-| `helix.panel.players` / `.players.manage` | Liste, Suche / Nachricht, Kick, Bann |
-| `helix.panel.schedules` / `.schedules.edit` | Lesen / anlegen, löschen, ausführen |
+| `helix.panel.players` / `.players.manage` | Liste, Suche (ohne gespeicherte Spielerdaten) / Nachricht, Kick, Bann, Spielerdaten in der Suche (`sources`) |
+| `helix.panel.schedules` / `.schedules.edit` | Lesen / anlegen, löschen, ausführen – nur Aktionen, die man selbst aufrufen darf (Jobs laufen mit Systemrechten; `createdBy` hält fest, wer den Job gespeichert hat) |
 | `helix.panel.backups` / `.backups.restore` | Liste / wiederherstellen, löschen |
 | `helix.panel.files` / `.files.edit` | Lesen / schreiben, löschen |
 | `helix.panel.addons` / `.addons.manage` | Liste / ein- und ausschalten |
 | `helix.panel.translations` / `.translations.edit` | Lesen / ändern |
-| `helix.panel.access` | `GET /access/catalog`: alle Rechte mit Bezeichnung für die Zugriffs-Matrix (Gruppen ändert man über `perm.group.grant`/`revoke`) |
+| `helix.panel.access` | `GET /access/catalog`: alle Rechte mit Bezeichnung für die Zugriffs-Matrix (`critical: true` = admin-gleich). Die Matrix **ansehen**; ändern (`perm.access.set`, `perm.access.presets`) darf nur `helix.admin`. |
 
 `helix.panel.<bereich>.*` vergibt einen Bereich komplett.
+
+**Admin-gleiche Rechte** (`critical` im Katalog, Warnung im Dashboard, nie in Voreinstellungen):
+`services.console`, `files.edit`, `tasks.edit`, `addons.manage`, `schedules.edit`, `access`. Wer eines davon hat,
+kann sich über Konsole, Dateien, Tasks, Addons oder geplante Aktionen volle Kontrolle verschaffen.
+
+**Spieler-Befehle** (Aktionen mit `playerCommand`, z. B. `clan`, `discord`) nehmen den ausführenden Spieler als
+erstes Argument. Über `POST /actions` darf sie deshalb nur ein Admin aufrufen; für alle anderen sind sie nur ingame
+nutzbar (`403 player commands are in-game only`).
+
+**Log-Streams** (`/logs/stream`, `/services/{id}/logs/stream`) prüfen Sitzung und Recht etwa alle 10 Sekunden neu
+und enden mit dem Ereignis `revoked`, sobald eines davon wegfällt.
+
+**Upgrade:** Bis 0.91 gab `helix.panel.services` auch Stoppen, Kill und Konsole frei, `helix.panel.tasks` das
+Bearbeiten usw. Gruppen, die solche Rechte nur über das Ansehen-Recht hatten, verlieren sie; im Dashboard unter
+„Zugriff“ (als Admin) die passenden Steuer-Rechte vergeben – z. B. `helix.panel.services.control` zum Stoppen,
+`helix.panel.services.logs` für die Konsole lesen, `helix.panel.services.console` zum Schreiben.
 
 ## Platform
 

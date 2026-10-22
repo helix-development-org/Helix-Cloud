@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Sicherheit: Dashboard-Rechte, Bug-Anhänge, Spieler-Befehle
+
+- **Anhänge nur noch als Bild oder Text** (`image/png|jpeg|gif|webp`, `text/plain`, sonst `invalid_mime`); die
+  Panels bauen Bilder und Download-Links ohne HTML-Parser. Ein präparierter MIME-Typ konnte vorher Code im
+  Bugs-Tab des Teams ausführen.
+- **Spieler-Befehle über `POST /actions` nur für Admins**: Wer im Dashboard angemeldet war, konnte z. B.
+  `clan <Name> disband` im Namen eines anderen Spielers auslösen.
+- **Zugriffs-Matrix ändern nur mit `helix.admin`**; admin-gleiche Rechte (`services.console`, `files.edit`,
+  `tasks.edit`, `addons.manage`, `schedules.edit`, `access`) sind im Katalog markiert und nie in Voreinstellungen.
+  Zeitpläne lassen nur Aktionen zu, die der Anlegende selbst aufrufen darf (`createdBy`).
+- **Voreinstellungen** einmal pro Gruppe; eine Gruppe mit eigenem oder verneintem Dashboard-Recht bleibt
+  unangetastet. `feedback.staff` schließt `feedback.report` ein.
+- **Tester sehen keine Server-Logs** mehr, auch nicht in den eigenen Meldungen; Team-Mitglieder handeln im
+  Dashboard immer unter ihrem eigenen Namen; Uploads gehören ihrem Hochlader (höchstens 4 offene pro Tester).
+- **Spielersuche** zeigt gespeicherte Spielerdaten nur mit `helix.panel.players.manage`; Log-Streams enden, sobald
+  das Recht wegfällt; `lobby.spawn.set` nur noch von Lobby-Servern für einen Online-Spieler.
+- **Upgrade-Hinweis:** Ansehen-Rechte enthalten keine Steuer- oder Konsolenrechte mehr (siehe `docs/REST.md`).
+
 ### IGuard: Abbauzeit, Mehrfachziele auf Mobs, Autoclicker-Schwellen
 
 - **`world.fastbreak.a` prüft die Vanilla-Abbauzeit**: Der Server misst beim
