@@ -66,9 +66,12 @@ class FeedbackAddon(
             hasPermission = { name, node -> runCatching { context.hasPermission(name, node) }.getOrDefault(false) },
         )
         registerActions()
+        registerTesterArea()
         registerRelease()
         publishSettings(service.settings())
         panel("feedback", "Bugs", "/panel.html")
+        panel("testguide", "Befehle", "/testguide.html", GUIDE_ICON)
+        panel("bugreport", "Bug melden", "/bugreport.html", BUGREPORT_ICON)
     }
 
     override fun onDisable() {
@@ -337,6 +340,63 @@ class FeedbackAddon(
     }
 
     /**
+     * The tester area of the dashboard (tabs „Befehle“ and „Bug melden“) and the in-game `/befehle` link: the command
+     * guide, the public report limits and the reporter's own attachments.
+     */
+    private fun registerTesterArea() {
+        action("feedback.testguide", "The tester command guide (JSON catalog).", "feedback.testguide", permission = REPORT) { _ ->
+            val raw = TestGuide.raw() ?: return@action fail("not_found", "command guide missing")
+            ActionResult.ok(raw)
+        }
+        action("feedback.limits", "Public report limits for the tester tab.", "feedback.limits", permission = REPORT) { _ ->
+            val s = service.settings()
+            ActionResult.ok(
+                buildJsonObject {
+                    put("testphase", s.testphase)
+                    put("cooldownSeconds", s.cooldownSeconds)
+                    put("maxPerDay", s.maxPerDay)
+                    put("maxAttachmentBytes", s.maxAttachmentBytes)
+                    put("maxAttachmentsPerReport", s.maxAttachmentsPerReport)
+                }.toString(),
+            )
+        }
+        action(
+            "feedback.attachment.mine",
+            "Returns an attachment of a report the caller may see (reporter or staff): mime, base64.",
+            "feedback.attachment.mine <id> [viewerJson]",
+            permission = REPORT,
+        ) { inv ->
+            val id = inv.arguments.getOrNull(0) ?: return@action bad("usage: feedback.attachment.mine <id> [viewerJson]")
+            val viewer = viewer(inv, ref(body(inv, 1)))
+            when (val outcome = service.attachmentFor(id, viewer)) {
+                is Outcome.Ok -> ActionResult.ok(outcome.value.first, Base64.getEncoder().encodeToString(outcome.value.second))
+                is Outcome.Fail -> fail(outcome.code, outcome.detail)
+            }
+        }
+        action(
+            "befehle",
+            "Links to the tester command guide in the dashboard.",
+            "befehle",
+            playerCommand = true,
+            permission = REPORT,
+        ) { inv ->
+            val player = inv.arguments.firstOrNull() ?: return@action ActionResult.error("missing executing player")
+            val url = panelUrl()
+            if (url == null) {
+                ActionResult.ok(messages.formatFor(player, "guide.nourl"))
+            } else {
+                ActionResult.ok(messages.formatFor(player, "guide.link", "url" to guideLink(url)))
+            }
+        }
+    }
+
+    /** The public dashboard address from the admin addon (`admin.panelurl`), `null` when none is set. */
+    private fun panelUrl(): String? {
+        val result = runCatching { context.actions.invoke(ActionInvocation("admin.panelurl", emptyList(), ActionSource.ADDON)) }.getOrNull()
+        return result?.takeIf { it.success }?.lines?.firstOrNull()?.trim()?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
+    }
+
+    /**
      * Release reset participant, reward redemption and the beta-tester profile entry (plan 1, sections 8/9).
      */
     private fun registerRelease() {
@@ -549,5 +609,19 @@ class FeedbackAddon(
         const val LOG_TAIL = 2000
         /** Bridge value carrying the public settings. */
         const val SETTINGS_KEY = "feedback.settings"
+
+        /** Sidebar icon of the tab „Befehle“ (terminal prompt). */
+        const val GUIDE_ICON = "<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M7 9l3 3-3 3M12 15h5\"/>"
+
+        /** Sidebar icon of the tab „Bug melden“ (bug). */
+        const val BUGREPORT_ICON = "<rect x=\"8\" y=\"6\" width=\"8\" height=\"14\" rx=\"4\"/><path d=\"M12 6V3M8 11H4M20 11h-4M8 16H5M19 16h-3M9 4l1 2M15 4l-1 2\"/>"
+
+        /**
+         * Deep link into the dashboard tab „Befehle“.
+         *
+         * @param panelUrl public dashboard address.
+         * @return the link (`…/#view=panel:testguide`).
+         */
+        fun guideLink(panelUrl: String): String = panelUrl.trimEnd('/') + "/#view=panel:testguide"
     }
 }

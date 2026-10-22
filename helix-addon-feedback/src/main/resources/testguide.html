@@ -1,0 +1,89 @@
+<style>
+  .filters{display:grid;grid-template-columns:minmax(220px,2fr) repeat(2,minmax(150px,1fr));gap:10px;align-items:end}
+  @media (max-width:760px){.filters{grid-template-columns:1fr}}
+  .mode-head{display:flex;align-items:center;gap:10px}
+  .cmd{font-family:var(--mono);font-size:13px;white-space:nowrap;cursor:copy;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:3px 8px;display:inline-block}
+  .cmd:hover{border-color:var(--gold)}
+  td.text{font-size:13.5px;line-height:1.45}
+  td.expected{color:var(--ink-2)}
+  .perm{font-family:var(--mono);font-size:11.5px;color:var(--ink-3)}
+  .aud-Spieler{background:var(--good);color:#fff;text-shadow:0 1px 0 #2a160a}
+  .aud-Tester{background:var(--info);color:#fff;text-shadow:0 1px 0 #2a160a}
+  .aud-Team{background:var(--surface-2);color:var(--ink-2)}
+  .intro{font-size:14px;line-height:1.5;margin:0}
+  .hidden{display:none!important}
+</style>
+
+<div class="card">
+  <div class="card-head"><h2>Befehle zum Testen</h2><span class="sub" id="count"></span></div>
+  <div class="card-body">
+    <p class="intro">Hier steht jeder Befehl im Spiel mit einer kurzen Erklärung und dem, was beim Testen passieren soll.
+      Klick auf einen Befehl kopiert ihn. Passiert etwas anderes als beschrieben, melde es im Tab <strong>Bug melden</strong>
+      oder im Spiel mit <span class="cmd" data-copy="/bug">/bug</span>.</p>
+    <div class="filters" style="margin-top:14px">
+      <div><label>Suche</label><input id="q" placeholder="Befehl oder Stichwort, z. B. clan, plot, kronen …"></div>
+      <div><label>Bereich</label><select id="mode"><option value="">alle Bereiche</option></select></div>
+      <div><label>Für</label><select id="aud"><option value="">alle</option></select></div>
+    </div>
+  </div>
+</div>
+<div id="list"><div class="card"><div class="empty">lädt …</div></div></div>
+
+<script>
+"use strict";
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const $ = id => document.getElementById(id);
+const MODES = ["Netzwerk", "Lobby", "MineClash", "CityBuild", "Testphase"];
+const AUDIENCES = { Spieler: "Spieler", Tester: "Tester", Team: "nur Team" };
+let entries = [];
+
+MODES.forEach(m => $("mode").insertAdjacentHTML("beforeend", `<option value="${m}">${m}</option>`));
+Object.entries(AUDIENCES).forEach(([k, v]) => $("aud").insertAdjacentHTML("beforeend", `<option value="${k}">${esc(v)}</option>`));
+
+async function copy(text) {
+  try { await navigator.clipboard.writeText(text); Helix.toast(`Kopiert: ${text}`); }
+  catch (e) {
+    const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); Helix.toast(`Kopiert: ${text}`); } catch (e2) { Helix.toast("Kopieren nicht erlaubt"); }
+    ta.remove();
+  }
+}
+document.addEventListener("click", ev => {
+  const el = ev.target.closest("[data-copy]");
+  if (el) copy(el.dataset.copy);
+});
+
+function matches(e, q) {
+  if (!q) return true;
+  const hay = `${e.command} ${e.summary} ${e.expected} ${e.permission || ""} ${e.mode}`.toLowerCase();
+  return q.split(/\s+/).every(w => hay.includes(w));
+}
+function render() {
+  const q = $("q").value.trim().toLowerCase(), mode = $("mode").value, aud = $("aud").value;
+  const shown = entries.filter(e => (!mode || e.mode === mode) && (!aud || e.audience === aud) && matches(e, q));
+  $("count").textContent = `${shown.length} von ${entries.length} Befehlen`;
+  if (!shown.length) { $("list").innerHTML = '<div class="card"><div class="empty">Kein Befehl passt zur Suche.</div></div>'; return; }
+  $("list").innerHTML = MODES.filter(m => shown.some(e => e.mode === m)).map(m => {
+    const rows = shown.filter(e => e.mode === m);
+    return `<div class="card">
+      <div class="card-head mode-head"><h2>${esc(m)}</h2><span class="sub">${rows.length} Befehle</span></div>
+      <table><thead><tr><th>Befehl</th><th>Was er macht</th><th>Das soll passieren</th><th>Für</th></tr></thead><tbody>${
+        rows.map(e => `<tr>
+          <td><span class="cmd" data-copy="${esc(e.command)}" title="Klicken zum Kopieren">${esc(e.command)}</span>${e.permission ? `<div class="perm">${esc(e.permission)}</div>` : ""}</td>
+          <td class="text">${esc(e.summary)}</td>
+          <td class="text expected">${esc(e.expected)}</td>
+          <td><span class="badge aud-${esc(e.audience)}">${esc(AUDIENCES[e.audience] || e.audience)}</span></td></tr>`).join("")
+      }</tbody></table></div>`;
+  }).join("");
+}
+let typing;
+$("q").oninput = () => { clearTimeout(typing); typing = setTimeout(render, 150); };
+$("mode").onchange = render; $("aud").onchange = render;
+
+Helix.ready(async () => {
+  const r = await Helix.action("feedback.testguide");
+  if (!r.success) { $("list").innerHTML = `<div class="card"><div class="empty">Befehls-Übersicht nicht ladbar (${esc(r.lines[0] || "Fehler")}).</div></div>`; return; }
+  try { entries = JSON.parse(r.lines.join("\n")).entries || []; } catch (e) { entries = []; }
+  render();
+});
+</script>

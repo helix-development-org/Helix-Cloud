@@ -36,6 +36,26 @@ Team members with `tester.manage` use the proxy command:
 /tester list                      # all testers with remaining time
 ```
 
+## Panel für Tester
+
+Tester sind kein Team: Im Webpanel sehen sie nur zwei eigene Tabs (Rechte `helix.panel.login`,
+`helix.panel.addon.testguide`, `helix.panel.addon.bugreport` – bei neuen Installationen in der Gruppe
+`tester`, bestehende Gruppen bekommen sie einmalig per Voreinstellung).
+
+1. **Login:** Panel-Adresse öffnen, Minecraft-Namen eingeben; der Code kommt im Spiel als Nachricht
+   (der Tester muss online sein) und wird im Panel bestätigt.
+2. **Tab „Befehle“:** jeder Ingame-Befehl mit Aufruf (`/clan create <Tag> <Name>`), Erklärung und dem, was
+   beim Testen passieren soll – Suche, Filter nach Bereich und Zielgruppe, Klick kopiert den Befehl. Im Spiel
+   zeigt `/befehle` einen Link direkt auf diesen Tab (Panel-Adresse aus `admin.panelurl`). Der Katalog liegt in
+   `helix-addon-feedback/src/main/resources/testguide/commands.json`; neue Befehle dort nachtragen.
+3. **Tab „Bug melden“:** Formular (Bereich, Schwere, Titel, Beschreibung, Screenshot) und „Meine Meldungen“
+   mit Status, Verlauf und Team-Antworten. Es gelten dieselben Limits und die Tester-Vereinbarung wie bei
+   `/bug`; Meldungen aus dem Panel haben die Quelle `panel` und keinen Server-Kontext (Ort und Logs gibt es nur
+   ingame). Exploit-Meldungen sehen nur das Team und der Melder.
+
+Der Team-Tab „Bugs“ (alle Meldungen, Status, Zuständigkeit) braucht `feedback.staff` bzw. den Panel-Tab
+`helix.panel.addon.feedback`.
+
 ## Afterwards
 
 At the end of the test phase every former tester keeps the permanent badge permission

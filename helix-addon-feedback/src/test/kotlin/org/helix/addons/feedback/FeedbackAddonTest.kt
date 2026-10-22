@@ -137,6 +137,52 @@ class FeedbackAddonTest {
     }
 
     @Test
+    fun `testers fetch only attachments of their own reports`() {
+        context.uuidsByName["alice"] = "uuid-alice"
+        context.uuidsByName["bob"] = "uuid-bob"
+        context.permissionCheck = { player, perm -> perm == "feedback.report" || (player == "mod" && perm == "feedback.staff") }
+        val nr = create("alice")
+        val data = Base64.getEncoder().encodeToString(byteArrayOf(1, 2, 3))
+        val att = call("feedback.attach", nr.toString(), "shot.png", "image/png", data, """{"uuid":"uuid-alice","name":"alice"}""")
+        assertTrue(att.success, att.lines.joinToString())
+        val id = Json.parseToJsonElement(att.lines[0]).jsonObject["id"]!!.jsonPrimitive.content
+
+        assertEquals(listOf("image/png", data), panel("feedback.attachment.mine", "alice", id).lines)
+        assertEquals("forbidden", panel("feedback.attachment.mine", "bob", id).lines[0])
+        assertTrue(panel("feedback.attachment.mine", "mod", id).success, "staff sees every attachment")
+        assertEquals("not_found", panel("feedback.attachment.mine", "alice", "nope").lines[0])
+        assertFalse(context.handlers.getValue("feedback.attachment.mine").first.bridgeInvocable)
+    }
+
+    @Test
+    fun `tester area serves the guide and the public limits`() {
+        context.uuidsByName["bob"] = "uuid-bob"
+        val guide = panel("feedback.testguide", "bob")
+        assertTrue(guide.success, guide.lines.joinToString())
+        assertTrue(TestGuide.parse(guide.lines[0]).entries.isNotEmpty())
+        val limits = Json.parseToJsonElement(panel("feedback.limits", "bob").lines[0]).jsonObject
+        assertEquals(2 * 1024 * 1024, limits["maxAttachmentBytes"]!!.jsonPrimitive.int)
+        assertEquals("true", limits["testphase"]!!.jsonPrimitive.content)
+        for (action in listOf("feedback.testguide", "feedback.limits", "feedback.attachment.mine", "befehle")) {
+            assertEquals("feedback.report", context.handlers.getValue(action).first.permission, action)
+        }
+        assertTrue(context.handlers.getValue("befehle").first.playerCommand)
+    }
+
+    @Test
+    fun `befehle links to the guide tab or explains the login`() {
+        val noUrl = call("befehle", "bob", source = ActionSource.REST)
+        assertTrue(noUrl.success)
+        assertFalse(noUrl.lines[0].contains("#view="), "no panel address configured")
+        context.invocationResult = { inv ->
+            if (inv.action == "admin.panelurl") ActionResult.ok("https://panel.kronland.de") else ActionResult.ok()
+        }
+        val link = call("befehle", "bob", source = ActionSource.REST)
+        assertTrue(link.lines[0].contains("https://panel.kronland.de/#view=panel:testguide"), link.lines.joinToString())
+        assertEquals("https://panel.kronland.de/#view=panel:testguide", FeedbackAddon.guideLink("https://panel.kronland.de/"))
+    }
+
+    @Test
     fun `player-facing actions need feedback report, the workflow feedback staff`() {
         val declared = context.handlers.mapValues { it.value.first.permission }
         for (action in listOf("feedback.create", "feedback.get", "feedback.comment", "feedback.attach", "feedback.attach.chunk", "feedback.attach.finish", "feedback.mine", "feedback.whoami")) {

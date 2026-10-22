@@ -124,5 +124,7 @@
   "release.reward.network": "<#4ac85e>Danke fürs Testen! Release-Belohnung: <#ffcf4a>{kronen} Kronen</#ffcf4a>{extra}.</#4ac85e>",
   "release.reward.extra": " und Freischaltungen",
   "release.reward.citybuild": "<#f1e2c2>Weitere Release-Belohnungen (Schlüssel/Items) liegen beim ersten CityBuild-Besuch in deiner Abholkiste.</#f1e2c2>",
-  "release.reward.failed": "<#ff5a4a>Deine Release-Belohnung konnte gerade nicht ausgezahlt werden. Wir versuchen es beim nächsten Join erneut.</#ff5a4a>"
+  "release.reward.failed": "<#ff5a4a>Deine Release-Belohnung konnte gerade nicht ausgezahlt werden. Wir versuchen es beim nächsten Join erneut.</#ff5a4a>",
+  "guide.link": "<#f1e2c2>Alle Befehle zum Testen stehen im Panel: <click:open_url:'{url}'><hover:show_text:'Im Browser öffnen'><#ffcf4a><u>Befehls-Übersicht öffnen</u></#ffcf4a></hover></click> <#7a4a24>—</#7a4a24> <#f1e2c2>Login mit deinem Minecraft-Namen, den Code bekommst du hier im Spiel.",
+  "guide.nourl": "<#f1e2c2>Die Befehls-Übersicht liegt im Panel (Tab <#ffcf4a>Befehle</#ffcf4a>). Frag das Team nach der Panel-Adresse und melde dich dort mit deinem Minecraft-Namen an – den Code bekommst du hier im Spiel."
 }

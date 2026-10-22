@@ -1,0 +1,254 @@
+<style>
+  .tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+  .tabs .btn[aria-pressed="true"]{background:var(--gold);color:#2a160a;text-shadow:none;--hi:#fff0a8;--lo:#e0a420}
+  .form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .form .full{grid-column:1/-1}
+  @media (max-width:760px){.form{grid-template-columns:1fr}}
+  textarea{min-height:150px;resize:vertical}
+  .hint{font-size:12.5px;color:var(--ink-3);margin-top:4px}
+  .warn-box{border:2px solid var(--bad);border-radius:12px;padding:8px 12px;font-size:13px;background:var(--surface-2)}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  tr.clickable{cursor:pointer}
+  .st-new{background:var(--info);color:#fff;text-shadow:0 1px 0 #2a160a}
+  .st-confirmed{background:var(--gold);color:#2a160a}
+  .st-in_progress{background:var(--warn);color:#2a160a}
+  .st-fixed{background:var(--good);color:#fff;text-shadow:0 1px 0 #2a160a}
+  .st-closed{background:var(--surface-2);color:var(--ink-3)}
+  .st-rejected,.st-not_a_bug,.st-duplicate{background:var(--surface-2);color:var(--ink-2);text-decoration:line-through}
+  .desc{white-space:pre-wrap;line-height:1.5;font-size:14px}
+  .comment{border-bottom:1px solid var(--line);padding:9px 0}
+  .comment .who{font-weight:800}
+  .ev{font-size:12.5px;color:var(--ink-2);padding:3px 0}
+  .thumbs{display:flex;gap:10px;flex-wrap:wrap}
+  .thumbs figure{margin:0;border:2px solid var(--outline);border-radius:12px;overflow:hidden;background:var(--surface-2);max-width:220px}
+  .thumbs img{display:block;max-width:220px;max-height:150px;cursor:zoom-in}
+  .thumbs figcaption{font-size:11.5px;padding:4px 8px;color:var(--ink-3)}
+  .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:50;cursor:zoom-out}
+  .lightbox img{max-width:94vw;max-height:94vh;border-radius:12px}
+  .hidden{display:none!important}
+</style>
+
+<div class="tabs" id="tabs">
+  <button class="btn sm subtle" data-tab="new" aria-pressed="true">Neue Meldung</button>
+  <button class="btn sm subtle" data-tab="mine">Meine Meldungen</button>
+</div>
+
+<section id="view-new">
+  <div class="card">
+    <div class="card-head"><h2>Bug melden</h2><span class="sub" id="who"></span></div>
+    <div class="card-body">
+      <div id="closed" class="warn-box hidden">Die Testphase ist gerade geschlossen – neue Meldungen sind nicht möglich.</div>
+      <div class="form">
+        <div><label>Bereich</label><select id="n-category"></select></div>
+        <div><label>Schwere</label><select id="n-severity"></select>
+          <div class="hint" id="sev-hint"></div></div>
+        <div class="full"><label>Titel</label><input id="n-title" maxlength="80" placeholder="Kurz und konkret, z. B. „Clan-Bank zieht doppelt ab“"></div>
+        <div class="full"><label>Beschreibung</label><textarea id="n-desc" maxlength="4000"
+          placeholder="Was hast du gemacht? Was ist passiert? Was hättest du erwartet? Auf welchem Server, wo genau?"></textarea>
+          <div class="hint">Schritte zum Nachstellen helfen am meisten. Im Spiel mit <strong>/bug</strong> hängt der Server Ort, Server und Logs automatisch an.</div></div>
+        <div class="full"><label>Screenshot (optional)</label><input type="file" id="n-file" accept="image/*">
+          <div class="hint" id="file-hint"></div></div>
+      </div>
+      <div class="row" style="margin-top:14px"><button class="btn good" id="n-send">Meldung abschicken</button><span class="sub" id="n-status"></span></div>
+    </div>
+  </div>
+</section>
+
+<section id="view-mine" class="hidden">
+  <div class="card">
+    <div class="card-head"><h2>Meine Meldungen</h2>
+      <div class="right" style="margin-left:auto"><button class="btn sm subtle" id="m-refresh">Aktualisieren</button></div></div>
+    <div id="mine"><div class="empty">lädt …</div></div>
+  </div>
+  <div id="detail" class="hidden"></div>
+</section>
+
+<script>
+"use strict";
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const $ = id => document.getElementById(id);
+const SEVERITY = { minor: "Kleinigkeit", annoying: "Störend", blocking: "Blockierend", crash: "Absturz", exploit: "Exploit" };
+const SEV_HINT = {
+  minor: "Schönheitsfehler, Tippfehler, kleine Ungereimtheiten.",
+  annoying: "Funktioniert, aber nervt oder ist falsch.",
+  blocking: "Du kommst nicht weiter, etwas geht gar nicht.",
+  crash: "Server oder Client stürzt ab bzw. trennt dich.",
+  exploit: "Ausnutzbarer Fehler (Duplizieren, Geld, Rechte …). Nur das Team und du sehen die Meldung – bitte nicht weitererzählen oder ausnutzen.",
+};
+const SEV_CLASS = { minor: "neutral", annoying: "warn", blocking: "warn", crash: "bad", exploit: "bad" };
+const CATEGORY = { mineclash: "MineClash", citybuild: "CityBuild", lobby: "Lobby", network: "Netzwerk", graphics: "Grafik/Texte", other: "Sonstiges" };
+const STATUS = { new: "Neu", confirmed: "Bestätigt", in_progress: "In Arbeit", fixed: "Behoben", closed: "Geschlossen", rejected: "Abgelehnt", duplicate: "Duplikat", not_a_bug: "Kein Bug" };
+const ERRORS = {
+  cooldown: d => `Bitte warte noch ${d} Sekunden bis zur nächsten Meldung.`,
+  daily_limit: () => "Du hast heute schon die maximale Zahl an Meldungen abgeschickt.",
+  agreement_required: () => "Du musst zuerst im Spiel die Tester-Vereinbarung annehmen (/testervereinbarung).",
+  not_tester: () => "Bug-Meldungen sind nur für Tester freigeschaltet.",
+  testphase_closed: () => "Die Testphase ist geschlossen.",
+  invalid_title: () => "Der Titel muss 1–80 Zeichen lang sein.",
+  invalid_description: () => "Die Beschreibung darf höchstens 4000 Zeichen haben.",
+  invalid_text: () => "Der Kommentar muss 1–4000 Zeichen lang sein.",
+  comment_cooldown: d => `Bitte warte noch ${d} Sekunden bis zum nächsten Kommentar.`,
+  comment_limit: () => "Du hast heute schon die maximale Zahl an Kommentaren geschrieben.",
+  too_large: () => "Die Datei ist zu groß.",
+  attachment_limit: () => "Diese Meldung hat schon die maximale Zahl an Anhängen.",
+  busy: () => "Gerade laufen zu viele Uploads – versuch es gleich nochmal.",
+  forbidden: () => "Das ist nicht deine Meldung.",
+  not_found: () => "Nicht gefunden.",
+};
+let me = { name: "" }, limits = { maxAttachmentBytes: 2097152, testphase: true }, current = null;
+
+const statusBadge = s => `<span class="badge st-${esc(s)}">${esc(STATUS[s] || s)}</span>`;
+const sevBadge = s => `<span class="badge ${SEV_CLASS[s] || ""}">${esc(SEVERITY[s] || s)}</span>`;
+const when = ms => new Date(ms).toLocaleString("de-DE");
+// Testers always act as themselves (the node ignores these names); team members keep their name on the report.
+const self = () => (me.uuid ? { uuid: me.uuid, name: me.name } : { name: me.name });
+function parse(r, fallback) { try { return JSON.parse(r.lines[0]); } catch (e) { return fallback; } }
+function errorText(r) { const f = ERRORS[r.lines[0]]; return f ? f(r.lines[1] || "") : (r.lines[1] || r.lines[0] || "Fehler"); }
+async function call(name, ...args) {
+  const r = await Helix.action(name, ...args);
+  if (!r.success) Helix.toast(errorText(r));
+  return r;
+}
+function fill(select, map) { Object.entries(map).forEach(([k, v]) => select.insertAdjacentHTML("beforeend", `<option value="${k}">${esc(v)}</option>`)); }
+fill($("n-category"), CATEGORY); fill($("n-severity"), SEVERITY);
+$("n-severity").value = "annoying";
+const showHint = () => { $("sev-hint").textContent = SEV_HINT[$("n-severity").value] || ""; };
+$("n-severity").onchange = showHint; showHint();
+
+// ------------------------------------------------------------------ tabs
+document.querySelectorAll("#tabs [data-tab]").forEach(b => b.onclick = () => openTab(b.dataset.tab));
+function openTab(tab) {
+  document.querySelectorAll("#tabs [data-tab]").forEach(x => x.setAttribute("aria-pressed", x.dataset.tab === tab ? "true" : "false"));
+  ["new", "mine"].forEach(t => $("view-" + t).classList.toggle("hidden", t !== tab));
+  if (tab === "mine") loadMine();
+}
+
+// ------------------------------------------------------------------ upload
+function readFile(file) {
+  return new Promise((ok, fail) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(",")[1] || ""); fr.onerror = fail; fr.readAsDataURL(file); });
+}
+async function upload(nr, file) {
+  if (file.size > limits.maxAttachmentBytes) { Helix.toast(`Zu groß (max. ${Math.round(limits.maxAttachmentBytes / 1024)} KB)`); return false; }
+  const b64 = await readFile(file);
+  const mime = file.type || "application/octet-stream";
+  const name = file.name.replace(/\s+/g, "_");
+  const CHUNK = 48000;
+  let r;
+  if (b64.length <= CHUNK) {
+    r = await call("feedback.attach", String(nr), name, mime, b64);
+  } else {
+    const id = "panel-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const count = Math.ceil(b64.length / CHUNK);
+    for (let i = 0; i < count; i++) {
+      const c = await call("feedback.attach.chunk", id, String(i), String(count), b64.slice(i * CHUNK, (i + 1) * CHUNK));
+      if (!c.success) return false;
+    }
+    r = await call("feedback.attach.finish", id, String(nr), name, mime);
+  }
+  return r.success;
+}
+
+// ------------------------------------------------------------------ new report
+$("n-send").onclick = async () => {
+  const title = $("n-title").value.trim(), description = $("n-desc").value.trim();
+  if (!title) return Helix.toast("Bitte einen Titel angeben.");
+  const severity = $("n-severity").value;
+  if (severity === "exploit" && !confirm("Als Exploit melden? Die Meldung sehen nur das Team und du.")) return;
+  $("n-send").disabled = true; $("n-status").textContent = "wird gesendet …";
+  try {
+    const r = await call("feedback.create", JSON.stringify({ reporter: self(), severity, category: $("n-category").value, title, description }));
+    if (!r.success) return;
+    const report = parse(r, null);
+    const file = $("n-file").files[0];
+    let note = "";
+    if (report && file) note = (await upload(report.nr, file)) ? " mit Screenshot" : " (Screenshot konnte nicht hochgeladen werden)";
+    Helix.toast(`Meldung #${report ? report.nr : "?"} gesendet${note}. Danke!`);
+    $("n-title").value = ""; $("n-desc").value = ""; $("n-file").value = "";
+    openTab("mine");
+    if (report) openDetail(report.nr);
+  } finally {
+    $("n-send").disabled = !limits.testphase; $("n-status").textContent = "";
+  }
+};
+
+// ------------------------------------------------------------------ my reports
+async function loadMine() {
+  const r = await call("feedback.mine", me.uuid || "-", "100");
+  const items = parse(r, []);
+  $("mine").innerHTML = items.length ? `<table><thead><tr><th>#</th><th>Titel</th><th>Schwere</th><th>Bereich</th><th>Status</th><th>Geändert</th></tr></thead><tbody>${
+    items.map(b => `<tr class="clickable" data-nr="${b.nr}"><td><strong>#${b.nr}</strong></td><td><strong>${esc(b.title)}</strong>${(b.attachments || []).length ? ' <span class="chip">📎</span>' : ""}</td>
+      <td>${sevBadge(b.severity)}</td><td>${esc(CATEGORY[b.category] || b.category)}</td><td>${statusBadge(b.status)}</td><td class="muted">${when(b.updatedAt)}</td></tr>`).join("")
+  }</tbody></table>` : '<div class="empty">Du hast noch nichts gemeldet.</div>';
+  $("mine").querySelectorAll("[data-nr]").forEach(tr => tr.onclick = () => openDetail(Number(tr.dataset.nr)));
+}
+$("m-refresh").onclick = () => { loadMine(); if (current) openDetail(current.report.nr); };
+
+async function openDetail(nr) {
+  const r = await call("feedback.get", String(nr));
+  if (!r.success) return;
+  current = parse(r, null); if (!current) return;
+  const { report: b, comments = [], events = [] } = current;
+  $("detail").innerHTML = `
+  <div class="card">
+    <div class="card-head"><h2>#${b.nr} · ${esc(b.title)}</h2>
+      <div style="margin-left:auto" class="row">${sevBadge(b.severity)}${statusBadge(b.status)}<button class="btn sm subtle" id="d-close">Schließen</button></div></div>
+    <div class="card-body">
+      <div class="row" style="margin-bottom:10px"><span class="chip">${esc(CATEGORY[b.category] || b.category)}</span>
+        <span class="chip">gemeldet ${when(b.createdAt)}</span>
+        ${b.pointsGranted ? `<span class="chip">+${b.points} Punkte</span>` : ""}
+        ${b.duplicateOf ? `<span class="chip">Duplikat von #${b.duplicateOf}</span>` : ""}</div>
+      <div class="desc">${esc(b.description) || '<span class="muted">Keine Beschreibung.</span>'}</div>
+      <h2 style="margin:18px 0 8px;font-size:15px">Anhänge</h2>
+      <div class="thumbs" id="d-att">${(b.attachments || []).length ? "" : '<span class="muted">Keine Anhänge.</span>'}</div>
+      <div class="row" style="margin-top:10px"><input type="file" id="d-file" accept="image/*" style="max-width:320px"><button class="btn sm subtle" id="d-upload">Screenshot anhängen</button></div>
+      <h2 style="margin:18px 0 8px;font-size:15px">Antworten</h2>
+      ${comments.length ? comments.map(c => `<div class="comment"><span class="who">${esc(c.author ? c.author.name : "Team")}</span>${c.staff ? ' <span class="chip">Team</span>' : ""}
+        <span class="muted"> · ${when(c.at)}</span><div class="desc">${esc(c.text)}</div></div>`).join("") : '<span class="muted">Noch keine Antworten.</span>'}
+      <div class="row" style="margin-top:10px"><textarea id="d-comment" placeholder="Ergänzung oder Antwort ans Team …" style="min-height:70px" class="grow"></textarea></div>
+      <div class="row" style="margin-top:8px"><button class="btn sm good" id="d-send">Antworten</button></div>
+      <h2 style="margin:18px 0 8px;font-size:15px">Verlauf</h2>
+      ${events.map(e => `<div class="ev">${when(e.at)} · ${esc(e.actor || "")} · ${esc(e.type)}${e.to ? ` → ${esc(STATUS[e.to] || e.to)}` : ""}${e.note ? ` – ${esc(e.note)}` : ""}</div>`).join("") || '<span class="muted">–</span>'}
+    </div>
+  </div>`;
+  $("detail").classList.remove("hidden");
+  $("d-close").onclick = () => { $("detail").classList.add("hidden"); current = null; };
+  $("d-send").onclick = async () => {
+    const text = $("d-comment").value.trim(); if (!text) return;
+    const c = await call("feedback.comment", JSON.stringify({ nr: b.nr, author: self(), text }));
+    if (c.success) { Helix.toast("Antwort gesendet"); openDetail(b.nr); }
+  };
+  $("d-upload").onclick = async () => {
+    const file = $("d-file").files[0]; if (!file) return Helix.toast("Datei wählen");
+    if (await upload(b.nr, file)) { Helix.toast("Screenshot angehängt"); openDetail(b.nr); }
+  };
+  loadAttachments(b.attachments || []);
+  $("detail").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+async function loadAttachments(list) {
+  const box = $("d-att");
+  for (const a of list) {
+    const r = await Helix.action("feedback.attachment.mine", a.id);
+    const fig = document.createElement("figure");
+    if (r.success && String(r.lines[0]).startsWith("image/")) {
+      const src = `data:${r.lines[0]};base64,${r.lines[1]}`;
+      fig.innerHTML = `<img alt="${esc(a.name)}" src="${src}"><figcaption>${esc(a.name)} · ${Math.round(a.size / 1024)} KB</figcaption>`;
+      fig.querySelector("img").onclick = () => { const lb = document.createElement("div"); lb.className = "lightbox"; lb.innerHTML = `<img src="${src}">`; lb.onclick = () => lb.remove(); document.body.appendChild(lb); };
+    } else {
+      fig.innerHTML = `<figcaption>📄 ${esc(a.name)} · ${Math.round(a.size / 1024)} KB</figcaption>`;
+    }
+    box.appendChild(fig);
+  }
+}
+
+// ------------------------------------------------------------------ start
+Helix.ready(async () => {
+  const who = await Helix.action("feedback.whoami");
+  if (who.success) me = parse(who, me);
+  $("who").textContent = me.name ? `als ${me.name}` : "";
+  const l = await Helix.action("feedback.limits");
+  if (l.success) limits = parse(l, limits);
+  $("file-hint").textContent = `Bild bis ${Math.round(limits.maxAttachmentBytes / 1024)} KB. Pause zwischen zwei Meldungen: ${limits.cooldownSeconds ?? 60} s, höchstens ${limits.maxPerDay ?? 20} pro Tag.`;
+  $("closed").classList.toggle("hidden", limits.testphase !== false);
+  $("n-send").disabled = limits.testphase === false;
+});
+</script>

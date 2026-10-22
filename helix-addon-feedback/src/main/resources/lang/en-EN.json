@@ -124,5 +124,7 @@
   "release.reward.network": "<#4ac85e>Thanks for testing! Release reward: <#ffcf4a>{kronen} crowns</#ffcf4a>{extra}.</#4ac85e>",
   "release.reward.extra": " and unlocks",
   "release.reward.citybuild": "<#f1e2c2>More release rewards (keys/items) wait in your pickup box on your first CityBuild visit.</#f1e2c2>",
-  "release.reward.failed": "<#ff5a4a>Your release reward could not be paid right now. We will try again on your next join.</#ff5a4a>"
+  "release.reward.failed": "<#ff5a4a>Your release reward could not be paid right now. We will try again on your next join.</#ff5a4a>",
+  "guide.link": "<#f1e2c2>Every command to test is listed in the panel: <click:open_url:'{url}'><hover:show_text:'Open in your browser'><#ffcf4a><u>Open the command guide</u></#ffcf4a></hover></click> <#7a4a24>—</#7a4a24> <#f1e2c2>sign in with your Minecraft name, you get the code here in game.",
+  "guide.nourl": "<#f1e2c2>The command guide is in the panel (tab <#ffcf4a>Befehle</#ffcf4a>). Ask the team for the panel address and sign in with your Minecraft name – you get the code here in game."
 }

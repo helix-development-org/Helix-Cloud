@@ -514,6 +514,21 @@ class FeedbackService(
     fun attachment(id: String): Pair<String, ByteArray>? = store.attachment(id)
 
     /**
+     * Loads attachment bytes for a caller who may see the report it belongs to (its reporter or staff).
+     *
+     * @param id attachment id.
+     * @param viewer the caller.
+     * @return `(mime, bytes)`, `not_found` or `forbidden`.
+     */
+    fun attachmentFor(id: String, viewer: Viewer): Outcome<Pair<String, ByteArray>> {
+        val report = store.reports().firstOrNull { r -> r.attachments.any { it.id == id } }
+            ?: return Outcome.Fail("not_found", "attachment $id not found")
+        if (!visible(report, viewer)) return Outcome.Fail("forbidden", "not your report")
+        val data = store.attachment(id) ?: return Outcome.Fail("not_found", "attachment $id not found")
+        return Outcome.Ok(data)
+    }
+
+    /**
      * Lists the reports of one player (including their own exploits).
      *
      * @param uuid player UUID.
