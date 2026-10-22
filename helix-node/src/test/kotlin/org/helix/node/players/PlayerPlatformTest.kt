@@ -90,6 +90,18 @@ class PlayerPlatformTest {
     }
 
     @Test
+    fun `tab list order merges to the highest value and a disguise keeps its own`() {
+        val displays = DisplayResolverRegistry()
+        displays.register("groups") { name -> if (name == "steve") DisplayProfile(prefix = "&cOwner ", order = 100) else null }
+        displays.register("clan") { name -> if (name == "steve") DisplayProfile(suffix = " [STV]", order = 5) else null }
+        assertEquals(100, displays.resolve("steve").order, "highest order wins")
+        assertEquals(0, displays.resolve("alex").order)
+
+        displays.register("nick") { name -> if (name == "steve") DisplayProfile(prefix = "&7Spieler ", name = "Sneaky", exclusive = true) else null }
+        assertEquals(0, displays.resolve("steve").order, "a disguised staff member sorts like a player")
+    }
+
+    @Test
     fun `display registry merges profile components and bridge values track owners`() {
         val displays = DisplayResolverRegistry()
         displays.register("a") { null }

@@ -743,6 +743,8 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
             player.playerListName(composed)
             player.displayName(composed)
         }
+        // Tab list order (1.21.2+): higher ranks first; a cleared or disguised profile sorts as a player (0).
+        if (player.playerListOrder != profile.order) player.playerListOrder = profile.order
         if (previousNick != profile.name) {
             logger.info("Nick display for ${player.name}: '$previousNick' → '${profile.name}'")
             rescopePlayer(player)

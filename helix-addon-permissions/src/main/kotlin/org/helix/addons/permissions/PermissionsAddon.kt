@@ -44,9 +44,10 @@ class PermissionsAddon : AddonBase() {
         context.registerPermissionResolver { request -> store.has(request.name, request.permission, request.uuid) }
         // Group prefixes are DISPLAY state, deliberately decoupled from permission nodes: the
         // player's highest-weight group with a prefix wins, so a `*` grant never changes looks.
+        // Its weight sorts the tab list (higher ranks first).
         context.registerDisplayResolver { name ->
             store.displayGroup(name)?.let { group ->
-                org.helix.api.display.DisplayProfile(prefix = group.prefix, color = group.color)
+                org.helix.api.display.DisplayProfile(prefix = group.prefix, color = group.color, order = group.weight)
             }
         }
         context.registerPlayerDataProvider(

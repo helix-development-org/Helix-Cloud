@@ -48,7 +48,8 @@ class DisplayResolverRegistry {
      *
      * @param name player name.
      * @return the exclusive profile if any resolver claims one, otherwise
-     *   the merged profile (first non-empty value per component).
+     *   the merged profile (first non-empty value per component, the
+     *   highest tab list order).
      */
     fun resolve(name: String): DisplayProfile {
         var merged = DisplayProfile()
@@ -64,6 +65,7 @@ class DisplayResolverRegistry {
                 name = merged.name.ifEmpty { profile.name },
                 suffix = merged.suffix.ifEmpty { profile.suffix },
                 color = merged.color.ifEmpty { profile.color },
+                order = maxOf(merged.order, profile.order),
             )
         }
         return merged
