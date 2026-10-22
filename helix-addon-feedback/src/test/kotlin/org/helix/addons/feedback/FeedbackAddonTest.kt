@@ -104,6 +104,50 @@ class FeedbackAddonTest {
         assertEquals(0, Json.parseToJsonElement(call("feedback.list").lines[0]).jsonObject["total"]!!.jsonPrimitive.int, "no viewer, no reports")
     }
 
+    private fun panel(action: String, actor: String, vararg args: String): ActionResult =
+        context.handlers.getValue(action).second.execute(ActionInvocation(action, args.toList(), ActionSource.REST, actor = actor))
+
+    @Test
+    fun `a tester in the dashboard is a player, a team member with feedback staff is staff`() {
+        context.uuidsByName["bob"] = "uuid-bob"
+        context.uuidsByName["mod"] = "uuid-mod"
+        context.permissionCheck = { player, perm -> perm == "feedback.report" || (player == "mod" && perm == "feedback.staff") }
+        val alices = create("alice", "exploit")
+
+        assertEquals("forbidden", panel("feedback.get", "bob", alices.toString()).lines[0], "no foreign reports, no exploits")
+        val forged = """{"reporter":{"uuid":"uuid-alice","name":"alice"},"severity":"minor","category":"lobby","title":"Panel-Bug",""" +
+            """"description":"kaputt","context":{"service":"Lobby-1"}}"""
+        val created = panel("feedback.create", "bob", forged)
+        assertTrue(created.success, created.lines.joinToString())
+        val report = Json.parseToJsonElement(created.lines[0]).jsonObject
+        assertEquals("bob", report["reporter"]!!.jsonObject["name"]!!.jsonPrimitive.content, "the payload reporter is ignored")
+        assertEquals("panel", report["source"]!!.jsonPrimitive.content)
+        assertFalse(report["context"]!!.jsonObject.containsKey("logs"), "no server logs pulled into a panel report")
+        val mine = Json.parseToJsonElement(panel("feedback.mine", "bob", "uuid-alice").lines[0]).jsonArray
+        assertEquals(listOf("bob"), mine.map { it.jsonObject["reporter"]!!.jsonObject["name"]!!.jsonPrimitive.content }, "only own reports")
+        val status = panel("feedback.status", "bob", """{"nr":$alices,"status":"confirmed"}""")
+        assertEquals("forbidden", status.lines[0])
+        val whoBob = Json.parseToJsonElement(panel("feedback.whoami", "bob").lines[0]).jsonObject
+        assertEquals("false", whoBob["staff"]!!.jsonPrimitive.content)
+
+        val staff = panel("feedback.status", "mod", """{"nr":$alices,"status":"confirmed"}""")
+        assertTrue(staff.success, staff.lines.joinToString())
+        assertTrue(panel("feedback.get", "mod", alices.toString()).success)
+        assertEquals("true", Json.parseToJsonElement(panel("feedback.whoami", "mod").lines[0]).jsonObject["staff"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `player-facing actions need feedback report, the workflow feedback staff`() {
+        val declared = context.handlers.mapValues { it.value.first.permission }
+        for (action in listOf("feedback.create", "feedback.get", "feedback.comment", "feedback.attach", "feedback.attach.chunk", "feedback.attach.finish", "feedback.mine", "feedback.whoami")) {
+            assertEquals("feedback.report", declared[action], action)
+        }
+        for (action in listOf("feedback.list", "feedback.status", "feedback.assign", "feedback.duplicate", "feedback.severity", "feedback.attachment", "feedback.export", "feedback.toollog.list")) {
+            assertEquals("feedback.staff", declared[action], action)
+        }
+        assertEquals("feedback.admin", declared["feedback.settings"])
+    }
+
     @Test
     fun `chunked attachment upload over actions`() {
         val nr = create("alice")

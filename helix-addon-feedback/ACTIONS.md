@@ -31,7 +31,17 @@ Points are granted to the reporter when a report enters `confirmed` for the firs
 
 ## Visibility and callers
 
-- Calls from the CLI, REST/dashboard or other addons are **staff** calls.
+- Calls from the CLI, the static admin token and other addons are **staff** calls.
+- Dashboard calls (REST with a signed-in player) are staff only when that player holds `feedback.staff` or
+  `helix.admin`. Everyone else – a tester in the dashboard – acts as **themselves** (identity from the session, uuid
+  resolved by name) with player rights: payload names (`reporter`, `viewer`, `author`, `actor`) are ignored, `create`
+  forces `source = panel` and drops the payload `context` (no server logs in panel reports), `mine` always lists the
+  caller's own reports.
+- REST permissions of the actions: player-facing `create`, `get`, `comment`, `attach`, `attach.chunk`,
+  `attach.finish`, `mine`, `top`, `whoami` need `feedback.report`; the workflow and machine actions (`list`,
+  `status`, `assign`, `duplicate`, `severity`, `attachment`, `export`, `toollog.list`, `discord.*`, `rewards.claim`,
+  `auto`, `notifications*`, `agreement.*`, `rewards.pending`, `toollog`) need `feedback.staff`; `settings`,
+  `rewards.table`, `rewards.grant` need `feedback.admin`. Bridge calls are not affected by these nodes.
 - Calls from a Paper/Velocity bridge (`source = BRIDGE`) act **on behalf of a player** given in the payload
   (`viewer`/`actor`/`author` = `{uuid, name}`) and are **never staff**, whatever name the payload carries (staff work
   happens in the dashboard).
@@ -104,7 +114,7 @@ discordThread|null, createdAt, updatedAt}`
 | `feedback.release.reset` | – | `<plan\|run>` | `ReleaseReport` (helix-api `org.helix.api.release`); permission `release.reset`; called by the node's `release.reset` |
 | `feedback.toollog` | ✔ | `<uuid> <json {name?, action, details?:{…}, service?}>` | `ToolLogEntry`; `invalid_toollog` (action required) |
 | `feedback.toollog.list` | – | `[uuid\|-] [limit=100, max 1000]` | `[ToolLogEntry]` oldest first |
-| `feedback.whoami` | – | – | `{name, staff:true, admin}` – the panel user (`actor`) and whether it holds `feedback.admin` |
+| `feedback.whoami` | – | – | `{name, staff, admin, uuid?}` – the panel user (`actor`), whether it works with staff rights (`feedback.staff`/`helix.admin`/static token) and whether it holds `feedback.admin` |
 | `feedback.export` | – | – | `{total, byStatus:{…}, bySeverity:{…}, top:[{uuid,name,total}]}` |
 
 Bridge value `feedback.settings`: the settings below as JSON **without** `rewards`, republished on every
