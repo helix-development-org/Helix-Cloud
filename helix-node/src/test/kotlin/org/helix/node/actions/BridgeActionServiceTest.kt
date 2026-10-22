@@ -83,6 +83,19 @@ class BridgeActionServiceTest {
     }
 
     @Test
+    fun `unsuccessful results are not remembered so a retry runs again`() {
+        val dedup = ActionDedup(ttlMs = 600_000, clock = { now })
+        var attempt = 0
+        val first = dedup.once("finish") { attempt++; ActionResult.error("database down") }
+        val second = dedup.once("finish") { attempt++; ActionResult.ok("recorded") }
+        val third = dedup.once("finish") { attempt++; ActionResult.ok("again") }
+        assertFalse(first.success)
+        assertEquals(listOf("recorded"), second.lines)
+        assertEquals(listOf("recorded"), third.lines, "a successful result is remembered")
+        assertEquals(2, attempt)
+    }
+
+    @Test
     fun `eviction keeps the cache bounded`() {
         val dedup = ActionDedup(ttlMs = 600_000, maxEntries = 3, clock = { now })
         repeat(10) { i -> now += 1; dedup.once("k$i") { ActionResult.ok("$i") } }

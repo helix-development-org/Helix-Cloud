@@ -66,7 +66,9 @@ class BridgeActionService(
  * (at most [waitMs]) and return its result. Entries expire after [ttlMs]; at most [maxEntries]
  * are kept (oldest completed entries are evicted first). A run that throws is forgotten so a
  * retry can execute again — the exception is rethrown to the first caller and duplicates get an
- * error result.
+ * error result. An unsuccessful result is handed to the duplicates waiting for it but not remembered either: a
+ * retry after a transient failure (database hiccup, unreachable addon) must run again instead of repeating the error
+ * for the whole [ttlMs].
  *
  * @property ttlMs how long a result is remembered.
  * @property maxEntries upper bound of remembered keys.
@@ -105,7 +107,10 @@ class ActionDedup(
                 .getOrElse { ActionResult.error("duplicate request still running or failed: ${it.message}") }
         }
         return try {
-            action().also { mine.result.complete(it) }
+            action().also { result ->
+                mine.result.complete(result)
+                if (!result.success) entries.remove(key, mine)
+            }
         } catch (failure: Throwable) {
             entries.remove(key, mine)
             mine.result.completeExceptionally(failure)
