@@ -27,6 +27,33 @@ Login-Ablauf: MC-Name eingeben → Code ingame erhalten → Code eingeben →
 Session-Token. Die sichtbaren Views/Panels richten sich nach den Permissions
 (`helix.panel.<view>`, `helix.panel.addon.<id>`). Das Admin-Token darf alles.
 
+### Rechte: ansehen vs. steuern
+
+Jeder Bereich hat ein Recht zum Ansehen und eigene Rechte zum Ändern. Wer
+`helix.panel.services` hat, sieht die Server, kann sie aber weder steuern noch
+in eine Konsole schreiben. `GET /auth/me` liefert zusätzlich `capabilities`
+(die IDs ohne `helix.panel.`), das Dashboard blendet damit Knöpfe aus; der
+Server prüft jeden Endpunkt selbst.
+
+| Recht | Erlaubt |
+|---|---|
+| `helix.panel.services` | `GET /services`, `GET /services/{id}` |
+| `helix.panel.services.logs` | `GET /services/{id}/logs`, `…/logs/stream` |
+| `helix.panel.services.console` | `POST /services/{id}/command` |
+| `helix.panel.services.control` | `POST /tasks/{name}/services`, `POST /services/{id}/stop`, `…/kill` |
+| `helix.panel.services.backups` | `POST /services/{id}/backups` |
+| `helix.panel.tasks` / `.tasks.edit` | Lesen / `PUT`, `DELETE /tasks/{name}` |
+| `helix.panel.proxy` / `.proxy.control` | `GET /proxy`, `GET /proxy/whitelist` / Wartung und Whitelist ändern |
+| `helix.panel.players` / `.players.manage` | Liste, Suche / Nachricht, Kick, Bann |
+| `helix.panel.schedules` / `.schedules.edit` | Lesen / anlegen, löschen, ausführen |
+| `helix.panel.backups` / `.backups.restore` | Liste / wiederherstellen, löschen |
+| `helix.panel.files` / `.files.edit` | Lesen / schreiben, löschen |
+| `helix.panel.addons` / `.addons.manage` | Liste / ein- und ausschalten |
+| `helix.panel.translations` / `.translations.edit` | Lesen / ändern |
+| `helix.panel.access` | `GET /access/catalog`: alle Rechte mit Bezeichnung für die Zugriffs-Matrix (Gruppen ändert man über `perm.group.grant`/`revoke`) |
+
+`helix.panel.<bereich>.*` vergibt einen Bereich komplett.
+
 ## Platform
 
 | Methode | Pfad | Beschreibung |

@@ -584,6 +584,46 @@ class ControlServerTest {
     }
 
     @Test
+    fun `viewing services does not allow console, control or logs and capabilities follow the grants`() = testApplication {
+        val client = apiClient()
+        dependencies.playerRegistry.handle(
+            org.helix.api.player.PlayerEvent("join", "Steve", "u", proxyServiceId = "Proxy-1"),
+        )
+        dependencies.nativePermissions.update("steve", listOf("helix.panel.login", "helix.panel.services"))
+        val token = client.loginAs("Steve")
+
+        assertEquals(HttpStatusCode.OK, client.get("/api/v1/services") { bearerAuth(token) }.status)
+        val console = client.post("/api/v1/services/Lobby-1/command") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(ServiceCommandRequest("op Steve"))
+        }
+        assertEquals(HttpStatusCode.Forbidden, console.status, "seeing services must not open the console")
+        assertEquals(HttpStatusCode.Forbidden, client.post("/api/v1/services/Lobby-1/stop") { bearerAuth(token) }.status)
+        assertEquals(HttpStatusCode.Forbidden, client.get("/api/v1/services/Lobby-1/logs") { bearerAuth(token) }.status)
+        assertEquals(HttpStatusCode.Forbidden, client.get("/api/v1/access/catalog") { bearerAuth(token) }.status)
+        val me: org.helix.node.control.auth.PanelIdentity = client.get("/api/v1/auth/me") { bearerAuth(token) }.body()
+        assertEquals(listOf("services"), me.capabilities)
+
+        dependencies.nativePermissions.update(
+            "steve",
+            listOf("helix.panel.login", "helix.panel.services", "helix.panel.services.console", "helix.panel.access"),
+        )
+        val allowed = client.post("/api/v1/services/Lobby-1/command") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(ServiceCommandRequest("say hi"))
+        }
+        assertEquals(HttpStatusCode.NotFound, allowed.status, "authorized now, the service just does not run")
+        val again: org.helix.node.control.auth.PanelIdentity = client.get("/api/v1/auth/me") { bearerAuth(token) }.body()
+        assertTrue("services.console" in again.capabilities && "access" in again.capabilities)
+        assertTrue("access" in again.views)
+        val catalog: org.helix.node.control.auth.AccessCatalog = client.get("/api/v1/access/catalog") { bearerAuth(token) }.body()
+        assertTrue(catalog.capabilities.any { it.id == "services.console" && it.node == "helix.panel.services.console" })
+        assertEquals("helix.panel.login", catalog.login)
+    }
+
+    @Test
     fun `post actions enforces the invoked action's declared permission`() = testApplication {
         val client = apiClient()
         registry.register(

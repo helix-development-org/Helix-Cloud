@@ -247,10 +247,26 @@ class PanelAuthService(
      * Builds the identity payload for a caller.
      *
      * @param principal the authenticated caller.
-     * @return the caller's name, admin flag and allowed views.
+     * @return the caller's name, admin flag, allowed views and capabilities.
      */
     fun identity(principal: PanelPrincipal): PanelIdentity =
-        PanelIdentity(principal.name, principal.admin, allowedViews(principal))
+        PanelIdentity(principal.name, principal.admin, allowedViews(principal), allowedCapabilities(principal))
+
+    /**
+     * The permission node needed to sign in at all (configurable, default `helix.panel.login`).
+     *
+     * @return the login node.
+     */
+    fun loginNode(): String = loginPermission
+
+    /**
+     * The built-in capabilities a caller holds (see [PanelCapabilities]).
+     *
+     * @param principal the authenticated caller.
+     * @return ids of the granted capabilities.
+     */
+    fun allowedCapabilities(principal: PanelPrincipal): List<String> =
+        PanelCapabilities.ALL.filter { grants(principal, it.node) }.map { it.id }
 
     /**
      * Drops expired login codes and elapsed request cooldowns, called on
@@ -310,6 +326,7 @@ class PanelAuthService(
             "files" to "helix.panel.files",
             "translations" to "helix.panel.translations",
             "settings" to "helix.panel.settings",
+            "access" to PanelCapabilities.ACCESS,
         )
 
         /** Permission node prefix for an addon-contributed dashboard panel. */

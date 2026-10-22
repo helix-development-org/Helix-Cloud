@@ -56,9 +56,12 @@ import org.helix.api.proxy.ProxyPoll
 import org.helix.api.service.ServiceState
 import org.helix.api.task.TaskDefinition
 import org.helix.node.config.NodeConfig
+import org.helix.node.control.auth.AccessCatalog
 import org.helix.node.control.auth.LoginRequest
 import org.helix.node.control.auth.PanelAuthService
+import org.helix.node.control.auth.PanelCapabilities
 import org.helix.node.control.auth.PanelPrincipal
+import org.helix.node.control.auth.PanelTabCapability
 import org.helix.node.control.auth.TicketIssueRequest
 import org.helix.node.control.auth.TicketRequest
 import org.helix.node.control.auth.TicketResponse
@@ -497,6 +500,11 @@ private fun io.ktor.server.routing.Route.panelRoutes(dependencies: ControlDepend
         }
         call.respond(visible)
     }
+    get("/access/catalog") {
+        if (!authorize(dependencies, PanelCapabilities.ACCESS)) return@get
+        val tabs = dependencies.dashboardPanels.list().map { PanelTabCapability(it.id, PanelAuthService.panelNode(it.id), it.title) }
+        call.respond(AccessCatalog(PanelCapabilities.ALL, tabs, dependencies.panelAuth.loginNode(), PanelAuthService.ADMIN_PERMISSION))
+    }
     get("/panels/{id}") {
         val id = call.parameters["id"].orEmpty()
         if (!authorize(dependencies, PanelAuthService.panelNode(id))) return@get
@@ -521,7 +529,7 @@ private fun io.ktor.server.routing.Route.translationRoutes(dependencies: Control
         )
     }
     post("/translations") {
-        if (!authorize(dependencies, "helix.panel.translations")) return@post
+        if (!authorize(dependencies, PanelCapabilities.TRANSLATIONS_EDIT)) return@post
         val update = call.receive<TranslationUpdate>()
         val ok = if (update.reset) {
             dependencies.messages.reset(update.key, update.language)
@@ -536,7 +544,7 @@ private fun io.ktor.server.routing.Route.translationRoutes(dependencies: Control
         }
     }
     delete("/translations/{key}") {
-        if (!authorize(dependencies, "helix.panel.translations")) return@delete
+        if (!authorize(dependencies, PanelCapabilities.TRANSLATIONS_EDIT)) return@delete
         val key = call.parameters["key"].orEmpty()
         if (dependencies.messages.deleteKey(key)) {
             dependencies.messages.ownerOf(key)?.let(dependencies.onMessagesChanged)
@@ -546,7 +554,7 @@ private fun io.ktor.server.routing.Route.translationRoutes(dependencies: Control
         }
     }
     post("/translations/languages") {
-        if (!authorize(dependencies, "helix.panel.translations")) return@post
+        if (!authorize(dependencies, PanelCapabilities.TRANSLATIONS_EDIT)) return@post
         val update = call.receive<LanguageUpdate>()
         val ok = if (update.default) {
             dependencies.languages.setDefaultLanguage(update.language)
@@ -560,7 +568,7 @@ private fun io.ktor.server.routing.Route.translationRoutes(dependencies: Control
         }
     }
     delete("/translations/languages/{language}") {
-        if (!authorize(dependencies, "helix.panel.translations")) return@delete
+        if (!authorize(dependencies, PanelCapabilities.TRANSLATIONS_EDIT)) return@delete
         val language = call.parameters["language"].orEmpty()
         if (dependencies.languages.removeLanguage(language)) {
             call.respond(MessageResponse("removed $language"))
@@ -603,7 +611,7 @@ private fun io.ktor.server.routing.Route.proxyRoutes(dependencies: ControlDepend
         call.respond(ProxyView(dependencies.routing.maintenance, proxies, backends))
     }
     post("/proxy/maintenance") {
-        if (!authorize(dependencies, "helix.panel.proxy")) return@post
+        if (!authorize(dependencies, PanelCapabilities.PROXY_CONTROL)) return@post
         val request = call.receive<MaintenanceRequest>()
         dependencies.routing.maintenance = request.enabled
         dependencies.proxyEvents.bumpRouting()
@@ -619,7 +627,7 @@ private fun io.ktor.server.routing.Route.proxyRoutes(dependencies: ControlDepend
         call.respond(WhitelistView(dependencies.whitelist.isEnabled(), dependencies.whitelist.all()))
     }
     post("/proxy/whitelist") {
-        if (!authorize(dependencies, "helix.panel.proxy")) return@post
+        if (!authorize(dependencies, PanelCapabilities.PROXY_CONTROL)) return@post
         val request = call.receive<WhitelistToggleRequest>()
         dependencies.whitelist.setEnabled(request.enabled)
         dependencies.eventLog.record(
@@ -630,7 +638,7 @@ private fun io.ktor.server.routing.Route.proxyRoutes(dependencies: ControlDepend
         call.respond(MessageResponse("whitelist ${if (request.enabled) "enabled" else "disabled"}"))
     }
     post("/proxy/whitelist/add") {
-        if (!authorize(dependencies, "helix.panel.proxy")) return@post
+        if (!authorize(dependencies, PanelCapabilities.PROXY_CONTROL)) return@post
         val request = call.receive<WhitelistEntryRequest>()
         if (dependencies.whitelist.add(request.player)) {
             call.respond(MessageResponse("added ${request.player}"))
@@ -639,7 +647,7 @@ private fun io.ktor.server.routing.Route.proxyRoutes(dependencies: ControlDepend
         }
     }
     post("/proxy/whitelist/remove") {
-        if (!authorize(dependencies, "helix.panel.proxy")) return@post
+        if (!authorize(dependencies, PanelCapabilities.PROXY_CONTROL)) return@post
         val request = call.receive<WhitelistEntryRequest>()
         if (dependencies.whitelist.remove(request.player)) {
             call.respond(MessageResponse("removed ${request.player}"))
@@ -664,14 +672,14 @@ private fun io.ktor.server.routing.Route.taskRoutes(dependencies: ControlDepende
         }
     }
     put("/tasks/{name}") {
-        if (!authorize(dependencies, "helix.panel.tasks")) return@put
+        if (!authorize(dependencies, PanelCapabilities.TASKS_EDIT)) return@put
         val task = call.receive<TaskDefinition>()
         require(task.name == call.parameters["name"]) { "task name must match the url" }
         dependencies.taskStore.save(task)
         call.respond(task)
     }
     delete("/tasks/{name}") {
-        if (!authorize(dependencies, "helix.panel.tasks")) return@delete
+        if (!authorize(dependencies, PanelCapabilities.TASKS_EDIT)) return@delete
         val name = call.parameters["name"].orEmpty()
         require(dependencies.manager.activeCount(name) == 0) { "task $name still has active services" }
         if (dependencies.taskStore.delete(name)) {
@@ -681,7 +689,7 @@ private fun io.ktor.server.routing.Route.taskRoutes(dependencies: ControlDepende
         }
     }
     post("/tasks/{name}/services") {
-        if (!authorize(dependencies, "helix.panel.tasks")) return@post
+        if (!authorize(dependencies, PanelCapabilities.SERVICES_CONTROL)) return@post
         val info = dependencies.manager.startService(call.parameters["name"].orEmpty())
         call.respond(HttpStatusCode.Created, info)
     }
@@ -702,7 +710,7 @@ private fun io.ktor.server.routing.Route.serviceRoutes(dependencies: ControlDepe
         }
     }
     post("/services/{id}/stop") {
-        if (!authorize(dependencies, "helix.panel.services")) return@post
+        if (!authorize(dependencies, PanelCapabilities.SERVICES_CONTROL)) return@post
         val id = call.parameters["id"].orEmpty()
         if (dependencies.manager.stopService(id)) {
             call.respond(MessageResponse("stopping $id"))
@@ -711,7 +719,7 @@ private fun io.ktor.server.routing.Route.serviceRoutes(dependencies: ControlDepe
         }
     }
     post("/services/{id}/kill") {
-        if (!authorize(dependencies, "helix.panel.services")) return@post
+        if (!authorize(dependencies, PanelCapabilities.SERVICES_CONTROL)) return@post
         val id = call.parameters["id"].orEmpty()
         if (dependencies.manager.killService(id)) {
             call.respond(MessageResponse("killed $id"))
@@ -720,12 +728,12 @@ private fun io.ktor.server.routing.Route.serviceRoutes(dependencies: ControlDepe
         }
     }
     get("/services/{id}/logs") {
-        if (!authorize(dependencies, "helix.panel.services")) return@get
+        if (!authorize(dependencies, PanelCapabilities.SERVICES_LOGS)) return@get
         val tail = call.request.queryParameters["tail"]?.toIntOrNull() ?: 50
         call.respond(LogsResponse(dependencies.manager.logs(call.parameters["id"].orEmpty(), tail)))
     }
     get("/services/{id}/logs/stream") {
-        if (!authorize(dependencies, "helix.panel.services")) return@get
+        if (!authorize(dependencies, PanelCapabilities.SERVICES_LOGS)) return@get
         val id = call.parameters["id"].orEmpty()
         streamSse { emit ->
             var last: List<String> = dependencies.manager.logs(id, STREAM_TAIL)
@@ -740,7 +748,7 @@ private fun io.ktor.server.routing.Route.serviceRoutes(dependencies: ControlDepe
         }
     }
     post("/services/{id}/command") {
-        if (!authorize(dependencies, "helix.panel.services")) return@post
+        if (!authorize(dependencies, PanelCapabilities.SERVICES_CONSOLE)) return@post
         val id = call.parameters["id"].orEmpty()
         val command = call.receive<ServiceCommandRequest>().command
         require(command.isNotBlank()) { "command must not be empty" }
@@ -766,7 +774,7 @@ private fun io.ktor.server.routing.Route.scheduleRoutes(dependencies: ControlDep
         call.respond(dependencies.jobScheduler.all())
     }
     post("/schedules") {
-        if (!authorize(dependencies, "helix.panel.schedules")) return@post
+        if (!authorize(dependencies, PanelCapabilities.SCHEDULES_EDIT)) return@post
         val job = call.receive<ScheduledJob>()
         require(job.id.isNotBlank()) { "job id must not be empty" }
         require(job.action.isNotBlank()) { "job action must not be empty" }
@@ -775,7 +783,7 @@ private fun io.ktor.server.routing.Route.scheduleRoutes(dependencies: ControlDep
         call.respond(job)
     }
     delete("/schedules/{id}") {
-        if (!authorize(dependencies, "helix.panel.schedules")) return@delete
+        if (!authorize(dependencies, PanelCapabilities.SCHEDULES_EDIT)) return@delete
         val id = call.parameters["id"].orEmpty()
         if (dependencies.jobScheduler.delete(id)) {
             call.respond(MessageResponse("deleted $id"))
@@ -784,7 +792,7 @@ private fun io.ktor.server.routing.Route.scheduleRoutes(dependencies: ControlDep
         }
     }
     post("/schedules/{id}/run") {
-        if (!authorize(dependencies, "helix.panel.schedules")) return@post
+        if (!authorize(dependencies, PanelCapabilities.SCHEDULES_EDIT)) return@post
         val id = call.parameters["id"].orEmpty()
         if (dependencies.jobScheduler.runNow(id)) {
             call.respond(MessageResponse("ran $id"))
@@ -805,7 +813,7 @@ private fun io.ktor.server.routing.Route.backupRoutes(dependencies: ControlDepen
         )
     }
     post("/services/{id}/backups") {
-        if (!authorize(dependencies, "helix.panel.backups")) return@post
+        if (!authorize(dependencies, PanelCapabilities.SERVICES_BACKUPS)) return@post
         val id = call.parameters["id"].orEmpty()
         val info = dependencies.backups.create(id)
         dependencies.audit.record(
@@ -816,7 +824,7 @@ private fun io.ktor.server.routing.Route.backupRoutes(dependencies: ControlDepen
         call.respond(HttpStatusCode.Created, info)
     }
     post("/backups/{serviceId}/{file}/restore") {
-        if (!authorize(dependencies, "helix.panel.backups")) return@post
+        if (!authorize(dependencies, PanelCapabilities.BACKUPS_RESTORE)) return@post
         val serviceId = call.parameters["serviceId"].orEmpty()
         val file = call.parameters["file"].orEmpty()
         dependencies.backups.restore(serviceId, file)
@@ -828,7 +836,7 @@ private fun io.ktor.server.routing.Route.backupRoutes(dependencies: ControlDepen
         call.respond(MessageResponse("restored $file into $serviceId"))
     }
     delete("/backups/{serviceId}/{file}") {
-        if (!authorize(dependencies, "helix.panel.backups")) return@delete
+        if (!authorize(dependencies, PanelCapabilities.BACKUPS_RESTORE)) return@delete
         val serviceId = call.parameters["serviceId"].orEmpty()
         val file = call.parameters["file"].orEmpty()
         if (dependencies.backups.delete(serviceId, file)) {
@@ -857,7 +865,7 @@ private fun io.ktor.server.routing.Route.fileRoutes(dependencies: ControlDepende
         call.respond(dependencies.files.read(root, path))
     }
     put("/files/content") {
-        if (!authorize(dependencies, "helix.panel.files")) return@put
+        if (!authorize(dependencies, PanelCapabilities.FILES_EDIT)) return@put
         val request = call.receive<org.helix.node.files.FileWriteRequest>()
         dependencies.files.write(request.root, request.path, request.content)
         dependencies.audit.record(
@@ -868,7 +876,7 @@ private fun io.ktor.server.routing.Route.fileRoutes(dependencies: ControlDepende
         call.respond(MessageResponse("saved ${request.path}"))
     }
     delete("/files") {
-        if (!authorize(dependencies, "helix.panel.files")) return@delete
+        if (!authorize(dependencies, PanelCapabilities.FILES_EDIT)) return@delete
         val root = call.request.queryParameters["root"].orEmpty()
         val path = call.request.queryParameters["path"].orEmpty()
         if (dependencies.files.delete(root, path)) {
@@ -909,20 +917,20 @@ private fun io.ktor.server.routing.Route.playerRoutes(dependencies: ControlDepen
         )
     }
     post("/players/{name}/message") {
-        if (!authorize(dependencies, "helix.panel.players")) return@post
+        if (!authorize(dependencies, PanelCapabilities.PLAYERS_MANAGE)) return@post
         val name = call.parameters["name"].orEmpty()
         val text = call.receive<PlayerActionRequest>().value
         require(text.isNotBlank()) { "message must not be empty" }
         call.respond(dependencies.registry.invoke(playerAction("player.message", name, text)))
     }
     post("/players/{name}/kick") {
-        if (!authorize(dependencies, "helix.panel.players")) return@post
+        if (!authorize(dependencies, PanelCapabilities.PLAYERS_MANAGE)) return@post
         val name = call.parameters["name"].orEmpty()
         val reason = call.receive<PlayerActionRequest>().value
         call.respond(dependencies.registry.invoke(playerAction("player.kick", name, reason)))
     }
     post("/players/{name}/ban") {
-        if (!authorize(dependencies, "helix.panel.players")) return@post
+        if (!authorize(dependencies, PanelCapabilities.PLAYERS_MANAGE)) return@post
         val name = call.parameters["name"].orEmpty()
         val request = call.receive<PlayerActionRequest>()
         val arguments = buildList {
@@ -1038,7 +1046,7 @@ private fun io.ktor.server.routing.Route.addonRoutes(dependencies: ControlDepend
         call.respond(dependencies.addonManager.addons())
     }
     post("/addons/{id}/enable") {
-        if (!authorize(dependencies, "helix.panel.addons")) return@post
+        if (!authorize(dependencies, PanelCapabilities.ADDONS_MANAGE)) return@post
         val id = call.parameters["id"].orEmpty()
         if (dependencies.addonManager.enable(id)) {
             call.respond(MessageResponse("enabled $id"))
@@ -1047,7 +1055,7 @@ private fun io.ktor.server.routing.Route.addonRoutes(dependencies: ControlDepend
         }
     }
     post("/addons/{id}/disable") {
-        if (!authorize(dependencies, "helix.panel.addons")) return@post
+        if (!authorize(dependencies, PanelCapabilities.ADDONS_MANAGE)) return@post
         val id = call.parameters["id"].orEmpty()
         if (dependencies.addonManager.disable(id)) {
             call.respond(MessageResponse("disabled $id"))
