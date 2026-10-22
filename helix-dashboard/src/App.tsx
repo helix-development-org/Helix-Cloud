@@ -20,6 +20,9 @@ import { TranslationsView } from "@/views/translations"
 import { SettingsView } from "@/views/settings"
 import { AddonPanelView } from "@/views/addon-panel"
 import { AccessView } from "@/views/access"
+import { TestGuideView } from "@/views/testguide"
+import { BugReportView } from "@/views/bugreport"
+import { isIntegratedPanel } from "@/lib/integrated"
 import { AccessProvider } from "@/lib/access"
 import { IngameMenuView } from "@/views/ingame-menu"
 import { isIngame, onModeChange, reportExpired, requestHud, requestMouse, takeTicketFromUrl } from "@/lib/ingame"
@@ -28,7 +31,19 @@ const TITLES: Record<string, string> = {
   overview: "Overview", tasks: "Tasks", services: "Services", players: "Players", proxy: "Proxy",
   events: "Events", logs: "Konsole", audit: "Logs", "audit-log": "Audit", addons: "Addons",
   schedules: "Schedules", backups: "Backups", files: "Files", translations: "Translations", settings: "Settings",
-  access: "Zugriff",
+  access: "Zugriff", testguide: "Befehle", bugreport: "Bug melden",
+}
+
+/** `panel:testguide` (old deep links) → `testguide`: integrated addon panels are views of their own. */
+const normalizeView = (v: string | null) => (v && v.startsWith("panel:") && isIntegratedPanel(v.slice(6)) ? v.slice(6) : v)
+
+/** The view a user lands on: overview for admins, else their first view, an integrated panel or an extension. */
+function firstView(me: Identity, panels: PanelInfo[]): string {
+  if (me.admin) return "overview"
+  if (me.views[0]) return me.views[0]
+  const integrated = ["testguide", "bugreport"].find((id) => panels.some((p) => p.id === id))
+  if (integrated) return integrated
+  return panels[0] ? "panel:" + panels[0].id : "overview"
 }
 
 export function App() {
@@ -37,8 +52,8 @@ export function App() {
   const [panels, setPanels] = useState<PanelInfo[]>([])
   const [version, setVersion] = useState("")
   const [view, setView] = useState("overview")
-  // Deep link (`…/#view=panel:testguide`, e.g. from the in-game /befehle): opened right after sign-in when allowed
-  const [wanted] = useState(() => new URLSearchParams(location.hash.replace(/^#/, "")).get("view"))
+  // Deep link (`…/#view=testguide`, e.g. from the in-game /befehle): opened right after sign-in when allowed
+  const [wanted] = useState(() => normalizeView(new URLSearchParams(location.hash.replace(/^#/, "")).get("view")))
   // In-game (Helix Admin mod): quick menu first, the full dashboard on request
   const [ingame] = useState(isIngame)
   const [fullDashboard, setFullDashboard] = useState(false)
@@ -57,8 +72,7 @@ export function App() {
     setPanels(pnls)
     setVersion(ov?.version ?? "")
     setIdentity(me)
-    const first = me.admin ? "overview" : me.views[0] ?? (pnls[0] ? "panel:" + pnls[0].id : "overview")
-    setView(wanted ?? first)
+    setView(wanted ?? firstView(me, pnls))
   }
 
   useEffect(() => {
@@ -96,8 +110,10 @@ export function App() {
   }
   document.documentElement.classList.remove("ingame-transparent")
 
-  const allowed = (v: string) => v.startsWith("panel:") ? panels.some((p) => p.id === v.slice(6)) : identity.admin || identity.views.includes(v)
-  const current = allowed(view) ? view : (identity.admin ? "overview" : identity.views[0] ?? (panels[0] ? "panel:" + panels[0].id : "overview"))
+  const allowed = (v: string) => v.startsWith("panel:")
+    ? panels.some((p) => p.id === v.slice(6)) && !isIntegratedPanel(v.slice(6))
+    : isIntegratedPanel(v) ? panels.some((p) => p.id === v) : identity.admin || identity.views.includes(v)
+  const current = allowed(view) ? view : firstView(identity, panels)
   const title = current.startsWith("panel:") ? panels.find((p) => p.id === current.slice(6))?.title ?? "Extension" : TITLES[current] ?? NETWORK_NAME
 
   return (
@@ -121,6 +137,8 @@ export function App() {
         {current === "translations" && <TranslationsView />}
         {current === "settings" && <SettingsView identity={identity} version={version} />}
         {current === "access" && <AccessView />}
+        {current === "testguide" && <TestGuideView onReport={panels.some((p) => p.id === "bugreport") ? () => setView("bugreport") : undefined} />}
+        {current === "bugreport" && <BugReportView />}
         {current.startsWith("panel:") && <AddonPanelView panelId={current.slice(6)} />}
         </ViewTransition>
       </AppShell>

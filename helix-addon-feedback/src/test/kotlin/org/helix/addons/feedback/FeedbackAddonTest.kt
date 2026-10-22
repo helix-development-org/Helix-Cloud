@@ -236,8 +236,8 @@ class FeedbackAddonTest {
             if (inv.action == "admin.panelurl") ActionResult.ok("https://panel.kronland.de") else ActionResult.ok()
         }
         val link = call("befehle", "bob", source = ActionSource.REST)
-        assertTrue(link.lines[0].contains("https://panel.kronland.de/#view=panel:testguide"), link.lines.joinToString())
-        assertEquals("https://panel.kronland.de/#view=panel:testguide", FeedbackAddon.guideLink("https://panel.kronland.de/"))
+        assertTrue(link.lines[0].contains("https://panel.kronland.de/#view=testguide"), link.lines.joinToString())
+        assertEquals("https://panel.kronland.de/#view=testguide", FeedbackAddon.guideLink("https://panel.kronland.de/"))
     }
 
     @Test

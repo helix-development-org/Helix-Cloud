@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { animate } from "animejs"
 import {
-  Archive, Blocks, Clock, ClipboardList, FolderTree, KeyRound, Languages, LayoutDashboard, ListChecks, LogOut, Moon,
-  Network, Puzzle, ScrollText, Server, Settings, ShieldCheck, Sun, Users, Zap,
+  Archive, Blocks, Bug, Clock, ClipboardList, FolderTree, KeyRound, Languages, LayoutDashboard, ListChecks, LogOut, Moon,
+  Network, Puzzle, ScrollText, Server, Settings, ShieldCheck, SquareTerminal, Sun, Users, Zap,
 } from "lucide-react"
 import type { Identity, PanelInfo } from "@/lib/api"
 import { cn } from "@/lib/utils"
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Wordmark } from "@/components/brand/wordmark"
 import { applyTheme } from "@/lib/theme"
+import { isIntegratedPanel } from "@/lib/integrated"
 
 interface NavItem {
   id: string
@@ -19,6 +20,9 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
+  // Integrated addon views (feedback addon): visible when the addon registered the panel for this user.
+  { id: "testguide", label: "Befehle", icon: SquareTerminal, group: "Testphase" },
+  { id: "bugreport", label: "Bug melden", icon: Bug, group: "Testphase" },
   { id: "overview", label: "Overview", icon: LayoutDashboard, group: "Platform" },
   { id: "tasks", label: "Tasks", icon: ListChecks, group: "Platform" },
   { id: "services", label: "Services", icon: Server, group: "Platform" },
@@ -52,8 +56,11 @@ export function AppShell(props: {
   const [dark, setDark] = useState(document.documentElement.classList.contains("dark"))
   // "audit-log" is a second, filterable view of the same /audit endpoint as "audit" — both are
   // gated by the one existing helix.panel.audit permission, not a separate node.
-  const allowed = (id: string) => identity.admin || identity.views.includes(id === "audit-log" ? "audit" : id)
-  const groups = ["Platform", "Observability", "System"]
+  const allowed = (id: string) => isIntegratedPanel(id)
+    ? panels.some((p) => p.id === id)
+    : identity.admin || identity.views.includes(id === "audit-log" ? "audit" : id)
+  const groups = ["Testphase", "Platform", "Observability", "System"]
+  const extensions = panels.filter((p) => !isIntegratedPanel(p.id))
 
   const toggleTheme = () => {
     const next = !dark
@@ -83,10 +90,10 @@ export function AppShell(props: {
               </div>
             )
           })}
-          {panels.length > 0 && (
+          {extensions.length > 0 && (
             <div className="mb-3">
               <div className="px-2 py-1.5 font-display text-xs tracking-[0.08em] text-gold/80">Extensions</div>
-              {panels.map((p) => (
+              {extensions.map((p) => (
                 <NavButton key={p.id} active={props.view === "panel:" + p.id} icon={<Puzzle className="size-4" />}
                   label={p.title} onClick={() => props.onNavigate("panel:" + p.id)} />
               ))}

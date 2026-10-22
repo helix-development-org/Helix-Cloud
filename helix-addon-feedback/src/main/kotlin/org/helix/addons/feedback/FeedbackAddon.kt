@@ -646,8 +646,8 @@ class FeedbackAddon(
          * Deep link into the dashboard tab „Befehle“.
          *
          * @param panelUrl public dashboard address.
-         * @return the link (`…/#view=panel:testguide`).
+         * @return the link (`…/#view=testguide`).
          */
-        fun guideLink(panelUrl: String): String = panelUrl.trimEnd('/') + "/#view=panel:testguide"
+        fun guideLink(panelUrl: String): String = panelUrl.trimEnd('/') + "/#view=testguide"
     }
 }

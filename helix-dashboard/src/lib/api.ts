@@ -46,6 +46,11 @@ export async function api<T = unknown>(path: string, opts: ApiOptions = {}): Pro
   return parsed as T
 }
 
+/** Invokes a node action through `POST /actions` with the session's rights. */
+export function action(name: string, ...args: string[]): Promise<ActionResult> {
+  return api<ActionResult>("/actions", { method: "POST", body: { action: name, arguments: args } })
+}
+
 export interface Identity {
   name: string
   admin: boolean

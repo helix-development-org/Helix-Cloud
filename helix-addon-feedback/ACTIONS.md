@@ -105,7 +105,7 @@ discordThread|null, createdAt, updatedAt}`
 | `feedback.attachment.mine` | – | `<id> [viewerJson]` | like `feedback.attachment`, but only for a report the caller may see (reporter or staff; dashboard testers act as themselves): `lines[0]` = mime, `lines[1]` = base64; `not_found`, `forbidden` |
 | `feedback.testguide` | – | – | the tester command guide (`testguide/commands.json`: `{version, entries:[{id, mode, command, summary, expected, audience, permission?}]}`) |
 | `feedback.limits` | – | – | `{testphase, cooldownSeconds, maxPerDay, maxAttachmentBytes, maxAttachmentsPerReport}` for the tester tab |
-| `befehle` | – | `<player>` (player command `/befehle`) | clickable link to the dashboard tab „Befehle“ (`<admin.panelurl>/#view=panel:testguide`), or how to sign in when no panel address is set |
+| `befehle` | – | `<player>` (player command `/befehle`) | clickable link to the dashboard tab „Befehle“ (`<admin.panelurl>/#view=testguide`), or how to sign in when no panel address is set |
 | `feedback.mine` | ✔ | `<uuid> [limit]` | `[Report]` newest first (own reports, incl. exploits) |
 | `feedback.notifications` | ✔ | `<uuid>` | `[Notification]` unread |
 | `feedback.notifications.ack` | ✔ | `<uuid> [id …]` | `{acked}` (no ids = all) |
@@ -149,7 +149,7 @@ mirror moves the thread between forum and staff channel when the change crosses 
 Tester tabs (`helix.panel.addon.testguide`, `helix.panel.addon.bugreport`): `testguide.html` („Befehle“: the
 command guide with search, filters and copy) and `bugreport.html` („Bug melden“: form with screenshot upload via
 `feedback.attach`/`attach.chunk`/`attach.finish`, own reports via `feedback.mine`/`get`/`comment`, own screenshots
-via `feedback.attachment.mine`). The dashboard opens a tab directly with `#view=panel:<id>`.
+via `feedback.attachment.mine`). The dashboard renders „Befehle“ (`testguide`) and „Bug melden“ (`bugreport`) as native views in its „Testphase“ menu group, gated by these panel registrations (permission `helix.panel.addon.<id>`); `#view=testguide` / `#view=bugreport` open them directly (old `#view=panel:<id>` links still work). The registered HTML is only a pointer for dashboards that still embed it.
 
 
 `panel.html` (tab „Bugs“): list with filters (status, severity, category, task, source, reporter, search, sort, pages),
