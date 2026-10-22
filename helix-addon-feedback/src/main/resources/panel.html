@@ -253,7 +253,7 @@ function renderDetail() {
         <div class="desc">${esc(b.description) || '<span class="muted">Keine Beschreibung.</span>'}</div>
         <h2 style="margin:18px 0 8px;font-size:15px">Anhänge</h2>
         <div class="thumbs" id="d-att">${(b.attachments || []).length ? "" : '<span class="muted">Keine Anhänge.</span>'}</div>
-        <div class="row" style="margin-top:10px"><input type="file" id="d-file" accept="image/*,.txt,.log" style="max-width:320px"><button class="btn sm subtle" id="d-upload">Hochladen</button>
+        <div class="row" style="margin-top:10px"><input type="file" id="d-file" accept="image/png,image/jpeg,image/gif,image/webp,.txt,.log" style="max-width:320px"><button class="btn sm subtle" id="d-upload">Hochladen</button>
           <span class="sub">max. ${Math.round(((settings && settings.maxAttachmentBytes) || 2097152) / 1024)} KB</span></div>
         <h2 style="margin:18px 0 8px;font-size:15px">Log-Auszug (${logs.length} Zeilen)</h2>
         ${logs.length ? `<details ${logs.length <= 12 ? "open" : ""}><summary class="muted">anzeigen</summary><pre class="log">${esc(logs.join("\n"))}</pre></details>` : '<span class="muted">Keine WARN/ERROR-Zeilen im Zeitfenster.</span>'}
@@ -299,22 +299,46 @@ function renderDetail() {
   $("d-md").onclick = copyMarkdown;
   loadAttachments(b.attachments || []);
 }
+// Attachments are built with DOM APIs only: name and MIME type come from players and must never reach HTML parsing.
+const SAFE_MIME = /^(image\/(png|jpeg|gif|webp)|text\/plain)$/;
+function attachmentFigure(a, r, withDownload) {
+  const fig = document.createElement("figure");
+  const cap = document.createElement("figcaption");
+  const kb = Math.round((Number(a.size) || 0) / 1024);
+  const mime = r && r.success ? String(r.lines[0] || "") : "";
+  if (!SAFE_MIME.test(mime)) {
+    cap.textContent = `${a.name} – nicht ladbar`;
+    fig.appendChild(cap);
+    return fig;
+  }
+  const src = "data:" + mime + ";base64," + String(r.lines[1] || "").replace(/[^A-Za-z0-9+/=]/g, "");
+  if (mime.startsWith("image/")) {
+    const img = document.createElement("img");
+    img.alt = String(a.name || "");
+    img.src = src;
+    img.onclick = () => {
+      const lb = document.createElement("div"); lb.className = "lightbox";
+      const big = document.createElement("img"); big.src = src; lb.appendChild(big);
+      lb.onclick = () => lb.remove(); document.body.appendChild(lb);
+    };
+    fig.appendChild(img);
+    cap.textContent = `${a.name} · ${kb} KB`;
+  } else {
+    cap.textContent = `📄 ${a.name} · ${kb} KB`;
+  }
+  if (withDownload) {
+    cap.append(" · ");
+    const link = document.createElement("a"); link.href = src; link.download = String(a.name || "anhang"); link.textContent = "Download";
+    cap.appendChild(link);
+  }
+  fig.appendChild(cap);
+  return fig;
+}
 async function loadAttachments(list) {
   const box = $("d-att");
   for (const a of list) {
     const r = await Helix.action("feedback.attachment", a.id);
-    const fig = document.createElement("figure");
-    if (r.success && String(r.lines[0]).startsWith("image/")) {
-      const src = `data:${r.lines[0]};base64,${r.lines[1]}`;
-      fig.innerHTML = `<img alt="${esc(a.name)}" src="${src}"><figcaption>${esc(a.name)} · ${Math.round(a.size / 1024)} KB · <a href="${src}" download="${esc(a.name)}">Download</a></figcaption>`;
-      fig.querySelector("img").onclick = () => { const lb = document.createElement("div"); lb.className = "lightbox"; lb.innerHTML = `<img src="${src}">`; lb.onclick = () => lb.remove(); document.body.appendChild(lb); };
-    } else if (r.success) {
-      const src = `data:${r.lines[0]};base64,${r.lines[1]}`;
-      fig.innerHTML = `<figcaption>📄 ${esc(a.name)} · ${Math.round(a.size / 1024)} KB · <a href="${src}" download="${esc(a.name)}">Download</a></figcaption>`;
-    } else {
-      fig.innerHTML = `<figcaption>${esc(a.name)} – nicht ladbar</figcaption>`;
-    }
-    box.appendChild(fig);
+    box.appendChild(attachmentFigure(a, r, true));
   }
 }
 async function changeStatus(status) {
@@ -355,7 +379,8 @@ async function upload() {
   const max = (settings && settings.maxAttachmentBytes) || 2097152;
   if (file.size > max) return Helix.toast(`Zu groß (max. ${Math.round(max / 1024)} KB)`);
   const b64 = await readFile(file);
-  const mime = file.type || "application/octet-stream";
+  const mime = /\.(txt|log)$/i.test(file.name) && !file.type.startsWith("image/") ? "text/plain" : file.type;
+  if (!SAFE_MIME.test(mime)) { Helix.toast("Nur PNG, JPEG, GIF, WebP oder Text-Dateien"); return; }
   const CHUNK = 48000;
   let r;
   if (b64.length <= CHUNK) {
@@ -442,7 +467,7 @@ async function loadSettings() {
   $("s-loglines").value = settings.logMaxLines;
   $("s-maxatt").value = Math.round(settings.maxAttachmentBytes / 1024);
   $("s-zone").value = settings.zone;
-  $("s-points").innerHTML = Object.keys(SEVERITY).map(k => `<div><label>${esc(SEVERITY[k])}</label><input type="number" min="0" data-points="${k}" value="${(settings.points || {})[k] ?? 0}"></div>`).join("");
+  $("s-points").innerHTML = Object.keys(SEVERITY).map(k => `<div><label>${esc(SEVERITY[k])}</label><input type="number" min="0" data-points="${k}" value="${esc((settings.points || {})[k] ?? 0)}"></div>`).join("");
   const rt = await call("feedback.rewards.table");
   rewards = parse(rt, []) || [];
   renderRewards();
@@ -462,8 +487,8 @@ $("s-save").onclick = async () => {
 };
 function renderRewards() {
   $("rewards").innerHTML = rewards.length ? `<table><thead><tr><th>ab Punkten</th><th>Kronen</th><th>Schlüssel (kommagetrennt)</th><th>Items/Cosmetics (kommagetrennt)</th><th>Notiz</th><th></th></tr></thead><tbody>${
-    rewards.map((t, i) => `<tr><td><input type="number" min="0" data-r="${i}" data-f="minPoints" value="${t.minPoints ?? 0}"></td>
-      <td><input type="number" min="0" data-r="${i}" data-f="kronen" value="${t.kronen ?? 0}"></td>
+    rewards.map((t, i) => `<tr><td><input type="number" min="0" data-r="${i}" data-f="minPoints" value="${esc(t.minPoints ?? 0)}"></td>
+      <td><input type="number" min="0" data-r="${i}" data-f="kronen" value="${esc(t.kronen ?? 0)}"></td>
       <td><input data-r="${i}" data-f="keys" value="${esc((t.keys || []).join(", "))}"></td>
       <td><input data-r="${i}" data-f="items" value="${esc((t.items || []).join(", "))}"></td>
       <td><input data-r="${i}" data-f="note" value="${esc(t.note || "")}"></td>

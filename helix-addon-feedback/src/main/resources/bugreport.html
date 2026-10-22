@@ -46,7 +46,7 @@
         <div class="full"><label>Beschreibung</label><textarea id="n-desc" maxlength="4000"
           placeholder="Was hast du gemacht? Was ist passiert? Was hättest du erwartet? Auf welchem Server, wo genau?"></textarea>
           <div class="hint">Schritte zum Nachstellen helfen am meisten. Im Spiel mit <strong>/bug</strong> hängt der Server Ort, Server und Logs automatisch an.</div></div>
-        <div class="full"><label>Screenshot (optional)</label><input type="file" id="n-file" accept="image/*">
+        <div class="full"><label>Screenshot (optional)</label><input type="file" id="n-file" accept="image/png,image/jpeg,image/gif,image/webp">
           <div class="hint" id="file-hint"></div></div>
       </div>
       <div class="row" style="margin-top:14px"><button class="btn good" id="n-send">Meldung abschicken</button><span class="sub" id="n-status"></span></div>
@@ -90,6 +90,8 @@ const ERRORS = {
   comment_cooldown: d => `Bitte warte noch ${d} Sekunden bis zum nächsten Kommentar.`,
   comment_limit: () => "Du hast heute schon die maximale Zahl an Kommentaren geschrieben.",
   too_large: () => "Die Datei ist zu groß.",
+  invalid_mime: () => "Nur PNG, JPEG, GIF, WebP oder Text-Dateien sind erlaubt.",
+  upload_limit: () => "Du hast schon zu viele Uploads gleichzeitig offen – warte kurz.",
   attachment_limit: () => "Diese Meldung hat schon die maximale Zahl an Anhängen.",
   busy: () => "Gerade laufen zu viele Uploads – versuch es gleich nochmal.",
   forbidden: () => "Das ist nicht deine Meldung.",
@@ -130,7 +132,8 @@ function readFile(file) {
 async function upload(nr, file) {
   if (file.size > limits.maxAttachmentBytes) { Helix.toast(`Zu groß (max. ${Math.round(limits.maxAttachmentBytes / 1024)} KB)`); return false; }
   const b64 = await readFile(file);
-  const mime = file.type || "application/octet-stream";
+  const mime = /\.(txt|log)$/i.test(file.name) && !file.type.startsWith("image/") ? "text/plain" : file.type;
+  if (!SAFE_MIME.test(mime)) { Helix.toast("Nur PNG, JPEG, GIF, WebP oder Text-Dateien"); return false; }
   const name = file.name.replace(/\s+/g, "_");
   const CHUNK = 48000;
   let r;
@@ -200,7 +203,7 @@ async function openDetail(nr) {
       <div class="desc">${esc(b.description) || '<span class="muted">Keine Beschreibung.</span>'}</div>
       <h2 style="margin:18px 0 8px;font-size:15px">Anhänge</h2>
       <div class="thumbs" id="d-att">${(b.attachments || []).length ? "" : '<span class="muted">Keine Anhänge.</span>'}</div>
-      <div class="row" style="margin-top:10px"><input type="file" id="d-file" accept="image/*" style="max-width:320px"><button class="btn sm subtle" id="d-upload">Screenshot anhängen</button></div>
+      <div class="row" style="margin-top:10px"><input type="file" id="d-file" accept="image/png,image/jpeg,image/gif,image/webp" style="max-width:320px"><button class="btn sm subtle" id="d-upload">Screenshot anhängen</button></div>
       <h2 style="margin:18px 0 8px;font-size:15px">Antworten</h2>
       ${comments.length ? comments.map(c => `<div class="comment"><span class="who">${esc(c.author ? c.author.name : "Team")}</span>${c.staff ? ' <span class="chip">Team</span>' : ""}
         <span class="muted"> · ${when(c.at)}</span><div class="desc">${esc(c.text)}</div></div>`).join("") : '<span class="muted">Noch keine Antworten.</span>'}
@@ -224,19 +227,46 @@ async function openDetail(nr) {
   loadAttachments(b.attachments || []);
   $("detail").scrollIntoView({ behavior: "smooth", block: "start" });
 }
+// Attachments are built with DOM APIs only: name and MIME type come from players and must never reach HTML parsing.
+const SAFE_MIME = /^(image\/(png|jpeg|gif|webp)|text\/plain)$/;
+function attachmentFigure(a, r, withDownload) {
+  const fig = document.createElement("figure");
+  const cap = document.createElement("figcaption");
+  const kb = Math.round((Number(a.size) || 0) / 1024);
+  const mime = r && r.success ? String(r.lines[0] || "") : "";
+  if (!SAFE_MIME.test(mime)) {
+    cap.textContent = `${a.name} – nicht ladbar`;
+    fig.appendChild(cap);
+    return fig;
+  }
+  const src = "data:" + mime + ";base64," + String(r.lines[1] || "").replace(/[^A-Za-z0-9+/=]/g, "");
+  if (mime.startsWith("image/")) {
+    const img = document.createElement("img");
+    img.alt = String(a.name || "");
+    img.src = src;
+    img.onclick = () => {
+      const lb = document.createElement("div"); lb.className = "lightbox";
+      const big = document.createElement("img"); big.src = src; lb.appendChild(big);
+      lb.onclick = () => lb.remove(); document.body.appendChild(lb);
+    };
+    fig.appendChild(img);
+    cap.textContent = `${a.name} · ${kb} KB`;
+  } else {
+    cap.textContent = `📄 ${a.name} · ${kb} KB`;
+  }
+  if (withDownload) {
+    cap.append(" · ");
+    const link = document.createElement("a"); link.href = src; link.download = String(a.name || "anhang"); link.textContent = "Download";
+    cap.appendChild(link);
+  }
+  fig.appendChild(cap);
+  return fig;
+}
 async function loadAttachments(list) {
   const box = $("d-att");
   for (const a of list) {
     const r = await Helix.action("feedback.attachment.mine", a.id);
-    const fig = document.createElement("figure");
-    if (r.success && String(r.lines[0]).startsWith("image/")) {
-      const src = `data:${r.lines[0]};base64,${r.lines[1]}`;
-      fig.innerHTML = `<img alt="${esc(a.name)}" src="${src}"><figcaption>${esc(a.name)} · ${Math.round(a.size / 1024)} KB</figcaption>`;
-      fig.querySelector("img").onclick = () => { const lb = document.createElement("div"); lb.className = "lightbox"; lb.innerHTML = `<img src="${src}">`; lb.onclick = () => lb.remove(); document.body.appendChild(lb); };
-    } else {
-      fig.innerHTML = `<figcaption>📄 ${esc(a.name)} · ${Math.round(a.size / 1024)} KB</figcaption>`;
-    }
-    box.appendChild(fig);
+    box.appendChild(attachmentFigure(a, r, false));
   }
 }
 

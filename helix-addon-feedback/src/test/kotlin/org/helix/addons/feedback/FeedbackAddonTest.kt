@@ -52,7 +52,8 @@ class FeedbackAddonTest {
     @Test
     fun `bridge reports carry the service log excerpt and notify discord`() {
         val nr = create("alice")
-        val details = Json.parseToJsonElement(call("feedback.get", nr.toString(), """{"uuid":"uuid-alice","name":"alice"}""").lines[0]).jsonObject
+        // the team reads the excerpt (players never see server logs)
+        val details = Json.parseToJsonElement(call("feedback.get", nr.toString(), source = ActionSource.REST).lines[0]).jsonObject
         val logs = details["report"]!!.jsonObject["context"]!!.jsonObject["logs"]!!.jsonArray.map { it.jsonPrimitive.content }
         assertEquals(listOf("[09:59:00 ERROR]: boom"), logs)
         assertTrue(context.invocations.any { it.action == "service.logs" && it.arguments.first() == "Lobby-1" })
@@ -152,6 +153,63 @@ class FeedbackAddonTest {
         assertTrue(panel("feedback.attachment.mine", "mod", id).success, "staff sees every attachment")
         assertEquals("not_found", panel("feedback.attachment.mine", "alice", "nope").lines[0])
         assertFalse(context.handlers.getValue("feedback.attachment.mine").first.bridgeInvocable)
+    }
+
+    @Test
+    fun `only image and text attachments are stored, a crafted MIME type is refused`() {
+        val nr = create("alice")
+        val data = Base64.getEncoder().encodeToString(byteArrayOf(1, 2, 3))
+        val viewer = """{"uuid":"uuid-alice","name":"alice"}"""
+        val evil = call("feedback.attach", nr.toString(), "a.png", "image/x\" onerror=\"alert(1)\" x=\"", data, viewer)
+        assertEquals("invalid_mime", evil.lines[0])
+        assertEquals("invalid_mime", call("feedback.attach", nr.toString(), "a.html", "text/html", data, viewer).lines[0])
+        assertTrue(call("feedback.attach.chunk", "u-evil", "0", "1", data).success)
+        assertEquals("invalid_mime", call("feedback.attach.finish", "u-evil", nr.toString(), "a.svg", "image/svg+xml", viewer).lines[0])
+        val ok = call("feedback.attach", nr.toString(), "a.png", " IMAGE/PNG ", data, viewer)
+        assertTrue(ok.success, ok.lines.joinToString())
+        assertEquals("image/png", Json.parseToJsonElement(ok.lines[0]).jsonObject["mime"]!!.jsonPrimitive.content, "stored normalized")
+    }
+
+    @Test
+    fun `testers never see server logs, not even on their own reports`() {
+        context.uuidsByName["alice"] = "uuid-alice"
+        context.uuidsByName["mod"] = "uuid-mod"
+        context.permissionCheck = { player, perm -> perm == "feedback.report" || (player == "mod" && perm == "feedback.staff") }
+        val nr = create("alice")
+        val own = Json.parseToJsonElement(panel("feedback.get", "alice", nr.toString()).lines[0]).jsonObject
+        assertFalse(own["report"]!!.jsonObject["context"]!!.jsonObject.containsKey("logs"), "panel tester")
+        val viaBridge = Json.parseToJsonElement(call("feedback.get", nr.toString(), """{"uuid":"uuid-alice","name":"alice"}""").lines[0]).jsonObject
+        assertFalse(viaBridge["report"]!!.jsonObject["context"]!!.jsonObject.containsKey("logs"), "in-game /bugs")
+        val team = Json.parseToJsonElement(panel("feedback.get", "mod", nr.toString()).lines[0]).jsonObject
+        assertTrue(team["report"]!!.jsonObject["context"]!!.jsonObject.containsKey("logs"), "the team keeps the log excerpt")
+    }
+
+    @Test
+    fun `uploads belong to their uploader and a tester may keep only a few open`() {
+        context.uuidsByName["alice"] = "uuid-alice"
+        context.uuidsByName["bob"] = "uuid-bob"
+        val nr = create("bob")
+        val data = Base64.getEncoder().encodeToString(byteArrayOf(5))
+        assertTrue(panel("feedback.attach.chunk", "alice", "a-1", "0", "1", data).success)
+        assertEquals("forbidden", panel("feedback.attach.chunk", "bob", "a-1", "0", "1", data).lines[0], "no chunks into foreign uploads")
+        assertEquals("forbidden", panel("feedback.attach.finish", "bob", "a-1", nr.toString(), "x.png", "image/png").lines[0], "no foreign finish")
+        (2..4).forEach { assertTrue(panel("feedback.attach.chunk", "alice", "a-$it", "0", "2", data).success) }
+        assertEquals("upload_limit", panel("feedback.attach.chunk", "alice", "a-5", "0", "2", data).lines[0])
+        assertTrue(call("feedback.attach.chunk", "server-1", "0", "2", data).success, "servers are not limited per caller")
+    }
+
+    @Test
+    fun `team members act under their session name, payload names are ignored`() {
+        context.uuidsByName["mod"] = "uuid-mod"
+        context.permissionCheck = { player, perm -> perm == "feedback.report" || (player == "mod" && perm == "feedback.staff") }
+        val nr = create("alice")
+        val comment = panel("feedback.comment", "mod", """{"nr":$nr,"author":{"name":"Owner"},"text":"Wir schauen es uns an"}""")
+        assertTrue(comment.success, comment.lines.joinToString())
+        assertEquals("mod", Json.parseToJsonElement(comment.lines[0]).jsonObject["author"]!!.jsonObject["name"]!!.jsonPrimitive.content)
+        val status = panel("feedback.status", "mod", """{"nr":$nr,"status":"confirmed","actor":{"name":"Owner"}}""")
+        assertTrue(status.success, status.lines.joinToString())
+        val events = Json.parseToJsonElement(panel("feedback.get", "mod", nr.toString()).lines[0]).jsonObject["events"]!!.jsonArray
+        assertTrue(events.none { it.jsonObject["actor"]!!.jsonPrimitive.content == "Owner" }, events.toString())
     }
 
     @Test

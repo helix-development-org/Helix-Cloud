@@ -275,8 +275,10 @@ class BugMirror(
     private suspend fun attachFiles(nr: Long, player: BugPlayer, message: BugMessage) {
         message.files.take(MAX_FILES).forEach { remote ->
             if (remote.size > MAX_FILE_BYTES) return@forEach
+            // Only types the feedback addon stores (images, plain text); it refuses everything else (invalid_mime).
+            val mime = remote.mime?.substringBefore(';')?.trim()?.lowercase()?.takeIf { it in ATTACHABLE } ?: return@forEach
             val bytes = forum.download(remote.url, MAX_FILE_BYTES) ?: return@forEach
-            feedback.attach(nr, player, BugFile(remote.name, remote.mime ?: "application/octet-stream", bytes))
+            feedback.attach(nr, player, BugFile(remote.name, mime, bytes))
         }
     }
 
@@ -306,6 +308,9 @@ class BugMirror(
         const val DESCRIPTION_LIMIT = 1800
         const val MAX_FILES = 10
         const val MAX_FILE_BYTES = 2 * 1024 * 1024
+
+        /** Attachment types the feedback addon accepts. */
+        val ATTACHABLE = setOf("image/png", "image/jpeg", "image/gif", "image/webp", "text/plain")
         const val BOARD_SIZE = 10
         val KNOWN_ERRORS = setOf(
             "cooldown", "daily_limit", "testphase_closed", "forbidden", "not_found", "too_large", "unavailable",

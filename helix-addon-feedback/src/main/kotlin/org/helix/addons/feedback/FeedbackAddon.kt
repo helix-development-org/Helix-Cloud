@@ -101,7 +101,9 @@ class FeedbackAddon(
             // A tester in the dashboard reports as themselves: reporter, source and context of the payload are ignored
             // (a forged context.service would otherwise pull server logs into the tester's own report).
             val panel = panelPlayer(inv)
-            val reporter = panel ?: ref(body["reporter"])
+            // Dashboard team members report under their own name too; the payload reporter only counts for
+            // bridge (the server names its player) and addon calls.
+            val reporter = panel ?: sessionPlayer(inv) ?: ref(body["reporter"])
             val viewer = viewer(inv, reporter, asPlayer(body))
             val input = NewReport(
                 reporter = reporter,
@@ -206,13 +208,13 @@ class FeedbackAddon(
             val count = inv.arguments.getOrNull(2)?.toIntOrNull()
             val bytes = decode(inv.arguments.getOrNull(3))
             if (index == null || count == null || bytes == null) return@action bad("usage: feedback.attach.chunk <uploadId> <index> <count> <base64>")
-            reply(service.chunk(inv.arguments[0], index, count, bytes)) { buildJsonObject { put("received", it) }.toString() }
+            reply(service.chunk(inv.arguments[0], index, count, bytes, uploadOwner(inv))) { buildJsonObject { put("received", it) }.toString() }
         }
         action("feedback.attach.finish", "Completes a chunked attachment upload.", "feedback.attach.finish <uploadId> <nr> <name> <mime> [viewerJson]", permission = REPORT, bridgeInvocable = true) { inv ->
             val nr = number(inv, 1) ?: return@action bad("usage: feedback.attach.finish <uploadId> <nr> <name> <mime> [viewerJson]")
             val extra = body(inv, 4)
             val viewer = viewer(inv, ref(extra), extra?.let(::asPlayer) ?: false)
-            reply(service.finish(inv.arguments[0], nr, inv.arguments.getOrNull(2).orEmpty(), inv.arguments.getOrNull(3).orEmpty(), viewer, extra?.str("via"))) {
+            reply(service.finish(inv.arguments[0], nr, inv.arguments.getOrNull(2).orEmpty(), inv.arguments.getOrNull(3).orEmpty(), viewer, extra?.str("via"), uploadOwner(inv))) {
                 encode(Attachment.serializer(), it)
             }
         }
@@ -532,6 +534,8 @@ class FeedbackAddon(
     private fun viewer(inv: ActionInvocation, ref: PlayerRef?, asPlayer: Boolean = false): Viewer {
         if (inv.source == ActionSource.BRIDGE) return bridgeViewer(ref)
         panelPlayer(inv)?.let { return Viewer(it, false) }
+        // A signed-in team member acts under their own session name; actor/author names in the payload are ignored.
+        sessionPlayer(inv)?.let { return Viewer(it, true) }
         if (!(asPlayer && ref != null)) {
             return Viewer(ref ?: PlayerRef(null, inv.actor ?: "dashboard"), true)
         }
@@ -549,6 +553,28 @@ class FeedbackAddon(
         if (staffActor(actor)) return null
         return PlayerRef(runCatching { context.resolvePlayerUuid(actor) }.getOrNull(), actor)
     }
+
+    /**
+     * The signed-in dashboard user of any REST call (team or not), identity from the session; `null` for the static
+     * admin token and every other source.
+     */
+    private fun sessionPlayer(inv: ActionInvocation): PlayerRef? {
+        if (inv.source != ActionSource.REST) return null
+        val actor = inv.actor?.takeIf { it.isNotBlank() } ?: return null
+        return PlayerRef(runCatching { context.resolvePlayerUuid(actor) }.getOrNull(), actor)
+    }
+
+    /**
+     * Who owns a chunked upload: a dashboard player (only they may finish it, a few at a time), the servers
+     * (bridge) or the team/system.
+     */
+    private fun uploadOwner(inv: ActionInvocation): String =
+        panelPlayer(inv)?.let { FeedbackService.PLAYER_OWNER_PREFIX + it.name.lowercase() }
+            ?: when (inv.source) {
+                ActionSource.BRIDGE -> "bridge"
+                ActionSource.REST -> "staff:" + (inv.actor?.lowercase() ?: "admin")
+                else -> FeedbackService.SYSTEM_OWNER
+            }
 
     /** Whether a signed-in dashboard player works with staff rights (`feedback.staff` or full admin). */
     private fun staffActor(name: String): Boolean =

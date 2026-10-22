@@ -36,7 +36,10 @@ Points are granted to the reporter when a report enters `confirmed` for the firs
   `helix.admin`. Everyone else – a tester in the dashboard – acts as **themselves** (identity from the session, uuid
   resolved by name) with player rights: payload names (`reporter`, `viewer`, `author`, `actor`) are ignored, `create`
   forces `source = panel` and drops the payload `context` (no server logs in panel reports), `mine` always lists the
-  caller's own reports.
+  caller's own reports. Team members in the dashboard act under their **session name** as well: payload names
+  (`reporter`, `author`, `actor`) never change who is recorded.
+- `feedback.staff` implies `feedback.report` (permissions addon), so a team group can use the player-facing actions
+  the tab „Bugs“ calls without holding both nodes.
 - REST permissions of the actions: player-facing `create`, `get`, `comment`, `attach`, `attach.chunk`,
   `attach.finish`, `mine`, `top`, `whoami` need `feedback.report`; the workflow and machine actions (`list`,
   `status`, `assign`, `duplicate`, `severity`, `attachment`, `export`, `toollog.list`, `discord.*`, `rewards.claim`,
@@ -89,13 +92,13 @@ discordThread|null, createdAt, updatedAt}`
 | `feedback.create` | ✔ | `<json {reporter:{uuid,name}, severity, category, title, description, source?, context?}>` | `Report`; errors `invalid_*`, `cooldown` (detail = seconds left), `daily_limit`, `testphase_closed` |
 | `feedback.auto` | ✔ | `<json {hash, title, description, category?, service?, context?, player?:{uuid,name}}>` | `{nr, new:boolean, count}` – deduplicated by `hash` while the report is not `closed` |
 | `feedback.list` | ✔ | `[json {viewer?, status?:[…], severity?:[…], category?:[…], reporter?, query?, limit?, offset?, sort?: "new"\|"updated"\|"severity"}]` | `{total, items:[Report without context.logs]}` |
-| `feedback.get` | ✔ | `<nr> [viewerJson]` | `{report, comments:[Comment], events:[ReportEvent]}`; `not_found`, `forbidden` |
+| `feedback.get` | ✔ | `<nr> [viewerJson]` | `{report, comments:[Comment], events:[ReportEvent]}`; `not_found`, `forbidden`. Non-staff readers (also the reporter) get the report without `context.logs` |
 | `feedback.comment` | ✔ | `<json {nr, author:{uuid?,name}, text}>` | `Comment`; reporter or staff only |
 | `feedback.status` | ✔ | `<json {nr, status, actor?:{uuid,name}, note?}>` | `Report`; `invalid_transition`, `forbidden` |
 | `feedback.assign` | ✔ | `<json {nr, assignee|null, actor?}>` | `Report` |
 | `feedback.duplicate` | ✔ | `<json {nr, of, actor?}>` | `Report` (status `duplicate`, points revoked) |
-| `feedback.attach` | ✔ | `<nr> <name> <mime> <base64> [viewerJson]` | `Attachment`; `too_large` (> `maxAttachmentBytes`, default 2 MiB) |
-| `feedback.attach.chunk` | ✔ | `<uploadId> <index> <count> <base64>` then `feedback.attach.finish <uploadId> <nr> <name> <mime> [viewerJson]` | chunk: `{received}`; finish: `Attachment` (uploads expire after 10 min) |
+| `feedback.attach` | ✔ | `<nr> <name> <mime> <base64> [viewerJson]` | `Attachment`; `too_large` (> `maxAttachmentBytes`, default 2 MiB); `invalid_mime` unless `image/png`, `image/jpeg`, `image/gif`, `image/webp` or `text/plain` (stored normalized) |
+| `feedback.attach.chunk` | ✔ | `<uploadId> <index> <count> <base64>` then `feedback.attach.finish <uploadId> <nr> <name> <mime> [viewerJson]` | chunk: `{received}`; finish: `Attachment` (uploads expire after 10 min). An upload belongs to its uploader (dashboard player, the servers, the team): chunks or a finish by someone else → `forbidden` (staff may finish any); a dashboard player keeps at most 4 open uploads (`upload_limit`), 64 in total (`busy`) |
 | `feedback.attachment` | – | `<id>` | `lines[0]` = mime, `lines[1]` = base64 |
 | `feedback.discord.link` | – | `<nr> <threadId\|->` | `Report` with `discordThread` set (`-` clears); used by the Discord bot |
 | `feedback.discord.find` | – | `<threadId>` | `Report` mirrored by that Discord thread; `not_found` |

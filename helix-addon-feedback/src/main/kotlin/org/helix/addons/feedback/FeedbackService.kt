@@ -150,7 +150,7 @@ class FeedbackService(
     private val lock = Any()
     private val uploads = HashMap<String, Upload>()
 
-    private class Upload(val count: Int, val createdAt: Long) {
+    private class Upload(val count: Int, val createdAt: Long, val owner: String) {
         val parts = HashMap<Int, ByteArray>()
         val size: Int get() = parts.values.sumOf { it.size }
     }
@@ -313,7 +313,9 @@ class FeedbackService(
     fun get(nr: Long, viewer: Viewer): Outcome<ReportDetails> {
         val report = store.report(nr) ?: return Outcome.Fail("not_found", "report #$nr not found")
         if (!visible(report, viewer)) return Outcome.Fail("forbidden", "not your report")
-        return Outcome.Ok(ReportDetails(report, store.comments(nr), store.events(nr)))
+        // Server log lines (other players, positions, anticheat flags) are team-only, also on the reporter's own report.
+        val shown = if (viewer.staff) report else report.withoutLogs()
+        return Outcome.Ok(ReportDetails(shown, store.comments(nr), store.events(nr)))
     }
 
     /**
@@ -439,9 +441,10 @@ class FeedbackService(
      * @param bytes content.
      * @param viewer caller (reporter or staff).
      * @param via originating channel (for example `discord`), echoed in the [FeedbackEvent].
-     * @return the attachment metadata or a failure (`too_large`, `forbidden`, `not_found`).
+     * @return the attachment metadata or a failure (`too_large`, `forbidden`, `not_found`, `invalid_mime`).
      */
     fun attach(nr: Long, name: String, mime: String, bytes: ByteArray, viewer: Viewer, via: String? = null): Outcome<Attachment> = synchronized(lock) {
+        val type = allowedMime(mime) ?: return Outcome.Fail("invalid_mime", "allowed: image/png, image/jpeg, image/gif, image/webp, text/plain")
         val report = store.report(nr) ?: return Outcome.Fail("not_found", "report #$nr not found")
         if (!visible(report, viewer)) return Outcome.Fail("forbidden", "not your report")
         val max = settings().maxAttachmentBytes
@@ -451,7 +454,7 @@ class FeedbackService(
             return Outcome.Fail("attachment_limit", "at most ${settings().maxAttachmentsPerReport} attachments per report")
         }
         val now = clock.millis()
-        val attachment = Attachment(UUID.randomUUID().toString(), name.take(MAX_NAME).ifBlank { "attachment" }, mime.ifBlank { "application/octet-stream" }, bytes.size, now)
+        val attachment = Attachment(UUID.randomUUID().toString(), name.take(MAX_NAME).ifBlank { "attachment" }, type, bytes.size, now)
         store.putAttachment(nr, attachment, bytes)
         store.putReport(report.copy(attachments = report.attachments + attachment, updatedAt = now))
         store.addEvent(ReportEvent(nr, now, viewer.actorName, "attach", to = attachment.name))
@@ -466,15 +469,25 @@ class FeedbackService(
      * @param index chunk index (0-based).
      * @param count total number of chunks.
      * @param bytes chunk content.
-     * @return number of chunks received so far or a failure (`too_large`, `invalid_chunk`).
+     * @param owner who uploads ([uploadOwner]); only the same owner (or staff) may add chunks and finish it.
+     * @return number of chunks received so far or a failure (`too_large`, `invalid_chunk`, `busy`, `upload_limit`,
+     *   `forbidden`).
      */
-    fun chunk(uploadId: String, index: Int, count: Int, bytes: ByteArray): Outcome<Int> = synchronized(lock) {
+    fun chunk(uploadId: String, index: Int, count: Int, bytes: ByteArray, owner: String = SYSTEM_OWNER): Outcome<Int> = synchronized(lock) {
         expireUploads()
         if (uploadId.isBlank() || count !in 1..MAX_CHUNKS || index !in 0 until count) {
             return Outcome.Fail("invalid_chunk", "index $index of $count")
         }
-        if (uploadId !in uploads && uploads.size >= MAX_UPLOADS) return Outcome.Fail("busy", "too many uploads in progress")
-        val upload = uploads.getOrPut(uploadId) { Upload(count, clock.millis()) }
+        val existing = uploads[uploadId]
+        if (existing != null && existing.owner != owner) return Outcome.Fail("forbidden", "upload $uploadId belongs to someone else")
+        if (existing == null) {
+            if (uploads.size >= MAX_UPLOADS) return Outcome.Fail("busy", "too many uploads in progress")
+            // A dashboard player may only keep a few uploads open, so nobody can block the shared upload slots.
+            if (owner.startsWith(PLAYER_OWNER_PREFIX) && uploads.values.count { it.owner == owner } >= MAX_UPLOADS_PER_PLAYER) {
+                return Outcome.Fail("upload_limit", "at most $MAX_UPLOADS_PER_PLAYER open uploads")
+            }
+        }
+        val upload = existing ?: Upload(count, clock.millis(), owner).also { uploads[uploadId] = it }
         if (upload.count != count) return Outcome.Fail("invalid_chunk", "chunk count changed")
         upload.parts[index] = bytes
         if (upload.size > settings().maxAttachmentBytes) {
@@ -493,11 +506,13 @@ class FeedbackService(
      * @param mime MIME type.
      * @param viewer caller.
      * @param via originating channel, echoed in the [FeedbackEvent].
-     * @return the attachment or a failure (`incomplete`, `not_found`, …).
+     * @param owner who finishes it; must be the uploader unless [viewer] is staff.
+     * @return the attachment or a failure (`incomplete`, `not_found`, `forbidden`, …).
      */
-    fun finish(uploadId: String, nr: Long, name: String, mime: String, viewer: Viewer, via: String? = null): Outcome<Attachment> = synchronized(lock) {
+    fun finish(uploadId: String, nr: Long, name: String, mime: String, viewer: Viewer, via: String? = null, owner: String = SYSTEM_OWNER): Outcome<Attachment> = synchronized(lock) {
         expireUploads()
         val upload = uploads[uploadId] ?: return Outcome.Fail("not_found", "upload $uploadId unknown or expired")
+        if (upload.owner != owner && !viewer.staff) return Outcome.Fail("forbidden", "upload $uploadId belongs to someone else")
         if (upload.parts.size != upload.count) return Outcome.Fail("incomplete", "${upload.parts.size}/${upload.count} chunks")
         val bytes = (0 until upload.count).fold(ByteArray(0)) { acc, i -> acc + upload.parts.getValue(i) }
         val result = attach(nr, name, mime, bytes, viewer, via)
@@ -853,19 +868,41 @@ class FeedbackService(
     private fun Report.withoutLogs(): Report =
         if (context.containsKey("logs")) copy(context = JsonObject(context - "logs")) else this
 
-    private companion object {
-        val JSON = Json { ignoreUnknownKeys = true; encodeDefaults = true }
-        const val MAX_TITLE = 80
-        const val MAX_DESCRIPTION = 4000
-        const val MAX_NAME = 120
-        const val MAX_PAGE = 200
-        const val MAX_TOOLLOG_PAGE = 1000
-        const val MAX_AFFECTED = 200
-        const val MAX_CHUNKS = 256
-        const val UPLOAD_TTL_MILLIS = 10 * 60 * 1000L
-        const val MAX_UPLOADS = 64
-        const val HOUR_MILLIS = 60 * 60 * 1000L
-        const val REPORT_PERMISSION = "feedback.report"
+    /** Upload owners, MIME rules and limits. */
+    companion object {
+        /** Owner of uploads from addons, the CLI and staff without a player identity. */
+        const val SYSTEM_OWNER: String = "system"
+
+        /** Owner prefix of uploads by a dashboard player (non-staff), followed by the lowercase name. */
+        const val PLAYER_OWNER_PREFIX: String = "panel:"
+
+        /** Open uploads one dashboard player may keep at once. */
+        const val MAX_UPLOADS_PER_PLAYER: Int = 4
+
+        /** Attachment types that are stored; everything else is refused (`invalid_mime`). */
+        private val MIME = Regex("^(image/(png|jpeg|gif|webp)|text/plain)$")
+
+        /**
+         * Normalizes and checks an attachment MIME type. Panels render attachments as `data:` URLs, so the type is part
+         * of what a viewer's browser parses and must never carry anything else.
+         *
+         * @param mime type as sent.
+         * @return the normalized type, or `null` when it is not allowed.
+         */
+        fun allowedMime(mime: String): String? = mime.trim().lowercase().takeIf { MIME.matches(it) }
+
+        private val JSON = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+        private const val MAX_TITLE = 80
+        private const val MAX_DESCRIPTION = 4000
+        private const val MAX_NAME = 120
+        private const val MAX_PAGE = 200
+        private const val MAX_TOOLLOG_PAGE = 1000
+        private const val MAX_AFFECTED = 200
+        private const val MAX_CHUNKS = 256
+        private const val UPLOAD_TTL_MILLIS = 10 * 60 * 1000L
+        private const val MAX_UPLOADS = 64
+        private const val HOUR_MILLIS = 60 * 60 * 1000L
+        private const val REPORT_PERMISSION = "feedback.report"
     }
 }
 
