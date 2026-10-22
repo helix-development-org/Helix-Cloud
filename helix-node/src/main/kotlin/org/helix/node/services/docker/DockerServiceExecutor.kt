@@ -49,12 +49,12 @@ class DockerServiceExecutor(
                 add("--user")
                 add(settings.user)
             }
-            // Only the proxy's port is published to the host: backend Paper containers
-            // stay reachable solely over the docker network (by the proxy container),
-            // never directly from outside the docker host.
-            if (spec.task.environment.proxy) {
+            // By default only the proxy's port is published to the host: backend Paper
+            // containers stay reachable solely over the docker network (by the proxy
+            // container). `docker.publishBackends` publishes them too.
+            if (spec.task.environment.proxy || settings.publishBackends) {
                 add("-p")
-                add("${spec.port}:${spec.port}")
+                add(publishMapping(spec.port))
             }
             add("-v")
             // :z relabels the mount for SELinux hosts (Fedora/RHEL) and is
@@ -81,6 +81,13 @@ class DockerServiceExecutor(
         logger.info("Started container {} for {}", name, spec.serviceId)
         return DockerServiceHandle(name, runner, spec.workspace)
     }
+
+    private fun publishMapping(port: Int): String =
+        if (settings.publishAddress.isBlank() || settings.publishAddress == "0.0.0.0") {
+            "$port:$port"
+        } else {
+            "${settings.publishAddress}:$port:$port"
+        }
 
     private fun ensureNetwork() {
         if (!networkEnsured.compareAndSet(false, true)) {

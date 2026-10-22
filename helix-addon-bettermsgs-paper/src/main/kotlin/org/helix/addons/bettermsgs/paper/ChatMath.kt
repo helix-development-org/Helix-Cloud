@@ -1,12 +1,12 @@
 package org.helix.addons.bettermsgs.paper
 
 /**
- * Pure helpers of the chat GUI: scroll clamping, scrollbar thumb position
- * and message text wrapping.
+ * Pure helpers of the letters GUI: scroll clamping, paging and message
+ * text wrapping.
  */
 object ChatMath {
-    /** Messages visible at once — the chat area is drawn continuously. */
-    const val WINDOW = 9
+    /** Letters visible at once — one per ledger row. */
+    const val WINDOW = 8
 
     /**
      * Clamps a scroll offset (messages back from the newest).
@@ -19,21 +19,18 @@ object ChatMath {
         offset.coerceIn(0, (total - WINDOW).coerceAtLeast(0))
 
     /**
-     * Picks the scrollbar thumb variant for an offset.
-     *
-     * Thumb 7 is the bottom (newest messages, offset 0), thumb 0 the top
-     * (oldest window).
+     * Maps a scroll offset onto ledger pages: the page arrows step one window
+     * back (left, older) or forward (right, newer).
      *
      * @param offset current scroll offset.
      * @param total total message count.
-     * @return thumb index in `0..7`.
+     * @return current page (0 = oldest) to page count.
      */
-    fun thumbIndex(offset: Int, total: Int): Int {
-        val range = total - WINDOW
-        if (range <= 0) {
-            return 7
-        }
-        return Math.round((1.0 - clampOffset(offset, total).toDouble() / range) * 7).toInt().coerceIn(0, 7)
+    fun pages(offset: Int, total: Int): Pair<Int, Int> {
+        val clamped = clampOffset(offset, total)
+        val older = (total - clamped - WINDOW).coerceAtLeast(0).let { (it + WINDOW - 1) / WINDOW }
+        val newer = (clamped + WINDOW - 1) / WINDOW
+        return older to older + 1 + newer
     }
 
     /**

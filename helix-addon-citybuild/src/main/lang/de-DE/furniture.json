@@ -1,0 +1,20 @@
+{
+  "furniture.blocked": "<#ff5a4a>Da ist kein Platz. Such dir eine freie Stelle.",
+  "furniture.border": "<#ff5a4a>Das Möbel ragt über den Plotrand. Rück es ein Stück nach innen.",
+  "furniture.in-use": "<#ff5a4a>Das benutzt gerade jemand. Versuch es gleich nochmal.",
+  "furniture.limit": "<#ff5a4a>Auf diesem Grundstück stehen schon {limit} Möbel. Hol erst eins zurück (Shift + Linksklick).",
+  "furniture.no-plot": "<#ff5a4a>Hier ist kein Grundstück. Stell es auf deinen Plot.",
+  "furniture.no-rights": "<#ff5a4a>Das ist nicht dein Grundstück. Frag den Besitzer, ob er dich vertraut.",
+  "furniture.not-empty": "<#ff5a4a>Räum es erst aus, dann kannst du es zurückholen.",
+  "furniture.not-yours": "<#ff5a4a>Das gehört dir nicht.",
+  "furniture.only-plots": "<#ff5a4a>Möbel kannst du nur auf Grundstücken aufstellen.",
+  "furniture.seat-taken": "<#ff5a4a>Der Platz ist schon besetzt.",
+  "furniture.storage.title": "{name}",
+  "furniture.stove.can": "{times}×",
+  "furniture.stove.cooked": "<#4ac85e>Gekocht: <#ffcf4a>{amount}× {item}",
+  "furniture.stove.empty": "Noch keine Rezepte. Das Team legt sie im Admin-Hub an.",
+  "furniture.stove.missing": "fehlt",
+  "furniture.stove.no-ingredients": "<#ff5a4a>Dir fehlen Zutaten.",
+  "furniture.stove.subtitle": "Klick: kochen · Shift: alles",
+  "furniture.stove.title": "Kochherd"
+}

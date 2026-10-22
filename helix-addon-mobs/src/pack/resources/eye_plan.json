@@ -1,0 +1,2746 @@
+{
+ "allay": {
+  "adult": "allay",
+  "template": "allay",
+  "uv": [
+   10,
+   10
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   32,
+   32
+  ],
+  "head": [
+   -2.5,
+   6,
+   -2.5,
+   5,
+   5,
+   5
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "armadillo": {
+  "adult": "armadillo",
+  "template": "armadillo",
+  "uv": [
+   0,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -1.5,
+   -4,
+   -1,
+   3,
+   5,
+   2
+  ],
+  "headUv": [
+   43,
+   15
+  ]
+ },
+ "armadillo_baby": {
+  "adult": "armadillo",
+  "template": "armadillo_baby",
+  "uv": [
+   32,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -1,
+   4,
+   -6.7,
+   2,
+   2,
+   4
+  ],
+  "headUv": [
+   20,
+   17
+  ]
+ },
+ "axolotl": {
+  "adult": "axolotl",
+  "template": "axolotl",
+  "uv": [
+   21,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4,
+   4,
+   -10,
+   8,
+   5,
+   5
+  ],
+  "headUv": [
+   0,
+   1
+  ]
+ },
+ "axolotl_baby": {
+  "adult": "axolotl",
+  "template": "axolotl_baby",
+  "uv": [
+   20,
+   25
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   32,
+   32
+  ],
+  "head": [
+   -3,
+   0,
+   -5,
+   6,
+   3,
+   4
+  ],
+  "headUv": [
+   0,
+   8
+  ]
+ },
+ "bat": {
+  "adult": "bat",
+  "template": "bat",
+  "uv": [
+   22,
+   16
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   32,
+   32
+  ],
+  "head": [
+   -2,
+   7,
+   -1,
+   4,
+   3,
+   2
+  ],
+  "headUv": [
+   0,
+   7
+  ]
+ },
+ "bee": {
+  "adult": "bee",
+  "template": "bee",
+  "uv": [
+   37,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -3.5,
+   2,
+   -5,
+   7,
+   7,
+   10
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "bee_baby": {
+  "adult": "bee",
+  "template": "bee_baby",
+  "uv": [
+   0,
+   24
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   32,
+   32
+  ],
+  "head": [
+   -2,
+   1,
+   -2,
+   4,
+   4,
+   5
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "blaze": {
+  "adult": "blaze",
+  "template": "blaze",
+  "uv": [
+   24,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   32
+  ],
+  "head": [
+   -4,
+   20,
+   -4,
+   8,
+   8,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "bogged": {
+  "adult": "bogged",
+  "template": "bogged",
+  "uv": [
+   24,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   32
+  ],
+  "head": [
+   -4,
+   24,
+   -4,
+   8,
+   8,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "camel": {
+  "adult": "camel",
+  "template": "camel",
+  "uv": [
+   15,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   128,
+   128
+  ],
+  "head": [
+   -3.5,
+   22,
+   -24,
+   7,
+   8,
+   19
+  ],
+  "headUv": [
+   60,
+   24
+  ]
+ },
+ "camel_baby": {
+  "adult": "camel",
+  "template": "camel_baby",
+  "uv": [
+   15,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -2.5,
+   19,
+   -15,
+   5,
+   9,
+   5
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "camel_husk": {
+  "adult": "camel_husk",
+  "template": "camel",
+  "uv": [
+   15,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   128,
+   128
+  ],
+  "head": [
+   -3.5,
+   22,
+   -24,
+   7,
+   8,
+   19
+  ],
+  "headUv": [
+   60,
+   24
+  ]
+ },
+ "cat": {
+  "adult": "cat",
+  "template": "cat",
+  "uv": [
+   15,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   32
+  ],
+  "head": [
+   -2.5,
+   7,
+   -12,
+   5,
+   4,
+   5
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "cat_baby": {
+  "adult": "cat",
+  "template": "cat_baby",
+  "uv": [
+   10,
+   26
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   32,
+   32
+  ],
+  "head": [
+   -2.5,
+   3,
+   -6,
+   5,
+   4,
+   4
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "cave_spider": {
+  "adult": "cave_spider",
+  "template": "spider",
+  "uv": [
+   54,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   32
+  ],
+  "head": [
+   -4,
+   5,
+   -11,
+   8,
+   8,
+   8
+  ],
+  "headUv": [
+   32,
+   4
+  ]
+ },
+ "chicken": {
+  "adult": "chicken",
+  "template": "chicken",
+  "uv": [
+   38,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   32
+  ],
+  "head": [
+   -2,
+   9,
+   -6,
+   4,
+   6,
+   3
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "cold_chicken": {
+  "adult": "cold_chicken",
+  "template": "cold_chicken",
+  "uv": [
+   38,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   32
+  ],
+  "head": [
+   -2,
+   9,
+   -6,
+   4,
+   6,
+   3
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "cold_cow": {
+  "adult": "cold_cow",
+  "template": "cold_cow",
+  "uv": [
+   22,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4,
+   16,
+   -14,
+   8,
+   8,
+   6
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "cold_pig": {
+  "adult": "cold_pig",
+  "template": "cold_pig",
+  "uv": [
+   24,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4,
+   8,
+   -14,
+   8,
+   8,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "copper_golem": {
+  "adult": "copper_golem",
+  "template": "copper_golem",
+  "uv": [
+   0,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4,
+   11,
+   -5,
+   8,
+   5,
+   10
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "cow": {
+  "adult": "cow",
+  "template": "cow",
+  "uv": [
+   26,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4,
+   16,
+   -14,
+   8,
+   8,
+   6
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "cow_baby": {
+  "adult": "cow",
+  "template": "cow_baby",
+  "uv": [
+   28,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -3,
+   9,
+   -10,
+   6,
+   6,
+   5
+  ],
+  "headUv": [
+   0,
+   18
+  ]
+ },
+ "creeper": {
+  "adult": "creeper",
+  "template": "creeper",
+  "uv": [
+   24,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   32
+  ],
+  "head": [
+   -4,
+   18,
+   -4,
+   8,
+   8,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "dolphin_baby": {
+  "adult": "dolphin",
+  "template": "dolphin_baby",
+  "uv": [
+   51,
+   9
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -3,
+   0,
+   -8,
+   6,
+   5,
+   4
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "donkey": {
+  "adult": "donkey",
+  "template": "donkey",
+  "uv": [
+   0,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -3,
+   28,
+   -11,
+   6,
+   5,
+   7
+  ],
+  "headUv": [
+   0,
+   13
+  ]
+ },
+ "donkey_baby": {
+  "adult": "donkey",
+  "template": "donkey_baby",
+  "uv": [
+   28,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -2,
+   -0.4,
+   -8.4,
+   6,
+   4,
+   9
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "drowned": {
+  "adult": "drowned",
+  "template": "drowned",
+  "uv": [
+   24,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4,
+   24,
+   -4,
+   8,
+   8,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "drowned_baby": {
+  "adult": "drowned",
+  "template": "zombie_baby",
+  "uv": [
+   24,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -3,
+   9,
+   -3,
+   6,
+   6,
+   6
+  ],
+  "headUv": [
+   3,
+   3
+  ]
+ },
+ "evoker": {
+  "adult": "evoker",
+  "template": "illager",
+  "uv": [
+   32,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4,
+   24,
+   -4,
+   8,
+   10,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "fox": {
+  "adult": "fox",
+  "template": "fox",
+  "uv": [
+   21,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   48,
+   32
+  ],
+  "head": [
+   -4,
+   3.5,
+   -8,
+   8,
+   6,
+   6
+  ],
+  "headUv": [
+   1,
+   5
+  ]
+ },
+ "fox_baby": {
+  "adult": "fox",
+  "template": "fox_baby",
+  "uv": [
+   22,
+   17
+  ],
+  "strip": [
+   7,
+   3
+  ],
+  "tex": [
+   32,
+   32
+  ],
+  "head": [
+   -3,
+   3,
+   -5,
+   6,
+   5,
+   5
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "goat": {
+  "adult": "goat",
+  "template": "goat",
+  "uv": [
+   0,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   2.5,
+   19,
+   -10,
+   3,
+   2,
+   1
+  ],
+  "headUv": [
+   2,
+   61
+  ]
+ },
+ "goat_baby": {
+  "adult": "goat",
+  "template": "goat_baby",
+  "uv": [
+   51,
+   15
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -2,
+   8.3126,
+   -8.1548,
+   4,
+   4,
+   6
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "hoglin": {
+  "adult": "hoglin",
+  "template": "hoglin",
+  "uv": [
+   17,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   128,
+   64
+  ],
+  "head": [
+   -7,
+   -3,
+   -19,
+   14,
+   6,
+   19
+  ],
+  "headUv": [
+   61,
+   1
+  ]
+ },
+ "hoglin_baby": {
+  "adult": "hoglin",
+  "template": "hoglin_baby",
+  "uv": [
+   24,
+   41
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -5,
+   9.2605,
+   -17.547,
+   10,
+   4,
+   12
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "horse": {
+  "adult": "horse",
+  "template": "horse",
+  "uv": [
+   0,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -3,
+   28,
+   -11,
+   6,
+   5,
+   7
+  ],
+  "headUv": [
+   0,
+   13
+  ]
+ },
+ "horse_baby": {
+  "adult": "horse",
+  "template": "horse_baby",
+  "uv": [
+   21,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -3,
+   20,
+   -13.0001,
+   6,
+   4,
+   9
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "husk": {
+  "adult": "husk",
+  "template": "zombie",
+  "uv": [
+   24,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4,
+   24,
+   -4,
+   8,
+   8,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "husk_baby": {
+  "adult": "husk",
+  "template": "zombie_baby",
+  "uv": [
+   24,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -3,
+   9,
+   -3,
+   6,
+   6,
+   6
+  ],
+  "headUv": [
+   3,
+   3
+  ]
+ },
+ "illusioner": {
+  "adult": "illusioner",
+  "template": "illusioner",
+  "uv": [
+   0,
+   18
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4,
+   23,
+   -4,
+   8,
+   11,
+   8
+  ],
+  "headUv": [
+   32,
+   0
+  ]
+ },
+ "iron_golem": {
+  "adult": "iron_golem",
+  "template": "iron_golem",
+  "uv": [
+   32,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   128,
+   128
+  ],
+  "head": [
+   -4,
+   33,
+   -7.5,
+   8,
+   10,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "llama": {
+  "adult": "llama",
+  "template": "llama",
+  "uv": [
+   27,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   128,
+   64
+  ],
+  "head": [
+   -4,
+   15,
+   -12,
+   8,
+   18,
+   6
+  ],
+  "headUv": [
+   0,
+   14
+  ]
+ },
+ "llama_baby": {
+  "adult": "llama",
+  "template": "llama_baby",
+  "uv": [
+   28,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -3,
+   10,
+   -8,
+   6,
+   11,
+   4
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "mooshroom": {
+  "adult": "mooshroom",
+  "template": "cow",
+  "uv": [
+   26,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4,
+   16,
+   -14,
+   8,
+   8,
+   6
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "mooshroom_baby": {
+  "adult": "mooshroom",
+  "template": "cow_baby",
+  "uv": [
+   28,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -3,
+   9,
+   -10,
+   6,
+   6,
+   5
+  ],
+  "headUv": [
+   0,
+   18
+  ]
+ },
+ "mule": {
+  "adult": "mule",
+  "template": "donkey",
+  "uv": [
+   0,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -3,
+   28,
+   -11,
+   6,
+   5,
+   7
+  ],
+  "headUv": [
+   0,
+   13
+  ]
+ },
+ "mule_baby": {
+  "adult": "mule",
+  "template": "donkey_baby",
+  "uv": [
+   28,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -2,
+   -0.4,
+   -8.4,
+   6,
+   4,
+   9
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "ocelot": {
+  "adult": "ocelot",
+  "template": "cat",
+  "uv": [
+   15,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   32
+  ],
+  "head": [
+   -2.5,
+   7,
+   -12,
+   5,
+   4,
+   5
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "ocelot_baby": {
+  "adult": "ocelot",
+  "template": "cat_baby",
+  "uv": [
+   10,
+   26
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   32,
+   32
+  ],
+  "head": [
+   -2.5,
+   3,
+   -6,
+   5,
+   4,
+   4
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "panda": {
+  "adult": "panda",
+  "template": "panda",
+  "uv": [
+   0,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -6.5,
+   7.5,
+   -21,
+   13,
+   10,
+   9
+  ],
+  "headUv": [
+   0,
+   6
+  ]
+ },
+ "panda_baby": {
+  "adult": "panda",
+  "template": "panda_baby",
+  "uv": [
+   51,
+   30
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -3.5,
+   2,
+   -8,
+   7,
+   6,
+   5
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "parched": {
+  "adult": "parched",
+  "template": "parched",
+  "uv": [
+   48,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4,
+   24,
+   -4,
+   8,
+   8,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "parrot": {
+  "adult": "parrot",
+  "template": "parrot",
+  "uv": [
+   18,
+   16
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   32,
+   32
+  ],
+  "head": [
+   -1,
+   6.5,
+   -1.5,
+   2,
+   3,
+   2
+  ],
+  "headUv": [
+   2,
+   2
+  ]
+ },
+ "phantom": {
+  "adult": "phantom",
+  "template": "phantom",
+  "uv": [
+   19,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -3.5,
+   2.75,
+   -13,
+   7,
+   3,
+   5
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "pig": {
+  "adult": "pig",
+  "template": "pig",
+  "uv": [
+   24,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4,
+   8,
+   -14,
+   8,
+   8,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "pig_baby": {
+  "adult": "pig",
+  "template": "pig_baby",
+  "uv": [
+   14,
+   27
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   32,
+   32
+  ],
+  "head": [
+   -3.5,
+   4,
+   -7,
+   7,
+   6,
+   6
+  ],
+  "headUv": [
+   0,
+   15
+  ]
+ },
+ "piglin": {
+  "adult": "piglin",
+  "template": "piglin",
+  "uv": [
+   41,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -5,
+   24,
+   -4,
+   10,
+   8,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "piglin_baby": {
+  "adult": "piglin",
+  "template": "piglin_baby",
+  "uv": [
+   41,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4.5,
+   9,
+   -3.5,
+   9,
+   6,
+   7
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "piglin_brute": {
+  "adult": "piglin_brute",
+  "template": "piglin",
+  "uv": [
+   41,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -5,
+   24,
+   -4,
+   10,
+   8,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "pillager": {
+  "adult": "pillager",
+  "template": "pillager",
+  "uv": [
+   32,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4,
+   24,
+   -4,
+   8,
+   10,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "polar_bear": {
+  "adult": "polar_bear",
+  "template": "polar_bear",
+  "uv": [
+   32,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   128,
+   64
+  ],
+  "head": [
+   -3.5,
+   10,
+   -19,
+   7,
+   7,
+   7
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "polar_bear_baby": {
+  "adult": "polar_bear",
+  "template": "polar_bear_baby",
+  "uv": [
+   32,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -3,
+   3,
+   -10,
+   6,
+   5,
+   4
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "rabbit": {
+  "adult": "rabbit",
+  "template": "rabbit_21.11",
+  "uv": [
+   0,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   32
+  ],
+  "head": [
+   -2.5,
+   7.5,
+   -8,
+   5,
+   4,
+   5
+  ],
+  "headUv": [
+   32,
+   0
+  ]
+ },
+ "rabbit_baby": {
+  "adult": "rabbit",
+  "template": "rabbit_baby",
+  "uv": [
+   22,
+   5
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   32,
+   32
+  ],
+  "head": [
+   -2.5,
+   5,
+   -4,
+   5,
+   4,
+   4
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "ravager": {
+  "adult": "ravager",
+  "template": "ravager",
+  "uv": [
+   48,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   128,
+   128
+  ],
+  "head": [
+   -8,
+   14,
+   -24,
+   16,
+   20,
+   16
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "sheep": {
+  "adult": "sheep",
+  "template": "sheep",
+  "uv": [
+   20,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   32
+  ],
+  "head": [
+   -3,
+   16,
+   -14,
+   6,
+   6,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "sheep_baby": {
+  "adult": "sheep",
+  "template": "sheep_baby",
+  "uv": [
+   20,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   32
+  ],
+  "head": [
+   -2.5,
+   8,
+   -6,
+   5,
+   5,
+   5
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "skeleton": {
+  "adult": "skeleton",
+  "template": "skeleton",
+  "uv": [
+   24,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   32
+  ],
+  "head": [
+   -4,
+   24,
+   -4,
+   8,
+   8,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "skeleton_horse": {
+  "adult": "skeleton_horse",
+  "template": "horse",
+  "uv": [
+   0,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -3,
+   28,
+   -11,
+   6,
+   5,
+   7
+  ],
+  "headUv": [
+   0,
+   13
+  ]
+ },
+ "skeleton_horse_baby": {
+  "adult": "skeleton_horse",
+  "template": "horse_baby",
+  "uv": [
+   21,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -3,
+   20,
+   -13.0001,
+   6,
+   4,
+   9
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "sniffer": {
+  "adult": "sniffer",
+  "template": "sniffer",
+  "uv": [
+   11,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   192,
+   192
+  ],
+  "head": [
+   -6.5,
+   2,
+   -31,
+   13,
+   18,
+   11
+  ],
+  "headUv": [
+   8,
+   15
+  ]
+ },
+ "sniffer_baby": {
+  "adult": "sniffer",
+  "template": "sniffer_baby",
+  "uv": [
+   57,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   128,
+   128
+  ],
+  "head": [
+   -5,
+   3,
+   -17,
+   10,
+   9,
+   9
+  ],
+  "headUv": [
+   68,
+   20
+  ]
+ },
+ "spider": {
+  "adult": "spider",
+  "template": "spider",
+  "uv": [
+   54,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   32
+  ],
+  "head": [
+   -4,
+   5,
+   -11,
+   8,
+   8,
+   8
+  ],
+  "headUv": [
+   32,
+   4
+  ]
+ },
+ "stray": {
+  "adult": "stray",
+  "template": "skeleton",
+  "uv": [
+   24,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   32
+  ],
+  "head": [
+   -4,
+   24,
+   -4,
+   8,
+   8,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "trader_llama": {
+  "adult": "trader_llama",
+  "template": "llama",
+  "uv": [
+   27,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   128,
+   64
+  ],
+  "head": [
+   -4,
+   15,
+   -12,
+   8,
+   18,
+   6
+  ],
+  "headUv": [
+   0,
+   14
+  ]
+ },
+ "trader_llama_baby": {
+  "adult": "trader_llama",
+  "template": "llama_baby",
+  "uv": [
+   28,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -3,
+   10,
+   -8,
+   6,
+   11,
+   4
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "turtle_baby": {
+  "adult": "turtle",
+  "template": "turtle_baby",
+  "uv": [
+   0,
+   12
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   16,
+   16
+  ],
+  "head": [
+   -1.5,
+   0.1,
+   -4,
+   3,
+   3,
+   3
+  ],
+  "headUv": [
+   0,
+   6
+  ]
+ },
+ "vex": {
+  "adult": "vex",
+  "template": "vex",
+  "uv": [
+   10,
+   10
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   32,
+   32
+  ],
+  "head": [
+   -2.5,
+   6,
+   -2.5,
+   5,
+   5,
+   5
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "villager": {
+  "adult": "villager",
+  "template": "villager",
+  "uv": [
+   0,
+   18
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4,
+   24,
+   -4,
+   8,
+   10,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "villager_baby": {
+  "adult": "villager",
+  "template": "villager_baby",
+  "uv": [
+   44,
+   18
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4,
+   8,
+   -3.5,
+   8,
+   8,
+   7
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "vindicator": {
+  "adult": "vindicator",
+  "template": "illager",
+  "uv": [
+   32,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4,
+   24,
+   -4,
+   8,
+   10,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "wandering_trader": {
+  "adult": "wandering_trader",
+  "template": "villager",
+  "uv": [
+   0,
+   18
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4,
+   24,
+   -4,
+   8,
+   10,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "warm_cow": {
+  "adult": "warm_cow",
+  "template": "warm_cow",
+  "uv": [
+   52,
+   7
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4,
+   16,
+   -14,
+   8,
+   8,
+   6
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "witch": {
+  "adult": "witch",
+  "template": "witch",
+  "uv": [
+   32,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   128
+  ],
+  "head": [
+   -4,
+   24,
+   -4,
+   8,
+   10,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "wither_skeleton": {
+  "adult": "wither_skeleton",
+  "template": "skeleton",
+  "uv": [
+   24,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   32
+  ],
+  "head": [
+   -4,
+   24,
+   -4,
+   8,
+   8,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "wolf": {
+  "adult": "wolf",
+  "template": "wolf",
+  "uv": [
+   16,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   32
+  ],
+  "head": [
+   -3,
+   7.5,
+   -9,
+   6,
+   6,
+   4
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "wolf_baby": {
+  "adult": "wolf",
+  "template": "wolf_baby",
+  "uv": [
+   0,
+   28
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   32,
+   32
+  ],
+  "head": [
+   -3.01,
+   4,
+   -7,
+   6,
+   5,
+   5
+  ],
+  "headUv": [
+   0,
+   12
+  ]
+ },
+ "zoglin": {
+  "adult": "zoglin",
+  "template": "hoglin",
+  "uv": [
+   17,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   128,
+   64
+  ],
+  "head": [
+   -7,
+   -3,
+   -19,
+   14,
+   6,
+   19
+  ],
+  "headUv": [
+   61,
+   1
+  ]
+ },
+ "zoglin_baby": {
+  "adult": "zoglin",
+  "template": "zoglin_baby",
+  "uv": [
+   24,
+   41
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -5,
+   9.2605,
+   -17.547,
+   10,
+   4,
+   12
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "zombie": {
+  "adult": "zombie",
+  "template": "zombie",
+  "uv": [
+   24,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4,
+   24,
+   -4,
+   8,
+   8,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "zombie_baby": {
+  "adult": "zombie",
+  "template": "zombie_baby",
+  "uv": [
+   24,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -3,
+   9,
+   -3,
+   6,
+   6,
+   6
+  ],
+  "headUv": [
+   3,
+   3
+  ]
+ },
+ "zombie_horse": {
+  "adult": "zombie_horse",
+  "template": "horse",
+  "uv": [
+   0,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -3,
+   28,
+   -11,
+   6,
+   5,
+   7
+  ],
+  "headUv": [
+   0,
+   13
+  ]
+ },
+ "zombie_horse_baby": {
+  "adult": "zombie_horse",
+  "template": "horse_baby",
+  "uv": [
+   21,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -3,
+   20,
+   -13.0001,
+   6,
+   4,
+   9
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "zombie_villager": {
+  "adult": "zombie_villager",
+  "template": "zombie_villager",
+  "uv": [
+   0,
+   18
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4,
+   24,
+   -4,
+   8,
+   10,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "zombie_villager_baby": {
+  "adult": "zombie_villager",
+  "template": "zombie_villager_baby",
+  "uv": [
+   38,
+   18
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4,
+   8,
+   -3.5,
+   8,
+   8,
+   7
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "zombified_piglin": {
+  "adult": "zombified_piglin",
+  "template": "piglin",
+  "uv": [
+   41,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -5,
+   24,
+   -4,
+   10,
+   8,
+   8
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ },
+ "zombified_piglin_baby": {
+  "adult": "zombified_piglin",
+  "template": "piglin_baby",
+  "uv": [
+   41,
+   0
+  ],
+  "strip": [
+   10,
+   4
+  ],
+  "tex": [
+   64,
+   64
+  ],
+  "head": [
+   -4.5,
+   9,
+   -3.5,
+   9,
+   6,
+   7
+  ],
+  "headUv": [
+   0,
+   0
+  ]
+ }
+}

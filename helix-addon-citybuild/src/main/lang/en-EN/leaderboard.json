@@ -1,0 +1,6 @@
+{
+  "leaderboard.title": "<#ffcf4a><bold>Arena leaderboard</bold></#ffcf4a>\n<#c8bca8>Wins in the arena</#c8bca8>",
+  "leaderboard.row": "<{color}>{rank}. {name}</{color}> <#7a4a24>·</#7a4a24> <#f1e2c2>{kills}</#f1e2c2>",
+  "leaderboard.empty": "<#c8bca8>No fights yet. Brunhilde is waiting.</#c8bca8>",
+  "leaderboard.admin.saved": "<#4ac85e>Arena board placed here."
+}

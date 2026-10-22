@@ -66,12 +66,27 @@ sourceSets {
     create("pack")
 }
 
+dependencies {
+    // pure screen helpers (fonts, ascents) shared with the GUI library
+    "packImplementation"(project(":helix-gui"))
+    // rank badge codepoints (RankBadges) shared with the prefixes
+    "packImplementation"(project(":helix-api"))
+}
+
 val generatePack by tasks.registering(JavaExec::class) {
     group = "build"
     description = "Assembles the shared IGui font resource pack (pack.zip)."
     classpath = sourceSets["pack"].runtimeClasspath
     mainClass.set("org.helix.addons.guis.pack.PackGeneratorKt")
     val output = layout.buildDirectory.file("pack/pack.zip")
-    argumentProviders.add(CommandLineArgumentProvider { listOf(output.get().asFile.absolutePath) })
+    val art = layout.projectDirectory.dir("src/pack/resources/ledger")
+    argumentProviders.add(CommandLineArgumentProvider { listOf(output.get().asFile.absolutePath, art.asFile.absolutePath) })
+    inputs.dir(art)
+    inputs.dir(layout.projectDirectory.dir("src/pack/resources/anim"))
+    inputs.dir(layout.projectDirectory.dir("src/pack/resources/villagers"))
+    inputs.dir(layout.projectDirectory.dir("src/pack/resources/wordmark"))
+    inputs.dir(layout.projectDirectory.dir("src/pack/resources/icons"))
+    inputs.dir(layout.projectDirectory.dir("src/pack/resources/ranks"))
+    inputs.dir(layout.projectDirectory.dir("src/pack/resources/sounds"))
     outputs.file(output)
 }

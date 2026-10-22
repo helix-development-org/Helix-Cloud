@@ -5,6 +5,8 @@
   "main": "org.helix.addons.permissions.PermissionsAddon",
   "description": "Groups with weight, inheritance, default flag and display prefix/color, per-user permissions, wildcards and negation.",
   "permissions": [
-    "helix.permissions"
+    "helix.permissions",
+    "tester.manage",
+    "helix.permissions.badges"
   ]
 }

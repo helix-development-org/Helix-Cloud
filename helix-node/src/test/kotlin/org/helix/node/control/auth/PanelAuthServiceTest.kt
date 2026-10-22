@@ -234,4 +234,32 @@ class PanelAuthServiceTest {
         worker.join(3_000)
         assertTrue(elapsedMs < 500, "revokeSessions blocked for ${elapsedMs}ms behind a slow permission check")
     }
+
+    @Test
+    fun `in-game ticket logs the player in once`() {
+        val players = PlayerRegistry().apply { handle(PlayerEvent("join", "Steve", "u")) }
+        val cache = NativePermissionCache().apply { update("steve", listOf("helix.panel.login", "helix.panel.players")) }
+        val auth = service(cache, players)
+
+        val ticket = auth.issueTicket("steve")
+        val session = auth.redeemTicket(ticket)
+        assertEquals("Steve", session.identity.name)
+        assertTrue("players" in session.identity.views)
+        assertEquals("Steve", auth.authenticate(session.token)?.name)
+        assertFailsWith<IllegalArgumentException>("single use") { auth.redeemTicket(ticket) }
+    }
+
+    @Test
+    fun `tickets expire and need an online permitted player`() {
+        val players = PlayerRegistry().apply { handle(PlayerEvent("join", "Steve", "u")); handle(PlayerEvent("join", "Alex", "a")) }
+        val cache = NativePermissionCache().apply { update("steve", listOf("helix.panel.login")) }
+        val auth = service(cache, players)
+
+        val ticket = auth.issueTicket("Steve")
+        now += PanelAuthService.TICKET_TTL_MS
+        assertFailsWith<IllegalArgumentException> { auth.redeemTicket(ticket) }
+        assertFailsWith<IllegalArgumentException>("no login permission") { auth.issueTicket("Alex") }
+        assertFailsWith<IllegalArgumentException>("offline") { auth.issueTicket("Herobrine") }
+        assertFailsWith<IllegalArgumentException> { auth.redeemTicket("made-up") }
+    }
 }

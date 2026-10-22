@@ -9,16 +9,19 @@ import de.tytoss.iguard.api.IGuardApiImpl
 import de.tytoss.iguard.check.CheckEngine
 import de.tytoss.iguard.check.Enforcement
 import de.tytoss.iguard.command.IGuardCommand
-import de.tytoss.iguard.config.IGuardConfig
+import de.tytoss.iguard.config.IGuardConfigLoader
 import de.tytoss.iguard.gui.GuiService
 import de.tytoss.iguard.packet.IGuardPacketListener
 import de.tytoss.iguard.replay.ReplayService
+import de.tytoss.iguard.setback.SetbackMarks
 import de.tytoss.iguard.setback.SetbackService
+import de.tytoss.iguard.snapshot.DigProbe
 import de.tytoss.iguard.snapshot.MainThreadSampler
 import de.tytoss.iguard.snapshot.SnapshotStore
 import de.tytoss.iguard.spectate.SpectateService
 import de.tytoss.iguard.storage.GuardStore
 import de.tytoss.iguard.storage.HelixNodeStore
+import de.tytoss.iguard.trace.TraceHub
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -54,6 +57,8 @@ class IGuardPlugin : JavaPlugin(), Listener {
     private var replay: ReplayService? = null
     private var banCoordinator: de.tytoss.iguard.ban.BanCoordinator? = null
     private var translations: NodeTranslations? = null
+    private var traceHub: TraceHub? = null
+    private var debugOutput: de.tytoss.iguard.alert.DebugOutput? = null
     private var started = false
 
     /** Bootstraps all services; disables the plugin with a clear message when a requirement is missing. */
@@ -77,6 +82,8 @@ class IGuardPlugin : JavaPlugin(), Listener {
         registeredPacketListener = null
         engine?.stopAccepting()
         engine?.shutdown()
+        debugOutput?.stop()
+        traceHub?.shutdown()
         gui?.shutdown()
         spectate?.stopAll()
         replay?.stopAll()
@@ -99,6 +106,7 @@ class IGuardPlugin : JavaPlugin(), Listener {
     fun onQuit(event: PlayerQuitEvent) {
         packetListener?.remove(event.player.uniqueId)
         replay?.handleQuit(event.player.uniqueId)
+        traceHub?.remove(event.player.uniqueId)
     }
 
     /** Direct-join rejoin gate: deny login for players with an active network ban. Runs off-thread. */
@@ -112,7 +120,7 @@ class IGuardPlugin : JavaPlugin(), Listener {
         val until = ban.expiresAt?.let { java.time.Instant.ofEpochMilli(it).toString() } ?: permanent
         // Prefer the node-localized direct-join screen; fall back to plain text if translations are unavailable.
         val screen = i18n?.screen(event.name, null, "ban.screen.direct", "reason" to ban.reason, "until" to until)
-            ?: "IGuard: ${ban.reason}\nUntil: $until"
+            ?: "Banned: ${ban.reason}\nUntil: $until"
         event.disallow(
             org.bukkit.event.player.AsyncPlayerPreLoginEvent.Result.KICK_BANNED,
             net.kyori.adventure.text.Component.text(screen),
@@ -126,7 +134,7 @@ class IGuardPlugin : JavaPlugin(), Listener {
             ?: error("PacketEvents is not installed")
         require(packetPlugin.pluginMeta.version == "2.13.0") { "PacketEvents 2.13.0 is required, found ${packetPlugin.pluginMeta.version}" }
         require(PacketEvents.getAPI().isInitialized) { "PacketEvents is not initialized" }
-        val loaded = IGuardConfig.load(this)
+        val loaded = IGuardConfigLoader.load(this)
         val dynamic = AtomicReference(loaded.dynamic)
         val snapshots = SnapshotStore()
         val exemptions = ExemptionManager()
@@ -153,7 +161,22 @@ class IGuardPlugin : JavaPlugin(), Listener {
         alerts = alertService
         val notificationService = de.tytoss.iguard.notify.NotificationService(dynamic, logger)
         notifications = notificationService
-        val setbackService = SetbackService(this, snapshots)
+        val setbackMarks = SetbackMarks()
+        val setbackService = SetbackService(this, snapshots, setbackMarks)
+        // Trace recordings, API frame listeners and /iguard debug share one observer hub.
+        val hub = TraceHub(
+            dataFolder.toPath().resolve("traces"),
+            loaded.trace,
+            dynamic,
+            loaded.serverId,
+            { id -> snapshots.view(id)?.playerName },
+            { id -> engine?.snapshot(id)?.clientVersion },
+            logger,
+        )
+        traceHub = hub
+        exemptions.grantListener = hub::exemptionGranted
+        val debugSink = de.tytoss.iguard.alert.DebugOutput(this, hub.debug)
+        debugOutput = debugSink
         // Ban enforcement is pluggable (config bans.provider): IGuard always writes its own audit +
         // notifications via the coordinator, then delegates the actual ban to the selected provider —
         // helix (the default; `native` is an alias) posts guard.store.ban/unban and the node kicks +
@@ -183,13 +206,15 @@ class IGuardPlugin : JavaPlugin(), Listener {
             enforcement,
             notificationService,
             logger,
+            hub,
         )
         engine = checkEngine
-        val packets = IGuardPacketListener(checkEngine)
+        val digProbe = DigProbe()
+        val packets = IGuardPacketListener(checkEngine, digProbe)
         packetListener = packets
-        val mainSampler = MainThreadSampler(this, snapshots, exemptions, loaded.exemptions, loaded.sampler)
+        val mainSampler = MainThreadSampler(this, snapshots, exemptions, loaded.exemptions, loaded.sampler, setbackMarks, digProbe)
         sampler = mainSampler
-        val api = IGuardApiImpl(checkEngine, exemptions, banCoordinatorLocal)
+        val api = IGuardApiImpl(checkEngine, exemptions, banCoordinatorLocal, hub)
         server.servicesManager.register(IGuardApi::class.java, api, this, ServicePriority.Normal)
         val spectateService = SpectateService(this, nodeTranslations)
         spectate = spectateService
@@ -198,7 +223,7 @@ class IGuardPlugin : JavaPlugin(), Listener {
         replay = replayService
         val guiService = GuiService(this, checkEngine, exemptions, spectateService, replayService, banCoordinatorLocal, helixStore, loaded.serverId, scope, nodeTranslations)
         gui = guiService
-        val commandHandler = IGuardCommand(this, loaded, dynamic, api, checkEngine, alertService, helixStore, mainSampler, spectateService, guiService, replayService, banCoordinatorLocal, scope, nodeTranslations)
+        val commandHandler = IGuardCommand(this, loaded, dynamic, api, checkEngine, alertService, helixStore, mainSampler, spectateService, guiService, replayService, banCoordinatorLocal, scope, nodeTranslations, hub)
         getCommand("iguard")?.apply {
             setExecutor(commandHandler)
             tabCompleter = commandHandler
@@ -206,6 +231,7 @@ class IGuardPlugin : JavaPlugin(), Listener {
         Bukkit.getPluginManager().registerEvents(this, this)
         mainSampler.start()
         alertService.start()
+        debugSink.start()
         checkEngine.start()
         helixStore.start()
         guiService.install()

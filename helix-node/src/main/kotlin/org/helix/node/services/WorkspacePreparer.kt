@@ -34,6 +34,8 @@ import java.nio.file.attribute.BasicFileAttributes
  *   forwarding, written into both proxy and backend configs.
  * @property legacyForwarding opt-in escape hatch to unauthenticated
  *   BungeeCord-style forwarding instead of modern forwarding.
+ * @property paperclipCache shared Paperclip downloads (Mojang jar, libraries)
+ *   seeded into Paper workspaces, so fresh workspaces do not download them again.
  */
 class WorkspacePreparer(
     private val paths: NodePaths,
@@ -44,6 +46,7 @@ class WorkspacePreparer(
     private val eulaAccepted: Boolean = false,
     private val forwardingSecret: String = "",
     private val legacyForwarding: Boolean = false,
+    private val paperclipCache: PaperclipCache? = null,
 ) {
     private val logger = LoggerFactory.getLogger(WorkspacePreparer::class.java)
 
@@ -67,6 +70,7 @@ class WorkspacePreparer(
         Files.createDirectories(workspace)
         copyTemplates(task, workspace)
         installServerJar(task, workspace)
+        seedPaperclip(task, workspace)
         installWrapper(workspace)
         installBridge(task.environment, workspace)
         installAddonComponents(task, workspace)
@@ -135,6 +139,33 @@ class WorkspacePreparer(
     private fun installServerJar(task: TaskDefinition, workspace: Path) {
         val jar = serverJar(task.environment, task.version)
         Files.copy(jar, workspace.resolve("server.jar"), StandardCopyOption.REPLACE_EXISTING)
+    }
+
+    /**
+     * Paper only: first takes over what an earlier run of this (static) workspace downloaded, then fills
+     * the workspace from the shared cache – a failure here only means Paperclip downloads again.
+     */
+    private fun seedPaperclip(task: TaskDefinition, workspace: Path) {
+        val cache = paperclipCache ?: return
+        if (task.environment != Environment.PAPER) return
+        runCatching {
+            cache.harvest(workspace, task.version)
+            cache.seed(workspace, task.version)
+        }.onFailure { logger.warn("Paperclip cache for {} failed: {}", workspace.fileName, it.message) }
+    }
+
+    /**
+     * Stores the Paperclip downloads of a workspace in the shared cache (Paper only); called before a
+     * dynamic workspace is deleted.
+     *
+     * @param task task the service belongs to.
+     * @param workspace the workspace root.
+     */
+    fun harvestPaperclip(task: TaskDefinition, workspace: Path) {
+        val cache = paperclipCache ?: return
+        if (task.environment != Environment.PAPER) return
+        runCatching { cache.harvest(workspace, task.version) }
+            .onFailure { logger.warn("Paperclip cache for {} failed: {}", workspace.fileName, it.message) }
     }
 
     private fun installWrapper(workspace: Path) {

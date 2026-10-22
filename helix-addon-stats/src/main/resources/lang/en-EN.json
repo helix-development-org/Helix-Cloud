@@ -1,7 +1,7 @@
 {
-  "value": "<gold>{stat}: <white>{value}</white>",
-  "value.other": "<gold><white>{player}</white>'s {stat}: <white>{value}</white>",
-  "top.empty": "<gray>No values recorded yet for <white>{stat}</white>.",
-  "top.entry": "<gold>#{rank} <white>{player}</white> <dark_gray>— <white>{value}</white>",
-  "usage": "<gray>Usage: <white>/stats \\<stat> [player]</white> <dark_gray>| <white>/stats top \\<stat> [limit]</white>"
+  "value": "<#f1e2c2>{stat}: <#ffcf4a>{value}</#ffcf4a>",
+  "value.other": "<#f1e2c2><#ffcf4a>{player}</#ffcf4a>'s {stat}: <#ffcf4a>{value}</#ffcf4a>",
+  "top.empty": "<#f1e2c2>No values recorded yet for <#ffcf4a>{stat}</#ffcf4a>.",
+  "top.entry": "<#ffcf4a>#{rank}</#ffcf4a> <#f1e2c2>{player}</#f1e2c2> <#7a4a24>—</#7a4a24> <#ffcf4a>{value}</#ffcf4a>",
+  "usage": "<#f1e2c2>Usage: <#ffcf4a>/stats \\<stat> [player]</#ffcf4a> <#7a4a24>|</#7a4a24> <#ffcf4a>/stats top \\<stat> [limit]</#ffcf4a>"
 }

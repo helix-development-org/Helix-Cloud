@@ -4,8 +4,14 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import io.papermc.paper.event.player.AsyncPlayerSpawnLocationEvent
+import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.Bukkit
 import org.bukkit.GameMode
+import org.bukkit.Location
+import org.bukkit.World
+import org.bukkit.command.Command
+import org.bukkit.command.CommandSender
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
@@ -18,6 +24,7 @@ import org.bukkit.event.player.PlayerDropItemEvent
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerMoveEvent
+import org.bukkit.event.player.PlayerRespawnEvent
 import org.bukkit.entity.Player
 import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.plugin.java.JavaPlugin
@@ -37,6 +44,10 @@ import kotlin.coroutines.CoroutineContext
  *
  * Players with `helix.lobby.bypass` are exempt from the protection rules so
  * operators can build and manage the lobby world.
+ *
+ * The lobby spawn comes from the config ([LobbyConfig.spawn], set with the team command `/setlobbyspawn`): lobby
+ * services are temporary, so a spawn stored only in the world file would be lost on every restart. Joining,
+ * respawning and void-falling players land there; without a configured spawn the world's own spawn is used.
  */
 class LobbyPlugin : JavaPlugin(), Listener {
     private lateinit var scope: CoroutineScope
@@ -44,6 +55,11 @@ class LobbyPlugin : JavaPlugin(), Listener {
     private var translations: NodeTranslations? = null
     private lateinit var items: LobbyItemFactory
     private lateinit var serverMenu: ServerMenu
+    private lateinit var mainWorld: World
+    private val mini = MiniMessage.miniMessage()
+
+    /** The configured spawn as a location in [mainWorld]; read by the async spawn-location event. */
+    @Volatile private var spawnPoint: Location? = null
 
     private var task: String = "*"
 
@@ -72,6 +88,7 @@ class LobbyPlugin : JavaPlugin(), Listener {
             return
         }
         task = System.getenv("HELIX_TASK")?.takeIf { it.isNotBlank() } ?: "*"
+        mainWorld = server.worlds.first()
         scope = CoroutineScope(SupervisorJob() + mainDispatcher)
 
         val client = LobbyNodeClient(controlUrl, controlToken)
@@ -113,12 +130,24 @@ class LobbyPlugin : JavaPlugin(), Listener {
     private fun applyConfig(fetched: LobbyConfig) {
         if (initialized && fetched == config) return
         val serverMenuChanged = !initialized || fetched.serverMenu != config.serverMenu
+        val spawnChanged = !initialized || fetched.spawn != config.spawn || active != fetched.isLobbyTask(task)
         config = fetched
         active = fetched.isLobbyTask(task)
         initialized = true
         if (serverMenuChanged) serverMenu.install(fetched.serverMenu)
+        if (spawnChanged) applySpawn()
         if (active) server.onlinePlayers.forEach { applyLobby(it) }
     }
+
+    /** Turns the configured spawn into [spawnPoint] and makes it the main world's spawn while this is a lobby. */
+    private fun applySpawn() {
+        val point = config.spawn?.let { Location(mainWorld, it.x, it.y, it.z, it.yaw, it.pitch) }
+        spawnPoint = point
+        if (active && point != null) mainWorld.setSpawnLocation(point)
+    }
+
+    /** Where lobby players spawn: the configured point, else the main world's spawn. */
+    private fun lobbySpawn(): Location = spawnPoint?.clone() ?: mainWorld.spawnLocation
 
     /**
      * Puts a player into the lobby state: game mode, a clean inventory and
@@ -134,22 +163,9 @@ class LobbyPlugin : JavaPlugin(), Listener {
         if (protection.clearInventoryOnJoin) {
             player.inventory.clear()
         }
-        val phone = config.phone
-        if (phone.enabled) {
-            // Phone mode: a single item that opens the phone, which hosts everything.
-            val item = LobbyItem(
-                slot = phone.slot,
-                material = phone.material,
-                name = phone.name,
-                action = ItemAction.RUN_COMMAND,
-                command = "phone",
-            )
-            player.inventory.setItem(phone.slot.coerceIn(0, 8), items.build(item))
-        } else {
-            config.layoutFor(task).items.forEach { item ->
-                if (item.permission.isNotBlank() && !player.hasPermission(item.permission)) return@forEach
-                player.inventory.setItem(item.slot.coerceIn(0, 8), items.build(item))
-            }
+        config.layoutFor(task).items.forEach { item ->
+            if (item.permission.isNotBlank() && !player.hasPermission(item.permission)) return@forEach
+            player.inventory.setItem(item.slot.coerceIn(0, 8), items.build(item))
         }
         if (protection.preventHunger) {
             player.foodLevel = MAX_FOOD
@@ -224,15 +240,75 @@ class LobbyPlugin : JavaPlugin(), Listener {
         if (guarded(player, config.protection.preventItemMove)) event.isCancelled = true
     }
 
-    /** Teleports a lobby player back to spawn when they fall into the void. */
+    /** Teleports a lobby player back to the lobby spawn when they fall into the void. */
     @EventHandler(ignoreCancelled = true)
     fun onMove(event: PlayerMoveEvent) {
         if (!active || !config.protection.voidTeleport) return
         val to = event.to
         if (to.y >= config.protection.voidTeleportY) return
-        val spawn = event.player.respawnLocation ?: event.player.world.spawnLocation
-        event.player.teleport(spawn)
+        event.player.teleport(lobbySpawn())
     }
+
+    /** Joining players appear at the configured lobby spawn (runs off the main thread, before the join). */
+    @EventHandler
+    fun onSpawnLocation(event: AsyncPlayerSpawnLocationEvent) {
+        if (!active) return
+        spawnPoint?.let { event.spawnLocation = it.clone() }
+    }
+
+    /** Respawning lobby players come back at the lobby spawn. */
+    @EventHandler
+    fun onRespawn(event: PlayerRespawnEvent) {
+        if (active) event.respawnLocation = lobbySpawn()
+    }
+
+    // ------------------------------------------------------------------
+    // /setlobbyspawn
+    // ------------------------------------------------------------------
+
+    /** `/setlobbyspawn`: stores the sender's position as the lobby spawn on the node (all lobbies, restart-proof). */
+    override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
+        val player = sender as? Player ?: run {
+            sender.sendMessage(plainText("spawn.players-only"))
+            return true
+        }
+        when {
+            !active -> message(player, "spawn.not-lobby")
+            player.world != mainWorld -> message(player, "spawn.wrong-world")
+            else -> saveSpawn(player)
+        }
+        return true
+    }
+
+    private fun saveSpawn(player: Player) {
+        val location = player.location
+        val spawn = LobbySpawn(location.x, location.y, location.z, location.yaw, location.pitch)
+        val name = player.name
+        server.scheduler.runTaskAsynchronously(this, Runnable {
+            val error = client?.saveSpawn(name, spawn) ?: "unreachable"
+            server.scheduler.runTask(this, Runnable {
+                if (error == null) {
+                    config = config.copy(spawn = spawn)
+                    applySpawn()
+                }
+                if (!player.isOnline) return@Runnable
+                if (error == null) {
+                    message(player, "spawn.saved", "x" to fmt(spawn.x), "y" to fmt(spawn.y), "z" to fmt(spawn.z))
+                } else {
+                    message(player, "spawn.failed", "reason" to error)
+                }
+            })
+        })
+    }
+
+    private fun message(player: Player, key: String, vararg params: Pair<String, String>) {
+        val text = translations?.text(player.name, player.locale().language, key, *params) ?: key
+        player.sendMessage(mini.deserialize(text))
+    }
+
+    private fun plainText(key: String): String = translations?.text("", null, key) ?: key
+
+    private fun fmt(value: Double) = String.format(java.util.Locale.ROOT, "%.1f", value)
 
     /**
      * Whether a protection rule should fire for a player: the server is a

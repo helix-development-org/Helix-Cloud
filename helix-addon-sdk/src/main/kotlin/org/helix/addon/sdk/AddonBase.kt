@@ -64,6 +64,8 @@ abstract class AddonBase : HelixAddon {
      * @param permission permission node required to run the in-game command.
      * @param bridgeInvocable whether a per-service token may invoke it via
      *   `POST /internal/action`.
+     * @param bridgeTasks limits bridge calls to services of these tasks (case-insensitive);
+     *   empty allows every service.
      * @param handler executed on invocation.
      */
     protected fun action(
@@ -73,10 +75,11 @@ abstract class AddonBase : HelixAddon {
         playerCommand: Boolean = false,
         permission: String? = null,
         bridgeInvocable: Boolean = false,
+        bridgeTasks: Set<String> = emptySet(),
         handler: (ActionInvocation) -> ActionResult,
     ) {
         context.registerAction(
-            ActionDescriptor(name, description, usage, playerCommand, permission, bridgeInvocable),
+            ActionDescriptor(name, description, usage, playerCommand, permission, bridgeInvocable, bridgeTasks),
             handler,
         )
     }

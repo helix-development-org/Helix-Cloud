@@ -148,7 +148,8 @@ class DiscordBotAddon : AddonBase() {
             "discord.config.set",
             "Updates the bot config and reconnects. Keys: token, guild, panelchannel, statuschannel, " +
                 "auditchannel, notifychannel, categories, interval, codettl, confirmtimeout, " +
-                "category.<name>, audit.<type>, normal, destructive, critical.",
+                "category.<name>, audit.<type>, normal, destructive, critical, bugforum, bugstaff, " +
+                "bugtag.<severity|category|status>.<key>, bugboard, bugboardday, bugboardhour, bugboardzone.",
             "discord.config.set <key=value>...",
         ) { invocation -> updateConfig(storage, invocation) }
         action(
@@ -270,6 +271,8 @@ class DiscordBotAddon : AddonBase() {
             .mapKeys { it.key.removePrefix("category.") }
         val auditOverrides = overrides.filterKeys { it.startsWith("audit.") }
             .mapKeys { it.key.removePrefix("audit.") }
+        val tagOverrides = overrides.filterKeys { it.startsWith("bugtag.") }
+            .mapKeys { it.key.removePrefix("bugtag.") }
         val updated = current.copy(
             botToken = overrides["token"]?.takeIf { it.isNotBlank() } ?: current.botToken,
             guildId = overrides["guild"] ?: current.guildId,
@@ -286,6 +289,13 @@ class DiscordBotAddon : AddonBase() {
             normalActions = list("normal") ?: current.normalActions,
             destructiveActions = list("destructive") ?: current.destructiveActions,
             criticalActions = list("critical") ?: current.criticalActions,
+            bugForumChannelId = overrides["bugforum"] ?: current.bugForumChannelId,
+            bugStaffChannelId = overrides["bugstaff"] ?: current.bugStaffChannelId,
+            bugTags = (current.bugTags + tagOverrides).filterValues { it.isNotBlank() },
+            bugBoardChannelId = overrides["bugboard"] ?: current.bugBoardChannelId,
+            bugBoardDay = overrides["bugboardday"]?.toIntOrNull()?.coerceIn(1, 7) ?: current.bugBoardDay,
+            bugBoardHour = overrides["bugboardhour"]?.toIntOrNull()?.coerceIn(0, 23) ?: current.bugBoardHour,
+            bugBoardZone = overrides["bugboardzone"]?.takeIf { runCatching { java.time.ZoneId.of(it) }.isSuccess } ?: current.bugBoardZone,
         )
         DiscordConfig.save(storage, updated)
         runtime.stop()

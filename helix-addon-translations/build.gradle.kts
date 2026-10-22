@@ -6,12 +6,12 @@ dependencies {
 
 /**
  * Packages the addon as HXA: addon.json + addon.jar plus the Paper-side
- * `/translationsmenu` GUI (paper.jar) and its dirt/preview resource pack
- * (pack.zip), both built by :helix-addon-translations-paper.
+ * `/translationsmenu` GUI (paper.jar) built by :helix-addon-translations-paper.
+ * The ledger art ships with the Helix-GUIs pack.
  */
 val packageHxa by tasks.registering(Zip::class) {
     group = "distribution"
-    description = "Packages the addon as .hxa (addon.json + addon.jar + paper.jar + pack.zip)."
+    description = "Packages the addon as .hxa (addon.json + addon.jar + paper.jar)."
     dependsOn(tasks.named<Jar>("jar"))
     archiveFileName.set("helix-translations-$version.hxa")
     destinationDirectory.set(layout.buildDirectory.dir("distributions"))
@@ -21,8 +21,5 @@ val packageHxa by tasks.registering(Zip::class) {
     }
     from(project(":helix-addon-translations-paper").tasks.named<Jar>("jar").flatMap { it.archiveFile }) {
         rename { "paper.jar" }
-    }
-    from(project(":helix-addon-translations-paper").tasks.named("generatePack")) {
-        rename { "pack.zip" }
     }
 }

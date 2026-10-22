@@ -28,12 +28,15 @@ data class Vec3(val x: Double, val y: Double, val z: Double) {
     }
 
     companion object {
-        /** Unit view direction for the given yaw/pitch (Minecraft convention). */
+        /**
+         * Unit view direction for the given yaw/pitch, exactly like vanilla's
+         * `Entity.calculateViewVector`: yaw 0 looks south (+z), yaw 90 west (-x), pitch -90 straight up.
+         */
         fun direction(yaw: Float, pitch: Float): Vec3 {
-            val yawRadians = Math.toRadians(-yaw - 90.0)
-            val pitchRadians = Math.toRadians((-pitch).toDouble())
+            val yawRadians = Math.toRadians(yaw.toDouble())
+            val pitchRadians = Math.toRadians(pitch.toDouble())
             val horizontal = cos(pitchRadians)
-            return Vec3(cos(yawRadians) * horizontal, sin(pitchRadians), sin(yawRadians) * horizontal).normalized()
+            return Vec3(-sin(yawRadians) * horizontal, -sin(pitchRadians), cos(yawRadians) * horizontal).normalized()
         }
     }
 }
@@ -53,6 +56,14 @@ data class Box(
     /** True when the two boxes overlap (exclusive bounds). */
     fun intersects(other: Box) = maxX > other.minX && minX < other.maxX &&
         maxY > other.minY && minY < other.maxY && maxZ > other.minZ && minZ < other.maxZ
+
+    /** Distance from [point] to the closest point of the box (0 when the point lies inside). */
+    fun distanceTo(point: Vec3): Double {
+        val dx = max(0.0, max(minX - point.x, point.x - maxX))
+        val dy = max(0.0, max(minY - point.y, point.y - maxY))
+        val dz = max(0.0, max(minZ - point.z, point.z - maxZ))
+        return sqrt(dx * dx + dy * dy + dz * dz)
+    }
 
     /** Slab-test ray/box intersection distance from [origin] along [direction], or null past [maximum]. */
     fun rayDistance(origin: Vec3, direction: Vec3, maximum: Double): Double? {

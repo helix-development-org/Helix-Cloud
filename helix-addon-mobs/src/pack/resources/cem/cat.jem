@@ -1,0 +1,426 @@
+{
+ "textureSize": [
+  64,
+  32
+ ],
+ "models": [
+  {
+   "part": "head",
+   "id": "head",
+   "invertAxis": "xy",
+   "translate": [
+    0,
+    -9,
+    9
+   ],
+   "boxes": [
+    {
+     "coordinates": [
+      -2.5,
+      7,
+      -12,
+      5,
+      4,
+      5
+     ],
+     "textureOffset": [
+      0,
+      0
+     ],
+     "sizeAdd": 0.8
+    },
+    {
+     "coordinates": [
+      -1.5,
+      7.02,
+      -13,
+      3,
+      2,
+      2
+     ],
+     "textureOffset": [
+      0,
+      24
+     ],
+     "sizeAdd": 0.55
+    },
+    {
+     "coordinates": [
+      1,
+      11.8,
+      -9,
+      1,
+      1,
+      2
+     ],
+     "textureOffset": [
+      0,
+      10
+     ],
+     "sizeAdd": 0.55
+    },
+    {
+     "coordinates": [
+      -2,
+      11.8,
+      -9,
+      1,
+      1,
+      2
+     ],
+     "textureOffset": [
+      6,
+      10
+     ],
+     "sizeAdd": 0.55
+    }
+   ],
+   "submodels": [
+    {
+     "id": "kl_eye_l",
+     "boxes": [
+      {
+       "coordinates": [
+        -2.0,
+        8.44,
+        -13.16,
+        1.6,
+        1.6,
+        0.3
+       ],
+       "uvNorth": [
+        15,
+        0,
+        19,
+        4
+       ]
+      },
+      {
+       "coordinates": [
+        -1.36,
+        8.68,
+        -13.28,
+        0.8,
+        0.8,
+        0.1
+       ],
+       "uvNorth": [
+        19,
+        0,
+        21,
+        2
+       ]
+      }
+     ]
+    },
+    {
+     "id": "kl_lid_l",
+     "boxes": [
+      {
+       "coordinates": [
+        -2.05,
+        8.39,
+        -13.36,
+        1.7,
+        1.7,
+        0.06
+       ],
+       "uvNorth": [
+        21,
+        0,
+        24,
+        3
+       ]
+      }
+     ]
+    },
+    {
+     "id": "kl_eye_r",
+     "boxes": [
+      {
+       "coordinates": [
+        0.4,
+        8.44,
+        -13.16,
+        1.6,
+        1.6,
+        0.3
+       ],
+       "uvNorth": [
+        15,
+        0,
+        19,
+        4
+       ]
+      },
+      {
+       "coordinates": [
+        0.56,
+        8.68,
+        -13.28,
+        0.8,
+        0.8,
+        0.1
+       ],
+       "uvNorth": [
+        19,
+        0,
+        21,
+        2
+       ]
+      }
+     ]
+    },
+    {
+     "id": "kl_lid_r",
+     "boxes": [
+      {
+       "coordinates": [
+        0.35,
+        8.39,
+        -13.36,
+        1.7,
+        1.7,
+        0.06
+       ],
+       "uvNorth": [
+        21,
+        0,
+        24,
+        3
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "part": "body",
+   "id": "body",
+   "invertAxis": "xy",
+   "translate": [
+    0,
+    -12,
+    10
+   ],
+   "rotate": [
+    -90,
+    0,
+    0
+   ],
+   "boxes": [
+    {
+     "coordinates": [
+      -2,
+      -7,
+      -18,
+      4,
+      16,
+      6
+     ],
+     "textureOffset": [
+      20,
+      0
+     ]
+    }
+   ],
+   "animations": [
+    {
+     "this.rx": 0
+    }
+   ]
+  },
+  {
+   "part": "front_left_leg",
+   "id": "front_left_leg",
+   "invertAxis": "xy",
+   "translate": [
+    1.1,
+    -9.9,
+    5
+   ],
+   "boxes": [
+    {
+     "coordinates": [
+      -2.1,
+      -0.1,
+      -5,
+      2,
+      10,
+      2
+     ],
+     "textureOffset": [
+      40,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "part": "front_right_leg",
+   "id": "front_right_leg",
+   "invertAxis": "xy",
+   "translate": [
+    -1.1,
+    -9.9,
+    5
+   ],
+   "boxes": [
+    {
+     "coordinates": [
+      0.1,
+      -0.1,
+      -5,
+      2,
+      10,
+      2
+     ],
+     "textureOffset": [
+      40,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "part": "back_left_leg",
+   "id": "back_left_leg",
+   "invertAxis": "xy",
+   "translate": [
+    1.1,
+    -6,
+    -5
+   ],
+   "boxes": [
+    {
+     "coordinates": [
+      -2.1,
+      0,
+      6,
+      2,
+      6,
+      2
+     ],
+     "textureOffset": [
+      8,
+      13
+     ]
+    }
+   ]
+  },
+  {
+   "part": "back_right_leg",
+   "id": "back_right_leg",
+   "invertAxis": "xy",
+   "translate": [
+    -1.1,
+    -6,
+    -5
+   ],
+   "boxes": [
+    {
+     "coordinates": [
+      0.1,
+      0,
+      6,
+      2,
+      6,
+      2
+     ],
+     "textureOffset": [
+      8,
+      13
+     ]
+    }
+   ]
+  },
+  {
+   "part": "tail",
+   "id": "tail",
+   "invertAxis": "xy",
+   "translate": [
+    0,
+    -8.5,
+    -8
+   ],
+   "rotate": [
+    -90,
+    0,
+    0
+   ],
+   "boxes": [
+    {
+     "coordinates": [
+      -0.5,
+      0.5,
+      8,
+      1,
+      8,
+      1
+     ],
+     "textureOffset": [
+      0,
+      15
+     ]
+    }
+   ],
+   "animations": [
+    {
+     "this.rx": 0
+    }
+   ]
+  },
+  {
+   "part": "tail2",
+   "id": "tail2",
+   "invertAxis": "xy",
+   "translate": [
+    0,
+    -8.5,
+    -16
+   ],
+   "rotate": [
+    -90,
+    0,
+    0
+   ],
+   "boxes": [
+    {
+     "coordinates": [
+      -0.5,
+      0.5,
+      16,
+      1,
+      8,
+      1
+     ],
+     "textureOffset": [
+      4,
+      15
+     ]
+    }
+   ],
+   "animations": [
+    {
+     "this.rx": 0
+    }
+   ]
+  }
+ ],
+ "animations": [
+  {
+   "body.sy": "1 + 0.025 * sin((age + 21) * 0.09)",
+   "body.sx": "1 + 0.012 * sin((age + 21) * 0.09)",
+   "body.rz": "body.rz + sin(limb_swing * 0.6662) * min(limb_speed, 1) * 0.06",
+   "head.rz": "head.rz + sin(limb_swing * 0.6662) * min(limb_speed, 1) * 0.16 + sin((age + 21) * 0.045) * 0.05",
+   "head.rx": "head.rx + if(hurt_time > 0, -0.3 * hurt_time / 10, sin((age + 21) * 0.06) * 0.03)",
+   "head.sy": "1 + abs(sin(limb_swing * 0.6662) * min(limb_speed, 1)) * 0.06",
+   "head.sx": "1 - abs(sin(limb_swing * 0.6662) * min(limb_speed, 1)) * 0.03",
+   "tail.ry": "tail.ry + sin((age + 21) * 0.32) * 0.35",
+   "tail2.ry": "tail2.ry + sin((age + 21) * 0.32) * 0.35",
+   "kl_lid_l.visible": "frac((age + 147) / 101) > 0.955 || hurt_time > 0",
+   "kl_lid_r.visible": "frac((age + 147) / 101) > 0.955 || hurt_time > 0"
+  }
+ ],
+ "credit": "Kronland design concept \u00a713 (generated by tools/mobs/cem.py from the CEM templates)"
+}

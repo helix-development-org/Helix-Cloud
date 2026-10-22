@@ -1,12 +1,12 @@
 {
-  "banned": "<red><bold>You are banned</bold>\n<gray>from {network}\n \n<gray>Reason: <white>{reason}",
-  "banned.temp": "<red><bold>You are temporarily banned</bold>\n<gray>from {network}\n \n<gray>Reason: <white>{reason}\n<gray>Time left: <yellow>{remaining}\n<gray>Expires: <white>{expiry}",
-  "notify.set": "<white>{player}</white> <gray>was banned: {reason} <dark_gray>({expiry})</dark_gray>",
-  "notify.pardon": "<white>{player}</white> <green>was pardoned.",
-  "help.header": "<aqua><bold>Ban commands:</bold></aqua>",
-  "help.set": "<white>/bans set <player> [duration] [reason...]</white> <dark_gray>—</dark_gray> <gray>30m, 12h, 7d or permanent",
-  "help.pardon": "<white>/bans pardon <player></white>",
-  "help.check": "<white>/bans check <player></white>",
-  "help.list": "<white>/bans list</white>",
-  "help.history": "<white>/bans history <player></white>"
+  "banned": "<#ff5a4a><bold>You are banned</bold>\n<#f1e2c2>from <#ffcf4a>{network}</#ffcf4a>\n \n<#f1e2c2>Reason: <#ffcf4a>{reason}",
+  "banned.temp": "<#ff5a4a><bold>You are temporarily banned</bold>\n<#f1e2c2>from <#ffcf4a>{network}</#ffcf4a>\n \n<#f1e2c2>Reason: <#ffcf4a>{reason}\n<#f1e2c2>Time left: <#ffcf4a>{remaining}\n<#f1e2c2>Expires: <#ffcf4a>{expiry}",
+  "notify.set": "<#ffcf4a>{player}</#ffcf4a> <#f1e2c2>was banned: {reason} <#7a4a24>({expiry})</#7a4a24>",
+  "notify.pardon": "<#ffcf4a>{player}</#ffcf4a> <#4ac85e>was pardoned.",
+  "help.header": "<#ffcf4a><bold>Ban commands:</bold></#ffcf4a>",
+  "help.set": "<#ffcf4a>/bans set <player> [duration] [reason...]</#ffcf4a> <#7a4a24>—</#7a4a24> <#f1e2c2>30m, 12h, 7d or permanent",
+  "help.pardon": "<#ffcf4a>/bans pardon <player></#ffcf4a>",
+  "help.check": "<#ffcf4a>/bans check <player></#ffcf4a>",
+  "help.list": "<#ffcf4a>/bans list</#ffcf4a>",
+  "help.history": "<#ffcf4a>/bans history <player></#ffcf4a>"
 }

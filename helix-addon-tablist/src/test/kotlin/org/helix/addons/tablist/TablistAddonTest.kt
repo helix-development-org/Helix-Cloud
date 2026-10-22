@@ -13,8 +13,9 @@ class TablistAddonTest {
 
     @Test
     fun `defaults are published on enable`() {
-        assertEquals("&6Helix-Cloud", context.bridgeValues["tablist.header"])
-        assertTrue(context.bridgeValues["tablist.footer"]!!.contains("{online}"))
+        assertEquals(TablistConfig().header, context.bridgeValues["tablist.header"])
+        assertTrue(context.bridgeValues["tablist.header"]!!.contains("{online}"))
+        assertEquals(TablistConfig().footer, context.bridgeValues["tablist.footer"])
     }
 
     @Test

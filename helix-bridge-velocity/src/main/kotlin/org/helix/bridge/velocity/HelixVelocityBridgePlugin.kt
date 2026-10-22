@@ -16,6 +16,7 @@ import com.velocitypowered.api.plugin.Plugin
 import com.velocitypowered.api.proxy.Player
 import com.velocitypowered.api.proxy.ProxyServer
 import com.velocitypowered.api.proxy.server.ServerPing
+import com.velocitypowered.api.util.Favicon
 import com.velocitypowered.api.scheduler.ScheduledTask
 import kotlinx.serialization.json.Json
 import net.kyori.adventure.text.Component
@@ -441,12 +442,23 @@ class HelixVelocityBridgePlugin @Inject constructor(
     }
 
     /**
-     * Redirects kicked players to a fallback backend when possible.
+     * Redirects kicked players to a fallback backend when possible. A server that refuses a switch (full,
+     * whitelisted, not on a war roster …) does not move the player: they stay where they are and see the reason.
      *
      * @param event the kick event.
      */
     @Subscribe
     fun onKickedFromServer(event: KickedFromServerEvent) {
+        if (event.kickedDuringServerConnect() && event.player.currentServer.isPresent) {
+            val reason = event.serverKickReason.orElse(null) ?: translate(
+                event.player,
+                "helix.translations.velocity.connect.refused",
+                "{server} refused the connection.",
+                mapOf("server" to event.server.serverInfo.name),
+            )
+            event.result = KickedFromServerEvent.Notify.create(reason)
+            return
+        }
         val bypass = hasPermission(event.player.username, "helix.maintenance.bypass")
         val fallback = registry?.fallback(exclude = event.server.serverInfo.name, bypassMaintenance = bypass) ?: return
         event.result = KickedFromServerEvent.RedirectPlayer.create(
@@ -488,7 +500,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
             // No MOTD addon installed — keep the previous minimal behaviour.
             if (maintenance.get()) {
                 event.ping = event.ping.asBuilder()
-                    .description(translate(null, "helix.translations.velocity.motd.maintenance", "<red>Maintenance"))
+                    .description(translate(null, "helix.translations.velocity.motd.maintenance", "<#ffb43a>Maintenance"))
                     .build()
             }
             return
@@ -518,6 +530,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
                 }.toTypedArray(),
             )
         }
+        faviconOf(profile.favicon)?.let { builder.favicon(it) }
         if (profile.versionText.isNotBlank()) {
             builder.version(
                 ServerPing.Version(
@@ -527,6 +540,25 @@ class HelixVelocityBridgePlugin @Inject constructor(
             )
         }
         event.ping = builder.build()
+    }
+
+    @Volatile
+    private var faviconCache: Pair<String, Favicon?>? = null
+
+    /**
+     * Decodes the profile icon once per distinct value; an invalid icon is logged once and skipped.
+     *
+     * @param base64 plain Base64 of a 64×64 PNG, or empty.
+     * @return the favicon, or `null` to keep the proxy default.
+     */
+    private fun faviconOf(base64: String): Favicon? {
+        if (base64.isBlank()) return null
+        faviconCache?.let { (key, icon) -> if (key == base64) return icon }
+        val icon = runCatching { Favicon("data:image/png;base64,$base64") }
+            .onFailure { logger.warn("MOTD favicon rejected: {}", it.message) }
+            .getOrNull()
+        faviconCache = base64 to icon
+        return icon
     }
 
     private fun applyContext(template: String, ctx: Map<String, String>): String {
@@ -792,7 +824,38 @@ class HelixVelocityBridgePlugin @Inject constructor(
             "broadcast" -> proxy.allPlayers.forEach { player ->
                 player.sendMessage(commandComponent(command, player))
             }
+            "connect" -> proxy.getPlayer(command.player).ifPresent { player -> connect(player, command.target) }
             else -> logger.warn("Unknown proxy command type: {}", command.type)
+        }
+    }
+
+    /**
+     * Moves a player to the backend [targetId] (node action `player.connect`). Already being there is a no-op;
+     * an unknown server or a failed attempt leaves the player where they are and tells them why.
+     *
+     * @param player the player to move.
+     * @param targetId service id of the destination.
+     */
+    private fun connect(player: Player, targetId: String?) {
+        val target = targetId?.let { proxy.getServer(it).orElse(null) }
+        if (target == null) {
+            logger.warn("Connect for {} to unknown server {}", player.username, targetId)
+            player.sendMessage(
+                translate(player, "helix.translations.velocity.connect.unknown", "That server is not available right now."),
+            )
+            return
+        }
+        if (player.currentServer.map { it.serverInfo.name == target.serverInfo.name }.orElse(false)) return
+        player.createConnectionRequest(target).connect().whenComplete { result, error ->
+            if (error == null && result != null && result.isSuccessful) return@whenComplete
+            val reason = result?.reasonComponent?.orElse(null) ?: translate(
+                player,
+                "helix.translations.velocity.connect.failed",
+                "Could not connect you to {server}.",
+                mapOf("server" to target.serverInfo.name),
+            )
+            player.sendMessage(reason)
+            logger.info("Connect {} → {} failed: {}", player.username, target.serverInfo.name, error?.message ?: result?.status)
         }
     }
 

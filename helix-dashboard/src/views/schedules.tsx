@@ -3,6 +3,7 @@ import { Plus } from "lucide-react"
 import { toast } from "sonner"
 import { api, type ScheduledJob } from "@/lib/api"
 import { usePoll } from "@/lib/use-poll"
+import { useCan } from "@/lib/access"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,6 +16,8 @@ export function SchedulesView() {
   const { data, reload } = usePoll(() => api<ScheduledJob[]>("/schedules"), 0)
   const [f, setF] = useState({ id: "", action: "", args: "", every: "0", daily: "" })
   const set = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }))
+  const can = useCan()
+  const editable = can("schedules.edit")
 
   const create = async () => {
     if (!f.id.trim() || !f.action.trim()) return toast.error("ID and action required")
@@ -41,7 +44,7 @@ export function SchedulesView() {
                   <TableCell className="font-mono text-xs">{j.action} {j.arguments.join(" ")}</TableCell>
                   <TableCell className="text-sm">{j.everyMinutes > 0 ? `every ${j.everyMinutes}m` : j.dailyAt ? `daily ${j.dailyAt}` : "—"}</TableCell>
                   <TableCell><Badge variant={j.enabled ? "success" : "secondary"}>{j.enabled ? "on" : "off"}</Badge></TableCell>
-                  <TableCell><div className="flex justify-end gap-2"><Button size="sm" variant="outline" onClick={() => run(j.id)}>Run now</Button><Button size="sm" variant="destructive" onClick={() => del(j.id)}>Delete</Button></div></TableCell>
+                  <TableCell>{editable && <div className="flex justify-end gap-2"><Button size="sm" variant="outline" onClick={() => run(j.id)}>Run now</Button><Button size="sm" variant="destructive" onClick={() => del(j.id)}>Delete</Button></div>}</TableCell>
                 </TableRow>
               ))}
               {data && !data.length && <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">No scheduled jobs.</TableCell></TableRow>}
@@ -49,7 +52,7 @@ export function SchedulesView() {
           </Table>
         </CardContent>
       </Card>
-      <Card>
+      {editable && <Card>
         <CardHeader><CardTitle>New job</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <F label="ID"><Input value={f.id} onChange={(e) => set("id", e.target.value)} placeholder="daily-restart" /></F>
@@ -59,7 +62,7 @@ export function SchedulesView() {
           <F label="Daily at (HH:mm)"><Input value={f.daily} onChange={(e) => set("daily", e.target.value)} placeholder="04:00" /></F>
           <div className="flex items-end"><Button onClick={create}><Plus className="size-4" /> Create job</Button></div>
         </CardContent>
-      </Card>
+      </Card>}
     </div>
   )
 }

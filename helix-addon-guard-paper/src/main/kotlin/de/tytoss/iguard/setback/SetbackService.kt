@@ -1,5 +1,6 @@
 package de.tytoss.iguard.setback
 
+import de.tytoss.iguard.check.SetbackSink
 import de.tytoss.iguard.model.SafePosition
 import de.tytoss.iguard.snapshot.SnapshotStore
 import org.bukkit.Bukkit
@@ -15,11 +16,14 @@ import kotlin.math.floor
 class SetbackService(
     private val plugin: JavaPlugin,
     private val snapshots: SnapshotStore,
-) {
+    private val marks: SetbackMarks,
+) : SetbackSink {
     private val lastSetback = ConcurrentHashMap<UUID, Long>()
 
+    override fun recentSetback(playerId: UUID, now: Long): Boolean = marks.isRecent(playerId, now)
+
     /** Requests a setback to [safe]; skipped when recent, stale, cross-world or not collision-free. */
-    fun request(playerId: UUID, safe: SafePosition, reason: String) {
+    override fun request(playerId: UUID, safe: SafePosition, reason: String) {
         val now = System.currentTimeMillis()
         val previous = lastSetback.putIfAbsent(playerId, now)
         if (previous != null && now - previous < 1000) return
@@ -34,6 +38,9 @@ class SetbackService(
             val width = current.entityBox.maxX - current.entityBox.minX
             val height = current.entityBox.maxY - current.entityBox.minY
             if (!isCollisionFree(world, safe, width, height)) return@Runnable
+            // Mark first: the teleport event fires synchronously inside teleport() and the sampler
+            // must already see it as a setback (no teleport grace window).
+            marks.mark(playerId, System.currentTimeMillis())
             player.teleport(Location(world, safe.position.x, safe.position.y, safe.position.z, safe.yaw, safe.pitch))
             plugin.logger.fine("Set back ${player.name} after $reason")
         },

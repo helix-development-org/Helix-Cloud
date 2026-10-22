@@ -15,9 +15,11 @@ import dev.kord.core.event.interaction.GuildChatInputCommandInteractionCreateEve
 import dev.kord.core.event.interaction.GuildModalSubmitInteractionCreateEvent
 import dev.kord.core.event.interaction.GuildSelectMenuInteractionCreateEvent
 import dev.kord.core.event.interaction.GuildUserCommandInteractionCreateEvent
+import dev.kord.core.event.message.MessageCreateEvent
 import dev.kord.core.on
 import dev.kord.gateway.Intent
 import dev.kord.gateway.Intents
+import dev.kord.gateway.PrivilegedIntent
 import dev.kord.rest.builder.interaction.string
 import dev.kord.rest.builder.interaction.subCommand
 import dev.kord.rest.builder.message.MessageBuilder
@@ -27,6 +29,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -85,6 +88,7 @@ class BotRuntime(
     private val statusPoke = Channel<Unit>(Channel.CONFLATED)
     private val setupSelections = ConcurrentHashMap<String, MutableMap<String, String>>()
     private var lastStatus: List<String> = emptyList()
+    private val mirrorRef = AtomicReference<BugMirror?>(null)
 
     /**
      * Starts the bot when configured; otherwise stays idle.
@@ -145,6 +149,12 @@ class BotRuntime(
      * @param message the notification text.
      */
     fun notification(category: String, message: String) {
+        if (category == BugEvent.CATEGORY) {
+            val mirror = mirrorRef.get() ?: return
+            val event = runCatching { json.decodeFromString<BugEvent>(message) }.getOrNull() ?: return
+            scope?.launch { runCatching { mirror.onEvent(event) } }
+            return
+        }
         val config = bot.config()
         if (category in config.notificationCategories) {
             send(config.channelForCategory(category), DiscordMessages.stripColors(message))
@@ -159,6 +169,7 @@ class BotRuntime(
         statusPoke.trySend(Unit)
     }
 
+    @OptIn(PrivilegedIntent::class)
     private suspend fun runBot(botScope: CoroutineScope) {
         val kord = Kord(bot.config().botToken)
         kordRef.set(kord)
@@ -168,13 +179,40 @@ class BotRuntime(
         kord.on<GuildSelectMenuInteractionCreateEvent> { runCatching { handleSelect(this) } }
         kord.on<GuildModalSubmitInteractionCreateEvent> { runCatching { handleModal(this) } }
         kord.on<GuildUserCommandInteractionCreateEvent> { runCatching { handleUserCommand(this) } }
+        val mirror = bugMirror(kord)
+        mirrorRef.set(mirror)
+        kord.on<MessageCreateEvent> {
+            runCatching { KordForumPort.messageOf(this)?.let { mirror.onMessage(it) } }
+        }
         botScope.launch { flushOutbox(kord) }
         botScope.launch { statusLoop(kord) }
+        botScope.launch { boardLoop(mirror) }
         publishState("Discord bot connecting to guild ${bot.config().guildId}")
+        val bugs = bot.config().bugMirror()
         kord.login {
-            intents = Intents(Intent.Guilds)
+            intents = if (bugs) Intents(Intent.Guilds, Intent.GuildMessages, Intent.MessageContent) else Intents(Intent.Guilds)
         }
+        mirrorRef.compareAndSet(mirror, null)
         kordRef.compareAndSet(kord, null)
+    }
+
+    private fun bugMirror(kord: Kord): BugMirror = BugMirror(
+        config = bot.config,
+        feedback = ActionFeedbackPort(bot.actions),
+        forum = KordForumPort(kord) { channel, text -> send(channel, text) },
+        playerOf = { id -> bot.links.byDiscord(id)?.let { BugPlayer(it.uuid, it.playerName) } },
+        discordOf = { uuid -> bot.links.byPlayer(uuid)?.discordId },
+        text = { key, params -> texts.t(key, *params.toList().toTypedArray()) },
+    )
+
+    private suspend fun boardLoop(mirror: BugMirror) {
+        while (scope?.isActive == true && kordRef.get() != null) {
+            runCatching {
+                val last = storage.read(BUGBOARD_DOCUMENT)
+                mirror.postBoardIfDue(java.time.Instant.ofEpochMilli(bot.now()), last)?.let { storage.write(BUGBOARD_DOCUMENT, it) }
+            }
+            delay(BOARD_CHECK_MS)
+        }
     }
 
     private suspend fun registerCommands(kord: Kord) {
@@ -994,6 +1032,12 @@ class BotRuntime(
     private companion object {
         /** Storage document holding [BoardRefs]. */
         const val BOARDS_DOCUMENT = "boards"
+
+        /** Storage document holding the week key of the last leaderboard post. */
+        const val BUGBOARD_DOCUMENT = "bugboard"
+
+        /** Interval of the leaderboard schedule check. */
+        const val BOARD_CHECK_MS = 5 * 60 * 1000L
 
         /** How long queued outbox lines are collected before sending. */
         const val BATCH_WINDOW_MS = 1500L

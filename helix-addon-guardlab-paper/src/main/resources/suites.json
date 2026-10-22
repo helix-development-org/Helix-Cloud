@@ -1,0 +1,1186 @@
+{
+  "_comment": "GuardLab-Szenarien (von Hand gepflegt). Format siehe helix-addon-guardlab/CONTRACT.md. Eigene Fassung ohne Neubau: plugins/GuardLab/suites.json auf dem Testserver.",
+  "suites": {
+    "all": ["@legit", "@cheat", "@lag", "cheat_identity", "cheat_brandspoof"],
+    "legit": ["@legit"],
+    "cheats": ["@cheat"],
+    "lag": ["@lag"],
+    "smoke": ["legit_walk", "cheat_speed", "lag_walk_ping100"],
+    "movement": ["legit_walk", "legit_sprint", "legit_sprint_jump", "legit_strafe_circle", "legit_sneak", "legit_backwards", "legit_wall_push", "legit_parcours", "legit_head_hit", "legit_ice", "legit_packed_ice", "legit_blue_ice", "legit_ice_tunnel", "legit_slime_fall", "legit_slime_walk", "legit_honey", "legit_soulspeed", "legit_swim", "legit_water_exit", "legit_bubble_column", "legit_lava", "legit_ladder", "legit_vine", "legit_scaffolding", "legit_stairs", "legit_slabs", "legit_steps_jump", "legit_small_steps", "legit_piston", "legit_fall_damage", "legit_fall_water", "legit_cobweb", "legit_powder_snow", "legit_berries", "legit_elytra", "legit_speed_potion", "legit_jump_boost", "legit_levitation", "legit_knockback", "legit_minecart", "legit_boat", "legit_iceboat", "legit_horse", "legit_seat", "legit_idle", "cheat_speed", "cheat_speed_small", "cheat_fly_hover", "cheat_fly_up", "cheat_nofall", "cheat_timer", "cheat_timer_small", "cheat_step", "cheat_spider", "cheat_highjump", "cheat_airjump", "cheat_fastladder", "cheat_jesus", "cheat_elytrafly", "cheat_antiknockback", "cheat_blink", "cheat_phase", "cheat_omnisprint", "cheat_inventory_move"],
+    "combat": ["legit_combat_mob", "legit_combat_player", "cheat_reach", "cheat_killaura_snap", "cheat_killaura_smooth", "cheat_multitarget", "cheat_autoclicker", "cheat_autoclicker_jitter", "cheat_noswing", "cheat_inventory_attack", "lag_combat_jitter"],
+    "world": ["legit_bridge", "legit_break", "legit_place_wall", "cheat_scaffold", "cheat_scaffold_nofacing", "cheat_fastplace", "cheat_fastbreak", "cheat_nuker", "cheat_interactionreach", "cheat_badpackets"],
+    "inventory": ["cheat_inventory_move", "cheat_inventory_attack", "cheat_inventory_impossible"],
+    "client": ["legit_walk", "cheat_identity", "cheat_brandspoof"]
+  },
+  "scenarios": [
+    {
+      "id": "legit_walk",
+      "title": "Gehen geradeaus mit sanften Drehungen",
+      "category": "legit",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 60, "keys": ["forward"]},
+        {"ticks": 40, "keys": ["forward"], "yaw": "+2"},
+        {"ticks": 40, "keys": ["forward"], "yaw": "-2"}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.speed.a", "movement.timer.a", "movement.fly.a", "movement.phase.a", "client.identity.a", "client.brand_spoof.a", "protocol.badpackets.a"]
+    },
+    {
+      "id": "legit_sprint",
+      "title": "Sprinten mit Blick nach oben/unten",
+      "category": "legit",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 40, "keys": ["forward", "sprint"]},
+        {"ticks": 40, "keys": ["forward", "sprint"], "pitch": -30},
+        {"ticks": 40, "keys": ["forward", "sprint"], "pitch": 40}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.speed.a", "movement.timer.a"]
+    },
+    {
+      "id": "legit_sprint_jump",
+      "title": "Sprint-Springen (Bunny-Hop)",
+      "category": "legit",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 130, "keys": ["forward", "sprint", "jump"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.speed.a", "movement.fly.a", "movement.highjump.a", "movement.airjump.a", "movement.timer.a"]
+    },
+    {
+      "id": "legit_strafe_circle",
+      "title": "Seitwärts im Kreis sprinten",
+      "category": "legit",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 120, "keys": ["forward", "left", "sprint"], "yaw": "+3"}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.speed.a", "movement.timer.a"]
+    },
+    {
+      "id": "legit_sneak",
+      "title": "Schleichen vor und seitwärts",
+      "category": "legit",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 60, "keys": ["forward", "sneak"]},
+        {"ticks": 40, "keys": ["left", "sneak"]},
+        {"ticks": 40, "keys": ["right", "sneak"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.speed.a"]
+    },
+    {
+      "id": "legit_backwards",
+      "title": "Rückwärts gehen (Sprint-Taste gedrückt)",
+      "category": "legit",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 60, "keys": ["back"]},
+        {"ticks": 60, "keys": ["back", "sprint"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.sprintbackwards.a", "movement.speed.a"]
+    },
+    {
+      "id": "legit_wall_push",
+      "title": "Gegen eine Wand laufen, springen und daran entlang streifen",
+      "category": "legit",
+      "setup": {"spot": "wall.front"},
+      "script": [
+        {"ticks": 40, "keys": ["forward", "sprint"]},
+        {"ticks": 40, "keys": ["forward", "jump"]},
+        {"ticks": 40, "keys": ["forward", "left"], "yaw": "+1"},
+        {"ticks": 40, "keys": ["forward", "right"], "yaw": "-1"}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.phase.a", "movement.speed.a", "movement.fly.a", "movement.step.a"]
+    },
+    {
+      "id": "legit_parcours",
+      "title": "Parcours: Sprung-Pfeiler mit Lücken",
+      "category": "legit",
+      "setup": {"spot": "parcours.start"},
+      "script": [
+        {"ticks": 170, "keys": ["forward", "sprint", "jump"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.fly.a", "movement.speed.a", "movement.highjump.a", "movement.airjump.a", "movement.nofall.a", "movement.step.a"]
+    },
+    {
+      "id": "legit_head_hit",
+      "title": "Springen im 2-Block-Tunnel (Kopfstoß)",
+      "category": "legit",
+      "setup": {"spot": "parcours.tunnel"},
+      "script": [
+        {"ticks": 140, "keys": ["forward", "sprint", "jump"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.speed.a", "movement.fly.a", "movement.highjump.a"]
+    },
+    {
+      "id": "legit_ice",
+      "title": "Sprint-Springen auf Eis",
+      "category": "legit",
+      "setup": {"spot": "ice.ice"},
+      "script": [
+        {"ticks": 120, "keys": ["forward", "sprint", "jump"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.speed.a"]
+    },
+    {
+      "id": "legit_packed_ice",
+      "title": "Sprint-Springen auf Packeis",
+      "category": "legit",
+      "setup": {"spot": "ice.packed"},
+      "script": [
+        {"ticks": 120, "keys": ["forward", "sprint", "jump"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.speed.a"]
+    },
+    {
+      "id": "legit_blue_ice",
+      "title": "Sprint-Springen auf Blaueis",
+      "category": "legit",
+      "setup": {"spot": "ice.blue"},
+      "script": [
+        {"ticks": 120, "keys": ["forward", "sprint", "jump"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.speed.a"]
+    },
+    {
+      "id": "legit_ice_tunnel",
+      "title": "Blaueis-Tunnel (Höchstgeschwindigkeit)",
+      "category": "legit",
+      "setup": {"spot": "ice.tunnel"},
+      "script": [
+        {"ticks": 140, "keys": ["forward", "sprint", "jump"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.speed.a", "movement.fly.a", "movement.highjump.a"]
+    },
+    {
+      "id": "legit_slime_fall",
+      "title": "Fall aus 10 Blöcken auf Schleim (Abprallen)",
+      "category": "legit",
+      "setup": {"spot": "surfaces.slimefall"},
+      "script": [
+        {"ticks": 15, "keys": ["forward"]},
+        {"ticks": 120}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.nofall.a", "movement.fly.a", "movement.highjump.a"]
+    },
+    {
+      "id": "legit_slime_walk",
+      "title": "Springen auf Schleimblöcken",
+      "category": "legit",
+      "setup": {"spot": "surfaces.slime"},
+      "script": [
+        {"ticks": 100, "keys": ["forward", "jump"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.speed.a", "movement.highjump.a", "movement.fly.a"]
+    },
+    {
+      "id": "legit_honey",
+      "title": "Honigblock: Sprint-Springen",
+      "category": "legit",
+      "setup": {"spot": "surfaces.honey"},
+      "script": [
+        {"ticks": 100, "keys": ["forward", "sprint", "jump"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.speed.a", "movement.highjump.a"]
+    },
+    {
+      "id": "legit_soulspeed",
+      "title": "Seelensand mit Seelenläufer III",
+      "category": "legit",
+      "setup": {"spot": "surfaces.soulsand", "items": [{"slot": "feet", "material": "iron_boots", "enchants": {"soul_speed": 3}}]},
+      "script": [
+        {"ticks": 100, "keys": ["forward", "sprint"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.speed.a"]
+    },
+    {
+      "id": "legit_swim",
+      "title": "Schwimmen durchs Becken",
+      "category": "legit",
+      "setup": {"spot": "liquid.pool"},
+      "script": [
+        {"ticks": 30, "keys": ["forward"]},
+        {"ticks": 80, "keys": ["forward", "sprint"]},
+        {"ticks": 40, "keys": ["forward", "jump"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.jesus.a", "movement.speed.a", "movement.fly.a"]
+    },
+    {
+      "id": "legit_water_exit",
+      "title": "Ins Wasser und am Rand wieder heraus",
+      "category": "legit",
+      "setup": {"spot": "liquid.pool"},
+      "script": [
+        {"ticks": 40, "keys": ["forward"]},
+        {"ticks": 20},
+        {"ticks": 60, "keys": ["back", "jump"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.jesus.a", "movement.fly.a", "movement.step.a"]
+    },
+    {
+      "id": "legit_bubble_column",
+      "title": "Blasensäule nach oben",
+      "category": "legit",
+      "setup": {"spot": "liquid.bubble"},
+      "script": [
+        {"ticks": 80},
+        {"ticks": 40, "keys": ["forward"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.fly.a", "movement.highjump.a"]
+    },
+    {
+      "id": "legit_lava",
+      "title": "Lava mit Feuerresistenz",
+      "category": "legit",
+      "setup": {"spot": "liquid.lava", "effects": [{"type": "fire_resistance"}]},
+      "script": [
+        {"ticks": 60, "keys": ["forward", "jump"]},
+        {"ticks": 40, "keys": ["back", "jump"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.jesus.a", "movement.speed.a", "movement.fly.a"]
+    },
+    {
+      "id": "legit_ladder",
+      "title": "Leiter hoch und halten",
+      "category": "legit",
+      "setup": {"spot": "climb.ladder"},
+      "script": [
+        {"ticks": 120, "keys": ["forward", "jump"]},
+        {"ticks": 20, "keys": ["forward", "sneak"]},
+        {"ticks": 40}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.fastladder.a", "movement.spider.a", "movement.fly.a"]
+    },
+    {
+      "id": "legit_vine",
+      "title": "Ranken hochklettern",
+      "category": "legit",
+      "setup": {"spot": "climb.vine"},
+      "script": [
+        {"ticks": 120, "keys": ["forward", "jump"]},
+        {"ticks": 40}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.fastladder.a", "movement.spider.a", "movement.fly.a"]
+    },
+    {
+      "id": "legit_scaffolding",
+      "title": "Gerüst hoch (Springen) und runter (Schleichen)",
+      "category": "legit",
+      "setup": {"spot": "climb.scaffolding"},
+      "script": [
+        {"ticks": 10, "keys": ["forward"]},
+        {"ticks": 100, "keys": ["jump"]},
+        {"ticks": 80, "keys": ["sneak"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.fly.a", "movement.spider.a", "movement.fastladder.a", "movement.nofall.a"]
+    },
+    {
+      "id": "legit_stairs",
+      "title": "Treppe hochsprinten",
+      "category": "legit",
+      "setup": {"spot": "steps.stairs"},
+      "script": [
+        {"ticks": 60, "keys": ["forward", "sprint"]},
+        {"ticks": 20}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.step.a", "movement.speed.a"]
+    },
+    {
+      "id": "legit_slabs",
+      "title": "Stufen aus Halbblöcken",
+      "category": "legit",
+      "setup": {"spot": "steps.slabs"},
+      "script": [
+        {"ticks": 60, "keys": ["forward", "sprint"]},
+        {"ticks": 20}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.step.a"]
+    },
+    {
+      "id": "legit_steps_jump",
+      "title": "Blockstufen hochspringen",
+      "category": "legit",
+      "setup": {"spot": "steps.steplane"},
+      "script": [
+        {"ticks": 90, "keys": ["forward", "jump"]},
+        {"ticks": 20}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.step.a", "movement.highjump.a"]
+    },
+    {
+      "id": "legit_small_steps",
+      "title": "Teppich, Schnee, Halbblöcke (≤ 0,5)",
+      "category": "legit",
+      "setup": {"spot": "steps.small"},
+      "script": [
+        {"ticks": 100, "keys": ["forward", "sprint"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.step.a", "movement.speed.a"]
+    },
+    {
+      "id": "legit_piston",
+      "title": "Kolben-Schleim-Werfer",
+      "category": "legit",
+      "setup": {"spot": "launcher.pad", "pistonPulseTicks": 40},
+      "script": [
+        {"ticks": 160}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.fly.a", "movement.highjump.a", "movement.velocity.a", "movement.nofall.a"]
+    },
+    {
+      "id": "legit_fall_damage",
+      "title": "Fall aus 10 Blöcken auf Stein (Schaden)",
+      "category": "legit",
+      "setup": {"spot": "launcher.drop"},
+      "script": [
+        {"ticks": 20, "keys": ["forward"]},
+        {"ticks": 60}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.nofall.a", "movement.fly.a"]
+    },
+    {
+      "id": "legit_fall_water",
+      "title": "Fall aus 16 Blöcken ins Wasser",
+      "category": "legit",
+      "setup": {"spot": "launcher.dropwater"},
+      "script": [
+        {"ticks": 20, "keys": ["forward"]},
+        {"ticks": 80}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.nofall.a", "movement.fly.a", "movement.jesus.a"]
+    },
+    {
+      "id": "legit_cobweb",
+      "title": "Durch Spinnweben",
+      "category": "legit",
+      "setup": {"spot": "hazard.cobweb"},
+      "script": [
+        {"ticks": 140, "keys": ["forward", "jump"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.fly.a", "movement.speed.a", "movement.nofall.a"]
+    },
+    {
+      "id": "legit_powder_snow",
+      "title": "Pulverschnee mit Lederstiefeln",
+      "category": "legit",
+      "setup": {"spot": "hazard.powdersnow", "items": [{"slot": "feet", "material": "leather_boots"}]},
+      "script": [
+        {"ticks": 80, "keys": ["forward"]},
+        {"ticks": 60, "keys": ["forward", "jump"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.fly.a", "movement.speed.a", "movement.spider.a"]
+    },
+    {
+      "id": "legit_berries",
+      "title": "Durch Beerensträucher",
+      "category": "legit",
+      "setup": {"spot": "hazard.berries"},
+      "script": [
+        {"ticks": 100, "keys": ["forward"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.speed.a"]
+    },
+    {
+      "id": "legit_elytra",
+      "title": "Elytra-Gleitflug vom 40-Block-Turm",
+      "category": "legit",
+      "setup": {"spot": "elytra.top", "items": [{"slot": "chest", "material": "elytra"}]},
+      "script": [
+        {"ticks": 12, "keys": ["forward"]},
+        {"ticks": 4},
+        {"ticks": 2, "keys": ["jump"]},
+        {"ticks": 200, "pitch": 15}
+      ],
+      "durationTicks": 260,
+      "expect": {"none": true},
+      "covers": ["movement.elytrafly.a", "movement.fly.a", "movement.speed.a", "movement.nofall.a"]
+    },
+    {
+      "id": "legit_speed_potion",
+      "title": "Sprint-Springen mit Schnelligkeit II",
+      "category": "legit",
+      "setup": {"spot": "flat.start", "effects": [{"type": "speed", "amplifier": 1}]},
+      "script": [
+        {"ticks": 120, "keys": ["forward", "sprint", "jump"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.speed.a"]
+    },
+    {
+      "id": "legit_jump_boost",
+      "title": "Springen mit Sprungkraft III",
+      "category": "legit",
+      "setup": {"spot": "flat.start", "effects": [{"type": "jump_boost", "amplifier": 2}]},
+      "script": [
+        {"ticks": 100, "keys": ["forward", "jump"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.highjump.a", "movement.fly.a", "movement.nofall.a"]
+    },
+    {
+      "id": "legit_levitation",
+      "title": "Schwebeeffekt 3 s, dann Fall",
+      "category": "legit",
+      "setup": {"spot": "flat.start", "effects": [{"type": "levitation", "seconds": 3}]},
+      "script": [
+        {"ticks": 140}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.fly.a", "movement.nofall.a"]
+    },
+    {
+      "id": "legit_knockback",
+      "title": "Gehen mit Rückstoß alle 1,5 s",
+      "category": "legit",
+      "setup": {"spot": "flat.start", "knockback": {"everyTicks": 30, "strength": 0.4, "upward": 0.36}},
+      "script": [
+        {"ticks": 160, "keys": ["forward"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.velocity.a", "movement.speed.a", "movement.fly.a"]
+    },
+    {
+      "id": "legit_minecart",
+      "title": "Lore auf Antriebsschienen",
+      "category": "legit",
+      "setup": {"spot": "vehicles.rail", "vehicle": "minecart"},
+      "script": [
+        {"ticks": 200, "keys": ["forward"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.speed.a", "movement.fly.a"]
+    },
+    {
+      "id": "legit_boat",
+      "title": "Boot im Kanal",
+      "category": "legit",
+      "setup": {"spot": "vehicles.boat", "vehicle": "boat"},
+      "script": [
+        {"ticks": 160, "keys": ["forward"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.speed.a", "movement.jesus.a"]
+    },
+    {
+      "id": "legit_iceboat",
+      "title": "Boot auf Blaueis",
+      "category": "legit",
+      "setup": {"spot": "vehicles.iceboat", "vehicle": "boat"},
+      "script": [
+        {"ticks": 160, "keys": ["forward"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.speed.a"]
+    },
+    {
+      "id": "legit_horse",
+      "title": "Pferd reiten und springen",
+      "category": "legit",
+      "setup": {"spot": "vehicles.horse", "vehicle": "horse"},
+      "script": [
+        {"ticks": 80, "keys": ["forward", "sprint"]},
+        {"ticks": 10, "keys": ["forward", "jump"]},
+        {"ticks": 60, "keys": ["forward"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.speed.a", "movement.highjump.a", "movement.fly.a"]
+    },
+    {
+      "id": "legit_seat",
+      "title": "Sitzen (Möbel-Sitz) und umsehen",
+      "category": "legit",
+      "setup": {"spot": "seat.seat", "vehicle": "seat"},
+      "script": [
+        {"ticks": 100, "yaw": "+3"},
+        {"ticks": 40, "keys": ["forward"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.fly.a", "movement.speed.a"]
+    },
+    {
+      "id": "legit_bridge",
+      "title": "Schleich-Brücke rückwärts bauen",
+      "category": "legit",
+      "setup": {"spot": "build.bridge", "items": [{"slot": "hotbar0", "material": "stone", "amount": 64}], "resetStation": true},
+      "script": [
+        {"ticks": 220, "keys": ["back", "sneak"], "place": {"below": true, "cps": 5}}
+      ],
+      "expect": {"none": true},
+      "covers": ["world.scaffold.a", "world.fastplace.a", "world.nofacing.a", "world.interactionreach.a"]
+    },
+    {
+      "id": "legit_break",
+      "title": "Steinwand abbauen (Diamantspitzhacke)",
+      "category": "legit",
+      "setup": {"spot": "build.breakgrid", "items": [{"slot": "hotbar0", "material": "diamond_pickaxe"}], "resetStation": true},
+      "script": [
+        {"ticks": 80, "pitch": 20, "attack": {"cps": 0, "target": "block"}},
+        {"ticks": 80, "yaw": "-0.5", "attack": {"cps": 0, "target": "block"}},
+        {"ticks": 80, "yaw": "+0.5", "attack": {"cps": 0, "target": "block"}}
+      ],
+      "expect": {"none": true},
+      "covers": ["world.fastbreak.a", "world.nuker.a", "world.interactionreach.a", "combat.noswing.a"]
+    },
+    {
+      "id": "legit_place_wall",
+      "title": "Blöcke an eine Wand setzen",
+      "category": "legit",
+      "setup": {"spot": "build.placewall", "items": [{"slot": "hotbar0", "material": "stone", "amount": 64}], "resetStation": true},
+      "script": [
+        {"ticks": 120, "yaw": "+0.3", "pitch": 10, "place": {"below": false, "cps": 5}}
+      ],
+      "expect": {"none": true},
+      "covers": ["world.fastplace.a", "world.nofacing.a", "world.scaffold.a", "world.interactionreach.a"]
+    },
+    {
+      "id": "legit_combat_mob",
+      "title": "Kampf gegen Ziel-Mob (8 CPS mit Streuung)",
+      "category": "legit",
+      "setup": {"spot": "combat.player", "mob": "combat.mob", "items": [{"slot": "hotbar0", "material": "iron_sword"}]},
+      "script": [
+        {"ticks": 80, "keys": ["left"], "lookAt": "target", "attack": {"cps": 8, "jitter": 3, "target": "entity"}},
+        {"ticks": 80, "keys": ["right"], "lookAt": "target", "attack": {"cps": 8, "jitter": 3, "target": "entity"}}
+      ],
+      "expect": {"none": true},
+      "covers": ["combat.autoclicker.a", "combat.noswing.a", "combat.reach.a", "combat.rotation.a"]
+    },
+    {
+      "id": "legit_combat_player",
+      "title": "Kampf gegen Dummy-Spieler (7 CPS)",
+      "category": "legit",
+      "setup": {"spot": "combat.player", "dummy": "combat.dummy", "items": [{"slot": "hotbar0", "material": "iron_sword"}]},
+      "script": [
+        {"ticks": 80, "keys": ["forward", "left"], "lookAt": "target", "attack": {"cps": 7, "jitter": 3, "target": "entity"}},
+        {"ticks": 80, "keys": ["back", "right"], "lookAt": "target", "attack": {"cps": 7, "jitter": 3, "target": "entity"}}
+      ],
+      "dummyScript": [
+        {"ticks": 40, "keys": ["left"]},
+        {"ticks": 40, "keys": ["right"]},
+        {"ticks": 40, "keys": ["left"]},
+        {"ticks": 40, "keys": ["right"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["combat.reach.a", "combat.rotation.a", "combat.snapaim.a", "combat.autoclicker.a", "combat.multitarget.a", "combat.noswing.a"]
+    },
+    {
+      "id": "legit_hotbar_chat",
+      "title": "Gehen mit Hotbar-Wechseln und Chat",
+      "category": "legit",
+      "setup": {"spot": "flat.start", "items": [{"slot": "hotbar0", "material": "stone", "amount": 64}, {"slot": "hotbar1", "material": "iron_sword"}, {"slot": "hotbar2", "material": "bread", "amount": 16}]},
+      "script": [
+        {"ticks": 20, "keys": ["forward"], "hotbar": 1},
+        {"ticks": 20, "keys": ["forward"], "hotbar": 2},
+        {"ticks": 20, "keys": ["forward"], "hotbar": 0, "chat": "GuardLab Test"},
+        {"ticks": 20, "keys": ["forward", "sprint"], "hotbar": 1},
+        {"ticks": 20, "keys": ["forward"], "use": true, "hotbar": 2},
+        {"ticks": 40, "keys": ["forward"]}
+      ],
+      "expect": {"none": true},
+      "covers": ["inventory.impossible.a", "inventory.move.a", "combat.inventory.a", "movement.speed.a", "client.identity.a", "client.brand_spoof.a", "protocol.badpackets.a"]
+    },
+    {
+      "id": "legit_idle",
+      "title": "Stillstehen (Paket-Rhythmus im Leerlauf)",
+      "category": "legit",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 200}
+      ],
+      "expect": {"none": true},
+      "covers": ["movement.timer.a", "client.identity.a", "client.brand_spoof.a", "protocol.badpackets.a"]
+    },
+    {
+      "id": "cheat_speed",
+      "title": "Speed ×1,8",
+      "category": "cheat",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 100, "keys": ["forward", "sprint"]}
+      ],
+      "cheat": {"mode": "speed", "params": {"factor": 1.8}},
+      "expect": {"checks": ["movement.speed.a"]}
+    },
+    {
+      "id": "cheat_speed_small",
+      "title": "Speed ×1,15 (Grenzfall)",
+      "category": "cheat",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 140, "keys": ["forward", "sprint"]}
+      ],
+      "cheat": {"mode": "speed", "params": {"factor": 1.15}},
+      "expect": {"checks": ["movement.speed.a"], "note": "Grenzfall – 15 % über Vanilla"}
+    },
+    {
+      "id": "cheat_fly_hover",
+      "title": "Fly: Schweben",
+      "category": "cheat",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 10, "keys": ["jump"]},
+        {"ticks": 90, "keys": ["forward"]}
+      ],
+      "cheat": {"mode": "fly", "params": {"vy": 0.0}},
+      "expect": {"checks": ["movement.fly.a"]}
+    },
+    {
+      "id": "cheat_fly_up",
+      "title": "Fly: Aufsteigen",
+      "category": "cheat",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 80, "keys": ["forward"]}
+      ],
+      "cheat": {"mode": "fly", "params": {"vy": 0.3}},
+      "expect": {"checks": ["movement.fly.a"]}
+    },
+    {
+      "id": "cheat_nofall",
+      "title": "NoFall vom 10-Block-Turm",
+      "category": "cheat",
+      "setup": {"spot": "launcher.drop"},
+      "script": [
+        {"ticks": 20, "keys": ["forward"]},
+        {"ticks": 60}
+      ],
+      "cheat": {"mode": "nofall"},
+      "expect": {"checks": ["movement.nofall.a"]}
+    },
+    {
+      "id": "cheat_timer",
+      "title": "Timer ×1,5",
+      "category": "cheat",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 120, "keys": ["forward"]}
+      ],
+      "cheat": {"mode": "timer", "params": {"rate": 1.5}},
+      "expect": {"checks": ["movement.timer.a"]}
+    },
+    {
+      "id": "cheat_timer_small",
+      "title": "Timer ×1,1 (Grenzfall)",
+      "category": "cheat",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 200, "keys": ["forward"]}
+      ],
+      "cheat": {"mode": "timer", "params": {"rate": 1.1}},
+      "expect": {"checks": ["movement.timer.a"], "note": "Grenzfall – 10 % mehr Bewegungspakete"}
+    },
+    {
+      "id": "cheat_step",
+      "title": "Step 1 Block ohne Sprung",
+      "category": "cheat",
+      "setup": {"spot": "steps.steplane"},
+      "script": [
+        {"ticks": 90, "keys": ["forward"]}
+      ],
+      "cheat": {"mode": "step", "params": {"height": 1.0}},
+      "expect": {"checks": ["movement.step.a"]}
+    },
+    {
+      "id": "cheat_spider",
+      "title": "Spider: Wand hochlaufen",
+      "category": "cheat",
+      "setup": {"spot": "climb.wall"},
+      "script": [
+        {"ticks": 10, "keys": ["forward"]},
+        {"ticks": 80, "keys": ["forward"]}
+      ],
+      "cheat": {"mode": "fly", "params": {"vy": 0.2, "startTick": 10}},
+      "expect": {"checks": ["movement.spider.a", "movement.fly.a"]}
+    },
+    {
+      "id": "cheat_highjump",
+      "title": "HighJump (Sprung 0,8)",
+      "category": "cheat",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 100, "keys": ["forward", "jump"]}
+      ],
+      "cheat": {"mode": "fly", "params": {"jumpVy": 0.8}},
+      "expect": {"checks": ["movement.highjump.a", "movement.fly.a"]}
+    },
+    {
+      "id": "cheat_airjump",
+      "title": "AirJump (Springen in der Luft)",
+      "category": "cheat",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 100, "keys": ["forward", "jump"]}
+      ],
+      "cheat": {"mode": "fly", "params": {"airJump": true}},
+      "expect": {"checks": ["movement.airjump.a", "movement.fly.a"]}
+    },
+    {
+      "id": "cheat_fastladder",
+      "title": "FastLadder (0,35 Blöcke/Tick)",
+      "category": "cheat",
+      "setup": {"spot": "climb.ladder"},
+      "script": [
+        {"ticks": 10, "keys": ["forward"]},
+        {"ticks": 60, "keys": ["forward"]}
+      ],
+      "cheat": {"mode": "fly", "params": {"vy": 0.35, "startTick": 10}},
+      "expect": {"checks": ["movement.fastladder.a"], "note": "bekannte Lücke: fastladder läuft nur mit climbable-Tag, der alle Bewegungs-Checks ausnimmt – Fehlschlag erwartet bis zum GUARD-CORE-Fix"}
+    },
+    {
+      "id": "cheat_jesus",
+      "title": "Jesus: übers Wasser laufen",
+      "category": "cheat",
+      "setup": {"spot": "liquid.pool"},
+      "script": [
+        {"ticks": 100, "keys": ["forward"]}
+      ],
+      "cheat": {"mode": "fly", "params": {"vy": 0.0, "liquidOnly": true}},
+      "expect": {"checks": ["movement.jesus.a", "movement.fly.a"], "note": "bekannte Lücke: jesus läuft selten (liquid-Umgebung)"}
+    },
+    {
+      "id": "cheat_elytrafly",
+      "title": "ElytraFly: Gleiten ohne Sinken",
+      "category": "cheat",
+      "setup": {"spot": "elytra.top", "items": [{"slot": "chest", "material": "elytra"}]},
+      "script": [
+        {"ticks": 12, "keys": ["forward"]},
+        {"ticks": 4},
+        {"ticks": 2, "keys": ["jump"]},
+        {"ticks": 140, "keys": ["forward"], "pitch": 0}
+      ],
+      "cheat": {"mode": "fly", "params": {"vy": 0.0, "startTick": 30}},
+      "expect": {"checks": ["movement.elytrafly.a", "movement.fly.a"]}
+    },
+    {
+      "id": "cheat_antiknockback",
+      "title": "AntiKnockback",
+      "category": "cheat",
+      "setup": {"spot": "flat.start", "knockback": {"everyTicks": 30, "strength": 0.4, "upward": 0.36}},
+      "script": [
+        {"ticks": 160, "keys": ["forward"]}
+      ],
+      "cheat": {"mode": "antiknockback"},
+      "expect": {"checks": ["movement.velocity.a"]}
+    },
+    {
+      "id": "cheat_blink",
+      "title": "Blink (Pakete 1,5 s zurückhalten)",
+      "category": "cheat",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 140, "keys": ["forward", "sprint"]}
+      ],
+      "cheat": {"mode": "blink", "params": {"holdTicks": 30}},
+      "expect": {"checks": ["movement.timer.a", "movement.speed.a", "protocol.badpackets.a"]}
+    },
+    {
+      "id": "cheat_reach",
+      "title": "Reach 5,0 gegen Dummy (Hitbox 3,7 Blöcke entfernt)",
+      "category": "cheat",
+      "setup": {"spot": "combat.player", "dummy": "combat.dummyfar", "items": [{"slot": "hotbar0", "material": "iron_sword"}]},
+      "script": [
+        {"ticks": 120, "lookAt": "target", "attack": {"cps": 6, "jitter": 2, "target": "entity"}}
+      ],
+      "dummyScript": [
+        {"ticks": 160}
+      ],
+      "cheat": {"mode": "reach", "params": {"range": 5.0}},
+      "expect": {"checks": ["combat.reach.a"], "note": "Dummy auf combat.dummyfar: Hitbox 3,7 Blöcke vor den Augen – jenseits von Vanilla (3,0), innerhalb der Cheat-Reichweite"}
+    },
+    {
+      "id": "cheat_killaura_snap",
+      "title": "KillAura mit Blick-Schnappen",
+      "category": "cheat",
+      "setup": {"spot": "combat.player", "dummy": "combat.dummy", "items": [{"slot": "hotbar0", "material": "iron_sword"}]},
+      "script": [
+        {"ticks": 60, "yaw": 180},
+        {"ticks": 60, "yaw": 90},
+        {"ticks": 40, "yaw": 270}
+      ],
+      "dummyScript": [
+        {"ticks": 40, "keys": ["left"]},
+        {"ticks": 40, "keys": ["right"]},
+        {"ticks": 40, "keys": ["left"]},
+        {"ticks": 40, "keys": ["right"]}
+      ],
+      "cheat": {"mode": "killaura", "params": {"range": 3.5, "cps": 10, "jitter": 0, "snap": true, "target": "player"}},
+      "expect": {"checks": ["combat.snapaim.a", "combat.rotation.a", "combat.autoclicker.a"]}
+    },
+    {
+      "id": "cheat_killaura_smooth",
+      "title": "KillAura im Kreis um den Dummy, sanft gedreht (max. 40°/Tick)",
+      "category": "cheat",
+      "setup": {"spot": "combat.player", "dummy": "combat.dummy", "items": [{"slot": "hotbar0", "material": "iron_sword"}]},
+      "script": [
+        {"ticks": 160, "keys": ["forward", "left"], "yaw": "+4"}
+      ],
+      "dummyScript": [
+        {"ticks": 40, "keys": ["left"]},
+        {"ticks": 40, "keys": ["right"]},
+        {"ticks": 40, "keys": ["left"]},
+        {"ticks": 40, "keys": ["right"]}
+      ],
+      "cheat": {"mode": "killaura", "params": {"range": 3.5, "cps": 12, "target": "player"}},
+      "expect": {
+        "checks": ["combat.rotation.a", "combat.snapaim.a", "combat.reach.a", "combat.autoclicker.a"],
+        "knownGap": true,
+        "note": "Drehung unter der Snap-Schwelle, Treffer innerhalb der Reichweite, 12 CPS im 50-ms-Tick-Raster streuen für die Konsistenzprüfung zu stark (Varianzkoeffizient ~0,28)"
+      }
+    },
+    {
+      "id": "cheat_multitarget",
+      "title": "KillAura auf zwei Ziele",
+      "category": "cheat",
+      "setup": {"spot": "combat.player", "dummy": "combat.dummy", "mob": "combat.mob", "items": [{"slot": "hotbar0", "material": "iron_sword"}]},
+      "script": [
+        {"ticks": 140, "keys": ["left"], "yaw": "+2"}
+      ],
+      "dummyScript": [
+        {"ticks": 40, "keys": ["left"]},
+        {"ticks": 40, "keys": ["right"]},
+        {"ticks": 40, "keys": ["left"]},
+        {"ticks": 40, "keys": ["right"]}
+      ],
+      "cheat": {"mode": "killaura", "params": {"range": 3.5, "cps": 12, "multi": true, "target": "all"}},
+      "expect": {"checks": ["combat.multitarget.a"], "note": "Spieler und Mob im selben Client-Tick – IGuard wertet Mehrfachziele für jeden Ziel-Typ"}
+    },
+    {
+      "id": "cheat_autoclicker",
+      "title": "AutoClicker 20 CPS ohne Streuung",
+      "category": "cheat",
+      "setup": {"spot": "combat.player", "mob": "combat.mob", "items": [{"slot": "hotbar0", "material": "iron_sword"}]},
+      "script": [
+        {"ticks": 120, "lookAt": "target"}
+      ],
+      "cheat": {"mode": "autoclicker", "params": {"cps": 20, "jitter": 0}},
+      "expect": {"checks": ["combat.autoclicker.a"]}
+    },
+    {
+      "id": "cheat_autoclicker_jitter",
+      "title": "AutoClicker 16 CPS mit Streuung (Grenzfall)",
+      "category": "cheat",
+      "setup": {"spot": "combat.player", "mob": "combat.mob", "items": [{"slot": "hotbar0", "material": "iron_sword"}]},
+      "script": [
+        {"ticks": 140, "lookAt": "target"}
+      ],
+      "cheat": {"mode": "autoclicker", "params": {"cps": 16, "jitter": 2}},
+      "expect": {"checks": ["combat.autoclicker.a"], "knownGap": true, "note": "Grenzfall – 16 CPS mit menschenähnlicher Streuung (Abweichung ~0,39) sind auch für schnelle Jitter-Klicker erreichbar; IGuard meldet bewusst erst gleichmäßigere Klicks"}
+    },
+    {
+      "id": "cheat_noswing",
+      "title": "Angriffe ohne Arm-Schwung",
+      "category": "cheat",
+      "setup": {"spot": "combat.player", "mob": "combat.mob", "items": [{"slot": "hotbar0", "material": "iron_sword"}]},
+      "script": [
+        {"ticks": 120, "lookAt": "target"}
+      ],
+      "cheat": {"mode": "autoclicker", "params": {"cps": 8, "jitter": 1, "swing": false}},
+      "expect": {"checks": ["combat.noswing.a"]}
+    },
+    {
+      "id": "cheat_scaffold",
+      "title": "Scaffold beim Sprinten über den Abgrund",
+      "category": "cheat",
+      "setup": {"spot": "build.scaffold", "items": [{"slot": "hotbar0", "material": "stone", "amount": 64}], "resetStation": true},
+      "script": [
+        {"ticks": 100, "keys": ["forward", "sprint"]}
+      ],
+      "cheat": {"mode": "scaffold", "params": {"cps": 10}},
+      "expect": {"checks": ["world.scaffold.a", "world.nofacing.a", "world.fastplace.a"]}
+    },
+    {
+      "id": "cheat_scaffold_nofacing",
+      "title": "Scaffold ohne Blick auf den Block",
+      "category": "cheat",
+      "setup": {"spot": "build.scaffold", "items": [{"slot": "hotbar0", "material": "stone", "amount": 64}], "resetStation": true},
+      "script": [
+        {"ticks": 100, "keys": ["forward"]}
+      ],
+      "cheat": {"mode": "scaffold", "params": {"cps": 8, "facing": false}},
+      "expect": {"checks": ["world.nofacing.a", "world.scaffold.a"]}
+    },
+    {
+      "id": "cheat_fastplace",
+      "title": "FastPlace 20 Blöcke/s an die Wand",
+      "category": "cheat",
+      "setup": {"spot": "build.placewall", "items": [{"slot": "hotbar0", "material": "stone", "amount": 64}], "resetStation": true},
+      "script": [
+        {"ticks": 80, "yaw": "+0.4", "pitch": 10}
+      ],
+      "cheat": {"mode": "scaffold", "params": {"cps": 20, "target": "crosshair"}},
+      "expect": {"checks": ["world.fastplace.a"]}
+    },
+    {
+      "id": "cheat_fastbreak",
+      "title": "FastBreak ×3",
+      "category": "cheat",
+      "setup": {"spot": "build.breakgrid", "items": [{"slot": "hotbar0", "material": "diamond_pickaxe"}], "resetStation": true},
+      "script": [
+        {"ticks": 120, "pitch": 20, "yaw": "-0.3", "attack": {"cps": 0, "target": "block"}}
+      ],
+      "cheat": {"mode": "fastbreak", "params": {"multiplier": 3.0}},
+      "expect": {"checks": ["world.fastbreak.a"]}
+    },
+    {
+      "id": "cheat_nuker",
+      "title": "Nuker (Radius 3)",
+      "category": "cheat",
+      "setup": {"spot": "build.breakgrid", "items": [{"slot": "hotbar0", "material": "diamond_pickaxe"}], "resetStation": true},
+      "script": [
+        {"ticks": 100, "pitch": 20}
+      ],
+      "cheat": {"mode": "fastbreak", "params": {"nuker": true, "radius": 3}},
+      "expect": {"checks": ["world.nuker.a"]}
+    },
+    {
+      "id": "cheat_interactionreach",
+      "title": "Blöcke aus 8 Blöcken Entfernung abbauen",
+      "category": "cheat",
+      "setup": {"spot": "build.far", "items": [{"slot": "hotbar0", "material": "diamond_pickaxe"}], "resetStation": true},
+      "script": [
+        {"ticks": 100, "pitch": 0, "attack": {"cps": 0, "target": "block"}}
+      ],
+      "cheat": {"mode": "reach", "params": {"range": 8.0, "target": "block"}},
+      "expect": {"checks": ["world.interactionreach.a"]}
+    },
+    {
+      "id": "cheat_phase",
+      "title": "Phase: durch eine 1 Block dicke Wand laufen",
+      "category": "cheat",
+      "setup": {"spot": "wall.front"},
+      "script": [
+        {"ticks": 60, "keys": ["forward"]}
+      ],
+      "cheat": {"mode": "phase", "params": {"distance": 0.5}},
+      "expect": {"checks": ["movement.phase.a"]}
+    },
+    {
+      "id": "cheat_omnisprint",
+      "title": "Omni-Sprint: rückwärts sprinten",
+      "category": "cheat",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 100, "keys": ["back", "sprint"]}
+      ],
+      "cheat": {"mode": "omnisprint"},
+      "expect": {"checks": ["movement.sprintbackwards.a"]}
+    },
+    {
+      "id": "cheat_inventory_move",
+      "title": "Inventar-Klicks beim Sprinten (8 CPS)",
+      "category": "cheat",
+      "setup": {"spot": "flat.start", "items": [{"slot": "hotbar0", "material": "stone", "amount": 16}]},
+      "script": [
+        {"ticks": 100, "keys": ["forward", "sprint"]}
+      ],
+      "cheat": {"mode": "inventory", "params": {"action": "move", "cps": 8}},
+      "expect": {"checks": ["inventory.move.a"]}
+    },
+    {
+      "id": "cheat_inventory_attack",
+      "title": "Angriffe direkt nach Inventar-Klicks (6 CPS)",
+      "category": "cheat",
+      "setup": {"spot": "combat.player", "mob": "combat.mob", "items": [{"slot": "hotbar0", "material": "iron_sword"}]},
+      "script": [
+        {"ticks": 120, "lookAt": "target"}
+      ],
+      "cheat": {"mode": "inventory", "params": {"action": "attack", "cps": 6}},
+      "expect": {"checks": ["combat.inventory.a"]}
+    },
+    {
+      "id": "cheat_inventory_impossible",
+      "title": "Inventar-Klicks mit ungültiger Maustaste",
+      "category": "cheat",
+      "setup": {"spot": "flat.start", "items": [{"slot": "hotbar0", "material": "stone", "amount": 16}]},
+      "script": [
+        {"ticks": 60}
+      ],
+      "cheat": {"mode": "inventory", "params": {"action": "impossible", "cps": 4}},
+      "expect": {"checks": ["inventory.impossible.a"]}
+    },
+    {
+      "id": "cheat_badpackets",
+      "title": "Block-Klicks mit Cursor außerhalb des Blocks",
+      "category": "cheat",
+      "setup": {"spot": "build.placewall", "resetStation": true},
+      "script": [
+        {"ticks": 60, "pitch": 10}
+      ],
+      "cheat": {"mode": "badpackets", "params": {"cps": 4}},
+      "expect": {"checks": ["protocol.badpackets.a"]}
+    },
+    {
+      "id": "cheat_identity",
+      "title": "Kanal eines Cheat-Clients (Meteor) anmelden",
+      "category": "cheat",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 40}
+      ],
+      "cheat": {"mode": "identity", "params": {"family": "meteor"}},
+      "expect": {"checks": ["client.identity.a"], "note": "IGuard meldet das einmal pro Verbindung – vor einem weiteren Lauf neu verbinden (deshalb am Ende von all und in der Suite client)"}
+    },
+    {
+      "id": "cheat_brandspoof",
+      "title": "Brand vanilla mit Mod-Loader-Kanal",
+      "category": "cheat",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 40}
+      ],
+      "cheat": {"mode": "brandspoof"},
+      "expect": {"checks": ["client.brand_spoof.a"], "note": "IGuard meldet das einmal pro Verbindung – vor einem weiteren Lauf neu verbinden (deshalb am Ende von all und in der Suite client)"}
+    },
+    {
+      "id": "lag_walk_ping100",
+      "title": "Sprint-Springen bei 100 ms Ping",
+      "category": "lag",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 160, "keys": ["forward", "sprint", "jump"]}
+      ],
+      "lag": "ping100",
+      "expect": {"none": true},
+      "covers": ["movement.speed.a", "movement.timer.a", "movement.fly.a"]
+    },
+    {
+      "id": "lag_walk_jitter",
+      "title": "Sprint-Springen bei 250 ms ± 50 ms",
+      "category": "lag",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 80, "keys": ["forward", "sprint", "jump"]},
+        {"ticks": 80, "keys": ["forward", "left", "sprint"], "yaw": "+2"}
+      ],
+      "lag": "ping250_jitter50",
+      "expect": {"none": true},
+      "covers": ["movement.speed.a", "movement.timer.a", "movement.fly.a"]
+    },
+    {
+      "id": "lag_walk_loss",
+      "title": "Kreis-Sprint mit Paketverlust-Stottern",
+      "category": "lag",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 160, "keys": ["forward", "left", "sprint"], "yaw": "+3"}
+      ],
+      "lag": "loss2",
+      "expect": {"none": true},
+      "covers": ["movement.speed.a", "movement.timer.a"]
+    },
+    {
+      "id": "lag_spike",
+      "title": "Sprinten mit Lag-Spitzen (1,2 s)",
+      "category": "lag",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 100, "keys": ["forward", "sprint"]},
+        {"ticks": 100, "keys": ["forward", "sprint"], "yaw": "+1"},
+        {"ticks": 100, "keys": ["forward", "sprint"], "yaw": "-1"}
+      ],
+      "lag": "spike",
+      "expect": {"none": true},
+      "covers": ["movement.timer.a", "movement.speed.a", "movement.fly.a", "protocol.badpackets.a"]
+    },
+    {
+      "id": "lag_idle_spike",
+      "title": "Stillstehen mit Lag-Spitzen",
+      "category": "lag",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 300}
+      ],
+      "lag": "spike",
+      "expect": {"none": true},
+      "covers": ["movement.timer.a"]
+    },
+    {
+      "id": "lag_knockback_jitter",
+      "title": "Rückstoß bei 250 ms ± 50 ms",
+      "category": "lag",
+      "setup": {"spot": "flat.start", "knockback": {"everyTicks": 30, "strength": 0.4, "upward": 0.36}},
+      "script": [
+        {"ticks": 160, "keys": ["forward"]}
+      ],
+      "lag": "ping250_jitter50",
+      "expect": {"none": true},
+      "covers": ["movement.velocity.a", "movement.speed.a"]
+    },
+    {
+      "id": "lag_combat_jitter",
+      "title": "Kampf gegen Dummy bei 250 ms ± 50 ms",
+      "category": "lag",
+      "setup": {"spot": "combat.player", "dummy": "combat.dummy", "items": [{"slot": "hotbar0", "material": "iron_sword"}]},
+      "script": [
+        {"ticks": 160, "keys": ["left"], "lookAt": "target", "attack": {"cps": 7, "jitter": 3, "target": "entity"}}
+      ],
+      "dummyScript": [
+        {"ticks": 40, "keys": ["left"]},
+        {"ticks": 40, "keys": ["right"]},
+        {"ticks": 40, "keys": ["left"]},
+        {"ticks": 40, "keys": ["right"]}
+      ],
+      "lag": "ping250_jitter50",
+      "expect": {"none": true},
+      "covers": ["combat.reach.a", "combat.rotation.a", "combat.autoclicker.a"]
+    },
+    {
+      "id": "lag_ice_spike",
+      "title": "Blaueis mit Lag-Spitzen",
+      "category": "lag",
+      "setup": {"spot": "ice.blue"},
+      "script": [
+        {"ticks": 200, "keys": ["forward", "sprint", "jump"]}
+      ],
+      "lag": "spike",
+      "expect": {"none": true},
+      "covers": ["movement.speed.a", "movement.timer.a"]
+    },
+    {
+      "id": "lag_speed_ping250",
+      "title": "Speed ×1,8 bei 250 ms ± 50 ms (muss erkannt werden)",
+      "category": "lag",
+      "setup": {"spot": "flat.start"},
+      "script": [
+        {"ticks": 120, "keys": ["forward", "sprint"]}
+      ],
+      "cheat": {"mode": "speed", "params": {"factor": 1.8}},
+      "lag": "ping250_jitter50",
+      "expect": {"checks": ["movement.speed.a"]}
+    }
+  ]
+}

@@ -1,7 +1,8 @@
 package org.helix.addons.subtitles.paper
 
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.format.NamedTextColor
+import net.kyori.adventure.text.format.TextColor
+import net.kyori.adventure.text.format.TextDecoration
 import org.bukkit.Location
 import org.bukkit.entity.Display
 import org.bukkit.entity.Player
@@ -34,7 +35,8 @@ class SubtitleDisplayService {
             return
         }
         val display = displays[player.uniqueId]?.takeIf { it.isValid } ?: spawn(player)
-        val component = Component.text(text, NamedTextColor.GRAY)
+        // Design concept §10: the subtitle line under the name tag is italic parchment-dark.
+        val component = Component.text(text, SUBTITLE_COLOR).decorate(TextDecoration.ITALIC)
         if (display.text() != component) {
             display.text(component)
         }
@@ -88,5 +90,8 @@ class SubtitleDisplayService {
     private companion object {
         /** Blocks above the player's feet; tuned to sit just under the vanilla name tag. */
         const val SUBTITLE_HEIGHT = 2.1
+
+        /** Parchment-dark (`#d8c08e`) of the design concept. */
+        val SUBTITLE_COLOR: TextColor = TextColor.color(0xD8C08E)
     }
 }

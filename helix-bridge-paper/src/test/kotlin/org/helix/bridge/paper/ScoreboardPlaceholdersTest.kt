@@ -50,7 +50,7 @@ class ScoreboardPlaceholdersTest {
         // Global values exactly once, then the same resolved template is
         // rendered per player — the global segment must stay identical while
         // the per-player segment varies.
-        val template = ScoreboardPlaceholders.global("&f{player}&7: &a{online} online, &e{balance} coins", global)
+        val template = ScoreboardPlaceholders.global("&f{player}&7: &a{online} online, &e{balance} Kronen", global)
 
         val steve = ScoreboardPlaceholders.player(
             template,
@@ -83,7 +83,7 @@ class ScoreboardPlaceholdersTest {
             ),
         )
 
-        assertEquals("&fSteve&7: &a7 online, &e100 coins", steve)
-        assertEquals("&fAlex&7: &a7 online, &e250 coins", alex)
+        assertEquals("&fSteve&7: &a7 online, &e100 Kronen", steve)
+        assertEquals("&fAlex&7: &a7 online, &e250 Kronen", alex)
     }
 }

@@ -22,6 +22,9 @@ import kotlinx.serialization.Serializable
  *   never satisfy — this flag is the explicit opt-in for actions meant to
  *   be called by a plugin's own backend component instead of the CLI or
  *   dashboard, for example a HXA's node-backed storage proxy.
+ * @property bridgeTasks task names whose services may invoke this action over
+ *   the bridge (case-insensitive); empty allows every service. Calls with the
+ *   static admin token are never restricted.
  */
 @Serializable
 data class ActionDescriptor @JvmOverloads constructor(
@@ -31,4 +34,5 @@ data class ActionDescriptor @JvmOverloads constructor(
     val playerCommand: Boolean = false,
     val permission: String? = null,
     val bridgeInvocable: Boolean = false,
+    val bridgeTasks: Set<String> = emptySet(),
 )

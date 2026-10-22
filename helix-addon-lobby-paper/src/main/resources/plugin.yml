@@ -4,7 +4,15 @@ main: org.helix.addons.lobby.paper.LobbyPlugin
 api-version: '1.21'
 description: Lobby hotbar (items run commands / open the server selector) with toggleable lobby protection, driven by the helix.lobby addon.
 depend: [Helix-GUIs]
+commands:
+  setlobbyspawn:
+    description: Sets the lobby spawn to your position (all lobby servers, survives restarts).
+    usage: /setlobbyspawn
+    permission: helix.lobby.admin
 permissions:
+  helix.lobby.admin:
+    description: Set the lobby spawn with /setlobbyspawn.
+    default: op
   helix.lobby.bypass:
     description: Exempts a player from lobby protection (build, damage, item lock, void teleport).
     default: op

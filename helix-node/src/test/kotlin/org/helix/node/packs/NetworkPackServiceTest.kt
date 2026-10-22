@@ -50,7 +50,10 @@ class NetworkPackServiceTest {
         // the addons' own pack.mcmeta entries are replaced by a generated one
         val meta = Json.parseToJsonElement(merged["pack.mcmeta"]!!).jsonObject["pack"]!!.jsonObject
         assertEquals(46, meta["pack_format"]!!.jsonPrimitive.int)
-        assertEquals(34, meta["supported_formats"]!!.jsonArray[0].jsonPrimitive.int)
+        assertEquals(46, meta["supported_formats"]!!.jsonArray[0].jsonPrimitive.int)
+        // 1.21.9+ clients reject a pack supporting formats > 64 without min_format/max_format
+        assertEquals(46, meta["min_format"]!!.jsonPrimitive.int)
+        assertEquals(999, meta["max_format"]!!.jsonPrimitive.int)
         assertEquals("Helix network pack", meta["description"]!!.jsonPrimitive.content)
     }
 

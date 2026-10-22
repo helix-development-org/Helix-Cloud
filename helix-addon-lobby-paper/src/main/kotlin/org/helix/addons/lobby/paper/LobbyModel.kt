@@ -16,7 +16,7 @@ data class LobbyConfig(
     val layouts: Map<String, LobbyLayout> = emptyMap(),
     val protection: ProtectionSettings = ProtectionSettings(),
     val serverMenu: ServerMenuSettings = ServerMenuSettings(),
-    val phone: PhoneItemSettings = PhoneItemSettings(),
+    val spawn: LobbySpawn? = null,
 ) {
     /** The layout a lobby task should use: its own, else the `*` fallback, else empty. */
     fun layoutFor(task: String): LobbyLayout = layouts[task] ?: layouts["*"] ?: LobbyLayout()
@@ -24,6 +24,24 @@ data class LobbyConfig(
     /** Whether a task's backends should behave as lobbies. */
     fun isLobbyTask(task: String): Boolean = task in lobbyTasks
 }
+
+/**
+ * The lobby spawn point in the lobby's main world (`null` in [LobbyConfig.spawn] = the world's own spawn).
+ *
+ * @property x block x (with fraction).
+ * @property y height.
+ * @property z block z (with fraction).
+ * @property yaw view direction.
+ * @property pitch view pitch.
+ */
+@Serializable
+data class LobbySpawn(
+    val x: Double,
+    val y: Double,
+    val z: Double,
+    val yaw: Float = 0f,
+    val pitch: Float = 0f,
+)
 
 /** One task's hotbar layout. */
 @Serializable
@@ -63,22 +81,29 @@ data class ProtectionSettings(
     val voidTeleportY: Int = 0,
 )
 
-/** Phone-mode: a single hotbar item that opens `/phone` replaces the layout. */
-@Serializable
-data class PhoneItemSettings(
-    val enabled: Boolean = false,
-    val slot: Int = 4,
-    val material: String = "COMPASS",
-    val name: String = "<green>Phone",
-)
 
-/** The built-in server selector's appearance. */
+/** The navigator (server selector). */
 @Serializable
 data class ServerMenuSettings(
-    val title: String = "<dark_gray>Server selector",
-    val rows: Int = 3,
+    val title: String = "Karte des Reichs",
     val excludeLobbyTasks: Boolean = true,
-    val entryMaterial: String = "PAPER",
+    val modes: List<NavigatorMode> = emptyList(),
+)
+
+/**
+ * One game mode of the navigator: task, display name, emblem id, place on the map, villager, lore, maintenance and
+ * whether a click opens the instance picker instead of joining the least-loaded backend.
+ */
+@Serializable
+data class NavigatorMode(
+    val task: String,
+    val name: String = "",
+    val emblem: String = "compass",
+    val place: String = "",
+    val villager: String = "",
+    val lore: String = "",
+    val maintenance: Boolean = false,
+    val pickInstance: Boolean = false,
 )
 
 /** A joinable backend returned by the `lobby.servers` action. */

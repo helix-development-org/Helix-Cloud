@@ -40,6 +40,9 @@ import org.bukkit.event.inventory.InventoryCloseEvent
 import org.bukkit.event.inventory.InventoryDragEvent
 import org.bukkit.event.inventory.InventoryType
 import org.bukkit.event.inventory.PrepareAnvilEvent
+import org.bukkit.event.entity.EntityPickupItemEvent
+import org.bukkit.event.entity.PlayerDeathEvent
+import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemStack
@@ -81,6 +84,7 @@ internal class GuiRuntime(
     private val playerJobs = ConcurrentHashMap<UUID, MutableSet<Job>>()
     private val playerMutexes = ConcurrentHashMap<UUID, Mutex>()
     private val plainText = PlainTextComponentSerializer.plainText()
+    private val takeover = PlayerInventoryTakeover(plugin)
     private var closed = false
 
     val definitionCount: Int get() = definitions.size
@@ -187,7 +191,7 @@ internal class GuiRuntime(
             return
         }
         val session = sessionsByInventory[event.view.topInventory] ?: return
-        if (session.page.cancelAllInteractions) event.isCancelled = true
+        if (session.page.cancelAllInteractions || session.definition.playerInventory) event.isCancelled = true
         val rawSlot = event.rawSlot
         if (rawSlot !in session.page.handlers.indices) return
         val binding = session.page.handlers[rawSlot] ?: return
@@ -237,7 +241,9 @@ internal class GuiRuntime(
     @EventHandler
     fun onDrag(event: InventoryDragEvent) {
         val session = sessionsByInventory[event.view.topInventory] ?: return
-        if (session.page.cancelAllInteractions || event.rawSlots.any { it < session.inventory.size }) {
+        if (session.page.cancelAllInteractions || session.definition.playerInventory ||
+            event.rawSlots.any { it < session.inventory.size }
+        ) {
             event.isCancelled = true
         }
     }
@@ -285,6 +291,51 @@ internal class GuiRuntime(
         playerJobs.remove(event.player.uniqueId)?.forEach { it.cancel(CancellationException("Player quit")) }
         playerMutexes.remove(event.player.uniqueId)
         sessionsByPlayer[event.player.uniqueId]?.let { remove(it, invokeCallback = true) }
+    }
+
+    /**
+     * Restores player items left borrowed by a full-window GUI when the
+     * server stopped without closing it (crash).
+     *
+     * @param event the raw Bukkit join event.
+     */
+    @EventHandler
+    fun onJoin(event: PlayerJoinEvent) {
+        takeover.restoreCrashed(event.player)
+    }
+
+    /**
+     * Keeps GUI-only items out of death drops while a full-window GUI is
+     * open: they are removed and the borrowed real items are dropped (or
+     * restored in place when the player keeps their inventory).
+     *
+     * @param event the raw Bukkit death event.
+     */
+    @EventHandler
+    fun onDeath(event: PlayerDeathEvent) {
+        val player = event.player
+        if (!takeover.isActive(player)) return
+        sessionsByPlayer[player.uniqueId]?.let { remove(it, invokeCallback = true, restoreInventory = false) }
+        event.drops.removeIf(takeover::isGuiItem)
+        event.itemsToKeep.removeIf(takeover::isGuiItem)
+        if (event.keepInventory) {
+            takeover.restore(player)
+        } else {
+            player.inventory.storageContents = arrayOfNulls(player.inventory.storageContents.size)
+            event.drops += takeover.release(player)
+        }
+    }
+
+    /**
+     * Stops players from picking up items into slots a full-window GUI is
+     * currently drawing over.
+     *
+     * @param event the raw Bukkit pickup event.
+     */
+    @EventHandler
+    fun onPickup(event: EntityPickupItemEvent) {
+        val player = event.entity as? Player ?: return
+        if (takeover.isActive(player)) event.isCancelled = true
     }
 
     /**
@@ -353,6 +404,7 @@ internal class GuiRuntime(
             remove(session, invokeCallback = false)
             Bukkit.getPlayer(session.playerId)?.closeInventory()
         }
+        takeover.restoreAll(Bukkit::getPlayer)
         definitions.clear()
         definitionIds.clear()
         pendingOpens.clear()
@@ -372,9 +424,11 @@ internal class GuiRuntime(
             if (previous.page !== page) previous.page.cleanupHandlers.forEach { it(previous.playerId) }
             if (previous.definition !== definition) invokeClose(previous)
         }
+        if (previous?.definition?.playerInventory == true && !definition.playerInventory) takeover.restore(player)
         val rendered = render(player, definition, page)
         val inventory = Bukkit.createInventory(null, definition.rows * 9, rendered.title)
-        inventory.contents = rendered.items
+        if (definition.playerInventory) takeover.begin(player)
+        apply(player, definition, inventory, rendered.items)
         player.openInventory(inventory)
         sounds.open?.play(player)
         val session = GuiSession(player.uniqueId, definition, page, inventory, rendered.title)
@@ -392,12 +446,12 @@ internal class GuiRuntime(
     private fun refreshNow(player: Player, session: GuiSession) {
         val rendered = render(player, session.definition, session.page)
         if (rendered.title == session.title) {
-            session.inventory.contents = rendered.items
+            apply(player, session.definition, session.inventory, rendered.items)
             return
         }
         sessionsByInventory.remove(session.inventory)
         val replacement = Bukkit.createInventory(null, session.definition.rows * 9, rendered.title)
-        replacement.contents = rendered.items
+        apply(player, session.definition, replacement, rendered.items)
         session.inventory = replacement
         session.title = rendered.title
         sessionsByInventory[replacement] = session
@@ -514,9 +568,25 @@ internal class GuiRuntime(
         return RenderedPage(title, items)
     }
 
-    private fun remove(session: GuiSession, invokeCallback: Boolean) {
+    /**
+     * Writes rendered items into the chest inventory and, for full-window
+     * GUIs, into the viewer's borrowed storage slots.
+     */
+    private fun apply(player: Player, definition: GuiDefinition, inventory: Inventory, items: Array<ItemStack?>) {
+        val grid = definition.grid
+        inventory.contents = items.copyOfRange(0, grid.chestSlotCount)
+        if (!definition.playerInventory) return
+        for (rawSlot in grid.chestSlotCount until grid.slotCount) {
+            takeover.show(player, grid.storageIndex(rawSlot) ?: continue, items.getOrNull(rawSlot))
+        }
+    }
+
+    private fun remove(session: GuiSession, invokeCallback: Boolean, restoreInventory: Boolean = true) {
         sessionsByInventory.remove(session.inventory)
         sessionsByPlayer.remove(session.playerId, session)
+        if (restoreInventory && session.definition.playerInventory) {
+            Bukkit.getPlayer(session.playerId)?.let(takeover::restore)
+        }
         session.page.cleanupHandlers.forEach { it(session.playerId) }
         if (invokeCallback) scope.launch { invokeClose(session) }
     }

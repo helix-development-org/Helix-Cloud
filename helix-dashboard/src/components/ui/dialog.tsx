@@ -13,7 +13,7 @@ const DialogOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
     ref={ref}
-    className={cn("fixed inset-0 z-50 bg-black/70 backdrop-blur-sm", className)}
+    className={cn("fixed inset-0 z-50 bg-[color-mix(in_srgb,var(--ink-lo)_72%,transparent)]", className)}
     {...props}
   />
 ))
@@ -28,13 +28,13 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border bg-card p-6 shadow-lg rounded-xl",
+        "fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-[22px] border-[3px] border-border bg-card p-6 pb-8 text-card-foreground shadow-[inset_0_4px_0_var(--card-hi),inset_0_-6px_0_var(--card-lo),0_8px_0_var(--border)]",
         className,
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none">
+      <DialogPrimitive.Close className="absolute right-4 top-4 grid size-8 place-items-center rounded-full border-2 border-border bg-parchment text-ink shadow-[0_2px_0_var(--border)] transition-transform duration-150 ease-out active:translate-y-[2px] active:shadow-none focus:outline-none focus-visible:ring-[3px] focus-visible:ring-ring">
         <X className="size-4" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
@@ -48,7 +48,7 @@ function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivEleme
 }
 
 function DialogTitle({ className, ...props }: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>) {
-  return <DialogPrimitive.Title className={cn("text-lg font-semibold", className)} {...props} />
+  return <DialogPrimitive.Title className={cn("pr-10 font-display text-[22px] leading-tight tracking-[0.02em]", className)} {...props} />
 }
 
 function DialogDescription({ className, ...props }: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>) {

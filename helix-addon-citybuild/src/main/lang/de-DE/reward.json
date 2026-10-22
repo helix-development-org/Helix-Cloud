@@ -1,0 +1,20 @@
+{
+  "reward.title": "Tägliche Post",
+  "reward.subtitle.open": "Heute wartet Tag {day} auf dich",
+  "reward.subtitle.done": "Abgeholt · Serie {streak} Tage",
+  "reward.row": "Tag {day}",
+  "reward.row.value": "{amount} Kronen",
+  "reward.row.value.extra": "{amount} Kronen + Extra",
+  "reward.pill.claimed": "Erhalten",
+  "reward.pill.today": "Heute",
+  "reward.pill.tomorrow": "Morgen",
+  "reward.note.1": "Einmal am Tag, in jeder Stadt gleich.",
+  "reward.note.2": "Ein Tag Pause startet die Serie neu.",
+  "reward.button.claim": "Abholen",
+  "reward.button.done": "Morgen",
+  "reward.loading": "Paula sucht deinen Brief …",
+  "reward.empty": "Paula hat heute keine Post für dich.",
+  "reward.claimed": "<#ffcf4a>Paula Paket:</#ffcf4a> <#f1e2c2>Tag {day}! <#ffcf4a>{amount} Kronen</#ffcf4a> – unterschreib – nein, keine Zeit!",
+  "reward.already": "<#ffb43a>Achtung: Die heutige Belohnung hast du schon abgeholt. Morgen kommt neue Post.",
+  "reward.hint": "<#ffcf4a>Paula Paket:</#ffcf4a> <#f1e2c2>Post für dich! Tag {day} wartet. <click:run_command:/belohnung><hover:show_text:'Belohnung ansehen'><#ffcf4a>[Abholen]</#ffcf4a></hover></click>"
+}

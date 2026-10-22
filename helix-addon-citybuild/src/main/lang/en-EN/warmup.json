@@ -1,0 +1,7 @@
+{
+  "warmup.start": "<#f1e2c2>Teleporting in <#ffcf4a>{seconds} s</#ffcf4a> – stand still.",
+  "warmup.countdown": "<#ffcf4a>Teleporting in {seconds} s …",
+  "warmup.cancelled.move": "<#ffb43a>Warning: You moved – teleport cancelled.",
+  "warmup.cancelled.damage": "<#ffb43a>Warning: You took damage – teleport cancelled.",
+  "warmup.cooldown": "<#ff5a4a>Wait <#ffcf4a>{seconds} s</#ffcf4a> before travelling again."
+}

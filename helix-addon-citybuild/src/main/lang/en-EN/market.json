@@ -1,0 +1,22 @@
+{
+  "market.error.economy_unavailable": "<#ffb43a>Warning: the treasury isn't answering. Try again in a moment.",
+  "market.error.insufficient_funds": "<#ff5a4a>You don't have enough crowns.",
+  "market.error.invalid_amount": "<#ff5a4a>That amount doesn't work.",
+  "market.error.invalid_duration": "<#ff5a4a>That duration doesn't exist. Pick 12h, 24h or 48h.",
+  "market.error.invalid_item": "<#ff5a4a>This item can't be listed.",
+  "market.error.invalid_price": "<#ff5a4a>That price doesn't work. Pick a price between 1 and 10,000,000 crowns.",
+  "market.error.item_limit": "<#ff5a4a>The merchant won't buy any more of this today. Come back tomorrow!",
+  "market.error.limit": "<#ff5a4a>The limit has been reached.",
+  "market.error.not_available": "<#ff5a4a>That's no longer available. Someone was faster.",
+  "market.error.not_bought": "<#ff5a4a>The merchant doesn't buy that.",
+  "market.error.not_for_sale": "<#ff5a4a>The merchant doesn't sell that.",
+  "market.error.not_found": "<#ff5a4a>That doesn't exist anymore.",
+  "market.error.not_owner": "<#ff5a4a>That isn't yours.",
+  "market.error.other": "<#ff5a4a>That didn't work. Try again in a moment.",
+  "market.error.own_listing": "<#ff5a4a>You can't buy your own listing.",
+  "market.error.sold_out": "<#ff5a4a>Sold out – the offer is gone or your limit is reached.",
+  "market.error.tier": "<#ff5a4a>You need a higher tier for that.",
+  "market.error.unavailable": "<#ffb43a>Warning: the city office isn't answering.",
+  "market.error.wrong_shard": "<#ff5a4a>That belongs to another city.",
+  "market.lore.category": "<#b8c0cc>{category}"
+}

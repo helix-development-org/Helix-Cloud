@@ -86,7 +86,9 @@ class WireClient(
      * @param endpoint the endpoint name.
      * @param payload the CBOR request body.
      * @return the response.
-     * @throws WireUnavailableException when no link is currently up.
+     * @throws WireUnavailableException when no link is currently up, the frame could not be written
+     *   ([WireUnavailableException.sent] `false`), or no response arrived after the frame was sent
+     *   ([WireUnavailableException.sent] `true` — the node may have executed the request).
      */
     fun request(endpoint: String, payload: ByteArray): WireResponse {
         val link = connection.get() ?: throw WireUnavailableException("wire not connected")
@@ -94,12 +96,15 @@ class WireClient(
         val future = CompletableFuture<WireResponse>()
         pending[id] = future
         try {
-            if (!link.send(WireFrame(WireFrameType.REQUEST, id, endpoint, payload))) {
+            val written = runCatching { link.send(WireFrame(WireFrameType.REQUEST, id, endpoint, payload)) }.getOrDefault(false)
+            if (!written) {
                 throw WireUnavailableException("wire write failed")
             }
-            return future.get(requestTimeoutMs, TimeUnit.MILLISECONDS)
-        } catch (failure: Exception) {
-            throw WireUnavailableException("wire request failed: ${failure.message}")
+            try {
+                return future.get(requestTimeoutMs, TimeUnit.MILLISECONDS)
+            } catch (failure: Exception) {
+                throw WireUnavailableException("wire request failed: ${failure.message}", sent = true)
+            }
         } finally {
             pending.remove(id)
         }
@@ -213,5 +218,9 @@ class WireClient(
  * down — the signal for the caller to fall back to HTTP.
  *
  * @param message the failure detail.
+ * @property sent whether the request frame had already been written when the
+ *   failure happened. `true` means the outcome is unknown: the node may have
+ *   executed the request, so it must only be repeated when the request is
+ *   idempotent (for example an action carrying a request id).
  */
-class WireUnavailableException(message: String) : RuntimeException(message)
+class WireUnavailableException(message: String, val sent: Boolean = false) : RuntimeException(message)

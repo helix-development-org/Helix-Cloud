@@ -12,10 +12,19 @@ repositories {
         name = "papermc"
         url = uri("https://repo.papermc.io/repository/maven-public/")
     }
+    maven {
+        name = "codemc"
+        url = uri("https://repo.codemc.io/repository/maven-releases/")
+    }
 }
 
 dependencies {
     compileOnly(libs.paper.api)
+    // packetevents is its own plugin on the servers (shipped by the guard addon); optional here
+    compileOnly(libs.packetevents.spigot)
+    // cinematic stand-ins (HelixCinematic provides the library and INpc at runtime)
+    compileOnly(project(":helix-library-cinematic"))
+    compileOnly(files("../helix-addon-npc-paper/libs/inpc-1.0.0-SNAPSHOT.jar"))
     implementation(libs.kotlinx.serialization.json)
     implementation(rootProject.project("helix-wire"))
 }
@@ -39,18 +48,20 @@ tasks.withType<Jar>().configureEach {
     exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
 }
 
-// The cosmetics resource pack (self-drawn wing/headwear textures + hand-authored
-// item models) is generated deterministically at build time and bundled into the HXA.
+// The cosmetics resource pack (Blockbench exports in src/pack/resources/cosmetics) is
+// assembled deterministically at build time and bundled into the HXA.
 sourceSets {
     create("pack")
 }
 
 val generatePack by tasks.registering(JavaExec::class) {
     group = "build"
-    description = "Draws the cosmetic textures, writes the item models and assembles pack.zip."
+    description = "Assembles pack.zip from the Blockbench cosmetic models and textures."
     classpath = sourceSets["pack"].runtimeClasspath
     mainClass.set("org.helix.addons.cosmetics.pack.PackGeneratorKt")
     val output = layout.buildDirectory.file("pack/pack.zip")
-    argumentProviders.add(CommandLineArgumentProvider { listOf(output.get().asFile.absolutePath) })
+    val source = layout.projectDirectory.dir("src/pack/resources/cosmetics")
+    argumentProviders.add(CommandLineArgumentProvider { listOf(output.get().asFile.absolutePath, source.asFile.absolutePath) })
+    inputs.dir(source)
     outputs.file(output)
 }

@@ -191,8 +191,8 @@ class ReplayService(
             "speed" to "%.1f".format(session.speed),
         )
         admin.sendActionBar(
-            Component.text("$head ").color(net.kyori.adventure.text.format.NamedTextColor.RED)
-                .append(Component.text(bar).color(net.kyori.adventure.text.format.NamedTextColor.GRAY))
+            Component.text("$head ").color(net.kyori.adventure.text.format.TextColor.color(0xFF5A4A))
+                .append(Component.text(bar).color(net.kyori.adventure.text.format.TextColor.color(0xA89A84)))
                 .append(text),
         )
     }
@@ -298,9 +298,9 @@ class ReplayService(
 
     /** A clickable `[label]` replay control button; the label is resolved prefix-free. */
     private fun control(player: Player, labelKey: String, command: String): Component =
-        Component.text("[").color(net.kyori.adventure.text.format.NamedTextColor.AQUA)
-            .append(screen(player, labelKey).color(net.kyori.adventure.text.format.NamedTextColor.AQUA))
-            .append(Component.text("]").color(net.kyori.adventure.text.format.NamedTextColor.AQUA))
+        Component.text("[").color(net.kyori.adventure.text.format.TextColor.color(0xFFCF4A))
+            .append(screen(player, labelKey).color(net.kyori.adventure.text.format.TextColor.color(0xFFCF4A)))
+            .append(Component.text("]").color(net.kyori.adventure.text.format.TextColor.color(0xFFCF4A)))
             .clickEvent(ClickEvent.runCommand(command))
 
     private fun render(text: String): Component =

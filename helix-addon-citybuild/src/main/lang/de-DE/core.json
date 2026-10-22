@@ -1,0 +1,13 @@
+{
+  "core.command.player-only": "<#ff5a4a>Dieser Befehl geht nur im Spiel.",
+  "core.command.no-permission": "<#ff5a4a>Dafür fehlt dir das Recht. Frag ein Teammitglied, wenn du es brauchst.",
+  "core.command.failed": "<#ff5a4a>Da ist etwas schiefgelaufen. Versuch es gleich noch einmal.",
+  "core.node.unavailable": "<#ffb43a>Achtung: Die Stadtverwaltung antwortet gerade nicht. Versuch es gleich noch einmal.",
+  "core.confirm.yes": "Bestätigen",
+  "core.confirm.no": "Abbrechen",
+  "core.kronen.insufficient": "<#ff5a4a>Dafür fehlen dir Kronen. Prüfe deinen Kontostand mit <#ffcf4a>/kronen</#ffcf4a>.",
+  "core.kronen.limit": "<#ff5a4a>Das Tageslimit ist erreicht. Morgen geht es weiter.",
+  "core.op.pending": "<#ffb43a>Achtung: Die Stadtverwaltung hat nicht rechtzeitig geantwortet. Dein Auftrag wird geprüft und gleich nachgetragen – nichts geht verloren.",
+  "core.op.settled": "<#4ac85e>Dein offener Auftrag ist abgeschlossen. Schau in deine <#ffcf4a>/abholkiste</#ffcf4a>, falls etwas fehlt.",
+  "core.op.reverted": "<#ffb43a>Dein offener Auftrag wurde nicht ausgeführt. Deine Sachen liegen wieder bei dir bzw. in der <#ffcf4a>/abholkiste</#ffcf4a>."
+}

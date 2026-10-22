@@ -1,0 +1,21 @@
+{
+  "farm.resetting": "<#ffb43a>Warning: The farm world is being recreated. Try again in a minute.",
+  "farm.unavailable": "<#ff5a4a>The farm world is not loaded. Tell a staff member.",
+  "farm.searching": "<#f1e2c2>Waldemar is looking for a quiet spot …",
+  "farm.no-spot": "<#ff5a4a>No safe spot found. Try again.",
+  "farm.arrived": "<#4ac85e>Welcome to the farm world. <#f1e2c2>Next reset: <#ffcf4a>{time}</#ffcf4a>.",
+  "farm.countdown.minutes": "<#ffb43a>Warning: The farm world resets in <#ffcf4a>{minutes} min</#ffcf4a>. Chests there will be lost, your inventory stays.",
+  "farm.countdown.seconds": "<#ffb43a>Warning: Farm world reset in <#ffcf4a>{seconds} s</#ffcf4a>!",
+  "farm.bossbar": "<#ffcf4a>Farm world reset <#f1e2c2>in {time}",
+  "farm.reset.moved": "<#5ab4ff>The farm world was recreated – you are at spawn.",
+  "farm.reset.done": "<#4ac85e>The farm world has been recreated! <#f1e2c2>Next reset: <#ffcf4a>{time}</#ffcf4a>.",
+  "farm.admin.now": "<#ffb43a>Warning: Farm reset starts in <#ffcf4a>{seconds} s</#ffcf4a>.",
+  "farm.admin.next": "<#f1e2c2>Next farm reset: <#ffcf4a>{time}</#ffcf4a>.",
+  "farm.book.title": "Waldemar's lodge",
+  "farm.book.subtitle": "Farm world, Nether, End",
+  "farm.book.line.1": "Mine, hunt and fish here.",
+  "farm.book.line.2": "Everything regrows on Sunday at 4.",
+  "farm.book.next": "Next reset: {time}",
+  "farm.book.farm": "Farm world",
+  "farm.book.nether": "Nether"
+}

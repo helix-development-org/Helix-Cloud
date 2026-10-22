@@ -205,7 +205,7 @@ class LabyModVelocityPlugin @Inject constructor(
         }
         val serviceId = labyPlayer.player.currentServer.map { it.serverInfo.name }.orElse("")
         val text = config.rpcFormat
-            .replace("{network}", values["network.name"] ?: "Helix")
+            .replace("{network}", values["network.name"] ?: "")
             .replace("{service}", serviceId)
             .replace("{task}", serviceId.substringBeforeLast('-'))
             .trim()

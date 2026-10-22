@@ -2,10 +2,12 @@ package org.helix.addons.permissions
 
 import kotlinx.serialization.json.Json
 import org.helix.addon.sdk.AddonBase
+import org.helix.api.release.ReleaseReset
 import org.helix.api.action.ActionInvocation
 import org.helix.api.action.ActionResult
 import org.helix.api.action.ActionSource
 import org.helix.api.addon.PlayerDataProvider
+import org.helix.api.design.StaffRanks
 
 /**
  * Permission system addon.
@@ -23,6 +25,9 @@ class PermissionsAddon : AddonBase() {
     private val json = Json { encodeDefaults = true }
     private lateinit var store: PermissionStore
     private lateinit var catalog: PermissionCatalog
+    private lateinit var tester: TesterAccess
+    private lateinit var badges: RankBadgeUpgrade
+    private lateinit var access: PanelAccess
 
     /**
      * Registers the resolver and all `perm.*` actions.
@@ -31,14 +36,26 @@ class PermissionsAddon : AddonBase() {
         store = PermissionStore(context.storage(), resolveUuid = context::resolvePlayerUuid)
         catalog = PermissionCatalog(context)
         if (store.group("default") == null) {
-            store.saveGroup(PermissionGroup(name = "default", default = true))
+            seedDefaultGroups(fresh = store.allGroups().isEmpty())
         }
-        context.registerPermissionResolver { request -> store.has(request.name, request.permission, request.uuid) }
+        tester = TesterAccess(store, loadMessages())
+        tester.seedGroup()
+        badges = RankBadgeUpgrade(store, context.storage())
+        badges.upgradeOnce()
+        access = PanelAccess(store, context.storage())
+        access.presetsOnce()
+        // Implied nodes: holding the left-hand node's partner (for example the team node feedback.staff) also grants
+        // it, so a team group never needs both nodes just to open the reports it works on.
+        context.registerPermissionResolver { request ->
+            store.has(request.name, request.permission, request.uuid) ||
+                IMPLIED_BY[request.permission].orEmpty().any { store.has(request.name, it, request.uuid) }
+        }
         // Group prefixes are DISPLAY state, deliberately decoupled from permission nodes: the
         // player's highest-weight group with a prefix wins, so a `*` grant never changes looks.
+        // Its weight sorts the tab list (higher ranks first).
         context.registerDisplayResolver { name ->
             store.displayGroup(name)?.let { group ->
-                org.helix.api.display.DisplayProfile(prefix = group.prefix, color = group.color)
+                org.helix.api.display.DisplayProfile(prefix = group.prefix, color = group.color, order = group.weight)
             }
         }
         context.registerPlayerDataProvider(
@@ -84,7 +101,7 @@ class PermissionsAddon : AddonBase() {
             ActionResult.ok(
                 "name: ${group.name}",
                 "weight: ${group.weight}, default: ${group.default}",
-                "prefix: '${group.prefix}'${if (group.color.isNotEmpty()) ", color: '${group.color}'" else ""}",
+                "prefix: '${org.helix.api.design.RankBadges.plain(group.prefix)}'${if (group.color.isNotEmpty()) ", color: '${group.color}'" else ""}",
                 "parents: ${group.parents.joinToString().ifEmpty { "-" }}",
                 "permissions: ${group.permissions.joinToString().ifEmpty { "-" }}",
             )
@@ -182,6 +199,62 @@ class PermissionsAddon : AddonBase() {
             val granted = store.has(player, permission)
             ActionResult.ok("$player ${if (granted) "HAS" else "does NOT have"} $permission")
         }
+        action(
+            "perm" + ReleaseReset.ACTION_SUFFIX,
+            "Release reset: beta badge for every tester, optionally removes the tester group from everyone.",
+            "perm.release.reset <plan|run> [--remove-testers]",
+            permission = ReleaseReset.PERMISSION,
+        ) { inv ->
+            val dryRun = ReleaseReset.dryRun(inv.arguments)
+                ?: return@action ActionResult.error("usage: perm.release.reset <plan|run> [--remove-testers]")
+            ActionResult.ok(tester.release(dryRun, ReleaseReset.FLAG_REMOVE_TESTERS in inv.arguments).toJson())
+        }
+        action(
+            "perm.ranks.apply-badges",
+            "Replaces the old text rank prefixes ([Owner] …) of the standard groups by the rank badges; --force also " +
+                "replaces prefixes the team changed.",
+            "perm.ranks.apply-badges [--force]",
+            permission = RankBadgeUpgrade.PERMISSION,
+        ) { inv ->
+            val changed = badges.apply(force = "--force" in inv.arguments)
+            if (changed.isEmpty()) ActionResult.ok("no group prefix changed") else ActionResult.ok("badge prefix set for: ${changed.joinToString()}")
+        }
+        action(
+            "perm.access.matrix",
+            "Dashboard access matrix: every group with its dashboard nodes (JSON, used by the dashboard view Zugriff).",
+            "perm.access.matrix",
+            permission = PanelAccess.PERMISSION,
+        ) {
+            ActionResult.ok(json.encodeToString(access.matrix()))
+        }
+        action(
+            "perm.access.set",
+            "Grants or revokes one dashboard node (helix.panel.* or a listed team node) on a group; wildcard groups are locked.",
+            "perm.access.set <group> <node> <on|off>",
+            permission = PanelAccess.EDIT_PERMISSION,
+        ) { inv ->
+            val group = inv.arguments.getOrNull(0)
+            val node = inv.arguments.getOrNull(1)
+            val grant = when (inv.arguments.getOrNull(2)?.lowercase()) {
+                "on", "true", "grant" -> true
+                "off", "false", "revoke" -> false
+                else -> null
+            }
+            if (group == null || node == null || grant == null) {
+                return@action ActionResult.error("usage: perm.access.set <group> <node> <on|off>")
+            }
+            access.set(group, node, grant)?.let { return@action ActionResult.error(it) }
+            ActionResult.ok("${if (grant) "granted" else "revoked"} $node ${if (grant) "to" else "from"} $group")
+        }
+        action(
+            "perm.access.presets",
+            "Gives the named preset groups (default: those never handled) their preset if they have no dashboard node.",
+            "perm.access.presets [group ...]",
+            permission = PanelAccess.EDIT_PERMISSION,
+        ) { inv ->
+            val changed = access.applyPresets(inv.arguments.filter { it.isNotBlank() })
+            if (changed.isEmpty()) ActionResult.ok("no group changed") else ActionResult.ok("presets applied to: ${changed.joinToString()}")
+        }
         action("perm.export", "Exports all groups and users as JSON (used by the dashboard).", "perm.export") {
             ActionResult.ok(json.encodeToString(store.document()))
         }
@@ -192,10 +265,23 @@ class PermissionsAddon : AddonBase() {
             playerCommand = true,
             permission = "helix.permissions",
         ) { invocation -> permissionsCommand(invocation.arguments.drop(1)) }
+        action(
+            "tester",
+            "Manages testers of the closed test phase.",
+            "tester <add|remove|list|info> [player] [duration]",
+            playerCommand = true,
+            permission = TesterAccess.MANAGE_PERMISSION,
+        ) { invocation -> tester.command(invocation.arguments.firstOrNull() ?: "", invocation.arguments.drop(1)) }
         panel("permissions", "Permissions", "/panel.html", PANEL_ICON)
     }
 
     private companion object {
+        /**
+         * Node → nodes that imply it. `feedback.report` gates the player-facing feedback actions the team tab Bugs
+         * uses too (get, comment, attach), so the team node `feedback.staff` includes it.
+         */
+        val IMPLIED_BY: Map<String, List<String>> = mapOf("feedback.report" to listOf("feedback.staff"))
+
         /** Sidebar icon for the permissions panel. */
         const val PANEL_ICON = "<path d=\"M9 12l2 2 4-4\"/><path d=\"M12 3l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V7z\"/>"
     }
@@ -223,6 +309,27 @@ class PermissionsAddon : AddonBase() {
     }
 
     // The perm.* actions answer in plain lines (also used by CLI/panel/Discord).
+    // Default groups follow the staff ranks of the design concept (DESIGN.md §9): the default
+    // group shows as [Spieler]; on a fresh store the staff groups are created too (display only,
+    // without permissions — operators grant those). Existing groups are never touched.
+    private fun seedDefaultGroups(fresh: Boolean) {
+        StaffRanks.ALL.forEach { rank ->
+            val name = rank.tag.trim('[', ']').lowercase()
+            val isDefault = rank.weight == 0
+            if (!isDefault && !fresh) return@forEach
+            // Rank badges (DESIGN §9 AC3): staff groups show the badge glyph, default players no badge (grey name).
+            store.saveGroup(
+                PermissionGroup(
+                    name = if (isDefault) "default" else name,
+                    weight = rank.weight,
+                    default = isDefault,
+                    prefix = rank.prefix,
+                    color = rank.colorTag,
+                ),
+            )
+        }
+    }
+
     // On the in-game /permissions path each line is prefixed with the literal
     // {prefix}, which the proxy bridge fills, so staff see the network prefix
     // like every other player message — without prefixing the admin channels.

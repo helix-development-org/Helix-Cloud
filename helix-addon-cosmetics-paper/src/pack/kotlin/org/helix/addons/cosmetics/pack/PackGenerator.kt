@@ -1,8 +1,7 @@
 package org.helix.addons.cosmetics.pack
 
-import java.awt.Color
-import java.awt.Graphics2D
 import java.awt.RenderingHints
+import java.awt.geom.AffineTransform
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import java.nio.file.Files
@@ -10,46 +9,81 @@ import java.nio.file.Path
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import javax.imageio.ImageIO
+import kotlin.io.path.extension
+import kotlin.io.path.isRegularFile
+import kotlin.io.path.name
+import kotlin.io.path.nameWithoutExtension
 
 /**
- * Draws every cosmetic's texture with Java2D and writes the hand-authored
- * item models (wings: two flat panels spread left/right; crowns: a square
- * band with four corner spikes; halos: a flat square ring) plus the
- * carrier-item `CustomModelData` overrides, then assembles the resource
- * pack consumed by the Paper component's item display entities.
+ * Assembles the cosmetics resource pack from the Blockbench exports in `src/pack/resources/cosmetics`
+ * (JSON models in `models`, PNG textures in `textures`; the editable Blockbench projects live next to them in
+ * `blockbench`).
  *
- * All cosmetics share one carrier item ([CARRIER_MODEL], a plain paper
- * item never actually equipped or used) so a single `CustomModelData`
- * value alone selects which cosmetic's model renders — the item is only
- * ever shown floating in an item display entity, never really held.
+ * The Paper component shows cosmetics as fake equipment, so the client renders them as part of the player model:
+ *
+ *  - headwear: item definition `helix_cosmetics:<name>` → the Blockbench model, whose `head` display transform
+ *    ([HEAD_DISPLAY]) puts the neck-pivoted model on the head
+ *  - wings: item definitions `helix_cosmetics:<name>_right` / `_left` → the Blockbench wing models, shown by
+ *    item displays mounted client-side on the player; as fallback (no packetevents) the equipment asset
+ *    `helix_cosmetics:<name>` with a `wings` layer – the vanilla elytra model with an HD texture generated from
+ *    the Blockbench wing art ([elytraTexture]); `<name>_icon` is its inventory icon
  */
 private const val NAMESPACE = "helix_cosmetics"
-private const val TEXTURE_SIZE = 32
+
+/** Headwear models (item definitions of the same name). */
+internal val HEADWEAR = listOf("crown_silver", "crown_bronze", "crown_gold", "halo_white", "halo_dark", "halo_rainbow")
+
+/** Wing themes: models `wings_<id>_right`/`_left`, art in `textures/wings_<id>.png`, elytra asset `wings_<id>`. */
+internal val WINGS = listOf("angel", "fairy", "ice", "fire", "demon", "dragon")
 
 /**
- * Entry point: writes `pack.zip` to the path given as first argument.
+ * `head` display of the headwear models. Models are built with 1 unit = 1 skin pixel around the neck (model
+ * centre); the head slot renders the model centre at the head centre at 0.625 skin pixels per unit – so scale
+ * by 1.6 and move down by 4 skin pixels (6.4 units).
+ */
+private const val HEAD_DISPLAY = """"display": {"head": {"rotation": [0, 0, 0], "translation": [0, -6.4, 0], "scale": [1.6, 1.6, 1.6]}}"""
+
+/** Elytra texture: vanilla layout 64×32, generated at [ELYTRA_SCALE]× for detail. */
+private const val ELYTRA_SCALE = 4
+
+/**
+ * Entry point: writes `pack.zip`.
  *
- * @param args `[0]` output path of the pack zip.
+ * @param args `[0]` output path of the pack zip, `[1]` the Blockbench export directory.
  */
 fun main(args: Array<String>) {
-    val output = Path.of(args.first())
+    val output = Path.of(args[0])
+    val source = Path.of(args[1])
     Files.createDirectories(output.parent)
     val entries = linkedMapOf<String, ByteArray>()
     entries["pack.mcmeta"] = packMeta()
-    entries["assets/minecraft/models/item/$CARRIER_MODEL.json"] = carrierOverrides()
-    entries["assets/minecraft/items/$CARRIER_MODEL.json"] = carrierItemModel()
 
-    WingTheme.entries.forEach { theme ->
-        entries["assets/$NAMESPACE/models/item/wings_${theme.id}.json"] = wingsModel(theme.id)
-        entries["assets/$NAMESPACE/textures/item/wings_${theme.id}.png"] = png { g -> theme.draw(g) }
+    val models = files(source.resolve("models"), "json")
+    val textures = files(source.resolve("textures"), "png")
+    val required = HEADWEAR + WINGS.flatMap { listOf("wings_${it}_right", "wings_${it}_left") }
+    val missing = required.filterNot { it in models } + WINGS.map { "wings_$it" }.filterNot { it in textures }
+    require(missing.isEmpty()) { "missing Blockbench exports: $missing" }
+
+    models.forEach { (name, path) ->
+        var json = Files.readString(path)
+        if (name in HEADWEAR) json = json.replaceFirst("{", "{\n  $HEAD_DISPLAY,")
+        entries["assets/$NAMESPACE/models/item/$name.json"] = json.toByteArray()
+        Regex("\"$NAMESPACE:item/([a-z0-9_]+)\"").findAll(json).forEach {
+            require(it.groupValues[1] in textures) { "model $name references missing texture ${it.groupValues[1]}" }
+        }
     }
-    CrownTheme.entries.forEach { theme ->
-        entries["assets/$NAMESPACE/models/item/crown_${theme.id}.json"] = crownModel(theme.id)
-        entries["assets/$NAMESPACE/textures/item/crown_${theme.id}.png"] = png { g -> theme.draw(g) }
-    }
-    HaloTheme.entries.forEach { theme ->
-        entries["assets/$NAMESPACE/models/item/halo_${theme.id}.json"] = haloModel(theme.id)
-        entries["assets/$NAMESPACE/textures/item/halo_${theme.id}.png"] = png { g -> theme.draw(g) }
+    textures.forEach { (name, path) -> entries["assets/$NAMESPACE/textures/item/$name.png"] = Files.readAllBytes(path) }
+
+    HEADWEAR.forEach { entries["assets/$NAMESPACE/items/$it.json"] = itemDefinition(it) }
+    WINGS.forEach { id ->
+        val name = "wings_$id"
+        entries["assets/$NAMESPACE/items/${name}_icon.json"] = itemDefinition("${name}_right")
+        entries["assets/$NAMESPACE/items/${name}_right.json"] = itemDefinition("${name}_right")
+        entries["assets/$NAMESPACE/items/${name}_left.json"] = itemDefinition("${name}_left")
+        entries["assets/$NAMESPACE/equipment/$name.json"] =
+            """{"layers": {"wings": [{"texture": "$NAMESPACE:$name"}]}}""".toByteArray()
+        entries["assets/$NAMESPACE/textures/entity/equipment/wings/$name.png"] =
+            elytraTexture(ImageIO.read(textures.getValue(name).toFile()))
     }
 
     ZipOutputStream(Files.newOutputStream(output)).use { zip ->
@@ -61,191 +95,63 @@ fun main(args: Array<String>) {
             zip.closeEntry()
         }
     }
-    println("Cosmetics pack written to $output (${Files.size(output)} bytes)")
+    println("Cosmetics pack written to $output (${Files.size(output)} bytes, ${models.size} models)")
 }
 
-/** The vanilla item every cosmetic model overrides via `CustomModelData` — never actually used as paper. */
-private const val CARRIER_MODEL = "paper"
+private fun files(dir: Path, extension: String): Map<String, Path> =
+    Files.list(dir).use { stream ->
+        stream.filter { it.isRegularFile() && it.extension == extension }
+            .toList()
+            .sortedBy { it.name }
+            .associateBy { it.nameWithoutExtension }
+    }
+
+private fun itemDefinition(model: String): ByteArray =
+    """{"model": {"type": "minecraft:model", "model": "$NAMESPACE:item/$model"}}""".toByteArray()
+
+/**
+ * Maps the Blockbench wing art (48×60 in the top-left of the 64×64 texture: shoulder/root on the left, leading
+ * edge along the top, feathers hanging down) onto the elytra wing box (texture offset 22,0; 10×20×2): the art is
+ * turned so the root sits at the shoulder (top) and the tip at the bottom, then drawn onto the back and front
+ * faces; sides, top and bottom take a squeezed copy for matching colours.
+ *
+ * @param art the wing art texture.
+ * @return PNG bytes of the elytra texture.
+ */
+internal fun elytraTexture(art: BufferedImage): ByteArray {
+    val s = ELYTRA_SCALE
+    val wing = art.getSubimage(0, 0, minOf(48, art.width), minOf(60, art.height))
+    // Wurzel nach oben (Schulter), Flügelspitze nach unten, Vorderkante außen
+    val turned = BufferedImage(wing.height, wing.width, BufferedImage.TYPE_INT_ARGB)
+    turned.createGraphics().apply {
+        transform = AffineTransform().apply { translate(wing.height.toDouble(), 0.0); rotate(Math.PI / 2) }
+        drawImage(wing, 0, 0, null)
+        dispose()
+    }
+    val out = BufferedImage(64 * s, 32 * s, BufferedImage.TYPE_INT_ARGB)
+    val g = out.createGraphics()
+    g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR)
+    fun draw(x: Int, y: Int, w: Int, h: Int, mirror: Boolean = false) {
+        if (mirror) g.drawImage(turned, (x + w) * s, y * s, -w * s, h * s, null)
+        else g.drawImage(turned, x * s, y * s, w * s, h * s, null)
+    }
+    draw(36, 2, 10, 20) // back (seen from behind)
+    draw(24, 2, 10, 20, mirror = true) // front
+    draw(22, 2, 2, 20) // side
+    draw(34, 2, 2, 20) // side
+    draw(24, 0, 10, 2) // top
+    draw(34, 0, 10, 2) // bottom
+    g.dispose()
+    return ByteArrayOutputStream().also { ImageIO.write(out, "png", it) }.toByteArray()
+}
 
 private fun packMeta(): ByteArray =
     """
     {
       "pack": {
         "pack_format": 46,
-        "supported_formats": {"min_inclusive": 9, "max_inclusive": 999},
-        "description": "Helix Cosmetics item models"
+        "supported_formats": {"min_inclusive": 46, "max_inclusive": 999}, "min_format": 46, "max_format": 999,
+        "description": "Helix Cosmetics"
       }
     }
     """.trimIndent().toByteArray()
-
-/** Maps `CustomModelData` values on [CARRIER_MODEL] to each cosmetic's model. */
-private fun carrierOverrides(): ByteArray {
-    val overrides = allCosmetics().joinToString(",\n    ") { (cmd, model) ->
-        """{"predicate": {"custom_model_data": $cmd}, "model": "$NAMESPACE:item/$model"}"""
-    }
-    return """
-    {
-      "parent": "minecraft:item/generated",
-      "textures": {"layer0": "minecraft:item/paper"},
-      "overrides": [
-        $overrides
-      ]
-    }
-    """.trimIndent().toByteArray()
-}
-
-/**
- * The modern (1.21.4+) item-model definition for [CARRIER_MODEL], read
- * instead of the legacy [carrierOverrides] file by clients new enough to
- * have it — vanilla items ship their own built-in item-model definitions
- * on those clients, which otherwise silently win over the legacy overrides
- * array, leaving the carrier rendering as plain paper. Kept alongside (not
- * replacing) [carrierOverrides] so older/ViaVersion-bridged clients that
- * only understand the legacy format still render correctly.
- */
-private fun carrierItemModel(): ByteArray {
-    val entries = allCosmetics().joinToString(",\n        ") { (cmd, model) ->
-        """{"threshold": $cmd, "model": {"type": "minecraft:model", "model": "$NAMESPACE:item/$model"}}"""
-    }
-    return """
-    {
-      "model": {
-        "type": "minecraft:range_dispatch",
-        "property": "minecraft:custom_model_data",
-        "index": 0,
-        "fallback": {"type": "minecraft:model", "model": "minecraft:item/paper"},
-        "entries": [
-        $entries
-        ]
-      }
-    }
-    """.trimIndent().toByteArray()
-}
-
-/** Every cosmetic's `CustomModelData` value paired with its model name, sorted ascending. */
-private fun allCosmetics(): List<Pair<Int, String>> = buildList {
-    WingTheme.entries.forEach { add(it.customModelData to "wings_${it.id}") }
-    CrownTheme.entries.forEach { add(it.customModelData to "crown_${it.id}") }
-    HaloTheme.entries.forEach { add(it.customModelData to "halo_${it.id}") }
-}.sortedBy { it.first }
-
-/**
- * Two flat panels spread left and right from a central gap — a simple,
- * axis-aligned silhouette that reads as wings regardless of which way the
- * item display entity is rotated to face, since the plugin orients the
- * whole entity at runtime rather than relying on model-space "forward".
- */
-private fun wingsModel(textureId: String): ByteArray = itemModel(
-    texture = "wings_$textureId",
-    elements = listOf(
-        cuboid(from = listOf(-16, 4, -1), to = listOf(-1, 20, 0)),
-        cuboid(from = listOf(1, 4, -1), to = listOf(16, 20, 0)),
-    ),
-)
-
-/** A square band around the head with four corner spikes. */
-private fun crownModel(textureId: String): ByteArray = itemModel(
-    texture = "crown_$textureId",
-    elements = listOf(
-        cuboid(from = listOf(4, 8, 4), to = listOf(12, 10, 12)), // band
-        cuboid(from = listOf(4, 10, 4), to = listOf(5, 13, 5)),
-        cuboid(from = listOf(11, 10, 4), to = listOf(12, 13, 5)),
-        cuboid(from = listOf(4, 10, 11), to = listOf(5, 13, 12)),
-        cuboid(from = listOf(11, 10, 11), to = listOf(12, 13, 12)),
-    ),
-)
-
-/** A flat square ring floating above the head (a border frame with an open center). */
-private fun haloModel(textureId: String): ByteArray = itemModel(
-    texture = "halo_$textureId",
-    elements = listOf(
-        cuboid(from = listOf(3, 8, 3), to = listOf(13, 9, 5)),
-        cuboid(from = listOf(3, 8, 11), to = listOf(13, 9, 13)),
-        cuboid(from = listOf(3, 8, 5), to = listOf(5, 9, 11)),
-        cuboid(from = listOf(11, 8, 5), to = listOf(13, 9, 11)),
-    ),
-)
-
-private fun cuboid(from: List<Int>, to: List<Int>): String {
-    val face = """{"uv": [0, 0, 16, 16], "texture": "#0"}"""
-    return """
-        {
-          "from": [${from.joinToString(", ")}],
-          "to": [${to.joinToString(", ")}],
-          "faces": {"north": $face, "south": $face, "east": $face, "west": $face, "up": $face, "down": $face}
-        }
-    """.trimIndent()
-}
-
-private fun itemModel(texture: String, elements: List<String>): ByteArray = """
-    {
-      "parent": "minecraft:item/generic",
-      "textures": {"0": "$NAMESPACE:item/$texture", "particle": "$NAMESPACE:item/$texture"},
-      "elements": [
-        ${elements.joinToString(",\n        ")}
-      ]
-    }
-""".trimIndent().toByteArray()
-
-/** Renders a [TEXTURE_SIZE]x[TEXTURE_SIZE] texture and encodes it as PNG bytes. */
-private fun png(draw: (Graphics2D) -> Unit): ByteArray {
-    val image = BufferedImage(TEXTURE_SIZE, TEXTURE_SIZE, BufferedImage.TYPE_INT_ARGB)
-    val g = image.createGraphics()
-    g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF)
-    draw(g)
-    g.dispose()
-    val bytes = ByteArrayOutputStream()
-    ImageIO.write(image, "png", bytes)
-    return bytes.toByteArray()
-}
-
-private fun Graphics2D.fill(color: Color, x: Int, y: Int, w: Int, h: Int) {
-    this.color = color
-    fillRect(x, y, w, h)
-}
-
-/** Wing texture themes: a base feather color plus a lighter tip stripe. */
-private enum class WingTheme(val id: String, val customModelData: Int, val base: Color, val tip: Color) {
-    ANGEL("angel", 1001, Color(0xF5, 0xF5, 0xF0), Color(0xFF, 0xD7, 0x00)),
-    FAIRY("fairy", 1002, Color(0x9B, 0x5D, 0xE0), Color(0xE0, 0xB8, 0xFF)),
-    ICE("ice", 1003, Color(0xA8, 0xE0, 0xF5), Color(0xFF, 0xFF, 0xFF)),
-    FIRE("fire", 1004, Color(0xD1, 0x30, 0x0A), Color(0xFF, 0xA5, 0x00)),
-    DEMON("demon", 1005, Color(0x20, 0x14, 0x22), Color(0x8B, 0x00, 0x00)),
-    DRAGON("dragon", 1006, Color(0x1E, 0x5A, 0x2E), Color(0x8F, 0xD9, 0x6B)),
-    ;
-
-    fun draw(g: Graphics2D) {
-        g.fill(base, 0, 0, TEXTURE_SIZE, TEXTURE_SIZE)
-        // A simple feather-row pattern: alternating lighter stripes.
-        for (row in 0 until 4) {
-            val y = row * 8
-            g.fill(tip, 0, y, TEXTURE_SIZE, 3)
-        }
-    }
-}
-
-/** Crown texture themes: a metal band color plus a gem accent. */
-private enum class CrownTheme(val id: String, val customModelData: Int, val metal: Color, val gem: Color) {
-    SILVER("silver", 2001, Color(0xC0, 0xC0, 0xC8), Color(0x40, 0x80, 0xFF)),
-    BRONZE("bronze", 2002, Color(0xCD, 0x7F, 0x32), Color(0x8B, 0x00, 0x00)),
-    GOLD("gold", 2004, Color(0xFF, 0xD7, 0x00), Color(0xFF, 0x00, 0x00)),
-    ;
-
-    fun draw(g: Graphics2D) {
-        g.fill(metal, 0, 0, TEXTURE_SIZE, TEXTURE_SIZE)
-        g.fill(gem, TEXTURE_SIZE / 2 - 3, TEXTURE_SIZE / 2 - 3, 6, 6)
-    }
-}
-
-/** Halo texture themes: a ring color plus a glow tint. */
-private enum class HaloTheme(val id: String, val customModelData: Int, val ring: Color, val glow: Color) {
-    WHITE("white", 2003, Color(0xFF, 0xFF, 0xFF), Color(0xFF, 0xFA, 0xC8)),
-    DARK("dark", 2005, Color(0x2A, 0x2A, 0x2E), Color(0x8B, 0x00, 0x8B)),
-    RAINBOW("rainbow", 2006, Color(0xFF, 0x40, 0x40), Color(0x40, 0x80, 0xFF)),
-    ;
-
-    fun draw(g: Graphics2D) {
-        g.fill(ring, 0, 0, TEXTURE_SIZE, TEXTURE_SIZE)
-        g.fill(glow, 0, TEXTURE_SIZE / 2 - 2, TEXTURE_SIZE, 4)
-    }
-}

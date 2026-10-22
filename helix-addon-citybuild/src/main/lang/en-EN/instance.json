@@ -1,0 +1,13 @@
+{
+  "instance.title": "Cities of Kronstadt",
+  "instance.subtitle": "You are in {current}",
+  "instance.row": "City {number}",
+  "instance.here": "here",
+  "instance.note.1": "Crowns count in every city.",
+  "instance.note.2": "Items and plots stay in their city.",
+  "instance.empty": "No other city is open right now.",
+  "instance.loading": "Asking the post office …",
+  "instance.already": "<#5ab4ff>You are already in this city.",
+  "instance.full": "<#ff5a4a>This city is full. Pick another one.",
+  "instance.connecting": "<#f1e2c2>Travelling to <#ffcf4a>City {number}</#ffcf4a> … <#5ab4ff>Your items stay here."
+}

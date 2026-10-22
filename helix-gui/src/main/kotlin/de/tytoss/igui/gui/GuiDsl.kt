@@ -3,6 +3,8 @@ package de.tytoss.igui.gui
 import de.tytoss.igui.display.DisplayBuilder
 import de.tytoss.igui.display.GuiFontConfiguration
 import de.tytoss.igui.internal.GuiRuntime
+import de.tytoss.igui.layout.GuiArea
+import de.tytoss.igui.layout.GuiGrid
 import de.tytoss.igui.slot.SlotSelection
 import de.tytoss.igui.slot.slot
 import net.kyori.adventure.text.Component
@@ -28,6 +30,19 @@ class GuiDefinitionBuilder internal constructor(
 
     /** Id of the page opened by default when no page is specified. */
     var landingPage: String = "main"
+
+    /**
+     * Whether the viewer's player inventory becomes part of the GUI (a
+     * "full-window" GUI). While such a GUI is open, the runtime snapshots the
+     * player's storage contents (hotbar and main inventory; armour and
+     * off-hand stay untouched), clears them and renders this GUI's items for
+     * raw slots `rows * 9 until rows * 9 + 36` there instead. The snapshot is
+     * also written to the player's persistent data, so it is restored on
+     * close, quit, death, plugin shutdown or — after a crash — the next join.
+     * Clicks on those slots are always cancelled and dispatched like chest
+     * slots. See [de.tytoss.igui.layout.GuiGrid] for the slot/pixel geometry.
+     */
+    var playerInventory: Boolean = false
 
     private val pages = LinkedHashMap<String, GuiPageBuilder>()
     private var closeHandler: GuiCloseHandler? = null
@@ -58,10 +73,10 @@ class GuiDefinitionBuilder internal constructor(
         require(rows in 1..6) { "GUI rows must be in 1..6" }
         require(pages.isNotEmpty()) { "GUI '$id' requires at least one page" }
         require(landingPage in pages) { "Landing page '$landingPage' is not defined" }
-        val inventorySize = rows * 9
+        val slotCount = GuiGrid(rows, playerInventory).slotCount
         val compiled = LinkedHashMap<String, GuiPage>(pages.size)
-        pages.forEach { (pageId, builder) -> compiled[pageId] = builder.build(pageId, inventorySize) }
-        return GuiDefinition(runtime, id, rows, landingPage, compiled, closeHandler)
+        pages.forEach { (pageId, builder) -> compiled[pageId] = builder.build(pageId, slotCount) }
+        return GuiDefinition(runtime, id, rows, playerInventory, landingPage, compiled, closeHandler)
     }
 }
 
@@ -75,8 +90,8 @@ class GuiPageBuilder internal constructor(
 ) {
     private var title: Component? = null
     private var titleRenderer: ((GuiRenderContext) -> Component)? = null
-    private val items = arrayOfNulls<ItemStack>(54)
-    private val itemRenderers = arrayOfNulls<(GuiRenderContext) -> ItemStack?>(54)
+    private val items = arrayOfNulls<ItemStack>(MAX_SLOTS)
+    private val itemRenderers = arrayOfNulls<(GuiRenderContext) -> ItemStack?>(MAX_SLOTS)
     private val handlerBindings = ArrayList<Pair<SlotSelection, GuiCompiledClick>>()
     private var openHandler: (suspend (Player) -> Unit)? = null
     private var prepareHandler: (suspend (Player) -> Unit)? = null
@@ -113,22 +128,24 @@ class GuiPageBuilder internal constructor(
      * Places a static item template in a slot, cloned into every rendered
      * instance of the page.
      *
-     * @param slot the slot index (0..53) to place the item in.
+     * @param slot the raw slot index to place the item in: 0..53 for chest
+     *  slots, up to 89 for player-inventory slots of a
+     *  [GuiDefinitionBuilder.playerInventory] GUI.
      * @param item the item template.
      */
     fun item(slot: Int, item: ItemStack) {
-        require(slot in items.indices) { "Slot $slot is outside 0..53" }
+        require(slot in items.indices) { "Slot $slot is outside 0..${MAX_SLOTS - 1}" }
         items[slot] = item.clone()
     }
 
     /**
      * Places a per-viewer dynamic item in a slot, re-invoked on every render.
      *
-     * @param slot the slot index (0..53) to place the item in.
+     * @param slot the raw slot index (see the static [item] overload for the range).
      * @param renderer produces the item for a given render context, or `null` to leave the slot empty.
      */
     fun item(slot: Int, renderer: (GuiRenderContext) -> ItemStack?) {
-        require(slot in items.indices) { "Slot $slot is outside 0..53" }
+        require(slot in items.indices) { "Slot $slot is outside 0..${MAX_SLOTS - 1}" }
         itemRenderers[slot] = renderer
     }
 
@@ -208,6 +225,23 @@ class GuiPageBuilder internal constructor(
         prepareHandler = handler
     }
 
+    /**
+     * Registers one click handler for a whole [GuiArea]; inside the handler,
+     * [GuiClickContext.cellIn] resolves the clicked cell relative to the
+     * area's top-left corner (e.g. which part of a large button was hit).
+     *
+     * @param area the region to bind.
+     * @param permission permission node required to trigger the handler; `null` allows everyone.
+     * @param cooldownMillis minimum time between triggers per player, in milliseconds.
+     * @param handler invoked on a qualifying click.
+     */
+    fun onClick(
+        area: GuiArea,
+        permission: String? = null,
+        cooldownMillis: Long = 0,
+        handler: GuiClickHandler,
+    ): Unit = onClick(area.selection(), permission, cooldownMillis, handler)
+
     internal fun cleanup(handler: (UUID) -> Unit) {
         cleanupHandlers += handler
     }
@@ -246,3 +280,6 @@ class GuiPageBuilder internal constructor(
         )
     }
 }
+
+/** Largest raw slot count of any GUI: a double chest plus the player inventory. */
+private const val MAX_SLOTS = GuiGrid.MAX_CHEST_ROWS * GuiGrid.COLUMNS + GuiGrid.PLAYER_INVENTORY_ROWS * GuiGrid.COLUMNS

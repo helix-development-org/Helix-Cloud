@@ -1,0 +1,12 @@
+{
+  "warId": "w-20261022-0001",
+  "winner": "A",
+  "reason": "POINT_LIMIT",
+  "points": {"A": 5000, "B": 3120},
+  "runningAt": 1792700000000,
+  "endedAt": 1792703600000,
+  "participants": [
+    {"uuid": "6f1b2c3d-1111-4a2b-9c3d-000000000001", "name": "Tytoss", "team": "A", "kills": 4, "deaths": 2, "presentAtEnd": true},
+    {"uuid": "6f1b2c3d-1111-4a2b-9c3d-000000000003", "name": "ZuluUmschlag243", "team": "B", "kills": 2, "deaths": 4, "presentAtEnd": false}
+  ]
+}

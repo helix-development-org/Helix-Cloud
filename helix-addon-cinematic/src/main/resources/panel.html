@@ -1,0 +1,52 @@
+<div class="card">
+  <div class="card-head">AFK</div>
+  <div class="card-body">
+    <p class="dim">After a while without input idle players get the AFK screen (dimmed, "you are AFK") – or, in mode <code>cinematic</code>, the cinematic camera. Players can turn it off in their profile.</p>
+    <div class="grid c2" id="form"></div>
+    <div style="margin-top:12px"><button class="btn" id="reload">Reload</button></div>
+  </div>
+</div>
+<script>
+  const FIELDS = [
+    ["mode", "Mode (screen | cinematic)", "text"],
+    ["tasks", "Tasks (comma separated)", "text"],
+    ["afkTitle", "AFK screen headline (MiniMessage)", "text"],
+    ["afkSubtitle", "AFK screen hint (MiniMessage)", "text"],
+    ["afkSeconds", "Seconds idle before it starts", "number"],
+    ["shotSeconds", "Cinematic: longest shot (s)", "number"],
+    ["fade", "Fade to black between shots", "bool"],
+    ["nameCard", "Show the player's name", "bool"],
+    ["afkTag", "AFK tag for others (MiniMessage, empty = none)", "text"],
+  ];
+  async function load() {
+    const res = await Helix.action("cinematic.config");
+    if (!res.success) { Helix.toast(res.lines[0] || "failed"); return; }
+    const cfg = JSON.parse(res.lines[0]);
+    const form = document.getElementById("form");
+    form.innerHTML = "";
+    FIELDS.forEach(([key, label, kind]) => {
+      const wrap = document.createElement("label");
+      wrap.textContent = label;
+      wrap.style.display = "flex"; wrap.style.flexDirection = "column"; wrap.style.gap = "4px";
+      let input;
+      if (kind === "bool") {
+        input = document.createElement("select");
+        ["true", "false"].forEach(v => { const o = document.createElement("option"); o.value = v; o.textContent = v === "true" ? "on" : "off"; input.appendChild(o); });
+        input.value = String(cfg[key]);
+      } else {
+        input = document.createElement("input");
+        input.type = kind; input.value = key === "tasks" ? cfg.tasks.join(", ") : cfg[key];
+      }
+      const save = document.createElement("button");
+      save.className = "btn sm"; save.textContent = "Save";
+      save.onclick = async () => {
+        const r = await Helix.action("cinematic.set", key, ...String(input.value).split(" "));
+        Helix.toast(r.lines[0] || (r.success ? "saved" : "failed"));
+      };
+      const row = document.createElement("div"); row.style.display = "flex"; row.style.gap = "6px";
+      row.append(input, save); wrap.append(row); form.append(wrap);
+    });
+  }
+  document.getElementById("reload").onclick = load;
+  Helix.ready(load);
+</script>

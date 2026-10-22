@@ -1,0 +1,23 @@
+{
+  "pickup.broken": "Unreadable item",
+  "pickup.click": "<#ffcf4a>Click: take",
+  "pickup.empty.1": "Empty. Things that don't fit your",
+  "pickup.empty.2": "inventory end up here.",
+  "pickup.from.auction": "Auction house",
+  "pickup.from.crate": "Treasure chest",
+  "pickup.from.kit": "Kit",
+  "pickup.from.kraemer": "Merchant",
+  "pickup.from.other": "City office",
+  "pickup.from.reward": "Reward",
+  "pickup.from.shop": "Player shop",
+  "pickup.from.trade": "Trade",
+  "pickup.full": "<#ff5a4a>Your inventory is full. Make some room first.",
+  "pickup.gone": "<#ff5a4a>That has already been taken.",
+  "pickup.overflow": "<#ffb43a>Warning: {count} stack(s) didn't fit and are in your <click:run_command:/abholkiste><hover:show_text:'Open pickup box'><#ffcf4a>pickup box</#ffcf4a></hover></click>.",
+  "pickup.queued": "<#ffb43a>Warning: the pickup box is unreachable. Your items will be delivered later.",
+  "pickup.source": "<#f1e2c2>From: {source}",
+  "pickup.subtitle": "{count} waiting",
+  "pickup.take-all": "Take all",
+  "pickup.title": "Pickup box",
+  "pickup.waiting": "<#f1e2c2><#ffcf4a>{count}</#ffcf4a> things are waiting in your pickup box. <click:run_command:/abholkiste><hover:show_text:'Open pickup box'><#ffcf4a>[Take]</#ffcf4a></hover></click>"
+}

@@ -1,0 +1,34 @@
+# GuardLab (aktiv nur auf dem Task IGuard-Test bzw. mit GUARDLAB_FORCE=1)
+#
+# Das Client-Token kommt vom Node (guardlab.configure → Bridge-Wert guardlab.settings) oder aus der
+# Umgebungsvariable GUARDLAB_TOKEN. Ohne Token wird kein hello gesendet (Labor geschlossen).
+
+# Toxiproxy für die Lag-Profile (Container im lokalen Stack). url leer = keine Lag-Simulation,
+# Lag-Szenarien werden dann übersprungen. listen/upstream gelten nur, falls der Proxy noch fehlt.
+toxiproxy:
+  url: "http://kronland-local-toxiproxy:8474"
+  proxy: "minecraft"
+  listen: "0.0.0.0:25570"
+  upstream: "helix-proxy-1:25565"
+
+# Name des optionalen zweiten Clients, der in Kampf-Szenarien als Spieler-Ziel dient.
+dummy-name: "GuardDummy"
+
+# Wartezeit nach „ready“, bevor die Suite automatisch startet (damit der Dummy noch verbinden kann).
+autostart-delay-ticks: 100
+
+# Pause zwischen zwei Szenarien (Ticks), damit IGuard-Werte abklingen …
+cooldown-ticks: 60
+# … aber höchstens so lange auf das Abklingen warten.
+max-cooldown-ticks: 400
+
+# Nach dem Lauf „quit“ an die Clients senden (sie dürfen sich dann trennen).
+quit-after-run: true
+
+# Live-Debug-Sidebar: ersetzt auf dem Testserver die Netzwerk-Sidebar durch das, was IGuard gerade sieht
+# (Ping, Frames/Fails pro Sekunde, Exemptions, Umgebungs-Tags, höchste VLs, letzter Flag mit Evidence) und den
+# Stand der laufenden Suite. Die Tablist bleibt unverändert.
+sidebar:
+  enabled: true
+  # Aktualisierung alle N Ticks (4 = fünfmal pro Sekunde).
+  interval-ticks: 4

@@ -1,0 +1,6 @@
+name: HelixCinematic
+version: 1.0.0
+main: org.helix.addons.cinematic.paper.CinematicPlugin
+api-version: '1.21'
+description: Cinematic AFK camera - drone shots around idle players (Helix addon helix.cinematic).
+depend: [packetevents]

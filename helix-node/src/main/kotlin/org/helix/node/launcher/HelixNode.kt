@@ -61,6 +61,7 @@ import org.helix.node.services.ForwardingSecret
 import org.helix.node.services.ManagedService
 import org.helix.node.services.ProcessIdentity
 import org.helix.node.services.ProcessServiceExecutor
+import org.helix.node.services.PaperclipCache
 import org.helix.node.services.ServiceManager
 import org.helix.node.services.ServiceRegistryFile
 import org.helix.node.services.WorkspacePreparer
@@ -156,6 +157,7 @@ class HelixNode(
                 paths.config.resolve("forwarding.secret"),
             ),
             legacyForwarding = config.proxy.legacyForwarding,
+            paperclipCache = PaperclipCache(paths.cache.resolve("paperclip")),
         ),
         executors = mapOf(
             ExecutorType.PROCESS to ProcessServiceExecutor(),
@@ -167,7 +169,7 @@ class HelixNode(
     )
 
     /** Proxy routing state. */
-    val routing: ProxyRoutingService = ProxyRoutingService(manager)
+    val routing: ProxyRoutingService = ProxyRoutingService(manager, paths.config.resolve("maintenance.json"))
 
     /** Per-service bridge tokens minted for managed services (see [bridgeEnvironment]). */
     private val serviceTokens: ServiceTokenRegistry = ServiceTokenRegistry()
@@ -257,46 +259,50 @@ class HelixNode(
         "velocity",
         mapOf(
             "en" to linkedMapOf(
-                "screen.maintenance" to "<red><bold>Maintenance</bold>\n" +
-                    "<gray>{network} is currently under maintenance.\n" +
-                    "<gray>Please check back soon.",
-                "screen.server_full" to "<red><bold>Network Full</bold>\n" +
-                    "<gray>{network} is full right now <dark_gray>(<white>{online}<gray>/<white>{max}<dark_gray>)\n" +
-                    "<gray>Please try again in a moment.",
-                "command.lobby.none" to "{prefix} <red>No lobby available.",
-                "command.server.usage" to "{prefix} <gray>Usage: <white>/server \\<name>",
-                "command.server.unknown" to "{prefix} <red>Unknown server: <white>{server}",
-                "command.servers.none" to "{prefix} <gray>No servers registered.",
-                "command.servers.header" to "{prefix} <gray>Servers <dark_gray>({count})<gray>:",
-                "command.servers.entry" to "<dark_gray> • <click:run_command:'/server {server}'>" +
-                    "<hover:show_text:'<gray>Connect to <white>{server}'><aqua>{server}</aqua></hover></click>",
-                "command.sent" to "{prefix} <gray>Sent to <white>{server}<gray>.",
-                "command.unavailable" to "{prefix} <red>Command is currently unavailable.",
-                "command.error" to "{prefix} <red>That command could not be completed.",
-                "kick.default" to "{prefix} <red>You were kicked from the network.",
-                "join.denied" to "<red>You may not join this network.",
-                "motd.maintenance" to "<red>Maintenance",
+                "screen.maintenance" to "<#5ab4ff><bold>Closed test phase</bold>\n" +
+                    "<#f1e2c2><#ffcf4a>{network}</#ffcf4a> is in its closed test phase.\n" +
+                    "<#f1e2c2>Updates and release news on <#ffcf4a>kronland.de</#ffcf4a>.",
+                "screen.server_full" to "<#ff5a4a><bold>Network full</bold>\n" +
+                    "<#f1e2c2><#ffcf4a>{network}</#ffcf4a> is full right now " +
+                    "<#7a4a24>(</#7a4a24><#ffcf4a>{online}</#ffcf4a><#7a4a24>/</#7a4a24><#ffcf4a>{max}</#ffcf4a><#7a4a24>)</#7a4a24>\n" +
+                    "<#f1e2c2>Please try again in a moment.",
+                "command.lobby.none" to "{prefix} <#ff5a4a>No lobby is available. Please try again in a moment.",
+                "command.server.usage" to "{prefix} <#f1e2c2>Usage: <#ffcf4a>/server \\<name>",
+                "command.server.unknown" to "{prefix} <#ff5a4a>Unknown server: <#ffcf4a>{server}</#ffcf4a>. " +
+                    "Use <#ffcf4a>/servers</#ffcf4a> to see all servers.",
+                "command.servers.none" to "{prefix} <#f1e2c2>No servers registered.",
+                "command.servers.header" to "{prefix} <#f1e2c2>Servers <#7a4a24>(</#7a4a24><#ffcf4a>{count}</#ffcf4a><#7a4a24>)</#7a4a24>:",
+                "command.servers.entry" to "<#7a4a24> · </#7a4a24><click:run_command:'/server {server}'>" +
+                    "<hover:show_text:'<#f1e2c2>Click: connect to <#ffcf4a>{server}'><#ffcf4a>{server}</#ffcf4a></hover></click>",
+                "command.sent" to "{prefix} <#4ac85e>Sent to <#ffcf4a>{server}</#ffcf4a>.",
+                "command.unavailable" to "{prefix} <#ff5a4a>This command is currently unavailable. Please try again later.",
+                "command.error" to "{prefix} <#ff5a4a>That command could not be completed. Please try again.",
+                "kick.default" to "{prefix} <#ff5a4a>You were kicked from the network.",
+                "join.denied" to "<#ff5a4a>You may not join this network.",
+                "motd.maintenance" to "<#ffb43a>Maintenance",
             ),
             "de" to linkedMapOf(
-                "screen.maintenance" to "<red><bold>Wartungsarbeiten</bold>\n" +
-                    "<gray>{network} befindet sich gerade in Wartung.\n" +
-                    "<gray>Schau später noch einmal vorbei.",
-                "screen.server_full" to "<red><bold>Netzwerk voll</bold>\n" +
-                    "<gray>{network} ist gerade voll <dark_gray>(<white>{online}<gray>/<white>{max}<dark_gray>)\n" +
-                    "<gray>Bitte versuche es gleich noch einmal.",
-                "command.lobby.none" to "{prefix} <red>Keine Lobby verfügbar.",
-                "command.server.usage" to "{prefix} <gray>Benutzung: <white>/server \\<name>",
-                "command.server.unknown" to "{prefix} <red>Unbekannter Server: <white>{server}",
-                "command.servers.none" to "{prefix} <gray>Keine Server registriert.",
-                "command.servers.header" to "{prefix} <gray>Server <dark_gray>({count})<gray>:",
-                "command.servers.entry" to "<dark_gray> • <click:run_command:'/server {server}'>" +
-                    "<hover:show_text:'<gray>Verbinde zu <white>{server}'><aqua>{server}</aqua></hover></click>",
-                "command.sent" to "{prefix} <gray>Weitergeleitet zu <white>{server}<gray>.",
-                "command.unavailable" to "{prefix} <red>Der Befehl ist gerade nicht verfügbar.",
-                "command.error" to "{prefix} <red>Der Befehl konnte nicht ausgeführt werden.",
-                "kick.default" to "{prefix} <red>Du wurdest vom Netzwerk geworfen.",
-                "join.denied" to "<red>Du darfst dieses Netzwerk nicht betreten.",
-                "motd.maintenance" to "<red>Wartungsarbeiten",
+                "screen.maintenance" to "<#5ab4ff><bold>Geschlossene Testphase</bold>\n" +
+                    "<#f1e2c2><#ffcf4a>{network}</#ffcf4a> ist in der geschlossenen Testphase.\n" +
+                    "<#f1e2c2>Infos und Release-News auf <#ffcf4a>kronland.de</#ffcf4a>.",
+                "screen.server_full" to "<#ff5a4a><bold>Netzwerk voll</bold>\n" +
+                    "<#f1e2c2><#ffcf4a>{network}</#ffcf4a> ist gerade voll " +
+                    "<#7a4a24>(</#7a4a24><#ffcf4a>{online}</#ffcf4a><#7a4a24>/</#7a4a24><#ffcf4a>{max}</#ffcf4a><#7a4a24>)</#7a4a24>\n" +
+                    "<#f1e2c2>Versuch es gleich noch einmal.",
+                "command.lobby.none" to "{prefix} <#ff5a4a>Gerade ist keine Lobby verfügbar. Versuch es gleich noch einmal.",
+                "command.server.usage" to "{prefix} <#f1e2c2>Benutzung: <#ffcf4a>/server \\<name>",
+                "command.server.unknown" to "{prefix} <#ff5a4a>Unbekannter Server: <#ffcf4a>{server}</#ffcf4a>. " +
+                    "Mit <#ffcf4a>/servers</#ffcf4a> siehst du alle Server.",
+                "command.servers.none" to "{prefix} <#f1e2c2>Keine Server registriert.",
+                "command.servers.header" to "{prefix} <#f1e2c2>Server <#7a4a24>(</#7a4a24><#ffcf4a>{count}</#ffcf4a><#7a4a24>)</#7a4a24>:",
+                "command.servers.entry" to "<#7a4a24> · </#7a4a24><click:run_command:'/server {server}'>" +
+                    "<hover:show_text:'<#f1e2c2>Klick: zu <#ffcf4a>{server}</#ffcf4a> verbinden'><#ffcf4a>{server}</#ffcf4a></hover></click>",
+                "command.sent" to "{prefix} <#4ac85e>Weitergeleitet zu <#ffcf4a>{server}</#ffcf4a>.",
+                "command.unavailable" to "{prefix} <#ff5a4a>Der Befehl ist gerade nicht verfügbar. Versuch es später noch einmal.",
+                "command.error" to "{prefix} <#ff5a4a>Der Befehl konnte nicht ausgeführt werden. Versuch es noch einmal.",
+                "kick.default" to "{prefix} <#ff5a4a>Du wurdest vom Netzwerk geworfen.",
+                "join.denied" to "<#ff5a4a>Du darfst dieses Netzwerk nicht betreten.",
+                "motd.maintenance" to "<#ffb43a>Wartungsarbeiten",
             ),
         ),
     )
@@ -306,32 +312,38 @@ class HelixNode(
         "helix",
         mapOf(
             "en" to linkedMapOf(
-                "usage" to "{prefix} <gray>Usage: <white>/helix " +
+                "usage" to "{prefix} <#f1e2c2>Usage: <#ffcf4a>/helix " +
                     "\\<language|addons|enable|disable|reload|backend restart|launcher restart>",
-                "no_permission" to "{prefix} <red>You do not have permission to do that.",
-                "restart.backend" to "{prefix} <green>Backend restart initiated — services keep running.",
-                "restart.launcher" to "{prefix} <green>Launcher restart initiated — services stop and " +
+                "no_permission" to "{prefix} <#ff5a4a>You do not have permission to do that.",
+                "restart.backend" to "{prefix} <#4ac85e>Backend restart initiated <#7a4a24>—</#7a4a24> services keep running.",
+                "restart.launcher" to "{prefix} <#4ac85e>Launcher restart initiated <#7a4a24>—</#7a4a24> services stop and " +
                     "a fresh launcher starts.",
-                "restart.unavailable" to "{prefix} <red>Restart unavailable (not running from Launcher.jar).",
-                "language.current" to "{prefix} <gray>Your language: <white>{language}<gray>. " +
-                    "Available: <white>{languages}<gray>. Change it with <white>/helix language \\<code><gray>.",
-                "language.set" to "{prefix} <green>Language changed to <white>{language}<green>.",
-                "language.unknown" to "{prefix} <red>Unknown language <white>{language}<red>. " +
-                    "Available: <white>{languages}",
+                "restart.unavailable" to "{prefix} <#ff5a4a>Restart unavailable (not running from Launcher.jar). " +
+                    "Restart the node manually.",
+                "language.current" to "{prefix} <#f1e2c2>Your language: <#ffcf4a>{language}</#ffcf4a>. " +
+                    "Available: <#ffcf4a>{languages}</#ffcf4a>. Change it with " +
+                    "<click:suggest_command:'/helix language '><hover:show_text:'<#f1e2c2>Click: choose a language'>" +
+                    "<#ffcf4a>/helix language \\<code></#ffcf4a></hover></click>.",
+                "language.set" to "{prefix} <#4ac85e>Language changed to <#ffcf4a>{language}</#ffcf4a>.",
+                "language.unknown" to "{prefix} <#ff5a4a>Unknown language <#ffcf4a>{language}</#ffcf4a>. " +
+                    "Pick one of: <#ffcf4a>{languages}",
             ),
             "de" to linkedMapOf(
-                "usage" to "{prefix} <gray>Benutzung: <white>/helix " +
+                "usage" to "{prefix} <#f1e2c2>Benutzung: <#ffcf4a>/helix " +
                     "\\<language|addons|enable|disable|reload|backend restart|launcher restart>",
-                "no_permission" to "{prefix} <red>Dafür hast du keine Berechtigung.",
-                "restart.backend" to "{prefix} <green>Backend-Neustart gestartet — die Services laufen weiter.",
-                "restart.launcher" to "{prefix} <green>Launcher-Neustart gestartet — Services stoppen und " +
+                "no_permission" to "{prefix} <#ff5a4a>Dafür hast du keine Berechtigung.",
+                "restart.backend" to "{prefix} <#4ac85e>Backend-Neustart gestartet <#7a4a24>—</#7a4a24> die Services laufen weiter.",
+                "restart.launcher" to "{prefix} <#4ac85e>Launcher-Neustart gestartet <#7a4a24>—</#7a4a24> Services stoppen und " +
                     "ein frischer Launcher startet.",
-                "restart.unavailable" to "{prefix} <red>Neustart nicht verfügbar (läuft nicht aus einer Launcher.jar).",
-                "language.current" to "{prefix} <gray>Deine Sprache: <white>{language}<gray>. " +
-                    "Verfügbar: <white>{languages}<gray>. Ändern mit <white>/helix language \\<code><gray>.",
-                "language.set" to "{prefix} <green>Sprache geändert zu <white>{language}<green>.",
-                "language.unknown" to "{prefix} <red>Unbekannte Sprache <white>{language}<red>. " +
-                    "Verfügbar: <white>{languages}",
+                "restart.unavailable" to "{prefix} <#ff5a4a>Neustart nicht verfügbar (läuft nicht aus einer Launcher.jar). " +
+                    "Starte die Node von Hand neu.",
+                "language.current" to "{prefix} <#f1e2c2>Deine Sprache: <#ffcf4a>{language}</#ffcf4a>. " +
+                    "Verfügbar: <#ffcf4a>{languages}</#ffcf4a>. Ändern mit " +
+                    "<click:suggest_command:'/helix language '><hover:show_text:'<#f1e2c2>Klick: Sprache wählen'>" +
+                    "<#ffcf4a>/helix language \\<code></#ffcf4a></hover></click>.",
+                "language.set" to "{prefix} <#4ac85e>Sprache geändert zu <#ffcf4a>{language}</#ffcf4a>.",
+                "language.unknown" to "{prefix} <#ff5a4a>Unbekannte Sprache <#ffcf4a>{language}</#ffcf4a>. " +
+                    "Wähle eine davon: <#ffcf4a>{languages}",
             ),
         ),
     )
@@ -354,19 +366,22 @@ class HelixNode(
             // never by MessageBundle.formatFor — the automatic chat prefix does not apply
             // on that path, the bridge fills {prefix} itself.
             "en" to linkedMapOf(
-                "prefix" to "<gradient:#8b5cf6:#38bdf8><bold>Helix</bold></gradient> <dark_gray>»</dark_gray>",
+                "prefix" to "<#ffcf4a>{network}</#ffcf4a> <#7a4a24>»</#7a4a24>",
                 "name" to config.network.name,
-                "restart.warn" to "{prefix} <gray><white>{target}</white> restarts in <white>{seconds}s</white>.",
-                "restart.now" to "{prefix} <gray><white>{target}</white> is restarting now.",
-                "restart.backend.start" to "{prefix} <gray>The backend is restarting — you may experience brief lag.",
-                "restart.backend.done" to "{prefix} <green>Backend restart complete.",
+                "restart.warn" to "{prefix} <#ffb43a>Warning: <#ffcf4a>{target}</#ffcf4a> restarts in " +
+                    "<#ffcf4a>{seconds}s</#ffcf4a>.",
+                "restart.now" to "{prefix} <#ffb43a>Warning: <#ffcf4a>{target}</#ffcf4a> is restarting now.",
+                "restart.backend.start" to "{prefix} <#5ab4ff>The game servers are restarting <#7a4a24>—</#7a4a24> " +
+                    "you may notice brief lag.",
+                "restart.backend.done" to "{prefix} <#4ac85e>Game servers restarted.",
             ),
             "de" to linkedMapOf(
-                "restart.warn" to "{prefix} <gray><white>{target}</white> startet in <white>{seconds}s</white> neu.",
-                "restart.now" to "{prefix} <gray><white>{target}</white> startet jetzt neu.",
-                "restart.backend.start" to "{prefix} <gray>Die Backend-Server starten neu — " +
-                    "es kann kurzzeitig zu Lags kommen.",
-                "restart.backend.done" to "{prefix} <green>Backend-Restart beendet.",
+                "restart.warn" to "{prefix} <#ffb43a>Achtung: <#ffcf4a>{target}</#ffcf4a> startet in " +
+                    "<#ffcf4a>{seconds}s</#ffcf4a> neu.",
+                "restart.now" to "{prefix} <#ffb43a>Achtung: <#ffcf4a>{target}</#ffcf4a> startet jetzt neu.",
+                "restart.backend.start" to "{prefix} <#5ab4ff>Die Spielserver starten neu <#7a4a24>—</#7a4a24> " +
+                    "es kann kurz zu Lags kommen.",
+                "restart.backend.done" to "{prefix} <#4ac85e>Spielserver neu gestartet.",
             ),
         ),
     )
@@ -391,10 +406,15 @@ class HelixNode(
      * republishes them to the bridges.
      */
     fun refreshNetworkPlaceholders() {
-        val prefix = networkMessages.raw("prefix")
         val name = networkMessages.raw("name")
+        // The prefix may name the network via {network}; expand it once here so every consumer
+        // (global placeholder, bridges) gets the finished prefix that follows the configured name.
+        val prefix = networkMessages.raw("prefix").replace("{network}", name)
         GlobalPlaceholders.set("prefix", prefix)
         GlobalPlaceholders.set("network", name)
+        GlobalPlaceholders.set("wordmark", org.helix.api.design.Wordmark.SMALL_MINI)
+        GlobalPlaceholders.set("wordmark_large", org.helix.api.design.Wordmark.LARGE_MINI)
+        GlobalPlaceholders.set("crown", org.helix.api.design.Crown.MINI)
         bridgeValues.publish("network", "network.prefix", prefix)
         bridgeValues.publish("network", "network.name", name)
     }
@@ -682,6 +702,12 @@ class HelixNode(
         ).registerAll(registry)
         addonActions.registerAll(registry)
         BackupActions(backups).registerAll(registry)
+        org.helix.node.release.ReleaseActions(
+            org.helix.node.release.ReleaseResetService(
+                host = org.helix.node.release.NodeReleaseHost(paths, taskStore, manager, backups, routing, registry, ::recordEvent),
+                config = { org.helix.node.release.ReleaseConfig.load(paths.config) },
+            ),
+        ).registerAll(registry)
         registerControlActions()
         WhitelistActions(whitelist).registerAll(registry)
         PlayerDataActions(playerData).registerAll(registry)
@@ -1219,7 +1245,7 @@ class HelixNode(
     private fun bridgeEnvironment(service: ManagedService): Map<String, String> {
         val host = when (service.task.executor) {
             ExecutorType.PROCESS -> "127.0.0.1"
-            ExecutorType.DOCKER -> "host.docker.internal"
+            ExecutorType.DOCKER -> config.docker.controlHost
         }
         // A per-service token, not the static admin token: any plugin on the
         // managed game server can read its own process's environment, so

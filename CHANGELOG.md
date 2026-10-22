@@ -1,5 +1,96 @@
 # Changelog
 
+## Unreleased
+
+### Sicherheit: Dashboard-Rechte, Bug-Anhänge, Spieler-Befehle
+
+- **Anhänge nur noch als Bild oder Text** (`image/png|jpeg|gif|webp`, `text/plain`, sonst `invalid_mime`); die
+  Panels bauen Bilder und Download-Links ohne HTML-Parser. Ein präparierter MIME-Typ konnte vorher Code im
+  Bugs-Tab des Teams ausführen.
+- **Spieler-Befehle über `POST /actions` nur für Admins**: Wer im Dashboard angemeldet war, konnte z. B.
+  `clan <Name> disband` im Namen eines anderen Spielers auslösen.
+- **Zugriffs-Matrix ändern nur mit `helix.admin`**; admin-gleiche Rechte (`services.console`, `files.edit`,
+  `tasks.edit`, `addons.manage`, `schedules.edit`, `access`) sind im Katalog markiert und nie in Voreinstellungen.
+  Zeitpläne lassen nur Aktionen zu, die der Anlegende selbst aufrufen darf (`createdBy`).
+- **Voreinstellungen** einmal pro Gruppe; eine Gruppe mit eigenem oder verneintem Dashboard-Recht bleibt
+  unangetastet. `feedback.staff` schließt `feedback.report` ein.
+- **Tester sehen keine Server-Logs** mehr, auch nicht in den eigenen Meldungen; Team-Mitglieder handeln im
+  Dashboard immer unter ihrem eigenen Namen; Uploads gehören ihrem Hochlader (höchstens 4 offene pro Tester).
+- **Spielersuche** zeigt gespeicherte Spielerdaten nur mit `helix.panel.players.manage`; Log-Streams enden, sobald
+  das Recht wegfällt; `lobby.spawn.set` nur noch von Lobby-Servern für einen Online-Spieler.
+- **Upgrade-Hinweis:** Ansehen-Rechte enthalten keine Steuer- oder Konsolenrechte mehr (siehe `docs/REST.md`).
+
+### IGuard: Abbauzeit, Mehrfachziele auf Mobs, Autoclicker-Schwellen
+
+- **`world.fastbreak.a` prüft die Vanilla-Abbauzeit**: Der Server misst beim
+  Abbauen jeden Tick `Block.getBreakSpeed` (Härte, Werkzeug, Effizienz,
+  Eile/Abbaumüdigkeit, `block_break_speed`, Wasser/Luft) und hängt das an den
+  FINISH-Frame; gezählt werden die Client-Ticks zwischen START und FINISH
+  (ältere Clients: Millisekunden mit `tolerance-millis` + ¼ Ping).
+  Sofort-Abbau und Creative bleiben ausgenommen. Neu: `checks.world.fastbreak.a.min-ratio`
+  (0.7) und `.tolerance-millis` (60).
+- **`combat.multitarget.a` für jedes Ziel**: zwei verschiedene Entities im
+  selben Client-Tick (Spieler, Mobs …); ohne Tick-End-Pakete nur Spielerpaare.
+- **`combat.autoclicker.a` konfigurierbar**: `min-cps` (9.5, vorher fest 13),
+  `max-deviation` (0.035), `min-samples` (25, vorher 40).
+- **`combat.reach.a`** misst Treffer jenseits von Reichweite + 1 über den
+  kürzesten Abstand zur Hitbox (vorher unbewertet).
+- **GuardLab**: 97 Szenarien (neu u. a. Phase, Omni-Sprint, Inventar,
+  Bad-Packets, Client-Kennung/Brand), Suiten `inventory` und `client`,
+  `knownGap` für bekannte Lücken (eigener Berichtsabschnitt).
+
+### Sicherheit: Bridge-Aktionen höchstens einmal, Task-Bindung
+
+- **Idempotente Bridge-Aktionen**: `ActionInvocation.requestId` (setzt
+  `ServiceNodeApi.action` automatisch). Der Node führt jede
+  `(Service, requestId)` höchstens einmal aus (10 min Cache, gleichzeitige
+  Duplikate warten auf das Original). Der HTTP-Rückfall nach einem gesendeten,
+  unbeantworteten Wire-Frame führt dadurch nicht mehr doppelt aus;
+  `WireUnavailableException.sent` meldet den unbekannten Ausgang,
+  Spielerbefehle werden danach nicht wiederholt.
+- **`ActionDescriptor.bridgeTasks`** (`AddonBase.action(…, bridgeTasks = …)`):
+  Bridge-Aufrufe nur von Diensten dieser Tasks; alle `citybuild.*`-Aktionen
+  sind auf Task `CityBuild` beschränkt. `eco.api.*` bleibt für alle
+  Paper-Dienste offen (MineClash braucht es).
+- **CityBuild**: Auktions- und Plot-Markt-Kauf erstatten automatisch, wenn
+  nach der Zahlung der Statuswechsel scheitert.
+
+### Neu: Netzwerkwährung „Kronen“ (`helix.economy` 2.0)
+
+- **Kronen ersetzen Coins**: alle Spielertexte, Vault-Name „Krone/Kronen“,
+  Dashboard-Panel „Kronen“, Kronen-Glyph `{crown}` (Font `helix_guis:icons`, U+E000).
+- **Konten pro UUID** in PostgreSQL (Schema `economy`: `accounts`, `ledger`,
+  `daily_counters`), atomar mit Zeilensperren; im json-Modus Dokument-Fallback.
+  Das alte namensbasierte `balances`-Dokument wird beim Start einmalig migriert,
+  nicht auflösbare Namen werden beim nächsten Join übernommen.
+- **Maschinen-API** (bridgeInvocable): `eco.api.deposit|withdraw` mit Grund,
+  Referenz und optionalem Tageslimit, `eco.api.transfer` (atomar, Gebühr in
+  Promille als Geld-Senke, JSON-Beleg), `eco.api.history`, `eco.api.limit`.
+  Alte Zwei-Argument-Aufrufe funktionieren weiter.
+- **`/kronen [verlauf]`**: Kontostand bzw. die letzten 20 Buchungen.
+
+### Neu: MineClash-Addon (`mineclash`)
+
+- **Node-Seite des Kartenkampfspiels MineClash**: Die gesamte Spielkonfiguration
+  (Karten, Truhen, Gebäude, Perks, Balancing, Serverrollen pro Task) liegt als
+  typisierte Settings und Dokument-Sammlungen im Addon-Storage, wird im
+  Dashboard-Panel **MineClash** editiert und den Spielservern als ein Bundle
+  (`mineclash.config.bundle`, versioniert) geliefert — kein YAML mehr auf den
+  Servern. Fehlende Standardwerte werden beim Start eingespielt
+  (`mineclash.config.seed [force]`).
+- **Spielerprofile** (Wallet, Kartensammlung, Deck, Truhen, Dorf, Tutorial) und
+  **Match-Historie** landen im zentralen PostgreSQL (Schema `mineclash`,
+  JSONB + Ranglisten-Spalten); ohne Postgres im Dokument-Store.
+  `mineclash.top` liefert die Rosen-Rangliste.
+- **Arena-Matchmaking** in der Node: Spielserver melden Warteschlangen-Beitritte
+  (`mineclash.queue.join/leave`) und holen per `mineclash.queue.poll` die Matches,
+  die sie hosten, sowie Spieler, die sie per BungeeCord-Connect zum Host schicken.
+- **Clan-Zugehörigkeit** kommt aus dem Clan-Addon (`mineclash.clan.of`).
+- Das HXA bündelt optional `paper.jar` (das MineClash-Paper-Plugin mit NMS,
+  gebaut im MineClash-Repository) und `pack.zip` (Karten-, Truhen- und
+  HUD-Assets; Trägeritem `brick`, damit es nicht mit Cosmetics kollidiert).
+
+
 ## 0.91.0 — 2026-08-12
 
 ### Neu: In-Game-Handy mit App-System (`helix.phone` + `helix-addon-phone-paper`)

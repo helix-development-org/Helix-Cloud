@@ -1,0 +1,8 @@
+{
+  "id": "helix.cinematic",
+  "name": "Helix AFK",
+  "version": "1.0.0",
+  "main": "org.helix.addons.cinematic.CinematicAddon",
+  "description": "AFK screen for idle players (dimmed \"you are AFK\" overlay, AFK tag for others) or, optionally, a cinematic camera; ships the cinematic library. Per task, players can turn it off in their profile.",
+  "permissions": ["helix.cinematic.admin"]
+}

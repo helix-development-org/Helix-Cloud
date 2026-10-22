@@ -17,6 +17,8 @@ import kotlinx.serialization.Serializable
  *   fallback used by any lobby task without its own layout.
  * @property protection the lobby protection rules, each toggleable.
  * @property serverMenu the built-in server selector's appearance.
+ * @property spawn where players appear in the lobby's main world; `null` keeps the world's own spawn. Lobby
+ *   services are temporary, so a spawn set in the world file would be lost on every restart – it lives here.
  */
 @Serializable
 data class LobbyConfig(
@@ -24,7 +26,7 @@ data class LobbyConfig(
     val layouts: Map<String, LobbyLayout> = mapOf("*" to LobbyLayout.DEFAULT),
     val protection: ProtectionSettings = ProtectionSettings(),
     val serverMenu: ServerMenuSettings = ServerMenuSettings(),
-    val phone: PhoneItemSettings = PhoneItemSettings(),
+    val spawn: LobbySpawn? = null,
 ) {
     /**
      * Resolves the layout a lobby task should use: its own if present,
@@ -62,16 +64,16 @@ data class LobbyLayout(
                 LobbyItem(
                     slot = 0,
                     material = "COMPASS",
-                    name = "<green>Server",
-                    lore = listOf("<gray>Click to switch server"),
+                    name = "<#ffcf4a>Server",
+                    lore = listOf("<#ffcf4a>Click: switch server"),
                     action = ItemAction.OPEN_SERVER_MENU,
                     glow = true,
                 ),
                 LobbyItem(
                     slot = 4,
                     material = "PLAYER_HEAD",
-                    name = "<aqua>Profile",
-                    lore = listOf("<gray>Open your profile menu"),
+                    name = "<#ffcf4a>Profile",
+                    lore = listOf("<#ffcf4a>Click: open your profile"),
                     action = ItemAction.RUN_COMMAND,
                     command = "profilemenu",
                 ),
@@ -152,40 +154,86 @@ data class ProtectionSettings(
 )
 
 /**
- * The built-in server selector GUI's appearance. Its content is dynamic —
- * the paper side asks the node for the live, joinable backends grouped by
- * task and connects the player through the proxy on click.
+ * The lobby spawn point in the lobby's main world.
  *
- * @property title the GUI title as MiniMessage.
- * @property rows chest rows (1..6).
- * @property excludeLobbyTasks hides lobby tasks from the selector.
- * @property entryMaterial the material used for each server entry.
+ * @property x block x (with fraction).
+ * @property y height.
+ * @property z block z (with fraction).
+ * @property yaw view direction.
+ * @property pitch view pitch.
+ */
+@Serializable
+data class LobbySpawn(
+    val x: Double,
+    val y: Double,
+    val z: Double,
+    val yaw: Float = 0f,
+    val pitch: Float = 0f,
+) {
+    /**
+     * Whether the point can be used: finite numbers inside the world height and a sane horizontal range.
+     *
+     * @return `true` when valid.
+     */
+    fun isValid(): Boolean =
+        listOf(x, y, z).all { it.isFinite() } && yaw.isFinite() && pitch.isFinite() &&
+            y in MIN_Y..MAX_Y && kotlin.math.abs(x) <= MAX_XZ && kotlin.math.abs(z) <= MAX_XZ && pitch in -90f..90f
+
+    /** Limits of a valid spawn point. */
+    companion object {
+        /** Lowest allowed height (world bottom). */
+        const val MIN_Y: Double = -64.0
+
+        /** Highest allowed height (build limit). */
+        const val MAX_Y: Double = 320.0
+
+        /** Largest allowed |x| and |z|. */
+        const val MAX_XZ: Double = 29_999_984.0
+    }
+}
+
+/**
+ * The navigator (server selector): a full-screen medieval board with one coat of arms per game mode.
+ *
+ * @property title headline on the board's ribbon (plain text).
+ * @property excludeLobbyTasks whether lobby tasks are left out.
+ * @property modes how game modes appear (name, emblem, order); tasks without an entry get their task name and an
+ *   emblem guessed from the name.
  */
 @Serializable
 data class ServerMenuSettings(
-    val title: String = "<dark_gray>Server selector",
-    val rows: Int = 3,
+    val title: String = "Karte des Reichs",
     val excludeLobbyTasks: Boolean = true,
-    val entryMaterial: String = "PAPER",
+    val modes: List<NavigatorMode> = emptyList(),
 )
 
 /**
- * Phone-mode: when enabled, a lobby hands out a single hotbar item that
- * opens the in-game phone (`/phone`, from the helix.phone addon) instead of
- * the configured [LobbyLayout] items. The phone then hosts everything.
+ * One game mode of the navigator.
  *
- * @property enabled whether phone mode replaces the normal hotbar.
- * @property slot the hotbar slot 0..8 the phone item occupies.
- * @property material the phone item's material.
- * @property name the phone item's display name (MiniMessage).
+ * @property task task name the mode connects to.
+ * @property name display name on the coat of arms (empty: the task name).
+ * @property emblem emblem id (`castle`, `swords`, `banner`, `compass`, `crown`).
+ * @property place place on the map (`ankerplatz`, `kesseldorf`, `rosenarena`, `grenzlande`, `nebelland`, `reserve`,
+ *   `kronstadt`; empty: guessed from the task name).
+ * @property villager villager id whose head stands beside the place (empty: the place's default).
+ * @property lore one sentence of lore in the tooltip (empty: the place's default text).
+ * @property maintenance whether the place is shown under maintenance (grey, not clickable).
+ * @property pickInstance whether a click opens the instance picker (a ledger listing every backend of the task, e.g.
+ *   `CityBuild-1..3`) instead of connecting to the least-loaded backend. Configs stored before this field existed
+ *   decode with `false`.
  */
 @Serializable
-data class PhoneItemSettings(
-    val enabled: Boolean = false,
-    val slot: Int = 4,
-    val material: String = "COMPASS",
-    val name: String = "<green>Phone",
+data class NavigatorMode(
+    val task: String,
+    val name: String = "",
+    val emblem: String = "compass",
+    val place: String = "",
+    val villager: String = "",
+    val lore: String = "",
+    val maintenance: Boolean = false,
+    val pickInstance: Boolean = false,
 )
+
 
 /**
  * A joinable backend the server selector can connect to, as returned by the

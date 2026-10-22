@@ -22,6 +22,9 @@ import kotlinx.serialization.Serializable
  *   entirely — no other resolver contributes a component. Used by
  *   disguises (nick): the group prefix and clan tag must not leak through
  *   an assumed identity.
+ * @property order tab list priority, higher entries are listed first. The
+ *   permissions addon sets the weight of the displayed group; merged
+ *   profiles keep the highest value, a disguise keeps its own (0 = player).
  */
 @Serializable
 data class DisplayProfile(
@@ -30,6 +33,7 @@ data class DisplayProfile(
     val suffix: String = "",
     val color: String = "",
     val exclusive: Boolean = false,
+    val order: Int = 0,
 ) {
     /**
      * The name component to render for a player.

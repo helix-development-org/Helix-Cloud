@@ -3,6 +3,7 @@ import { Plus } from "lucide-react"
 import { toast } from "sonner"
 import { api, type ActionResult, type TaskDefinition } from "@/lib/api"
 import { usePoll } from "@/lib/use-poll"
+import { useCan } from "@/lib/access"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -15,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 /** Tasks table with create / deploy / delete. */
 export function TasksView() {
   const { data, reload } = usePoll(() => api<TaskDefinition[]>("/tasks"), 5000)
+  const can = useCan()
 
   const deploy = async (name: string) => {
     try { const i = await api<{ id: string }>(`/tasks/${name}/services`, { method: "POST" }); toast.success("Deployed " + i.id) }
@@ -38,7 +40,7 @@ export function TasksView() {
       <CardContent className="p-0">
         <div className="flex items-center justify-between p-4">
           <div className="text-sm text-muted-foreground">{data?.length ?? 0} tasks</div>
-          <CreateTaskDialog onCreated={reload} />
+          {can("tasks.edit") && <CreateTaskDialog onCreated={reload} />}
         </div>
         <Table>
           <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Platform</TableHead><TableHead>Executor</TableHead><TableHead /></TableRow></TableHeader>
@@ -50,9 +52,9 @@ export function TasksView() {
                 <TableCell className="text-sm text-muted-foreground">{t.executor}</TableCell>
                 <TableCell>
                   <div className="flex justify-end gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setPaused(t, !t.paused)}>{t.paused ? "Resume" : "Pause"}</Button>
-                    <Button size="sm" onClick={() => deploy(t.name)}>Deploy</Button>
-                    <Button size="sm" variant="destructive" onClick={() => del(t.name)}>Delete</Button>
+                    {can("tasks.edit") && <Button size="sm" variant="outline" onClick={() => setPaused(t, !t.paused)}>{t.paused ? "Resume" : "Pause"}</Button>}
+                    {can("services.control") && <Button size="sm" onClick={() => deploy(t.name)}>Deploy</Button>}
+                    {can("tasks.edit") && <Button size="sm" variant="destructive" onClick={() => del(t.name)}>Delete</Button>}
                   </div>
                 </TableCell>
               </TableRow>

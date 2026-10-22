@@ -69,6 +69,12 @@ function profileCard(name, p) {
       </div>
       <div class="field" style="margin-top:10px"><label>Hover lines (player-count tooltip, one per line)</label>
         <textarea class="mono" rows="3" data-p="${name}" data-f="hover">${esc((p.hover||[]).join("\n"))}</textarea></div>
+      <div class="field" style="margin-top:10px"><label>Server icon (64×64 PNG; empty = network crown seal)</label>
+        <div class="row" style="gap:10px;align-items:center">
+          ${p.favicon ? `<img alt="icon" width="64" height="64" style="image-rendering:pixelated;border-radius:6px" src="data:image/png;base64,${p.favicon}">` : `<span class="sub">network icon (default)</span>`}
+          <input type="file" accept="image/png" data-favp="${name}">
+          <button class="btn sm subtle" data-favreset="${name}">Use default</button>
+        </div></div>
       <div class="row" style="margin-top:12px"><button class="btn" data-save="${name}">Save ${name}</button></div>
     </div></div>`;
 }
@@ -82,6 +88,21 @@ function bind() {
     else p[el.dataset.f] = el.value;
     if (el.dataset.f === "frameIntervalMs" || el.dataset.fi !== undefined) startPreview(el.dataset.p);
   });
+  document.querySelectorAll("[data-favp]").forEach(el => el.onchange = () => {
+    const file = el.files && el.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        if (img.width !== 64 || img.height !== 64) return Helix.toast("icon must be 64×64");
+        cfg[el.dataset.favp].favicon = String(reader.result).split("base64,")[1] || "";
+        render();
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+  document.querySelectorAll("[data-favreset]").forEach(b => b.onclick = () => { cfg[b.dataset.favreset].favicon = ""; render(); });
   document.querySelectorAll("[data-addf]").forEach(b => b.onclick = () => {
     const p = cfg[b.dataset.addf];
     if (p.frames.length >= 20) return Helix.toast("max 20 frames");
@@ -133,7 +154,7 @@ async function load() {
   render();
 }
 function normalize(p) {
-  p = { line1:"", line2:"", onlinePlayers:-1, maxPlayers:-1, versionText:"", hover:[], frames:[], frameIntervalMs:3000, ...(p||{}) };
+  p = { line1:"", line2:"", onlinePlayers:-1, maxPlayers:-1, versionText:"", hover:[], frames:[], frameIntervalMs:3000, favicon:"", ...(p||{}) };
   if (!p.frames.length) p.frames = [{ line1: p.line1, line2: p.line2 }];
   return p;
 }

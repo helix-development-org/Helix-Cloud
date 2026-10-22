@@ -3,6 +3,7 @@ import { Archive } from "lucide-react"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { usePoll } from "@/lib/use-poll"
+import { useCan } from "@/lib/access"
 import { ago } from "@/lib/format"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -30,6 +31,7 @@ function size(bytes: number): string {
 export function BackupsView() {
   const { data, reload } = usePoll(() => api<Overview>("/backups"), 5000)
   const [target, setTarget] = useState("")
+  const can = useCan()
 
   const create = async () => {
     if (!target) return toast.error("Pick a static service")
@@ -59,7 +61,7 @@ export function BackupsView() {
 
   return (
     <div className="flex flex-col gap-5">
-      <Card>
+      {can("services.backups") && <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><Archive className="size-4" /> Create backup</CardTitle></CardHeader>
         <CardContent className="flex items-center gap-3">
           <div className="w-64">
@@ -77,7 +79,7 @@ export function BackupsView() {
             <span className="text-sm text-muted-foreground">No static workspaces yet — static tasks create them on first start.</span>
           )}
         </CardContent>
-      </Card>
+      </Card>}
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -92,10 +94,10 @@ export function BackupsView() {
                   <TableCell>
                     <div className="flex items-center justify-end gap-2">
                       {running.get(b.serviceId) && <Badge variant="warning">running</Badge>}
-                      <Button size="sm" variant="outline" disabled={running.get(b.serviceId)}
+                      {can("backups.restore") && <Button size="sm" variant="outline" disabled={running.get(b.serviceId)}
                         title={running.get(b.serviceId) ? "Stop the service first" : ""}
-                        onClick={() => restore(b)}>Restore</Button>
-                      <Button size="sm" variant="destructive" onClick={() => del(b)}>Delete</Button>
+                        onClick={() => restore(b)}>Restore</Button>}
+                      {can("backups.restore") && <Button size="sm" variant="destructive" onClick={() => del(b)}>Delete</Button>}
                     </div>
                   </TableCell>
                 </TableRow>

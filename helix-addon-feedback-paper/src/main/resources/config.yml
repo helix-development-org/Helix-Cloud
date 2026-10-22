@@ -1,0 +1,10 @@
+# HelixFeedback – Einstellungen dieses Servers für /testtools.
+# Die übrigen Einstellungen (Testphase, Cooldown, Tageslimit, Punkte) verwaltet das Node-Addon helix.feedback.
+testtools:
+  # Welten, in denen Tester fliegen dürfen.
+  fly-worlds: [lobby, plots]
+  # Test-Kronen pro Klick und netzwerkweites Tageslimit je Tester.
+  kronen-amount: 1000
+  kronen-daily-limit: 10000
+  # Testpunkte: /testtools punkt setzen <name> (Recht feedback.admin)
+  points: {}

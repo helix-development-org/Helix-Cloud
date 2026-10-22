@@ -21,10 +21,10 @@ export function revealView(root: HTMLElement) {
   if (!children.length) return
   animate(children, {
     opacity: [0, 1],
-    translateY: [10, 0],
-    duration: 420,
+    translateY: [6, 0],
+    duration: 180,
     ease: "outQuad",
-    delay: stagger(45),
+    delay: stagger(30),
   })
 }
 

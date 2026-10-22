@@ -1,0 +1,7 @@
+{
+  "arena.info": "<#4ac85e>Brunhilde Brecher:</#ffcf4a> <#f1e2c2>Fight in the arena – you keep everything. Outside there is peace.",
+  "arena.closed": "<#4ac85e>Brunhilde Brecher:</#ffcf4a> <#f1e2c2>The arena is still closed.",
+  "arena.admin.none": "<#ffb43a>Warning: The arena has no corners yet (/cbadmin arena pos1|pos2).",
+  "arena.admin.info": "<#f1e2c2>Arena: <#ffcf4a>{region}</#ffcf4a>",
+  "arena.admin.saved": "<#4ac85e>Arena point saved: <#ffcf4a>{spot}</#ffcf4a>"
+}

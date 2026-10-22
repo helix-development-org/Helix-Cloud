@@ -28,6 +28,8 @@ dependencies {
     // is compile-only here; the movement tests exercise packetevents types, hence the test dependency.
     compileOnly(libs.packetevents.spigot)
     testImplementation(libs.packetevents.spigot)
+    // The check engine runs on coroutines provided by Helix-GUIs at runtime; tests need their own copy.
+    testImplementation(libs.kotlinx.coroutines.core)
     // helix-gui is not bundled: the shared Helix-GUIs plugin (helix-addon-guis) installs the one
     // real IGui instance and provides its classes (and kotlinx-coroutines-core) at runtime via the
     // plugin.yml `depend` relationship (Bukkit's plugin classloader delegates to declared
@@ -66,21 +68,4 @@ tasks.withType<Jar>().configureEach {
             .map { zipTree(it) }
     })
     exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
-}
-
-// The IGuard panel resource pack (header/background glyphs + fonts) is
-// generated deterministically at build time and bundled into the HXA; the
-// node merges it into the network pack.
-sourceSets {
-    create("pack")
-}
-
-val generatePack by tasks.registering(JavaExec::class) {
-    group = "build"
-    description = "Draws the IGuard panel textures and assembles pack.zip."
-    classpath = sourceSets["pack"].runtimeClasspath
-    mainClass.set("de.tytoss.iguard.pack.PackGeneratorKt")
-    val output = layout.buildDirectory.file("pack/pack.zip")
-    argumentProviders.add(CommandLineArgumentProvider { listOf(output.get().asFile.absolutePath) })
-    outputs.file(output)
 }

@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react"
+import { NETWORK_NAME } from "@/lib/brand"
 import { toast } from "sonner"
 import { api, token, type Identity } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { useCan } from "@/lib/access"
 
 /** Session info, the global network prefix and the current bearer token. */
 export function SettingsView({ identity, version }: { identity: Identity; version: string }) {
@@ -23,7 +25,7 @@ export function SettingsView({ identity, version }: { identity: Identity; versio
       <Card>
         <CardHeader><CardTitle>Bearer token</CardTitle></CardHeader>
         <CardContent className="flex items-center gap-3">
-          <code className="flex-1 truncate rounded-md bg-secondary px-3 py-2 font-mono text-xs">{token.slice(0, 12)}…{token.slice(-6)}</code>
+          <code className="flex-1 truncate rounded-[12px] border border-border bg-muted px-3 py-2 font-mono text-xs">{token.slice(0, 12)}…{token.slice(-6)}</code>
           <Button size="sm" variant="outline" onClick={() => { navigator.clipboard?.writeText(token); toast.success("Token copied") }}>Copy</Button>
         </CardContent>
       </Card>
@@ -47,6 +49,7 @@ function NetworkPrefixCard() {
       .catch(() => setValues(null))
   }, [])
 
+  const editable = useCan()("translations.edit")
   if (values === null) return null
 
   const save = async (key: "name" | "prefix") => {
@@ -66,8 +69,8 @@ function NetworkPrefixCard() {
       <CardHeader>
         <CardTitle>Network</CardTitle>
         <div className="text-sm text-muted-foreground">
-          Available as <code className="rounded bg-secondary px-1">{"{network}"}</code> and{" "}
-          <code className="rounded bg-secondary px-1">{"{prefix}"}</code> in every configurable message,
+          Available as <code className="rounded-[6px] bg-muted px-1">{"{network}"}</code> and{" "}
+          <code className="rounded-[6px] bg-muted px-1">{"{prefix}"}</code> in every configurable message,
           MOTD, tablist and disconnect screen. MiniMessage and &amp; codes supported; changes apply instantly.
         </div>
       </CardHeader>
@@ -77,15 +80,15 @@ function NetworkPrefixCard() {
           <Input className="font-mono text-xs" value={values.name}
             onChange={(e) => setValues({ ...values, name: e.target.value })}
             onKeyDown={(e) => e.key === "Enter" && save("name")} placeholder="MythicMC" />
-          <Button size="sm" onClick={() => save("name")}>Save</Button>
+          {editable && <Button size="sm" onClick={() => save("name")}>Save</Button>}
         </div>
         <div className="flex items-center gap-3">
           <span className="w-16 shrink-0 text-xs text-muted-foreground">Prefix</span>
           <Input className="font-mono text-xs" value={values.prefix}
             onChange={(e) => setValues({ ...values, prefix: e.target.value })}
             onKeyDown={(e) => e.key === "Enter" && save("prefix")}
-            placeholder="<gradient:#8b5cf6:#38bdf8><bold>Helix</bold></gradient> »" />
-          <Button size="sm" onClick={() => save("prefix")}>Save</Button>
+            placeholder={`<gradient:#ffcf4a:#d8382e><bold>${NETWORK_NAME}</bold></gradient> »`} />
+          {editable && <Button size="sm" onClick={() => save("prefix")}>Save</Button>}
         </div>
       </CardContent>
     </Card>

@@ -113,10 +113,12 @@ class MovementEvaluatorTest {
 
     @Test
     fun `sustained speed cheat flags every tick and its weight scales with the offset`() {
+        // airborne for a while: the tick starts in the air (air acceleration)
         val state = PlayerState().apply {
             sprinting = false
             predictedHorizontal = 0.08
             positionGapTicks = 1
+            airTicks = 3
         }
 
         // a small offset over the limit accrues little weight...
@@ -125,7 +127,7 @@ class MovementEvaluatorTest {
         val smallWeight = small.failures.firstOrNull { it.checkId == "movement.speed.a" }?.weight ?: 0.0
 
         // ...while a blatant offset accrues far more, on the same clean state
-        val bigState = PlayerState().apply { predictedHorizontal = 0.08; positionGapTicks = 1 }
+        val bigState = PlayerState().apply { predictedHorizontal = 0.08; positionGapTicks = 1; airTicks = 3 }
         val bigDelta = Vec3(0.0, 0.0, 0.6)
         val big = evaluator.evaluate(movement(Vec3(0.0, 1.0, 0.6), onGround = false), bigDelta, ground(), profile, bigState)
         val bigWeight = big.failures.first { it.checkId == "movement.speed.a" }.weight
@@ -373,6 +375,79 @@ class MovementEvaluatorTest {
         assertEquals(0, state.elytraLevelStreak)
 
         repeat(90) { assertEquals(null, evaluator.elytraFailure(Vec3(0.0, 0.02, 1.0), state)) }
+    }
+
+    @Test
+    fun `walking off an edge keeps ground acceleration for the ticks that started on ground`() {
+        // GuardLab legit_fall_damage: the move that crosses the edge ends unsupported (and the next one already
+        // falls), yet both ticks started on the ground in vanilla and accelerate like on ground.
+        val state = PlayerState().apply { predictedHorizontal = 0.2203 * 0.546; positionGapTicks = 1 }
+        val air = ground().copy(supportingCollision = false, collisionBoxes = emptyList(), surface = "AIR")
+        val edge = Vec3(0.0, 0.0, 0.2154)
+        state.lastMovement = movement(Vec3(0.0, 0.0, 0.0), onGround = true)
+        val first = evaluator.evaluate(movement(edge, onGround = true), edge, air, profile, state)
+        assertFalse(first.failed("movement.speed.a"), "edge tick")
+        evaluator.acceptHorizontal(edge, air, state, first.supporting)
+        state.airTicks = 1
+        state.lastMovement = movement(edge, onGround = true)
+        state.positionGapTicks = 1
+        val fall = Vec3(0.0, -0.0784, 0.2156)
+        val second = evaluator.evaluate(movement(edge + fall, onGround = false), fall, air, profile, state)
+        assertFalse(second.failed("movement.speed.a"), "first falling tick")
+    }
+
+    @Test
+    fun `a walking jump keeps ground acceleration on the takeoff tick`() {
+        val state = PlayerState().apply {
+            predictedHorizontal = 0.2203 * 0.546
+            positionGapTicks = 1
+            lastMovement = movement(Vec3(0.0, 0.0, 0.0), onGround = true)
+        }
+        val air = ground().copy(supportingCollision = false, collisionBoxes = emptyList(), surface = "AIR")
+        val takeoff = Vec3(0.0, 0.42, 0.2449)
+        val evaluation = evaluator.evaluate(movement(takeoff, onGround = false), takeoff, air, profile, state)
+
+        assertFalse(evaluation.failed("movement.speed.a"))
+    }
+
+    @Test
+    fun `a sustained small speed boost flags per window while vanilla sprinting stays clean`() {
+        val state = PlayerState().apply { sprinting = true }
+        var velocity = 0.0
+
+        fun run(frames: Int, factor: Double): List<CheckFailure> = buildList {
+            repeat(frames) {
+                velocity = velocity * 0.546 + 0.13
+                val delta = Vec3(0.0, 0.0, velocity * factor)
+                state.positionGapTicks = 1
+                // the fixture's ground box is small: judge every move at its centre so it stays supported
+                val frame = movement(Vec3(0.0, 0.0, 0.0), onGround = true)
+                val evaluation = evaluator.evaluate(frame, delta, ground(), profile, state)
+                addAll(evaluation.failures.filter { it.checkId == "movement.speed.a" })
+                if (evaluation.failed("movement.speed.a")) {
+                    evaluator.rejectHorizontal(ground(), state, evaluation.supporting)
+                } else {
+                    evaluator.acceptHorizontal(delta, ground(), state, evaluation.supporting)
+                }
+                state.lastMovement = frame
+            }
+        }
+
+        assertTrue(run(60, 1.0).isEmpty(), "vanilla sprint must stay clean")
+        val boosted = run(60, 1.15)
+        assertTrue(boosted.isNotEmpty(), "a 15 % boost must flag")
+        assertTrue(boosted.all { it.evidence["mode"] == "sustained" }, "it stays inside the per-tick tolerance")
+        assertTrue(boosted.size <= 3, "one verdict per window, not per tick")
+    }
+
+    @Test
+    fun `the second tick of a slime bounce is no step`() {
+        val state = PlayerState().apply { positionGapTicks = 1; lastVerticalDelta = 1.038 }
+        val air = ground().copy(supportingCollision = false, collisionBoxes = emptyList(), surface = "AIR")
+        val rise = Vec3(0.0, 0.9391, 0.0336)
+        val evaluation = evaluator.evaluate(movement(rise, onGround = false), rise, air, profile, state)
+
+        assertFalse(evaluation.failed("movement.step.a"))
     }
 
     private fun MovementEvaluation.failed(checkId: String) = failures.any { it.checkId == checkId }

@@ -1,0 +1,7 @@
+{
+  "arena.info": "<#4ac85e>Brunhilde Brecher:</#ffcf4a> <#f1e2c2>In der Arena darfst du kämpfen – du behältst alles. Draußen ist Frieden.",
+  "arena.closed": "<#4ac85e>Brunhilde Brecher:</#ffcf4a> <#f1e2c2>Die Arena ist noch zu. Das Team baut gerade.",
+  "arena.admin.none": "<#ffb43a>Achtung: Die Arena hat noch keine zwei Ecken (/cbadmin arena pos1|pos2).",
+  "arena.admin.info": "<#f1e2c2>Arena: <#ffcf4a>{region}</#ffcf4a>",
+  "arena.admin.saved": "<#4ac85e>Arena-Punkt gespeichert: <#ffcf4a>{spot}</#ffcf4a>"
+}

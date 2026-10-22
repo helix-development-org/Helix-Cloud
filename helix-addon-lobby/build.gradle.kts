@@ -10,9 +10,8 @@ dependencies {
 
 /**
  * Packages the addon as HXA: addon.json + addon.jar plus the Paper-side
- * component (paper.jar), built by :helix-addon-lobby-paper. No pack.zip of
- * its own — the server selector's font/texture needs are covered by the
- * shared Helix-GUIs plugin (`helix-addon-guis`).
+ * component (paper.jar) and its resource pack (pack.zip with the navigator
+ * art), both built by :helix-addon-lobby-paper.
  */
 val packageHxa by tasks.registering(Zip::class) {
     group = "distribution"
@@ -26,5 +25,8 @@ val packageHxa by tasks.registering(Zip::class) {
     }
     from(project(":helix-addon-lobby-paper").tasks.named<Jar>("jar").flatMap { it.archiveFile }) {
         rename { "paper.jar" }
+    }
+    from(project(":helix-addon-lobby-paper").tasks.named("generatePack")) {
+        rename { "pack.zip" }
     }
 }

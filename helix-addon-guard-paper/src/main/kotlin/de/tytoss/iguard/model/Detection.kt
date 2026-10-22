@@ -36,6 +36,8 @@ data class IncidentRecord(
     val evidenceCount: Int,
     val shadowAction: String?,
     val recipeVersion: String,
+    /** World of the incident scene (from the sampled snapshot, never read from Bukkit off-thread). */
+    val worldId: UUID? = null,
 )
 
 /** Compressed movement-timeline payload recorded around an incident. */

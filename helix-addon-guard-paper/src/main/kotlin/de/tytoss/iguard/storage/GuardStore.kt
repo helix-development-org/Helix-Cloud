@@ -71,6 +71,16 @@ interface GuardStore : AutoCloseable {
     /** Appends an audit entry (BAN/UNBAN) to the punishment history log. */
     fun enqueuePunishment(playerId: UUID, playerName: String, type: String, hours: Int?, reason: String, actor: String): Boolean
 
+    /**
+     * Mirrors a staff member's `/iguard alerts` toggle to the node, which then stops (or resumes)
+     * sending them network-wide incident alerts.
+     *
+     * @param playerName staff member's name.
+     * @param enabled the new toggle state.
+     * @return false when the write queue rejected the update.
+     */
+    fun enqueueAlertPreference(playerName: String, enabled: Boolean): Boolean
+
     // --- Ban reads / lifts ---
 
     /** Blocking ban revoke for the native provider's unban path (off the main thread). */

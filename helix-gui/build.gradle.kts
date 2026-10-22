@@ -18,6 +18,7 @@ dependencies {
     api(libs.postgresql)
     api(libs.hikaricp)
     api(libs.kotlinx.coroutines.core)
+    testImplementation(libs.paper.api)
 }
 
 // Consumed by Paper plugins (helix-addon-guard-paper, helix-addon-bettermsgs-paper), which run on

@@ -408,6 +408,7 @@ class ServiceManager(
             // late predecessor never wipes the successor's workspace or map entry.
             synchronized(this) {
                 if (services[managed.id] === managed) {
+                    workspacePreparer.harvestPaperclip(managed.task, managed.workspace)
                     workspacePreparer.deleteRecursively(managed.workspace)
                     if (managed.state == ServiceState.STOPPED) {
                         services.remove(managed.id)

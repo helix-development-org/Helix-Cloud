@@ -27,6 +27,8 @@ class NodeConfigLoaderTest {
 
             [docker]
             network = "helix-net"
+            controlHost = "kronland-node"
+            publishBackends = true
 
             [proxy]
             forwardingSecret = "fwd-secret"
@@ -50,6 +52,9 @@ class NodeConfigLoaderTest {
         assertEquals("secret", config.control.token)
         assertEquals("helix-net", config.docker.network)
         assertEquals(NodeConfig.DockerSettings().image, config.docker.image)
+        assertEquals("kronland-node", config.docker.controlHost)
+        assertEquals(true, config.docker.publishBackends)
+        assertEquals("0.0.0.0", config.docker.publishAddress)
         assertEquals("fwd-secret", config.proxy.forwardingSecret)
         assertEquals(true, config.proxy.legacyForwarding)
         assertEquals(true, config.eula.accept)

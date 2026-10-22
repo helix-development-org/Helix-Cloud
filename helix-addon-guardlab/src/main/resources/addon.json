@@ -1,0 +1,10 @@
+{
+  "id": "guardlab",
+  "name": "GuardLab",
+  "version": "1.0.0",
+  "main": "org.helix.addons.guardlab.GuardLabAddon",
+  "description": "Automated IGuard test lab: scenario suites on the IGuard-Test task, driven by the GuardLab dev client; stores run summaries.",
+  "permissions": [
+    "guardlab.admin"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "tester.usage": "<#ff5a4a>Usage: <#ffcf4a>/tester add|remove|info \\<player> [duration]</#ffcf4a> or <#ffcf4a>/tester list</#ffcf4a>. Duration e.g. 12h, 7d.",
+  "tester.added": "<#4ac85e><#ffcf4a>{player}</#ffcf4a> is now a tester (permanent).",
+  "tester.added.timed": "<#4ac85e><#ffcf4a>{player}</#ffcf4a> is now a tester for <#ffcf4a>{duration}</#ffcf4a>.",
+  "tester.removed": "<#4ac85e><#ffcf4a>{player}</#ffcf4a> is no longer a tester.",
+  "tester.error.duration": "<#ff5a4a>Invalid duration: <#ffcf4a>{duration}</#ffcf4a>. Use e.g. 30m, 12h or 7d.",
+  "tester.error.not-tester": "<#ff5a4a><#ffcf4a>{player}</#ffcf4a> is not a tester. Check the name with <#ffcf4a>/tester list</#ffcf4a>.",
+  "tester.info.none": "<#f1e2c2><#ffcf4a>{player}</#ffcf4a> is not a tester.",
+  "tester.list.empty": "<#f1e2c2>There are no testers yet. Add some with <#ffcf4a>/tester add \\<player></#ffcf4a>.",
+  "tester.list.header": "<#f1e2c2>Testers (<#ffcf4a>{count}</#ffcf4a>):",
+  "tester.entry.timed": "<#f1e2c2>- <#5ab4ff>{player}</#5ab4ff> · <#ffcf4a>{remaining}</#ffcf4a> left",
+  "tester.entry.permanent": "<#f1e2c2>- <#5ab4ff>{player}</#5ab4ff> · permanent"
+}

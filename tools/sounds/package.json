@@ -1,0 +1,13 @@
+{
+  "name": "helix-network-sounds",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Procedural synthesis of the network sound pack (design concept §16): renders WAV, encodes OGG Vorbis.",
+  "type": "module",
+  "scripts": {
+    "render": "node synth.mjs"
+  },
+  "dependencies": {
+    "wasm-media-encoders": "0.7.0"
+  }
+}

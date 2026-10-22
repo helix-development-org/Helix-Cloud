@@ -102,4 +102,24 @@ class HeartbeatWatchdogTest {
         assertFalse(executor.handles.first().killCalled)
         assertEquals(ServiceState.RUNNING, manager.find(info.id)?.state)
     }
+
+    @Test
+    fun `a starting service that keeps downloading is not reaped until it goes quiet`() {
+        task()
+        var downloaded = 0L
+        val progressWatchdog = HeartbeatWatchdog(manager, startDeadlineMillis = 120_000L, clock = { now }, startProgress = { downloaded })
+        manager.startService("Lobby")
+
+        progressWatchdog.tick()
+        for (minute in 1..10) {
+            now = minute * 60_000L
+            downloaded += 1_000_000L
+            progressWatchdog.tick()
+        }
+        assertFalse(executor.handles.first().killCalled, "a slow first download keeps the service alive")
+
+        now += 121_000L
+        progressWatchdog.tick()
+        assertTrue(executor.handles.first().killCalled, "without progress the deadline applies again")
+    }
 }

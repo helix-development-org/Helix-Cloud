@@ -1,7 +1,7 @@
 # REST-API-Referenz
 
 Basis-URL: `http://<host>:<port>/api/v1` (Default `127.0.0.1:8080`).
-Alle Endpunkte (außer `/auth/request-code` und `/auth/verify`) erfordern
+Alle Endpunkte (außer `/auth/request-code`, `/auth/verify` und `/auth/ticket`) erfordern
 `Authorization: Bearer <token>`; ohne gültiges Token antwortet die API mit
 `401`. Ein Token ist entweder das statische `control.token` (voller
 Admin-Zugriff, auch von Bridges/Wrapper genutzt) oder ein per Minecraft-Login
@@ -19,12 +19,56 @@ Das Dashboard unter `/` ist statisch und nutzt dieselbe API.
 |---|---|---|
 | POST | `/auth/request-code` | **Öffentlich.** Body `{"name": "<mcname>"}`. Prüft, ob der Spieler online ist und `helix.panel.login` besitzt, generiert einen Code und schickt ihn ihm ingame. |
 | POST | `/auth/verify` | **Öffentlich.** Body `{"name", "code"}`. Prüft den Code und liefert `{token, identity}` — das Session-Token für alle weiteren Aufrufe. |
+| POST | `/auth/ticket` | **Öffentlich.** Body `{"ticket"}`. Löst ein Einmal-Ticket des In-Game-Panels (Helix-Admin-Mod) ein und liefert `{token, identity}` wie `/auth/verify`. Tickets sind 60 s gültig und nur einmal verwendbar. |
 | GET | `/auth/me` | Der eingeloggte Aufrufer: `{name, admin, views}` (erlaubte Dashboard-Views). |
 | POST | `/auth/logout` | Invalidiert das aktuelle Session-Token. |
 
 Login-Ablauf: MC-Name eingeben → Code ingame erhalten → Code eingeben →
 Session-Token. Die sichtbaren Views/Panels richten sich nach den Permissions
 (`helix.panel.<view>`, `helix.panel.addon.<id>`). Das Admin-Token darf alles.
+
+### Rechte: ansehen vs. steuern
+
+Jeder Bereich hat ein Recht zum Ansehen und eigene Rechte zum Ändern. Wer
+`helix.panel.services` hat, sieht die Server, kann sie aber weder steuern noch
+in eine Konsole schreiben. `GET /auth/me` liefert zusätzlich `capabilities`
+(die IDs ohne `helix.panel.`), das Dashboard blendet damit Knöpfe aus; der
+Server prüft jeden Endpunkt selbst.
+
+| Recht | Erlaubt |
+|---|---|
+| `helix.panel.services` | `GET /services`, `GET /services/{id}` |
+| `helix.panel.services.logs` | `GET /services/{id}/logs`, `…/logs/stream` |
+| `helix.panel.services.console` | `POST /services/{id}/command` |
+| `helix.panel.services.control` | `POST /tasks/{name}/services`, `POST /services/{id}/stop`, `…/kill` |
+| `helix.panel.services.backups` | `POST /services/{id}/backups` |
+| `helix.panel.tasks` / `.tasks.edit` | Lesen / `PUT`, `DELETE /tasks/{name}` |
+| `helix.panel.proxy` / `.proxy.control` | `GET /proxy`, `GET /proxy/whitelist` / Wartung und Whitelist ändern |
+| `helix.panel.players` / `.players.manage` | Liste, Suche (ohne gespeicherte Spielerdaten) / Nachricht, Kick, Bann, Spielerdaten in der Suche (`sources`) |
+| `helix.panel.schedules` / `.schedules.edit` | Lesen / anlegen, löschen, ausführen – nur Aktionen, die man selbst aufrufen darf (Jobs laufen mit Systemrechten; `createdBy` hält fest, wer den Job gespeichert hat) |
+| `helix.panel.backups` / `.backups.restore` | Liste / wiederherstellen, löschen |
+| `helix.panel.files` / `.files.edit` | Lesen / schreiben, löschen |
+| `helix.panel.addons` / `.addons.manage` | Liste / ein- und ausschalten |
+| `helix.panel.translations` / `.translations.edit` | Lesen / ändern |
+| `helix.panel.access` | `GET /access/catalog`: alle Rechte mit Bezeichnung für die Zugriffs-Matrix (`critical: true` = admin-gleich). Die Matrix **ansehen**; ändern (`perm.access.set`, `perm.access.presets`) darf nur `helix.admin`. |
+
+`helix.panel.<bereich>.*` vergibt einen Bereich komplett.
+
+**Admin-gleiche Rechte** (`critical` im Katalog, Warnung im Dashboard, nie in Voreinstellungen):
+`services.console`, `files.edit`, `tasks.edit`, `addons.manage`, `schedules.edit`, `access`. Wer eines davon hat,
+kann sich über Konsole, Dateien, Tasks, Addons oder geplante Aktionen volle Kontrolle verschaffen.
+
+**Spieler-Befehle** (Aktionen mit `playerCommand`, z. B. `clan`, `discord`) nehmen den ausführenden Spieler als
+erstes Argument. Über `POST /actions` darf sie deshalb nur ein Admin aufrufen; für alle anderen sind sie nur ingame
+nutzbar (`403 player commands are in-game only`).
+
+**Log-Streams** (`/logs/stream`, `/services/{id}/logs/stream`) prüfen Sitzung und Recht etwa alle 10 Sekunden neu
+und enden mit dem Ereignis `revoked`, sobald eines davon wegfällt.
+
+**Upgrade:** Bis 0.91 gab `helix.panel.services` auch Stoppen, Kill und Konsole frei, `helix.panel.tasks` das
+Bearbeiten usw. Gruppen, die solche Rechte nur über das Ansehen-Recht hatten, verlieren sie; im Dashboard unter
+„Zugriff“ (als Admin) die passenden Steuer-Rechte vergeben – z. B. `helix.panel.services.control` zum Stoppen,
+`helix.panel.services.logs` für die Konsole lesen, `helix.panel.services.console` zum Schreiben.
 
 ## Platform
 
@@ -167,6 +211,7 @@ alles, was die Konsole kann.
 | POST | `/internal/player-command` | Spieler-Command ausführen: `{player, command, arguments}` → ActionResult (Permission wird geprüft) |
 | POST | `/internal/display` | Display-Profil eines Spielers: `{name}` → `{prefix, name, suffix, color}` (komponentenweise über alle Resolver gemerged) |
 | GET | `/internal/bridge-values` | von Addons publizierte globale Werte (Tablist, Chat-Format) |
+| POST | `/internal/panel-ticket` | Per-Service-Token: Body `{"player"}` → `{ticket, expiresInSeconds}` — Einmal-Ticket für einen online Spieler mit `helix.panel.login` (Paper-Teil von `helix.admin`, wenn der Spieler das In-Game-Panel öffnet). Das Dashboard nimmt es als `#ticket=…&ingame=1` entgegen. |
 | POST | `/internal/action` | Beliebige Action mit per-Service-Token ausführen: `{action, arguments}` → ActionResult — nur für Actions mit `bridgeInvocable = true` (z.B. `profile.texture.*`, `guard.store.*`); `POST /api/v1/actions` akzeptiert nur Admin-Token oder eine `helix.admin`-Session, niemals ein per-Service-Token |
 
 ## Beispiele

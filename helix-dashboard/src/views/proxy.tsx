@@ -1,6 +1,7 @@
 import { toast } from "sonner"
 import { api, type ProxyView } from "@/lib/api"
 import { usePoll } from "@/lib/use-poll"
+import { useCan } from "@/lib/access"
 import { stateVariant } from "@/lib/format"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -11,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 /** Proxy overview: maintenance toggle, proxies and backend routing. */
 export function ProxyPageView() {
   const { data, reload } = usePoll(() => api<ProxyView>("/proxy"), 3000)
+  const can = useCan()
 
   const setMaintenance = async (enabled: boolean) => {
     try { await api("/proxy/maintenance", { method: "POST", body: { enabled } }); toast.success(`Maintenance ${enabled ? "on" : "off"}`); reload() }
@@ -26,7 +28,7 @@ export function ProxyPageView() {
             <div className="font-medium">Maintenance mode</div>
             <div className="text-sm text-muted-foreground">Rejects regular joins; only players with the bypass permission may connect.</div>
           </div>
-          <Switch checked={data.maintenance} onCheckedChange={setMaintenance} />
+          <Switch checked={data.maintenance} onCheckedChange={setMaintenance} disabled={!can("proxy.control")} />
         </CardContent>
       </Card>
       <Card>

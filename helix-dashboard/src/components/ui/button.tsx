@@ -3,23 +3,34 @@ import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
+/**
+ * Buttons follow the design concept (§4, §17): 3 px ink outline, 13 px radius, top highlight + bottom edge
+ * in the surface's own hi/lo stage, hard ink drop shadow; pressing drops the face 2 px and halves the edge.
+ * default = primary, secondary = gold/wood, outline = parchment, destructive = red, ghost stays flat.
+ */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
+  "kl-press inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-button)] font-display text-[15px] leading-none tracking-[0.02em] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-55 disabled:saturate-50 [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border border-input bg-transparent hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+        default:
+          "kl-raised border-[3px] border-border bg-primary text-primary-foreground [--bevel-hi:var(--primary-hi)] [--bevel-lo:var(--primary-lo)] [text-shadow:var(--primary-text-shadow)]",
+        destructive:
+          "kl-raised border-[3px] border-border bg-destructive text-destructive-foreground [--bevel-hi:var(--destructive-hi)] [--bevel-lo:var(--destructive-lo)] [text-shadow:0_1px_0_var(--border)]",
+        outline:
+          "kl-raised border-[3px] border-border bg-parchment text-ink [--bevel-hi:var(--parchment-hi)] [--bevel-lo:var(--parchment-lo)]",
+        secondary:
+          "kl-raised border-[3px] border-border bg-secondary text-secondary-foreground [--bevel-hi:var(--secondary-hi)] [--bevel-lo:var(--secondary-lo)]",
+        success:
+          "kl-raised border-[3px] border-border bg-success text-success-foreground [--bevel-hi:var(--success-hi)] [--bevel-lo:var(--success-lo)] [text-shadow:0_1px_0_var(--border)]",
+        ghost: "border-[3px] border-transparent text-foreground hover:bg-[color-mix(in_srgb,var(--gold)_15%,transparent)]",
+        link: "font-sans font-bold text-foreground underline decoration-[var(--gold)] decoration-2 underline-offset-4 hover:decoration-[3px]",
       },
       size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
-        lg: "h-10 rounded-md px-6",
-        icon: "size-9",
+        default: "h-10 px-4 pb-[3px]",
+        sm: "h-8 px-3 pb-[2px] text-[13px] [--edge-hi:3px] [--edge-lo:4px] [--drop:3px]",
+        lg: "h-12 px-6 pb-[3px] text-[17px]",
+        icon: "size-10 pb-[3px]",
       },
     },
     defaultVariants: { variant: "default", size: "default" },

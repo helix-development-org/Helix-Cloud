@@ -1,8 +1,8 @@
 {
-  "usage": "<red>Verwendung: <white>/nick <name></white> <gray>oder <white>/nick off</white>",
-  "set.ok": "<green>Du wirst jetzt als <white>{nick}</white> angezeigt.",
-  "off.ok": "<gray>Dein echter Name wird wieder angezeigt.",
-  "off.none": "<red>Du hast keinen Nick gesetzt.",
-  "error.format": "<red>Nicks haben 3-16 Zeichen: Buchstaben, Ziffern und Unterstriche.",
-  "error.taken": "<red>Dieser Name ist bereits vergeben."
+  "usage": "<#ff5a4a>Verwendung: <#ffcf4a>/nick <name></#ffcf4a> <#f1e2c2>oder <#ffcf4a>/nick off</#ffcf4a>",
+  "set.ok": "<#4ac85e>Du wirst jetzt als <#ffcf4a>{nick}</#ffcf4a> angezeigt.",
+  "off.ok": "<#4ac85e>Dein echter Name wird wieder angezeigt.",
+  "off.none": "<#ff5a4a>Du hast keinen Nick gesetzt. Setze einen mit <#ffcf4a>/nick <name></#ffcf4a>.",
+  "error.format": "<#ff5a4a>Nicks haben 3-16 Zeichen: Buchstaben, Ziffern und Unterstriche.",
+  "error.taken": "<#ff5a4a>Dieser Name ist bereits vergeben. Wähle einen anderen."
 }

@@ -1,9 +1,12 @@
 package de.tytoss.iguard.check
 
 import com.github.retrooper.packetevents.protocol.player.ClientVersion
-import de.tytoss.iguard.alert.AlertService
 import de.tytoss.iguard.api.ExemptionManager
+import de.tytoss.iguard.api.IGuardCheckResult
+import de.tytoss.iguard.api.IGuardExemption
+import de.tytoss.iguard.api.IGuardExemptionScope
 import de.tytoss.iguard.api.IGuardPlayerSnapshot
+import de.tytoss.iguard.config.CheckConfig
 import de.tytoss.iguard.config.DetectionConfig
 import de.tytoss.iguard.config.DynamicConfig
 import de.tytoss.iguard.config.ExemptionConfig
@@ -17,6 +20,7 @@ import de.tytoss.iguard.model.ClientActionFrame
 import de.tytoss.iguard.model.ClientIdentityFrame
 import de.tytoss.iguard.model.ClientTickFrame
 import de.tytoss.iguard.model.EnvironmentFrame
+import de.tytoss.iguard.model.EnvironmentTags
 import de.tytoss.iguard.model.InventoryClickFrame
 import de.tytoss.iguard.model.MovementFrame
 import de.tytoss.iguard.model.PacketFrame
@@ -33,9 +37,11 @@ import de.tytoss.iguard.model.Vec3
 import de.tytoss.iguard.model.ViolationRecord
 import de.tytoss.iguard.profile.VersionProfile
 import de.tytoss.iguard.profile.VersionProfiles
-import de.tytoss.iguard.setback.SetbackService
 import de.tytoss.iguard.snapshot.SnapshotStore
 import de.tytoss.iguard.storage.GuardStore
+import de.tytoss.iguard.trace.FrameObserver
+import de.tytoss.iguard.trace.FrameTrace
+import de.tytoss.iguard.trace.TraceTarget
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -68,6 +74,9 @@ internal data class CheckFailure(
     val deterministic: Boolean = false,
 )
 
+/** A started dig: packet time, client tick and whether that tick came from tick-end packets. */
+internal data class DigStart(val at: Long, val tick: Long, val explicitTicks: Boolean)
+
 internal class PlayerState {
     var lastSequence = 0L
     var lastMovement: MovementFrame? = null
@@ -77,6 +86,7 @@ internal class PlayerState {
     var clientTick = 0L
     var attackTick = -1L
     var attackTarget = -1
+    var attackTargetPlayer = false
     var rotationMisses = 0
     var lastAttackAt = 0L
     var noSwingStreak = 0
@@ -85,6 +95,9 @@ internal class PlayerState {
 
     /** Consecutive movement frames spent gliding without a net-descending tick; see [MovementEvaluator.elytraFailure]. */
     var elytraLevelStreak = 0
+
+    /** Consecutive frames hovering level right above a liquid (surface Jesus check). */
+    var surfaceHoverStreak = 0
     var sprinting = false
     var sneaking = false
     var clientFlying = false
@@ -110,6 +123,17 @@ internal class PlayerState {
     var serverVelocity = Vec3(0.0, 0.0, 0.0)
     var velocityAt = 0L
     var predictedHorizontal = 0.0
+    // Slipperiness of the block last stood on: vanilla applies the START-of-tick block's friction, which
+    // the takeoff frame (already above air) can no longer sample.
+    var lastGroundSlipperiness = 0.6
+    // Sustained-speed window: observed vs. vanilla-possible horizontal distance over clean frames.
+    var speedWindowFrames = 0
+    // Movement packets since the last tick-end packet (blink: held packets arrive as one burst) and the
+    // teleport confirmations in between (each answers with one extra position packet).
+    var movesSinceTick = 0
+    var teleportConfirmsSinceTick = 0
+    var speedWindowObserved = 0.0
+    var speedWindowVanilla = 0.0
     var predictedVertical = 0.0
     var lastSpeedFailureTick = -1000L
     var speedFailureStreak = 0
@@ -127,7 +151,7 @@ internal class PlayerState {
     val pendingKeepAlives = LinkedHashMap<Long, Long>()
     var confirmedRttMillis = 0L
     var lastInteractionSequence = -1
-    val digStarts = HashMap<String, Long>()
+    val digStarts = HashMap<String, DigStart>()
     val digTimes = ArrayDeque<Long>()
     val placementTimes = ArrayDeque<Long>()
     val attackTimes = ArrayDeque<Long>()
@@ -152,6 +176,21 @@ internal class PlayerState {
     val violations = HashMap<String, Double>()
     val lastFailureAt = HashMap<String, Long>()
 
+    /** Time of each check's last verdict (pass or fail); decay runs on the time between verdicts. */
+    val violationTouchedAt = HashMap<String, Long>()
+
+    /** Whether each check's last verdict was a failure (continuous failing pauses the decay). */
+    val lastVerdictFailed = HashMap<String, Boolean>()
+
+    /** The pending server-teleport exemption, cancelled as soon as the client confirms the teleport. */
+    var teleportExemption: IGuardExemption? = null
+
+    /** Observation of the frame being processed, null when nobody observes the player. */
+    var observation: FrameObservation? = null
+
+    /** Reused observation buffer (allocated on first observation only). */
+    var observationBuffer: FrameObservation? = null
+
     /** Clears the motion-tracking fields after a teleport/respawn so stale deltas cannot flag. */
     fun resetMotion() {
         lastMovement = null
@@ -172,6 +211,31 @@ internal class PlayerState {
         physicalSupporting = true
         sprintBackStreak = 0
         elytraLevelStreak = 0
+        surfaceHoverStreak = 0
+    }
+}
+
+/** Per-frame collection of verdicts and internals while the player is observed (traces, debug, listeners). */
+internal class FrameObservation {
+    val results = ArrayList<IGuardCheckResult>(8)
+    val exemptions = ArrayList<String>(4)
+    var exempt = false
+    var delta: Vec3? = null
+    var physicalSupport: Boolean? = null
+    val limits = LinkedHashMap<String, Double>()
+    val metrics = LinkedHashMap<String, Any>()
+    val targets = ArrayList<TraceTarget>(1)
+
+    /** Resets the buffer for the next frame. */
+    fun clear() {
+        results.clear()
+        exemptions.clear()
+        exempt = false
+        delta = null
+        physicalSupport = null
+        limits.clear()
+        metrics.clear()
+        targets.clear()
     }
 }
 
@@ -191,11 +255,12 @@ class CheckEngine(
     private val dynamic: AtomicReference<DynamicConfig>,
     private val serverId: String,
     private val storage: GuardStore,
-    private val alerts: AlertService,
-    private val setbacks: SetbackService,
+    private val alerts: AlertSink,
+    private val setbacks: SetbackSink,
     private val enforcement: Enforcement,
     private val notifications: de.tytoss.iguard.notify.NotificationService,
     private val logger: Logger,
+    private val observer: FrameObserver = FrameObserver.None,
 ) {
     // Dedicated worker pool so detection never competes with Dispatchers.Default (storage cleanup,
     // command coroutines). One daemon thread per stripe; per-player ordering is preserved because a
@@ -255,6 +320,18 @@ class CheckEngine(
 
     /** The player's last published API snapshot, or null. */
     fun snapshot(playerId: UUID) = published[playerId]
+
+    /**
+     * Processes a frame synchronously on the calling thread (trace replays and tests). Never mix it
+     * with [submit] for the same player while the workers run.
+     */
+    internal fun processNow(frame: PacketFrame) = process(frame)
+
+    /** All current violation levels of the player (tests, replays). */
+    internal fun violationLevels(playerId: UUID): Map<String, Double> = states[playerId]?.violations?.toMap().orEmpty()
+
+    /** The current violation level of one check, 0 when the player never failed it (tests, replays). */
+    internal fun violationLevel(playerId: UUID, checkId: String): Double = states[playerId]?.violations?.get(checkId) ?: 0.0
 
     /** The player's most recent open incident, or null. */
     fun incidentSnapshot(playerId: UUID) = incidentTracker.latest(playerId)
@@ -325,13 +402,22 @@ class CheckEngine(
         val version = runCatching { ClientVersion.valueOf(frame.clientVersion) }.getOrNull()
         val view = snapshots.view(frame.playerId)
         val profile = version?.let(VersionProfiles::forClient)
+        val observation = if (observer.wants(frame.playerId)) {
+            (state.observationBuffer ?: FrameObservation().also { state.observationBuffer = it }).also(FrameObservation::clear)
+        } else {
+            null
+        }
+        state.observation = observation
         when (frame) {
-            is MovementFrame -> if (view != null && profile != null) processMovement(frame, state, view.current, profile, view.playerName)
+            is MovementFrame -> {
+                state.movesSinceTick++
+                if (view != null && profile != null) processMovement(frame, state, view.current, profile, view.playerName)
+            }
             is AttackFrame -> if (view != null && profile != null) processAttack(frame, state, view.current, profile, view.playerName)
             is SwingFrame -> state.lastSwingAt = frame.receivedAt
             is ClientActionFrame -> processAction(frame, state)
             is ClientAbilitiesFrame -> processClientAbilities(frame, state)
-            is ClientTickFrame -> processClientTick(frame, state, view?.current, view?.playerName)
+            is ClientTickFrame -> processClientTick(frame, state, view?.current, view?.playerName, version)
             is ClientIdentityFrame -> processIdentity(frame, state, view?.playerName)
             is ServerVelocityFrame -> processVelocity(frame, state)
             is ServerTeleportFrame -> processTeleport(frame, state)
@@ -343,6 +429,10 @@ class CheckEngine(
             is InventoryClickFrame -> if (view != null) processInventoryClick(frame, state, view.current, view.playerName)
         }
         if (view != null) reportIdentity(frame, state, view.current, view.playerName)
+        if (observation != null) {
+            state.observation = null
+            emitTrace(frame, state, observation, view?.current, view?.playerName ?: frame.playerId.toString())
+        }
         // Throttle the observability snapshot: it is consumed only by /iguard info|clients and the API,
         // so rebuilding it (with map/set copies) every packet was pure hot-path waste. Always publish
         // the first frame so a newly tracked player appears immediately.
@@ -350,6 +440,39 @@ class CheckEngine(
             state.lastPublishAt = frame.receivedAt
             publish(frame, state, view?.playerName ?: frame.playerId.toString(), profile != null)
         }
+    }
+
+    private fun emitTrace(frame: PacketFrame, state: PlayerState, observation: FrameObservation, environment: EnvironmentFrame?, playerName: String) {
+        val trace = FrameTrace(
+            frame,
+            playerName,
+            environment,
+            state.clientTick,
+            observation.exempt,
+            observation.exemptions.toList(),
+            observation.results.toList(),
+            state.violations.filterValues { it > 0.0 },
+            observation.delta,
+            observation.physicalSupport,
+            linkedMapOf(
+                "predictedHorizontal" to state.predictedHorizontal.rounded(),
+                "predictedVertical" to state.predictedVertical.rounded(),
+                "horizontalUncertainty" to state.horizontalUncertainty.rounded(),
+                "verticalUncertainty" to state.verticalUncertainty.rounded(),
+                "airTicks" to state.airTicks,
+                "positionGapTicks" to state.positionGapTicks,
+                "lastVerticalDelta" to state.lastVerticalDelta.rounded(),
+                "lastHorizontalDelta" to state.lastHorizontalDelta.rounded(),
+                "sprinting" to state.sprinting,
+                "sneaking" to state.sneaking,
+                "rttMillis" to state.confirmedRttMillis,
+            ),
+            LinkedHashMap(observation.limits),
+            LinkedHashMap(observation.metrics),
+            observation.targets.toList(),
+        )
+        runCatching { observer.observe(trace) }
+            .onFailure { logger.warning("IGuard frame observer failed: ${it.message}") }
     }
 
     private fun warnOverload(playerId: UUID) {
@@ -368,7 +491,11 @@ class CheckEngine(
      * the false positives the "flight"/"game-mode"/"vehicle" exemptions already exist to prevent.
      */
     private fun elytraCheckable(environment: EnvironmentFrame): Boolean =
-        environment.environmentTags.none { it != "elytra" && it !in TELEMETRY_ONLY_TAGS }
+        environment.environmentTags.none { it != EnvironmentTags.ELYTRA && it !in EnvironmentTags.NON_EXEMPTING }
+
+    /** Movement-only grace window granted by the engine itself (frame time based, not reported as external). */
+    private fun exemptMovement(frame: PacketFrame, millis: Long, reason: String): IGuardExemption =
+        exemptions.exempt(frame.playerId, Duration.ofMillis(millis.coerceAtLeast(1)), reason, IGuardExemptionScope.MOVEMENT, frame.receivedAt, external = false)
 
     private fun processMovement(
         incoming: MovementFrame,
@@ -377,6 +504,7 @@ class CheckEngine(
         profile: VersionProfile,
         playerName: String,
     ) {
+        val observation = state.observation
         val invalid = movementEvaluator.badPacketFailure(incoming)
         if (invalid != null) {
             applyResults(incoming, state, environment, playerName, listOf(invalid), setOf("protocol.badpackets.a"))
@@ -388,6 +516,9 @@ class CheckEngine(
         if (!state.explicitClientTicks) {
             state.positionGapTicks++
             state.clientTick++
+            // Clients without the 1.21.2+ tick-end packet (older versions, also behind ViaVersion) send
+            // at most one movement packet per client tick, so the movement stream is their tick clock.
+            recordClientTick(incoming, state, environment, playerName, "movement")
         }
         val stale = incoming.receivedAt - environment.capturedAt > exemptionConfig.snapshotMaxAgeMillis
         // The environment's collision scan covers a ±2-column neighborhood around the SAMPLED
@@ -402,7 +533,9 @@ class CheckEngine(
         // "liquid" alone is not exempting (the jesus check runs there), but it must never cancel the
         // OTHER exempting tags: a boat ON water is still a vehicle, riptide IN water is still riptide —
         // treating those as checkable produced jesus/highjump false positives for every boat passenger.
-        val exemptEnvironment = environment.environmentTags.any { it != "liquid" && it !in TELEMETRY_ONLY_TAGS }
+        // Context tags (low TPS, liquid surface) never exempt.
+        val exemptingTags = EnvironmentTags.movementExempting(environment.environmentTags)
+        val exemptEnvironment = exemptingTags.isNotEmpty()
         // Grossly stale snapshot / unloaded chunk = "we could not check", not "clean". Skip is still
         // FP-safe, but we count it so metrics never mistake a load blind spot for a clean player.
         if ((stale || !covered || !environment.chunkLoaded) && incoming.positionChanged) unevaluatedFrames.incrementAndGet()
@@ -413,8 +546,24 @@ class CheckEngine(
         // fresh (sampled within ~1 tick) AND actually covers the frame's position; otherwise freeze
         // airborne accounting instead of guessing.
         val supportReliable = covered && incoming.receivedAt - environment.capturedAt <= SUPPORT_FRESH_MILLIS
-        val exempt = exemptions.isExempt(incoming.playerId, incoming.receivedAt) || exemptEnvironment ||
-            stale || !covered || !environment.chunkLoaded || previous == null || worldChanged || state.bedrock == true
+        val timedExempt = exemptions.isExempt(incoming.playerId, incoming.receivedAt)
+        val blind = stale || !covered || !environment.chunkLoaded || previous == null || worldChanged || state.bedrock == true
+        val exempt = timedExempt || exemptEnvironment || blind
+        // Climbables exempt the dry-land model (climbing is not modelled there), but fast-ladder and
+        // high-jump are built for exactly that situation: run them whenever the climbable is the ONLY
+        // reason for the exemption.
+        val climbCheckable = !timedExempt && !blind && exemptingTags.size == 1 && EnvironmentTags.CLIMBABLE in exemptingTags
+        if (observation != null && exempt) {
+            observation.exempt = true
+            if (timedExempt) exemptions.activeReasons(incoming.playerId, incoming.receivedAt).forEach { observation.exemptions += "timed:$it" }
+            exemptingTags.forEach { observation.exemptions += "tag:$it" }
+            if (stale) observation.exemptions += "stale-snapshot"
+            if (!covered) observation.exemptions += "outside-scan"
+            if (!environment.chunkLoaded) observation.exemptions += "chunk-unloaded"
+            if (previous == null) observation.exemptions += "no-previous-position"
+            if (worldChanged) observation.exemptions += "world-changed"
+            if (state.bedrock == true) observation.exemptions += "bedrock"
+        }
         val safeCandidate = if (environment.supportingCollision && !environment.colliding) {
             SafePosition(environment.worldId, environment.position, environment.yaw, environment.pitch, environment.tick)
         } else null
@@ -429,7 +578,8 @@ class CheckEngine(
         }
         if (!exempt && incoming.positionChanged) {
             val delta = frame.position - previous.position
-            val evaluation = movementEvaluator.evaluate(frame, delta, environment, profile, state, laggy)
+            observation?.delta = delta
+            val evaluation = movementEvaluator.evaluate(frame, delta, environment, profile, state, laggy, observation?.limits)
             physicalSupporting = evaluation.supporting
             val failures = evaluation.failures
             applyResults(
@@ -437,9 +587,11 @@ class CheckEngine(
                 setOf("movement.fly.a", "movement.speed.a", "movement.nofall.a", "movement.phase.a", "movement.step.a", "movement.spider.a", "movement.jesus.a"),
             )
             val extra = ArrayList<CheckFailure>(2)
+            val extraEvaluated = HashSet<String>(4)
             // The impulse heuristics below model dry-land physics only: swimming (dolphin's grace,
             // ascent out of water) legitimately produces jump-sized impulses and reversed vectors.
-            if ("liquid" !in environment.environmentTags) {
+            if (EnvironmentTags.LIQUID !in environment.environmentTags) {
+                extraEvaluated += listOf("movement.airjump.a", "movement.sprintbackwards.a", "movement.highjump.a")
                 // Air-jump: a jump-sized upward impulse while airborne and previously descending — a second
                 // jump with no ground contact (support-reliable guard prevents lag FP).
                 if (supportReliable && !evaluation.supporting && state.airTicks >= 4 && state.lastVerticalDelta < -0.02 && delta.y > 0.33) {
@@ -460,22 +612,9 @@ class CheckEngine(
                     }
                 }
                 state.sprintBackStreak = if (backwards) state.sprintBackStreak + 1 else 0
-                // Fast-ladder: climbing a ladder/vine faster than the vanilla climb speed (~0.118/tick up).
-                // Gated on the climbable environment tag, so legit ground movement can never trip it.
-                if ("climbable" in environment.environmentTags && delta.y > 0.235) {
-                    extra += CheckFailure("movement.fastladder.a", 1.0, mapOf("dy" to delta.y.rounded()))
-                }
-                // High-jump: leaving the ground with an upward impulse beyond what the active jump-boost
-                // level allows (base jump 0.42 + 0.1 per amplifier level, plus margin). Requires a fresh
-                // takeoff (previous tick roughly level) so descending/apex frames don't fire.
-                val jumpBoost = if (environment.jumpAmplifier >= 0) 0.1 * (environment.jumpAmplifier + 1) else 0.0
-                if (supportReliable && state.airTicks <= 1 && state.lastVerticalDelta <= 0.02 &&
-                    delta.y > 0.72 + jumpBoost && "climbable" !in environment.environmentTags
-                ) {
-                    extra += CheckFailure("movement.highjump.a", 1.5, mapOf("dy" to delta.y.rounded(), "airTicks" to state.airTicks))
-                }
+                movementEvaluator.highJumpFailure(delta, environment, state, supportReliable, observation?.limits)?.let(extra::add)
             }
-            if (extra.isNotEmpty()) applyResults(incoming, state, environment, playerName, extra, setOf("movement.airjump.a", "movement.sprintbackwards.a", "movement.fastladder.a", "movement.highjump.a"))
+            if (extraEvaluated.isNotEmpty()) applyResults(incoming, state, environment, playerName, extra, extraEvaluated)
             if (failures.none { it.checkId == "movement.speed.a" }) {
                 movementEvaluator.acceptHorizontal(delta, environment, state, evaluation.supporting)
             } else {
@@ -507,6 +646,14 @@ class CheckEngine(
             // old "airTicks >= 10 overrides the exemption" escape hatch nofall-flagged every rider.
             if (incoming.positionChanged && previous != null) {
                 val delta = frame.position - previous.position
+                observation?.delta = delta
+                if (climbCheckable) {
+                    val climbFailures = listOfNotNull(
+                        movementEvaluator.fastLadderFailure(frame, delta, environment, state, observation?.limits),
+                        movementEvaluator.highJumpFailure(delta, environment, state, supportReliable, observation?.limits),
+                    )
+                    applyResults(incoming, state, environment, playerName, climbFailures, setOf("movement.fastladder.a", "movement.highjump.a"))
+                }
                 if (!exempt && supportReliable && state.bedrock != true && state.airTicks >= (if (laggy) 18 else 6)) {
                     val failure = movementEvaluator.groundSpoofFailure(frame.onGround, frame.position, environment, state, laggy)
                     applyResults(incoming, state, environment, playerName, listOfNotNull(failure), setOf("movement.nofall.a"))
@@ -530,13 +677,13 @@ class CheckEngine(
         // ignoring gravity) with zero coverage. This check never touches the shared motion predictor
         // (state.predictedHorizontal/Vertical), so it cannot destabilize the dry-land checks for the
         // frame after landing. See MovementEvaluator.elytraFailure for the physics reasoning.
-        if ("elytra" in environment.environmentTags && incoming.positionChanged && previous != null &&
+        if (EnvironmentTags.ELYTRA in environment.environmentTags && incoming.positionChanged && previous != null &&
             !laggy && elytraCheckable(environment)
         ) {
             val delta = frame.position - previous.position
             val failure = movementEvaluator.elytraFailure(delta, state)
             applyResults(incoming, state, environment, playerName, listOfNotNull(failure), setOf("movement.elytrafly.a"))
-        } else if ("elytra" !in environment.environmentTags) {
+        } else if (EnvironmentTags.ELYTRA !in environment.environmentTags) {
             state.elytraLevelStreak = 0
         }
         if (!state.explicitClientTicks && supportReliable) {
@@ -545,6 +692,7 @@ class CheckEngine(
             // counted as hovering while a genuinely airborne cheater still accrues on fresh ticks.
             state.airTicks = if (physicalSupporting) 0 else state.airTicks + 1
         }
+        observation?.physicalSupport = physicalSupporting
         if (incoming.rotationChanged) {
             if (!state.lastRotationYaw.isNaN()) {
                 state.lastYawDelta = abs(yawDelta(frame.yaw, state.lastRotationYaw))
@@ -568,7 +716,7 @@ class CheckEngine(
             ClientAction.STOP_SNEAKING -> state.sneaking = false
             ClientAction.START_ELYTRA -> {
                 state.resetMotion()
-                exemptions.exempt(frame.playerId, Duration.ofMillis(exemptionConfig.teleportMillis), "elytra-action")
+                exemptMovement(frame, exemptionConfig.teleportMillis, "elytra-action")
             }
             ClientAction.OTHER -> Unit
         }
@@ -643,12 +791,24 @@ class CheckEngine(
         state.clientFlying = frame.flying
         if (frame.flying || state.serverFlightAllowed) {
             state.resetMotion()
-            exemptions.exempt(frame.playerId, Duration.ofMillis(exemptionConfig.teleportMillis), "flight-ability")
+            exemptMovement(frame, exemptionConfig.teleportMillis, "flight-ability")
         }
     }
 
-    private fun processClientTick(frame: ClientTickFrame, state: PlayerState, environment: EnvironmentFrame?, playerName: String?) {
-        state.explicitClientTicks = true
+    private fun processClientTick(
+        frame: ClientTickFrame,
+        state: PlayerState,
+        environment: EnvironmentFrame?,
+        playerName: String?,
+        version: ClientVersion?,
+    ) {
+        checkMovementBurst(frame, state, environment, playerName, version)
+        if (!state.explicitClientTicks) {
+            // The first tick-end packet switches the timer from the movement-packet fallback to the
+            // explicit tick clock; mixing both sources would double-count the window.
+            state.explicitClientTicks = true
+            state.clientTickTimes.clear()
+        }
         state.clientTick++
         state.positionGapTicks = (state.positionGapTicks + 1).coerceAtMost(3)
         // Freeze the airborne accounting on a stale support sample (same rule as the legacy-client
@@ -657,22 +817,72 @@ class CheckEngine(
         if (environment != null && frame.receivedAt - environment.capturedAt <= SUPPORT_FRESH_MILLIS) {
             state.airTicks = if (state.physicalSupporting) 0 else state.airTicks + 1
         }
+        recordClientTick(frame, state, environment, playerName, "tick-end")
+    }
+
+    /**
+     * Blink check: a 1.21.2+ client ends every tick with a tick-end packet and sends at most one movement packet
+     * per tick (plus one per teleport it confirms). TCP keeps the order, so lag delays both alike; a burst of
+     * movement packets between two tick-ends only happens when a client held them back (blink, fake lag).
+     * Older clients behind ViaVersion and Bedrock players are not judged.
+     */
+    private fun checkMovementBurst(
+        frame: ClientTickFrame,
+        state: PlayerState,
+        environment: EnvironmentFrame?,
+        playerName: String?,
+        version: ClientVersion?,
+    ) {
+        val moves = state.movesSinceTick
+        val allowed = 1 + state.teleportConfirmsSinceTick
+        state.movesSinceTick = 0
+        state.teleportConfirmsSinceTick = 0
+        if (!state.explicitClientTicks || environment == null || playerName == null || state.bedrock == true) return
+        if (version == null || !version.isNewerThanOrEquals(ClientVersion.V_1_21_2)) return
+        if (moves - allowed < MOVE_BURST_MIN_EXTRA) return
+        val burst = CheckFailure(
+            "protocol.badpackets.a", 1.0,
+            mapOf("reason" to "movement-burst", "moves" to moves, "allowed" to allowed),
+            deterministic = true,
+        )
+        applyResults(frame, state, environment, playerName, listOf(burst), setOf("protocol.badpackets.a"))
+    }
+
+    /**
+     * Timer check: one sample per client tick (the explicit tick-end packet, or a movement packet for
+     * clients without it), judged over a 10-second window so lag bursts average out. Evaluated on
+     * every tick once the window is full, so the timer VL decays while the rate is legit.
+     */
+    private fun recordClientTick(frame: PacketFrame, state: PlayerState, environment: EnvironmentFrame?, playerName: String?, source: String) {
         state.clientTickTimes.addLast(frame.receivedAt)
-        while (state.clientTickTimes.firstOrNull()?.let { frame.receivedAt - it > 10_000 } == true) state.clientTickTimes.removeFirst()
-        val first = state.clientTickTimes.firstOrNull()
-        if (environment != null && playerName != null && first != null && frame.receivedAt - first >= 9_000 &&
-            state.clientTickTimes.size >= 190 && frame.receivedAt - state.lastTimerFailureAt >= 1_000
-        ) {
-            val rate = (state.clientTickTimes.size - 1) * 1000.0 / (frame.receivedAt - first).coerceAtLeast(1)
-            if (rate > 21.2 && state.bedrock != true && state.confirmedRttMillis < 500 && environment.tps >= 19.0) {
-                state.lastTimerFailureAt = frame.receivedAt
-                applyResults(
-                    frame, state, environment, playerName,
-                    listOf(CheckFailure("movement.timer.a", 1.0, mapOf("clientTps" to rate.rounded(), "samples" to state.clientTickTimes.size, "rtt" to state.confirmedRttMillis))),
-                    setOf("movement.timer.a"),
-                )
-            }
+        while (state.clientTickTimes.firstOrNull()?.let { frame.receivedAt - it > TIMER_WINDOW_MILLIS } == true) state.clientTickTimes.removeFirst()
+        val first = state.clientTickTimes.firstOrNull() ?: return
+        if (environment == null || playerName == null) return
+        if (frame.receivedAt - first < TIMER_MIN_SPAN_MILLIS || state.clientTickTimes.size < TIMER_MIN_SAMPLES) return
+        // Not judgeable: Bedrock clients tick differently, a high RTT means bursty delivery and a
+        // lagging server delays (and then bunches) the packets it reads.
+        if (state.bedrock == true || state.confirmedRttMillis >= 500 || environment.tps < 19.0) return
+        val rate = (state.clientTickTimes.size - 1) * 1000.0 / (frame.receivedAt - first).coerceAtLeast(1)
+        state.observation?.metrics?.put("clientTps", rate.rounded())
+        if (rate <= TIMER_RATE_LIMIT) {
+            applyResults(frame, state, environment, playerName, emptyList(), TIMER_CHECKS)
+            return
         }
+        if (frame.receivedAt - state.lastTimerFailureAt < 1_000) {
+            applyResults(frame, state, environment, playerName, emptyList(), TIMER_CHECKS, held = TIMER_CHECKS)
+            return
+        }
+        state.lastTimerFailureAt = frame.receivedAt
+        applyResults(
+            frame, state, environment, playerName,
+            listOf(
+                CheckFailure(
+                    "movement.timer.a", 1.0,
+                    mapOf("clientTps" to rate.rounded(), "samples" to state.clientTickTimes.size, "rtt" to state.confirmedRttMillis, "source" to source),
+                ),
+            ),
+            TIMER_CHECKS,
+        )
     }
 
     private fun processVelocity(frame: ServerVelocityFrame, state: PlayerState) {
@@ -687,7 +897,8 @@ class CheckEngine(
         // next ticks; the short exemption still covers the immediate impact tick.
         state.horizontalUncertainty = max(state.horizontalUncertainty, sqrt(frame.velocity.horizontalLengthSquared()))
         state.verticalUncertainty = max(state.verticalUncertainty, max(0.0, frame.velocity.y))
-        exemptions.exempt(frame.playerId, Duration.ofMillis(exemptionConfig.velocityMillis), frame.source)
+        // Knockback only affects movement: the hit player stays fully judgeable for reach/killaura.
+        exemptMovement(frame, exemptionConfig.velocityMillis, frame.source)
     }
 
     private fun processTeleport(frame: ServerTeleportFrame, state: PlayerState) {
@@ -702,13 +913,22 @@ class CheckEngine(
         state.pendingTeleportId = frame.teleportId
         state.serverVelocity = frame.deltaMovement
         state.velocityAt = frame.receivedAt
-        exemptions.exempt(frame.playerId, Duration.ofMillis(exemptionConfig.teleportMillis), "server-teleport")
+        // The teleport only exempts until the client confirms it (then a short grace for packets in
+        // flight). The cap only matters when no confirm arrives; a setback gets a short one so being
+        // set back can never buy a check-free window.
+        val setback = setbacks.recentSetback(frame.playerId, frame.receivedAt)
+        val cap = if (setback) minOf(exemptionConfig.teleportMillis, SETBACK_TELEPORT_CAP_MILLIS) else exemptionConfig.teleportMillis
+        state.teleportExemption?.cancel()
+        state.teleportExemption = exemptMovement(frame, cap, if (setback) "setback-teleport" else "server-teleport")
     }
 
     private fun processTeleportConfirm(frame: TeleportConfirmFrame, state: PlayerState) {
+        state.teleportConfirmsSinceTick++
         if (state.pendingTeleportId == frame.teleportId) {
             state.pendingTeleportId = null
-            exemptions.exempt(frame.playerId, Duration.ofMillis(250), "teleport-confirm")
+            state.teleportExemption?.cancel()
+            state.teleportExemption = null
+            exemptMovement(frame, TELEPORT_CONFIRM_GRACE_MILLIS, "teleport-confirm")
         }
     }
 
@@ -719,7 +939,7 @@ class CheckEngine(
         state.movementScale = frame.movementScale
         if (frame.flying || frame.flightAllowed || frame.creative) {
             state.resetMotion()
-            exemptions.exempt(frame.playerId, Duration.ofMillis(exemptionConfig.teleportMillis), "server-abilities")
+            exemptMovement(frame, exemptionConfig.teleportMillis, "server-abilities")
         }
     }
 
@@ -732,7 +952,13 @@ class CheckEngine(
         state.pendingVelocity = null
         state.clientTickTimes.clear()
         state.lastInteractionSequence = -1
-        exemptions.exempt(frame.playerId, Duration.ofMillis(exemptionConfig.respawnMillis), frame.reason)
+        state.movesSinceTick = 0
+        state.teleportConfirmsSinceTick = 0
+        // Respawns/world changes reset everything; a short full exemption covers the reload.
+        exemptions.exempt(
+            frame.playerId, Duration.ofMillis(exemptionConfig.respawnMillis.coerceAtLeast(1)), frame.reason,
+            IGuardExemptionScope.ALL, frame.receivedAt, external = false,
+        )
     }
 
     private fun processTimeline(frame: TimelineFrame, state: PlayerState) {
@@ -750,16 +976,20 @@ class CheckEngine(
 
     private fun processBlockAction(frame: BlockActionFrame, state: PlayerState, environment: EnvironmentFrame, playerName: String) {
         // The world/interaction heuristics model survival pacing: creative building (instant break,
-        // rapid place) and exempt states (bypass, dead, vehicle, ...) would flood them with FPs.
-        if (exemptions.isExempt(frame.playerId, frame.receivedAt) || environment.exemptEnvironment) return
+        // rapid place) and bypass/dead/sleeping states would flood them with FPs. Physics states
+        // (flight, vehicle, liquid …) and movement-only exemptions do NOT suspend them.
+        if (actionExempt(frame, state, environment)) return
         val failures = ArrayList<CheckFailure>()
-        if (frame.interactionSequence >= 0 && state.lastInteractionSequence >= 0 && frame.interactionSequence < state.lastInteractionSequence - 4) {
+        // Sequence 0 means "not predicted": the vanilla client numbers predicted interactions from 1 and sends
+        // every unpredicted one (abort digging, item use release, drops …) with 0 – never a regression.
+        val sequenced = frame.interactionSequence > 0
+        if (sequenced && state.lastInteractionSequence > 0 && frame.interactionSequence < state.lastInteractionSequence - 4) {
             failures += CheckFailure(
                 "protocol.badpackets.a", 1.0,
                 mapOf("reason" to "interaction-sequence-regression", "sequence" to frame.interactionSequence, "previous" to state.lastInteractionSequence),
             )
         }
-        if (frame.interactionSequence >= 0) state.lastInteractionSequence = max(state.lastInteractionSequence, frame.interactionSequence)
+        if (sequenced) state.lastInteractionSequence = max(state.lastInteractionSequence, frame.interactionSequence)
         if (frame.action == BlockAction.PLACE && listOf(frame.cursorX, frame.cursorY, frame.cursorZ).any { it !in 0.0f..1.0f || !it.isFinite() }) {
             failures += CheckFailure(
                 "protocol.badpackets.a", 2.0, mapOf("reason" to "invalid-block-cursor"),
@@ -769,8 +999,9 @@ class CheckEngine(
         val movement = state.lastMovement
         if (movement != null && frame.action != BlockAction.USE_ITEM) {
             val center = Vec3(frame.blockX + 0.5, frame.blockY + 0.5, frame.blockZ + 0.5)
-            val eye = movement.position + Vec3(0.0, environment.eyeHeight, 0.0)
+            val eye = actorPosition(movement, environment) + Vec3(0.0, environment.eyeHeight, 0.0)
             val distance = sqrt((center - eye).lengthSquared())
+            state.observation?.metrics?.put("distance", distance.rounded())
             if (distance > 6.5) {
                 failures += CheckFailure("world.interactionreach.a", 1.0, mapOf("distance" to distance.rounded(), "action" to frame.action.name))
             }
@@ -780,6 +1011,10 @@ class CheckEngine(
                 val direction = Vec3.direction(movement.yaw, movement.pitch)
                 val targetDirection = (center - eye).normalized()
                 val dot = direction.x * targetDirection.x + direction.y * targetDirection.y + direction.z * targetDirection.z
+                state.observation?.metrics?.apply {
+                    put("lookDot", dot.rounded())
+                    put("placementsPerSecond", state.placementTimes.size)
+                }
                 if (state.placementTimes.size >= 6 && frame.blockY <= movement.position.y - 0.4 && dot < 0.25) {
                     failures += CheckFailure(
                         "world.scaffold.a", 1.0,
@@ -794,26 +1029,44 @@ class CheckEngine(
         val key = "${frame.blockX},${frame.blockY},${frame.blockZ}"
         when (frame.action) {
             BlockAction.START_DIG -> {
-                state.digStarts[key] = frame.receivedAt
+                state.digStarts[key] = DigStart(frame.receivedAt, state.clientTick, state.explicitClientTicks)
                 state.digTimes.addLast(frame.receivedAt)
                 trimTimes(state.digTimes, frame.receivedAt, 1_000)
                 if (state.digTimes.size >= 12) failures += CheckFailure("world.nuker.a", 1.0, mapOf("startsPerSecond" to state.digTimes.size))
                 // No-facing: starting to dig a block the player is not looking at (nuker/no-rotation tell).
                 if (movement != null) {
                     val center = Vec3(frame.blockX + 0.5, frame.blockY + 0.5, frame.blockZ + 0.5)
-                    val eye = movement.position + Vec3(0.0, environment.eyeHeight, 0.0)
+                    val eye = actorPosition(movement, environment) + Vec3(0.0, environment.eyeHeight, 0.0)
                     val look = Vec3.direction(movement.yaw, movement.pitch)
                     val toBlock = (center - eye).normalized()
                     val dot = look.x * toBlock.x + look.y * toBlock.y + look.z * toBlock.z
+                    state.observation?.metrics?.put("digLookDot", dot.rounded())
                     if (dot < 0.2) failures += CheckFailure("world.nofacing.a", 1.0, mapOf("lookDot" to dot.rounded(), "block" to key))
                 }
             }
             BlockAction.FINISH_DIG -> state.digStarts.remove(key)?.let { started ->
-                val duration = frame.receivedAt - started
-                // Only a FINISH in the same client flush as its START is cheat evidence. A legit 1-2
-                // tick break (haste + efficiency) sends FINISH 50-100ms later, and network jitter can
-                // compress that gap — the old 74ms window fastbreak-flagged exactly those players.
-                if (duration in 0..24) failures += CheckFailure("world.fastbreak.a", 0.5, mapOf("durationMillis" to duration, "block" to key))
+                val duration = frame.receivedAt - started.at
+                val ticks = if (started.explicitTicks && state.explicitClientTicks) state.clientTick - started.tick else null
+                val dig = frame.dig
+                state.observation?.metrics?.apply {
+                    put("digMillis", duration)
+                    ticks?.let { put("digTicks", it) }
+                    dig?.let {
+                        put("digProgress", it.progressPerTick.rounded())
+                        put("digBlock", it.block)
+                    }
+                }
+                if (dig != null) {
+                    // Measured by the server while digging: compare with the vanilla break time.
+                    DigTiming.judge(dig, ticks, duration, environment.ping, dynamic.get().tuning)?.let { evidence ->
+                        failures += CheckFailure("world.fastbreak.a", 1.0, evidence)
+                    }
+                } else if (duration in 0..24) {
+                    // Unmeasured (FINISH before the first server sample): only a FINISH in the same client
+                    // flush as its START is evidence. A legit 1-2 tick break sends FINISH 50-100ms later and
+                    // jitter can compress that gap — the old 74ms window flagged exactly those players.
+                    failures += CheckFailure("world.fastbreak.a", 0.5, mapOf("durationMillis" to duration, "block" to key))
+                }
             }
             BlockAction.CANCEL_DIG -> state.digStarts.remove(key)
             else -> Unit
@@ -838,6 +1091,10 @@ class CheckEngine(
                 ),
             )
             state.lastInventoryClickAt = frame.receivedAt
+            state.observation?.metrics?.apply {
+                put("sprinting", state.sprinting)
+                put("horizontal", state.lastHorizontalDelta.rounded())
+            }
             // Bedrock (Geyser) clients can legitimately keep walking with an open inventory.
             if (state.bedrock != true && state.sprinting && state.lastHorizontalDelta > 0.12) {
                 state.inventoryMoveTimes.addLast(frame.receivedAt)
@@ -857,7 +1114,11 @@ class CheckEngine(
         profile: VersionProfile,
         playerName: String,
     ) {
-        if (exemptions.isExempt(frame.playerId, frame.receivedAt) || environment.exemptEnvironment || !environment.chunkLoaded) return
+        if (actionExempt(frame, state, environment)) return
+        if (!environment.chunkLoaded) {
+            state.observation?.apply { exempt = true; exemptions += "chunk-unloaded" }
+            return
+        }
         val movement = state.lastMovement ?: return
         val previousAttackAt = state.lastAttackAt
         state.lastAttackAt = frame.receivedAt
@@ -867,7 +1128,8 @@ class CheckEngine(
         // perfectly regular "autoclicker".
         state.attackTimes.addLast(frame.receivedAt)
         trimTimes(state.attackTimes, frame.receivedAt, 3_000)
-        if (state.attackTimes.size >= 40) {
+        val tuning = dynamic.get().tuning
+        if (state.attackTimes.size >= tuning.autoclickerMinSamples) {
             val duration = state.attackTimes.last() - state.attackTimes.first()
             if (duration >= 2_000) {
                 val intervals = state.attackTimes.zipWithNext { first, second -> (second - first).toDouble() }
@@ -875,7 +1137,13 @@ class CheckEngine(
                 val variance = intervals.sumOf { (it - mean) * (it - mean) } / intervals.size
                 val deviation = sqrt(variance)
                 val cps = (state.attackTimes.size - 1) * 1000.0 / duration
-                if (cps > 13.0 && deviation / mean.coerceAtLeast(1.0) < 0.035) {
+                state.observation?.metrics?.apply {
+                    put("cps", cps.rounded())
+                    put("intervalDeviation", (deviation / mean.coerceAtLeast(1.0)).rounded())
+                }
+                // Machine regularity from min-cps on (a metronome at 10 CPS is as suspicious as at 20). Tick
+                // aligned rates such as 12 CPS alternate 50/100ms intervals and stay above the threshold.
+                if (cps >= tuning.autoclickerMinCps && deviation / mean.coerceAtLeast(1.0) < tuning.autoclickerMaxDeviation) {
                     failures += CheckFailure(
                         "combat.autoclicker.a", 1.0,
                         mapOf("cps" to cps.rounded(), "meanInterval" to mean.rounded(), "deviation" to deviation.rounded(), "samples" to intervals.size),
@@ -904,10 +1172,22 @@ class CheckEngine(
             }
         }
         val target = snapshots.target(frame.targetEntityId)
-        if (target == null || target.playerId == frame.playerId || target.current.worldId != environment.worldId) {
-            // Cadence/no-swing/inventory apply to any attack (mobs included); the positional checks
-            // below need a tracked player target.
-            applyResults(frame, state, environment, playerName, failures, setOf("combat.autoclicker.a", "combat.noswing.a", "combat.inventory.a"))
+        val playerTarget = target != null && target.playerId != frame.playerId && target.current.worldId == environment.worldId
+        // Multi-target: vanilla attacks at most what the crosshair hits, so two different entities in one client
+        // tick (any type: players, mobs, armor stands …) are aura evidence. Without tick-end packets the tick
+        // clock is the movement stream, which idles for standing players – only player pairs count there.
+        if (state.attackTick == state.clientTick && state.attackTarget != -1 && state.attackTarget != frame.targetEntityId &&
+            (state.explicitClientTicks || (playerTarget && state.attackTargetPlayer))
+        ) {
+            failures += CheckFailure("combat.multitarget.a", 1.5, mapOf("firstTarget" to state.attackTarget, "secondTarget" to frame.targetEntityId, "clientTick" to state.clientTick))
+        }
+        state.attackTick = state.clientTick
+        state.attackTarget = frame.targetEntityId
+        state.attackTargetPlayer = playerTarget
+        if (target == null || !playerTarget) {
+            // Cadence/no-swing/inventory/multi-target apply to any attack (mobs included); the positional
+            // checks below need a tracked player target.
+            applyResults(frame, state, environment, playerName, failures, setOf("combat.autoclicker.a", "combat.noswing.a", "combat.inventory.a", "combat.multitarget.a"))
             return
         }
         // Lag compensation: the attacker acted roughly one-way latency before the packet arrived and
@@ -919,25 +1199,32 @@ class CheckEngine(
         val targetFrames = sampleTimes.map { snapshots.frameAt(target, it) }
         val attackerFrame = snapshots.view(frame.playerId)?.let { snapshots.frameAt(it, sampleTimes[0]) } ?: environment
         val eyeHeight = if (attackerFrame.entityBox.maxY - attackerFrame.entityBox.minY < 1.0) 0.4 else 1.62
-        val origin = movement.position + Vec3(0.0, eyeHeight, 0.0)
+        val origin = actorPosition(movement, environment) + Vec3(0.0, eyeHeight, 0.0)
         val direction = Vec3.direction(movement.yaw, movement.pitch)
         val tolerance = 0.1 + environment.ping.coerceIn(0, 300) * 0.0005
-        val distance = targetFrames.mapNotNull { it.entityBox.expand(tolerance).rayDistance(origin, direction, profile.reach + 1.0) }.minOrNull()
+        // Where the view ray misses a frame (or hits beyond reach + 1), the closest-point distance stands in: a
+        // lower bound of any hit, so a hit from 4+ blocks no longer escapes the check.
+        val distance = targetFrames.minOfOrNull { sample ->
+            val box = sample.entityBox.expand(tolerance)
+            box.rayDistance(origin, direction, profile.reach + 1.0) ?: box.distanceTo(origin)
+        }
+        state.observation?.apply {
+            targets += TraceTarget(frame.targetEntityId, target.playerId, target.playerName, targetFrames.sortedBy(EnvironmentFrame::capturedAt))
+            distance?.let { metrics["reachDistance"] = it.rounded() }
+            metrics["reachLimit"] = (profile.reach + tolerance).rounded()
+            metrics["ping"] = environment.ping
+        }
         if (distance != null && distance > profile.reach + tolerance) {
             failures += CheckFailure("combat.reach.a", 1.0, mapOf("distance" to distance.rounded(), "limit" to (profile.reach + tolerance).rounded(), "ping" to environment.ping))
         }
         val rotationHit = targetFrames.any { it.entityBox.expand(0.22 + tolerance).rayDistance(origin, direction, profile.reach + 1.0) != null }
+        state.observation?.metrics?.put("rotationHit", rotationHit)
         if (frame.receivedAt - previousAttackAt > 500) state.rotationMisses = 0
         state.rotationMisses = if (rotationHit) 0 else state.rotationMisses + 1
         // Geyser's input translation produces rotations a Java client never would; skip aim heuristics.
         if (state.bedrock != true && state.rotationMisses >= 3) {
             failures += CheckFailure("combat.rotation.a", 1.0, mapOf("misses" to state.rotationMisses, "target" to target.playerName))
         }
-        if (state.attackTick == state.clientTick && state.attackTarget != -1 && state.attackTarget != frame.targetEntityId) {
-            failures += CheckFailure("combat.multitarget.a", 1.5, mapOf("firstTarget" to state.attackTarget, "secondTarget" to frame.targetEntityId, "clientTick" to state.clientTick))
-        }
-        state.attackTick = state.clientTick
-        state.attackTarget = frame.targetEntityId
         // Snap-aim: attacks right after huge single-tick rotations. High-sensitivity players flick past
         // 60°/tick legitimately, so this needs a larger angle AND a repeat before it becomes evidence.
         val snapped = frame.receivedAt - state.lastRotationAt <= SNAP_AIM_WINDOW_MILLIS && state.lastYawDelta > SNAP_AIM_DEGREES
@@ -948,6 +1235,38 @@ class CheckEngine(
         applyResults(frame, state, environment, playerName, failures, setOf("combat.reach.a", "combat.rotation.a", "combat.multitarget.a", "combat.autoclicker.a", "combat.inventory.a", "combat.noswing.a", "combat.snapaim.a"))
     }
 
+    /**
+     * Whether combat/world/inventory checks must be skipped for this frame: only a FULL exemption or
+     * a tag under which the player cannot act normally (bypass, dead, sleeping, creative/spectator).
+     */
+    private fun actionExempt(frame: PacketFrame, state: PlayerState, environment: EnvironmentFrame): Boolean {
+        val timed = exemptions.isFullyExempt(frame.playerId, frame.receivedAt)
+        val tagged = EnvironmentTags.actionExempt(environment.environmentTags)
+        if (!timed && !tagged) return false
+        state.observation?.let { observation ->
+            observation.exempt = true
+            if (timed) {
+                exemptions.activeReasons(frame.playerId, frame.receivedAt).filter { it.startsWith("all:") }.forEach { observation.exemptions += "timed:$it" }
+            }
+            environment.environmentTags.filter { it in EnvironmentTags.ACTION_EXEMPTING }.forEach { observation.exemptions += "tag:$it" }
+        }
+        return true
+    }
+
+    // Where the player acts from: riding clients send no position packets, so their last movement
+    // position is wherever they mounted — the sampled server position is the real seat position.
+    private fun actorPosition(movement: MovementFrame, environment: EnvironmentFrame): Vec3 =
+        if (EnvironmentTags.VEHICLE in environment.environmentTags) environment.position else movement.position
+
+    /**
+     * Folds one evaluation into the violation levels.
+     *
+     * Decay is time based: on every verdict a check loses `decay-per-second` for the time since its
+     * previous verdict, except while it keeps failing (a continuous cheat must accumulate). [held]
+     * marks checks that fail this frame without adding weight (their own pacing holds them back).
+     * Sub-threshold failures feed incident confidence only in proportion to VL / alert-vl and never
+     * open an incident on their own.
+     */
     private fun applyResults(
         frame: PacketFrame,
         state: PlayerState,
@@ -955,27 +1274,52 @@ class CheckEngine(
         playerName: String,
         failures: List<CheckFailure>,
         evaluated: Set<String>,
+        held: Set<String> = emptySet(),
     ) {
         val settings = dynamic.get()
+        val now = frame.receivedAt
+        val observation = state.observation
         val failedIds = failures.mapTo(HashSet(), CheckFailure::checkId)
-        for (checkId in evaluated - failedIds) {
+        for (checkId in evaluated) {
+            if (checkId in failedIds) continue
             val config = settings.checks[checkId] ?: continue
-            state.violations.computeIfPresent(checkId) { _, value -> (value - config.decay).coerceAtLeast(0.0) }
+            val failing = checkId in held
+            decay(state, checkId, config, now, failing)
+            observation?.results?.add(
+                IGuardCheckResult(checkId, failing, false, 0.0, state.violations[checkId] ?: 0.0, config.alertVl, emptyMap()),
+            )
         }
         for (failure in failures) {
             val config = settings.checks[failure.checkId] ?: continue
-            if (!config.enabled) continue
+            if (!config.enabled) {
+                observation?.results?.add(
+                    IGuardCheckResult(failure.checkId, true, false, 0.0, state.violations[failure.checkId] ?: 0.0, config.alertVl, failure.evidence + ("disabled" to true)),
+                )
+                continue
+            }
+            decay(state, failure.checkId, config, now, failing = true)
             val lastFailure = state.lastFailureAt[failure.checkId] ?: Long.MIN_VALUE
-            if (lastFailure != Long.MIN_VALUE && frame.receivedAt - lastFailure < detectionConfig.signalCooldownMillis) continue
-            state.lastFailureAt[failure.checkId] = frame.receivedAt
+            if (lastFailure != Long.MIN_VALUE && now - lastFailure < detectionConfig.signalCooldownMillis) {
+                observation?.results?.add(
+                    IGuardCheckResult(failure.checkId, true, false, 0.0, state.violations[failure.checkId] ?: 0.0, config.alertVl, failure.evidence),
+                )
+                continue
+            }
+            state.lastFailureAt[failure.checkId] = now
             val violationLevel = (state.violations[failure.checkId] ?: 0.0) + failure.weight
             state.violations[failure.checkId] = violationLevel
-            val incident = incidentTracker.assign(frame, playerName, failure)
+            observation?.results?.add(
+                IGuardCheckResult(failure.checkId, true, true, failure.weight, violationLevel, config.alertVl, failure.evidence),
+            )
+            // Evidence weight: a check below its alert level is noise-prone, so it only contributes
+            // proportionally to an incident and cannot open one by itself.
+            val evidenceWeight = if (config.alertVl <= 0.0) 1.0 else (violationLevel / config.alertVl).coerceIn(0.0, 1.0)
+            val incident = incidentTracker.assign(frame, playerName, failure, evidenceWeight, environment.worldId)
             // Forensic provenance: flag violations raised during/just after a queue-overload window,
             // where dropped frames may have distorted the motion predictor. Stored in existing JSONB.
-            val evidence = if (frame.receivedAt < state.underloadUntil) failure.evidence + ("underload" to true) else failure.evidence
+            val evidence = if (now < state.underloadUntil) failure.evidence + ("underload" to true) else failure.evidence
             val record = ViolationRecord(
-                frame.receivedAt,
+                now,
                 serverId,
                 frame.playerId,
                 playerName,
@@ -986,11 +1330,13 @@ class CheckEngine(
                 environment.ping,
                 environment.tps,
                 evidence,
-                incident.incidentId,
-                incident.confidence,
-                incident.shadowAction,
+                incident?.incidentId,
+                incident?.confidence ?: 0.0,
+                incident?.shadowAction,
             )
-            storage.enqueue(record, incident.incident)
+            // The incident itself is written by the tracker (throttled upserts); the violation row
+            // only references it.
+            storage.enqueue(record)
             if (violationLevel >= config.alertVl) alerts.record(record)
             // Setback is the primary reaction for every movement check: a movement cheat is neutralised
             // by rewinding the player, so a false positive can never ban anyone. Bans stay for the
@@ -999,6 +1345,20 @@ class CheckEngine(
                 state.safePosition?.let { setbacks.request(frame.playerId, it, failure.checkId) }
             }
         }
+    }
+
+    // Applies the time-based decay for one verdict of [checkId] at [now].
+    private fun decay(state: PlayerState, checkId: String, config: CheckConfig, now: Long, failing: Boolean) {
+        val touchedAt = state.violationTouchedAt.put(checkId, now)
+        val previousFailed = state.lastVerdictFailed.put(checkId, failing) == true
+        if (touchedAt == null || config.decayPerSecond <= 0.0) return
+        val elapsed = now - touchedAt
+        if (elapsed <= 0) return
+        // Failing again right after a failure is one continuous offence: no decay in between.
+        if (failing && previousFailed && elapsed <= CONTINUOUS_FAILURE_GAP_MILLIS) return
+        val current = state.violations[checkId] ?: return
+        if (current <= 0.0) return
+        state.violations[checkId] = (current - config.decayPerSecond * elapsed / 1000.0).coerceAtLeast(0.0)
     }
 
     private fun publish(frame: PacketFrame, state: PlayerState, playerName: String, supported: Boolean) {
@@ -1044,9 +1404,25 @@ private fun yawDelta(a: Float, b: Float): Double {
 private const val SNAP_AIM_DEGREES = 90.0
 private const val SNAP_AIM_WINDOW_MILLIS = 160L
 
-// Tags that describe server health rather than a per-player physics modifier (mirrors the sampler's
-// telemetry-only set); they never force an exemption.
-private val TELEMETRY_ONLY_TAGS = setOf("low-tps")
+// Grace after a confirmed teleport for movement packets that were already in flight.
+private const val TELEPORT_CONFIRM_GRACE_MILLIS = 250L
+
+// Upper bound of a setback teleport's exemption when the client never confirms it.
+private const val SETBACK_TELEPORT_CAP_MILLIS = 1000L
+
+// Two failures of one check closer than this are one continuous offence (no decay in between).
+private const val CONTINUOUS_FAILURE_GAP_MILLIS = 1000L
+
+// Timer check window: samples over the last 10 s, judged once 9 s and 190 samples are covered.
+private const val TIMER_WINDOW_MILLIS = 10_000L
+private const val TIMER_MIN_SPAN_MILLIS = 9_000L
+private const val TIMER_MIN_SAMPLES = 190
+private const val TIMER_RATE_LIMIT = 21.2
+private val TIMER_CHECKS = setOf("movement.timer.a")
+
+// Extra movement packets between two tick-ends before the blink check flags (vanilla sends at most one per
+// tick plus one per confirmed teleport; four or more held packets cannot come from a vanilla client).
+private const val MOVE_BURST_MIN_EXTRA = 3
 
 private const val PUBLISH_INTERVAL_MILLIS = 200L
 

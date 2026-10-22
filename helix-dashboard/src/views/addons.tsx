@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import { api, type ActionResult, type AddonAction, type AddonInfo } from "@/lib/api"
 import { usePoll } from "@/lib/use-poll"
 import { stateVariant } from "@/lib/format"
+import { useCan } from "@/lib/access"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -14,6 +15,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 export function AddonsView() {
   const { data, reload } = usePoll(() => api<AddonInfo[]>("/addons"), 6000)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const can = useCan()
+  const manage = can("addons.manage")
 
   const toggle = async (id: string, enabled: boolean) => {
     try { await api(`/addons/${id}/${enabled ? "disable" : "enable"}`, { method: "POST" }); toast.success(id); reload() }
@@ -29,13 +32,14 @@ export function AddonsView() {
       <CardContent className="p-0">
         <div className="flex items-center justify-between p-4">
           <div className="text-sm text-muted-foreground">{data?.length ?? 0} addons</div>
-          <Button size="sm" variant="outline" onClick={reloadNew}><RefreshCw className="size-4" /> Load new</Button>
+          {manage && <Button size="sm" variant="outline" onClick={reloadNew}><RefreshCw className="size-4" /> Load new</Button>}
         </div>
         <Table>
           <TableHeader><TableRow><TableHead className="w-8" /><TableHead>ID</TableHead><TableHead>Name</TableHead><TableHead>Version</TableHead><TableHead>State</TableHead><TableHead /></TableRow></TableHeader>
           <TableBody>
             {(data ?? []).map((a) => {
-              const runnable = (a.actions ?? []).filter((ac) => !ac.playerCommand)
+              // The action runner is a management tool: only for those who may manage addons.
+              const runnable = manage ? (a.actions ?? []).filter((ac) => !ac.playerCommand) : []
               const open = expanded === a.manifest.id
               return (
                 <Fragment key={a.manifest.id}>
@@ -54,12 +58,12 @@ export function AddonsView() {
                       )}
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
-                      <div className="flex justify-end"><Button size="sm" variant={a.state === "ENABLED" ? "secondary" : "default"} onClick={() => toggle(a.manifest.id, a.state === "ENABLED")}>{a.state === "ENABLED" ? "Disable" : "Enable"}</Button></div>
+                      {manage && <div className="flex justify-end"><Button size="sm" variant={a.state === "ENABLED" ? "secondary" : "default"} onClick={() => toggle(a.manifest.id, a.state === "ENABLED")}>{a.state === "ENABLED" ? "Disable" : "Enable"}</Button></div>}
                     </TableCell>
                   </TableRow>
                   {open && (
                     <TableRow>
-                      <TableCell colSpan={6} className="bg-secondary/20 p-4">
+                      <TableCell colSpan={6} className="bg-muted p-4">
                         <div className="flex flex-col gap-3">
                           {runnable.map((action) => <ActionRunner key={action.name} action={action} />)}
                         </div>
@@ -105,11 +109,11 @@ function ActionRunner({ action }: { action: AddonAction }) {
   }
 
   return (
-    <div className="rounded-lg border bg-background p-3">
+    <div className="rounded-[14px] border border-border bg-background p-3">
       <div className="flex items-baseline justify-between gap-3">
         <div>
           <span className="font-mono text-sm">{action.name}</span>
-          {action.permission && <span className="ml-2 rounded bg-secondary px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">{action.permission}</span>}
+          {action.permission && <span className="ml-2 rounded-full border border-border bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">{action.permission}</span>}
           <div className="text-xs text-muted-foreground">{action.description}</div>
         </div>
       </div>
@@ -124,7 +128,7 @@ function ActionRunner({ action }: { action: AddonAction }) {
         <Button size="sm" disabled={busy} onClick={run}><Play className="size-4" /> Run</Button>
       </div>
       {result && (
-        <div className={"mt-2 rounded-md border p-2 font-mono text-xs " + (result.success ? "" : "border-destructive/50 text-destructive")}>
+        <div className={"mt-2 rounded-[12px] border border-border p-2 font-mono text-xs " + (result.success ? "" : "border-destructive text-destructive")}>
           {result.lines.length ? result.lines.map((line, index) => <div key={index}>{line}</div>) : (result.success ? "ok" : "failed")}
         </div>
       )}

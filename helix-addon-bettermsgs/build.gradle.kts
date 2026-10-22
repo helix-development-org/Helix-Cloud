@@ -10,12 +10,12 @@ dependencies {
 
 /**
  * Packages the addon as HXA: addon.json + addon.jar plus the Paper-side
- * GUI component (paper.jar) and the self-drawn resource pack (pack.zip),
- * both built by :helix-addon-bettermsgs-paper.
+ * GUI component (paper.jar) built by :helix-addon-bettermsgs-paper. The
+ * letters ledger art ships with the Helix-GUIs pack.
  */
 val packageHxa by tasks.registering(Zip::class) {
     group = "distribution"
-    description = "Packages the addon as .hxa (addon.json + addon.jar + paper.jar + pack.zip)."
+    description = "Packages the addon as .hxa (addon.json + addon.jar + paper.jar)."
     dependsOn(tasks.named<Jar>("jar"))
     archiveFileName.set("helix-bettermsgs-$version.hxa")
     destinationDirectory.set(layout.buildDirectory.dir("distributions"))
@@ -25,8 +25,5 @@ val packageHxa by tasks.registering(Zip::class) {
     }
     from(project(":helix-addon-bettermsgs-paper").tasks.named<Jar>("jar").flatMap { it.archiveFile }) {
         rename { "paper.jar" }
-    }
-    from(project(":helix-addon-bettermsgs-paper").tasks.named("generatePack")) {
-        rename { "pack.zip" }
     }
 }

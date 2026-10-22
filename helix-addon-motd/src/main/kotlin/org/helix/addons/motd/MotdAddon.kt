@@ -11,7 +11,8 @@ import org.helix.api.action.ActionResult
  * publishes them as the `motd.config` bridge value. The velocity bridge
  * renders the matching profile on every server-list ping: lines (MiniMessage
  * and `&` codes, `{online}`/`{max}`/`{network}` placeholders), shown player
- * counts, version text and the hover sample. While network maintenance is on,
+ * counts, version text, the hover sample and the server icon (default: the
+ * KronlandMC crown seal bundled as `/favicon.png`). While network maintenance is on,
  * the maintenance profile is served automatically.
  */
 class MotdAddon : AddonBase() {
@@ -26,7 +27,8 @@ class MotdAddon : AddonBase() {
         publish()
         action(
             "motd.set",
-            "Sets a MOTD field. Fields: line1, line2, version, hover (\\n separates lines), online, max (-1 = real).",
+            "Sets a MOTD field. Fields: line1, line2, version, hover (\\n separates lines), online, max (-1 = real), " +
+                "favicon (Base64 of a 64x64 PNG, or 'default' for the network icon).",
             "motd.set <normal|maintenance> <field> <value...>",
         ) { invocation -> set(invocation.arguments) }
         action("motd.show", "Shows both MOTD profiles.", "motd.show") {
@@ -49,6 +51,11 @@ class MotdAddon : AddonBase() {
             if (imported.normal.frames.size > MAX_FRAMES || imported.maintenance.frames.size > MAX_FRAMES) {
                 return@action ActionResult.error("too many frames (max $MAX_FRAMES)")
             }
+            listOf(imported.normal, imported.maintenance)
+                .map { MotdFavicon.normalize(it.favicon) }
+                .filter { it.isNotEmpty() }
+                .firstNotNullOfOrNull { MotdFavicon.validate(it) }
+                ?.let { return@action ActionResult.error(it) }
             config = MotdConfig(
                 normal = sanitize(imported.normal),
                 maintenance = sanitize(imported.maintenance),
@@ -89,7 +96,12 @@ class MotdAddon : AddonBase() {
                 maxPlayers = value.toIntOrNull()
                     ?: if (value.equals("real", ignoreCase = true)) -1 else return ActionResult.error("max must be a number or 'real'"),
             )
-            else -> return ActionResult.error("unknown field: $field (line1, line2, version, hover, online, max)")
+            "favicon" -> {
+                val icon = if (value.equals("default", ignoreCase = true)) "" else MotdFavicon.normalize(value)
+                if (icon.isNotEmpty()) MotdFavicon.validate(icon)?.let { return ActionResult.error(it) }
+                profile.copy(favicon = icon)
+            }
+            else -> return ActionResult.error("unknown field: $field (line1, line2, version, hover, online, max, favicon)")
         }
         config = config.with(profileName, updated)
         save()
@@ -113,11 +125,20 @@ class MotdAddon : AddonBase() {
             frameIntervalMs = profile.frameIntervalMs.coerceAtLeast(MIN_INTERVAL_MS),
             line1 = first?.line1 ?: profile.line1,
             line2 = first?.line2 ?: profile.line2,
+            favicon = MotdFavicon.normalize(profile.favicon),
         )
     }
 
+    /**
+     * Publishes the configuration with every empty favicon resolved to the network icon, so the
+     * proxy always has an icon to serve while the stored configuration keeps "default" as empty.
+     */
     private fun publish() {
-        context.publishBridgeValue("motd.config", json.encodeToString(config))
+        val effective = config.copy(
+            normal = config.normal.copy(favicon = MotdFavicon.effective(config.normal)),
+            maintenance = config.maintenance.copy(favicon = MotdFavicon.effective(config.maintenance)),
+        )
+        context.publishBridgeValue("motd.config", json.encodeToString(effective))
     }
 
     private fun load(): MotdConfig =

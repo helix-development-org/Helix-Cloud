@@ -1,0 +1,653 @@
+package org.helix.addons.feedback
+
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.put
+import org.helix.addon.sdk.AddonBase
+import org.helix.addons.feedback.store.DocumentFeedbackStore
+import org.helix.addons.feedback.store.FeedbackStore
+import org.helix.addons.feedback.store.PostgresFeedbackStore
+import org.helix.api.action.ActionInvocation
+import org.helix.api.action.ActionResult
+import org.helix.api.action.ActionSource
+import org.helix.api.addon.ProfileInfoEntry
+import org.helix.api.addon.ProfileInfoProvider
+import org.helix.api.design.PlayerRanks
+import org.helix.api.message.Messages
+import org.helix.api.release.ReleaseReport
+import org.helix.api.release.ReleaseReset
+import org.slf4j.LoggerFactory
+import java.time.Clock
+import java.util.Base64
+
+/**
+ * Closed test phase of KronlandMC: bug reports with context, logs and attachments, a staff workflow, tester
+ * points and pending release rewards. The action contract is documented in `ACTIONS.md` of this module.
+ *
+ * @param storeFactory optional store override (tests); by default PostgreSQL when the node uses it,
+ *   otherwise the addon document storage.
+ * @param clock time source.
+ */
+class FeedbackAddon(
+    private val storeFactory: (() -> FeedbackStore)? = null,
+    private val clock: Clock = Clock.systemUTC(),
+) : AddonBase() {
+    private val logger = LoggerFactory.getLogger(FeedbackAddon::class.java)
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    private lateinit var store: FeedbackStore
+    private lateinit var messages: Messages
+
+    /** The service behind the actions (exposed for tests and sibling components). */
+    lateinit var service: FeedbackService
+        private set
+
+    override fun enable() {
+        messages = loadMessages()
+        store = storeFactory?.invoke() ?: openStore()
+        service = FeedbackService(
+            store = store,
+            clock = clock,
+            logs = ::serviceLogs,
+            notify = { category, key, params ->
+                runCatching { context.publishNotification(category, messages.format(key, params)) }
+            },
+            events = { event ->
+                runCatching { context.publishNotification(FeedbackEvent.CATEGORY, json.encodeToString(FeedbackEvent.serializer(), event)) }
+            },
+            hasPermission = { name, node -> runCatching { context.hasPermission(name, node) }.getOrDefault(false) },
+        )
+        registerActions()
+        registerTesterArea()
+        registerRelease()
+        publishSettings(service.settings())
+        panel("feedback", "Bugs", "/panel.html")
+        panel("testguide", "Befehle", "/testguide.html", GUIDE_ICON)
+        panel("bugreport", "Bug melden", "/bugreport.html", BUGREPORT_ICON)
+    }
+
+    override fun onDisable() {
+        if (::store.isInitialized) runCatching { store.close() }
+    }
+
+    private fun openStore(): FeedbackStore {
+        val connection = context.storageConnection()
+        if (connection != null && connection.mode.equals("postgres", ignoreCase = true)) {
+            return runCatching { PostgresFeedbackStore(connection) }
+                .onFailure { logger.warn("PostgreSQL feedback store unavailable, using document store: {}", it.message) }
+                .getOrElse { DocumentFeedbackStore(context.storage()) }
+        }
+        return DocumentFeedbackStore(context.storage())
+    }
+
+    private fun serviceLogs(service: String): List<String> {
+        val result = runCatching { context.actions.invoke(ActionInvocation("service.logs", listOf(service, LOG_TAIL.toString()), ActionSource.ADDON)) }
+            .getOrNull() ?: return emptyList()
+        if (!result.success) return emptyList()
+        return result.lines.filterNot { it.startsWith("no logs for ") }
+    }
+
+    private fun registerActions() {
+        action("feedback.create", "Creates a bug report.", "feedback.create <json>", permission = REPORT, bridgeInvocable = true) { inv ->
+            val body = body(inv, 0) ?: return@action bad("usage: feedback.create <json>")
+            // A tester in the dashboard reports as themselves: reporter, source and context of the payload are ignored
+            // (a forged context.service would otherwise pull server logs into the tester's own report).
+            val panel = panelPlayer(inv)
+            // Dashboard team members report under their own name too; the payload reporter only counts for
+            // bridge (the server names its player) and addon calls.
+            val reporter = panel ?: sessionPlayer(inv) ?: ref(body["reporter"])
+            val viewer = viewer(inv, reporter, asPlayer(body))
+            val input = NewReport(
+                reporter = reporter,
+                severity = body.str("severity").orEmpty(),
+                category = body.str("category").orEmpty(),
+                title = body.str("title").orEmpty(),
+                description = body.str("description").orEmpty(),
+                source = if (panel != null) Sources.PANEL else body.str("source") ?: if (inv.source == ActionSource.BRIDGE) Sources.INGAME else Sources.PANEL,
+                context = if (panel != null) JsonObject(emptyMap()) else body["context"] as? JsonObject ?: JsonObject(emptyMap()),
+            )
+            reply(service.create(input, viewer)) { encode(Report.serializer(), it) }
+        }
+        action("feedback.auto", "Records an automatic exception report.", "feedback.auto <json>", permission = STAFF, bridgeInvocable = true) { inv ->
+            val body = body(inv, 0) ?: return@action bad("usage: feedback.auto <json>")
+            val input = AutoReport(
+                hash = body.str("hash").orEmpty(),
+                title = body.str("title").orEmpty(),
+                description = body.str("description").orEmpty(),
+                category = body.str("category") ?: "network",
+                severity = body.str("severity") ?: Severities.ANNOYING,
+                context = (body["context"] as? JsonObject ?: JsonObject(emptyMap())).let { ctx ->
+                    body.str("service")?.let { JsonObject(ctx + ("service" to JsonPrimitive(it))) } ?: ctx
+                },
+                player = ref(body["player"]),
+            )
+            reply(service.auto(input)) { (report, new) ->
+                buildJsonObject { put("nr", report.nr); put("new", new); put("count", report.count) }.toString()
+            }
+        }
+        action("feedback.list", "Lists bug reports.", "feedback.list [json]", permission = STAFF) { inv ->
+            val body = body(inv, 0) ?: JsonObject(emptyMap())
+            val viewer = viewer(inv, ref(body["viewer"]))
+            val filter = ListFilter(
+                status = body.strings("status"),
+                severity = body.strings("severity"),
+                category = body.strings("category"),
+                reporter = body.str("reporter"),
+                query = body.str("query"),
+                limit = (body["limit"] as? JsonPrimitive)?.intOrNull ?: 50,
+                offset = (body["offset"] as? JsonPrimitive)?.intOrNull ?: 0,
+                sort = body.str("sort") ?: "new",
+            )
+            val (total, items) = service.list(filter, viewer)
+            ActionResult.ok(
+                buildJsonObject {
+                    put("total", total)
+                    put("items", json.encodeToJsonElement(ListSerializer(Report.serializer()), items))
+                }.toString(),
+            )
+        }
+        action("feedback.get", "Shows one bug report.", "feedback.get <nr> [viewerJson]", permission = REPORT, bridgeInvocable = true) { inv ->
+            val nr = number(inv, 0) ?: return@action bad("usage: feedback.get <nr> [viewerJson]")
+            val viewer = viewer(inv, ref(body(inv, 1)))
+            reply(service.get(nr, viewer)) { d ->
+                buildJsonObject {
+                    put("report", json.encodeToJsonElement(Report.serializer(), d.report))
+                    put("comments", json.encodeToJsonElement(ListSerializer(Comment.serializer()), d.comments))
+                    put("events", json.encodeToJsonElement(ListSerializer(ReportEvent.serializer()), d.events))
+                }.toString()
+            }
+        }
+        action("feedback.comment", "Comments on a bug report.", "feedback.comment <json>", permission = REPORT, bridgeInvocable = true) { inv ->
+            val body = body(inv, 0) ?: return@action bad("usage: feedback.comment <json>")
+            val nr = (body["nr"] as? JsonPrimitive)?.longOrNull ?: return@action bad("nr required")
+            val viewer = viewer(inv, ref(body["author"]), asPlayer(body))
+            reply(service.comment(nr, body.str("text").orEmpty(), viewer, body.str("via"))) { encode(Comment.serializer(), it) }
+        }
+        action("feedback.status", "Changes the status of a bug report.", "feedback.status <json>", permission = STAFF) { inv ->
+            val body = body(inv, 0) ?: return@action bad("usage: feedback.status <json>")
+            val nr = (body["nr"] as? JsonPrimitive)?.longOrNull ?: return@action bad("nr required")
+            reply(service.status(nr, body.str("status").orEmpty(), viewer(inv, ref(body["actor"])), body.str("note"))) {
+                encode(Report.serializer(), it)
+            }
+        }
+        action("feedback.assign", "Assigns a bug report.", "feedback.assign <json>", permission = STAFF) { inv ->
+            val body = body(inv, 0) ?: return@action bad("usage: feedback.assign <json>")
+            val nr = (body["nr"] as? JsonPrimitive)?.longOrNull ?: return@action bad("nr required")
+            reply(service.assign(nr, body.str("assignee"), viewer(inv, ref(body["actor"])))) { encode(Report.serializer(), it) }
+        }
+        action("feedback.duplicate", "Marks a bug report as duplicate.", "feedback.duplicate <json>", permission = STAFF) { inv ->
+            val body = body(inv, 0) ?: return@action bad("usage: feedback.duplicate <json>")
+            val nr = (body["nr"] as? JsonPrimitive)?.longOrNull ?: return@action bad("nr required")
+            val of = (body["of"] as? JsonPrimitive)?.longOrNull ?: return@action bad("of required")
+            reply(service.duplicate(nr, of, viewer(inv, ref(body["actor"])))) { encode(Report.serializer(), it) }
+        }
+        action("feedback.severity", "Reclassifies a bug report (severity, optional category).", "feedback.severity <nr> <severity> [category]", permission = STAFF) { inv ->
+            val nr = number(inv, 0) ?: return@action bad("usage: feedback.severity <nr> <severity> [category]")
+            val severity = inv.arguments.getOrNull(1) ?: return@action bad("usage: feedback.severity <nr> <severity> [category]")
+            reply(service.severity(nr, severity, inv.arguments.getOrNull(2), viewer(inv, null))) { encode(Report.serializer(), it) }
+        }
+        action("feedback.attach", "Attaches a file to a bug report.", "feedback.attach <nr> <name> <mime> <base64> [viewerJson]", permission = REPORT, bridgeInvocable = true) { inv ->
+            val nr = number(inv, 0) ?: return@action bad("usage: feedback.attach <nr> <name> <mime> <base64> [viewerJson]")
+            val bytes = decode(inv.arguments.getOrNull(3)) ?: return@action fail("invalid_attachment", "base64 expected")
+            val extra = body(inv, 4)
+            val viewer = viewer(inv, ref(extra), extra?.let(::asPlayer) ?: false)
+            reply(service.attach(nr, inv.arguments.getOrNull(1).orEmpty(), inv.arguments.getOrNull(2).orEmpty(), bytes, viewer, extra?.str("via"))) {
+                encode(Attachment.serializer(), it)
+            }
+        }
+        action("feedback.attach.chunk", "Receives one chunk of an attachment upload.", "feedback.attach.chunk <uploadId> <index> <count> <base64>", permission = REPORT, bridgeInvocable = true) { inv ->
+            val index = inv.arguments.getOrNull(1)?.toIntOrNull()
+            val count = inv.arguments.getOrNull(2)?.toIntOrNull()
+            val bytes = decode(inv.arguments.getOrNull(3))
+            if (index == null || count == null || bytes == null) return@action bad("usage: feedback.attach.chunk <uploadId> <index> <count> <base64>")
+            reply(service.chunk(inv.arguments[0], index, count, bytes, uploadOwner(inv))) { buildJsonObject { put("received", it) }.toString() }
+        }
+        action("feedback.attach.finish", "Completes a chunked attachment upload.", "feedback.attach.finish <uploadId> <nr> <name> <mime> [viewerJson]", permission = REPORT, bridgeInvocable = true) { inv ->
+            val nr = number(inv, 1) ?: return@action bad("usage: feedback.attach.finish <uploadId> <nr> <name> <mime> [viewerJson]")
+            val extra = body(inv, 4)
+            val viewer = viewer(inv, ref(extra), extra?.let(::asPlayer) ?: false)
+            reply(service.finish(inv.arguments[0], nr, inv.arguments.getOrNull(2).orEmpty(), inv.arguments.getOrNull(3).orEmpty(), viewer, extra?.str("via"), uploadOwner(inv))) {
+                encode(Attachment.serializer(), it)
+            }
+        }
+        action("feedback.attachment", "Returns an attachment (mime, base64).", "feedback.attachment <id>", permission = STAFF) { inv ->
+            val id = inv.arguments.getOrNull(0) ?: return@action bad("usage: feedback.attachment <id>")
+            val (mime, bytes) = service.attachment(id) ?: return@action fail("not_found", "attachment $id not found")
+            ActionResult.ok(mime, Base64.getEncoder().encodeToString(bytes))
+        }
+        action("feedback.discord.link", "Links a bug report to its Discord thread.", "feedback.discord.link <nr> <threadId|->", permission = STAFF) { inv ->
+            val nr = number(inv, 0) ?: return@action bad("usage: feedback.discord.link <nr> <threadId|->")
+            val thread = inv.arguments.getOrNull(1)?.takeIf { it != "-" }.orEmpty()
+            reply(service.linkDiscord(nr, thread)) { encode(Report.serializer(), it) }
+        }
+        action("feedback.discord.find", "Finds the bug report mirrored by a Discord thread.", "feedback.discord.find <threadId>", permission = STAFF) { inv ->
+            val thread = inv.arguments.getOrNull(0) ?: return@action bad("usage: feedback.discord.find <threadId>")
+            val report = service.byDiscordThread(thread) ?: return@action fail("not_found", "no report for thread $thread")
+            ActionResult.ok(encode(Report.serializer(), report))
+        }
+        action("feedback.mine", "Lists the reports of a player.", "feedback.mine <uuid> [limit]", permission = REPORT, bridgeInvocable = true) { inv ->
+            val requested = inv.arguments.getOrNull(0) ?: return@action bad("usage: feedback.mine <uuid> [limit]")
+            // A tester in the dashboard only ever sees their own reports, whatever uuid the request names.
+            val uuid = panelPlayer(inv)?.let { it.uuid ?: return@action fail("forbidden", "unknown player ${it.name}") } ?: requested
+            val limit = inv.arguments.getOrNull(1)?.toIntOrNull() ?: 50
+            ActionResult.ok(json.encodeToString(ListSerializer(Report.serializer()), service.mine(uuid, limit)))
+        }
+        action("feedback.notifications", "Lists unread report updates of a player.", "feedback.notifications <uuid>", permission = STAFF, bridgeInvocable = true) { inv ->
+            val uuid = inv.arguments.getOrNull(0) ?: return@action bad("usage: feedback.notifications <uuid>")
+            ActionResult.ok(json.encodeToString(ListSerializer(Notification.serializer()), service.notifications(uuid)))
+        }
+        action("feedback.notifications.ack", "Marks report updates as read.", "feedback.notifications.ack <uuid> [id ...]", permission = STAFF, bridgeInvocable = true) { inv ->
+            val uuid = inv.arguments.getOrNull(0) ?: return@action bad("usage: feedback.notifications.ack <uuid> [id ...]")
+            ActionResult.ok(buildJsonObject { put("acked", service.ack(uuid, inv.arguments.drop(1).toSet())) }.toString())
+        }
+        action("feedback.top", "Tester ranking by points.", "feedback.top [limit]", permission = REPORT, bridgeInvocable = true) { inv ->
+            val limit = inv.arguments.getOrNull(0)?.toIntOrNull() ?: 10
+            val rows = service.top(limit).mapIndexed { i, p ->
+                buildJsonObject { put("rank", i + 1); put("uuid", p.uuid); put("name", p.name); put("points", p.total) }
+            }
+            ActionResult.ok(JsonArray(rows).toString())
+        }
+        action("feedback.agreement.get", "Shows the tester agreement state of a player.", "feedback.agreement.get <uuid>", permission = STAFF, bridgeInvocable = true) { inv ->
+            val uuid = inv.arguments.getOrNull(0) ?: return@action bad("usage: feedback.agreement.get <uuid>")
+            val (version, accepted) = service.agreement(uuid)
+            ActionResult.ok(
+                buildJsonObject {
+                    put("version", version)
+                    put("acceptedVersion", accepted)
+                    put("accepted", accepted != null && accepted >= version)
+                }.toString(),
+            )
+        }
+        action("feedback.agreement.accept", "Records the acceptance of the tester agreement.", "feedback.agreement.accept <uuid> [version]", permission = STAFF, bridgeInvocable = true) { inv ->
+            val uuid = inv.arguments.getOrNull(0) ?: return@action bad("usage: feedback.agreement.accept <uuid> [version]")
+            val agreement = service.accept(uuid, inv.arguments.getOrNull(1)?.toIntOrNull())
+            ActionResult.ok(buildJsonObject { put("accepted", true); put("version", agreement.version) }.toString())
+        }
+        action("feedback.settings", "Shows or patches the feedback settings.", "feedback.settings [json]", permission = "feedback.admin") { inv ->
+            val patch = body(inv, 0)
+            val settings = if (patch == null) service.settings() else when (val r = service.patchSettings(patch)) {
+                is Outcome.Ok -> r.value.also { publishSettings(it) }
+                is Outcome.Fail -> return@action fail(r.code, r.detail)
+            }
+            ActionResult.ok(encode(FeedbackSettings.serializer(), settings))
+        }
+        action("feedback.rewards.table", "Shows or replaces the release reward table.", "feedback.rewards.table [json]", permission = "feedback.admin") { inv ->
+            val raw = inv.arguments.joinToString(" ").trim()
+            val settings = if (raw.isEmpty()) {
+                service.settings()
+            } else {
+                val table = runCatching { json.parseToJsonElement(raw) as JsonArray }.getOrNull()
+                    ?.mapNotNull { it as? JsonObject } ?: return@action fail("invalid_table", "JSON array of objects expected")
+                service.setRewardTable(table)
+            }
+            ActionResult.ok(JsonArray(settings.rewards).toString())
+        }
+        action("feedback.rewards.pending", "Lists unclaimed rewards of a player.", "feedback.rewards.pending <uuid>", permission = STAFF, bridgeInvocable = true) { inv ->
+            val uuid = inv.arguments.getOrNull(0) ?: return@action bad("usage: feedback.rewards.pending <uuid>")
+            ActionResult.ok(json.encodeToString(ListSerializer(PendingReward.serializer()), service.pending(uuid)))
+        }
+        action("feedback.rewards.grant", "Queues a reward for a player.", "feedback.rewards.grant <uuid> <json>", permission = "feedback.admin") { inv ->
+            val uuid = inv.arguments.getOrNull(0) ?: return@action bad("usage: feedback.rewards.grant <uuid> <json>")
+            val reward = body(inv, 1) ?: return@action bad("reward JSON object required")
+            ActionResult.ok(encode(PendingReward.serializer(), service.grant(uuid, reward)))
+        }
+        action("feedback.rewards.claim", "Marks a reward as claimed (staff/addons; Paper uses feedback.rewards.redeem).", "feedback.rewards.claim <uuid> <id>", permission = STAFF) { inv ->
+            val uuid = inv.arguments.getOrNull(0)
+            val id = inv.arguments.getOrNull(1)
+            if (uuid == null || id == null) return@action bad("usage: feedback.rewards.claim <uuid> <id>")
+            reply(service.claim(uuid, id)) { encode(PendingReward.serializer(), it) }
+        }
+        action("feedback.toollog", "Records the use of a tester tool.", "feedback.toollog <uuid> <json>", permission = STAFF, bridgeInvocable = true) { inv ->
+            val uuid = inv.arguments.getOrNull(0) ?: return@action bad("usage: feedback.toollog <uuid> <json>")
+            val body = body(inv, 1) ?: return@action bad("usage: feedback.toollog <uuid> <json>")
+            reply(service.toolLog(uuid, body)) { encode(ToolLogEntry.serializer(), it) }
+        }
+        action("feedback.toollog.list", "Lists tester tool usage.", "feedback.toollog.list [uuid|-] [limit]", permission = STAFF) { inv ->
+            val uuid = inv.arguments.getOrNull(0)?.takeIf { it != "-" && it.isNotBlank() }
+            val limit = inv.arguments.getOrNull(1)?.toIntOrNull() ?: 100
+            ActionResult.ok(json.encodeToString(ListSerializer(ToolLogEntry.serializer()), service.toolLogs(uuid, limit)))
+        }
+        action("feedback.whoami", "Panel user and its feedback rights.", "feedback.whoami", permission = REPORT) { inv ->
+            val actor = inv.actor?.takeIf { it.isNotBlank() }
+            val name = actor ?: "dashboard"
+            val has = { node: String -> actor != null && runCatching { context.hasPermission(actor, node) }.getOrDefault(false) }
+            ActionResult.ok(
+                buildJsonObject {
+                    put("name", name)
+                    put("staff", actor == null || staffActor(actor))
+                    put("admin", actor == null || has(ADMIN) || has(FULL_ADMIN))
+                    context.resolvePlayerUuid(name)?.takeIf { actor != null }?.let { put("uuid", it) }
+                }.toString(),
+            )
+        }
+        action("feedback.export", "Summary of reports and points for the panel.", "feedback.export", permission = STAFF) { _ ->
+            val all = service.all()
+            ActionResult.ok(
+                buildJsonObject {
+                    put("total", all.size)
+                    put("byStatus", JsonObject(all.groupingBy { it.status }.eachCount().mapValues { JsonPrimitive(it.value) }))
+                    put("bySeverity", JsonObject(all.groupingBy { it.severity }.eachCount().mapValues { JsonPrimitive(it.value) }))
+                    put("top", json.encodeToJsonElement(ListSerializer(Points.serializer()), service.top(50)))
+                }.toString(),
+            )
+        }
+    }
+
+    /**
+     * The tester area of the dashboard (tabs „Befehle“ and „Bug melden“) and the in-game `/befehle` link: the command
+     * guide, the public report limits and the reporter's own attachments.
+     */
+    private fun registerTesterArea() {
+        action("feedback.testguide", "The tester command guide (JSON catalog).", "feedback.testguide", permission = REPORT) { _ ->
+            val raw = TestGuide.raw() ?: return@action fail("not_found", "command guide missing")
+            ActionResult.ok(raw)
+        }
+        action("feedback.limits", "Public report limits for the tester tab.", "feedback.limits", permission = REPORT) { _ ->
+            val s = service.settings()
+            ActionResult.ok(
+                buildJsonObject {
+                    put("testphase", s.testphase)
+                    put("cooldownSeconds", s.cooldownSeconds)
+                    put("maxPerDay", s.maxPerDay)
+                    put("maxAttachmentBytes", s.maxAttachmentBytes)
+                    put("maxAttachmentsPerReport", s.maxAttachmentsPerReport)
+                }.toString(),
+            )
+        }
+        action(
+            "feedback.attachment.mine",
+            "Returns an attachment of a report the caller may see (reporter or staff): mime, base64.",
+            "feedback.attachment.mine <id> [viewerJson]",
+            permission = REPORT,
+        ) { inv ->
+            val id = inv.arguments.getOrNull(0) ?: return@action bad("usage: feedback.attachment.mine <id> [viewerJson]")
+            val viewer = viewer(inv, ref(body(inv, 1)))
+            when (val outcome = service.attachmentFor(id, viewer)) {
+                is Outcome.Ok -> ActionResult.ok(outcome.value.first, Base64.getEncoder().encodeToString(outcome.value.second))
+                is Outcome.Fail -> fail(outcome.code, outcome.detail)
+            }
+        }
+        action(
+            "befehle",
+            "Links to the tester command guide in the dashboard.",
+            "befehle",
+            playerCommand = true,
+            permission = REPORT,
+        ) { inv ->
+            val player = inv.arguments.firstOrNull() ?: return@action ActionResult.error("missing executing player")
+            val url = panelUrl()
+            if (url == null) {
+                ActionResult.ok(messages.formatFor(player, "guide.nourl"))
+            } else {
+                ActionResult.ok(messages.formatFor(player, "guide.link", "url" to guideLink(url)))
+            }
+        }
+    }
+
+    /** The public dashboard address from the admin addon (`admin.panelurl`), `null` when none is set. */
+    private fun panelUrl(): String? {
+        val result = runCatching { context.actions.invoke(ActionInvocation("admin.panelurl", emptyList(), ActionSource.ADDON)) }.getOrNull()
+        return result?.takeIf { it.success }?.lines?.firstOrNull()?.trim()?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
+    }
+
+    /**
+     * Release reset participant, reward redemption and the beta-tester profile entry (plan 1, sections 8/9).
+     */
+    private fun registerRelease() {
+        action(
+            "feedback" + ReleaseReset.ACTION_SUFFIX,
+            "Release reset: queues release rewards, grants the beta badge to point holders and closes the test phase.",
+            "feedback.release.reset <plan|run>",
+            permission = ReleaseReset.PERMISSION,
+        ) { inv ->
+            val dryRun = ReleaseReset.dryRun(inv.arguments) ?: return@action bad("usage: feedback.release.reset <plan|run>")
+            ActionResult.ok(releaseReset(dryRun).toJson())
+        }
+        action(
+            "feedback.rewards.redeem",
+            "Redeems a pending reward: pays crowns and permissions of network parts, marks CityBuild parts delivered.",
+            "feedback.rewards.redeem <uuid> <id> <name>",
+            bridgeInvocable = true,
+        ) { inv ->
+            val uuid = inv.arguments.getOrNull(0)
+            val id = inv.arguments.getOrNull(1)
+            val name = inv.arguments.getOrNull(2)
+            if (uuid == null || id == null || name == null) return@action bad("usage: feedback.rewards.redeem <uuid> <id> <name>")
+            // A server may only redeem for a player who is online on the network under that uuid and name.
+            if (inv.source == ActionSource.BRIDGE &&
+                context.onlinePlayers().none { it.uuid.equals(uuid, ignoreCase = true) && it.name.equals(name, ignoreCase = true) }
+            ) {
+                return@action fail("forbidden", "player $name is not online with uuid $uuid")
+            }
+            redeem(uuid, id, name)
+        }
+        context.registerProfileInfoProvider(
+            /** Profile entries „Beta-Tester“ (badge permission) and „Bug-Punkte“. */
+            object : ProfileInfoProvider {
+                override fun infoFor(player: String): List<ProfileInfoEntry> {
+                    val entries = mutableListOf<ProfileInfoEntry>()
+                    val badge = runCatching { context.hasPermission(player, PlayerRanks.BETA_TESTER_BADGE) }.getOrDefault(false)
+                    if (badge) entries += ProfileInfoEntry(messages.rawFor(player, "profile.badge"), messages.rawFor(player, "profile.badge.value"))
+                    service.top(Int.MAX_VALUE).firstOrNull { it.name.equals(player, ignoreCase = true) }?.let { points ->
+                        entries += ProfileInfoEntry(messages.rawFor(player, "profile.points"), points.total.toString())
+                    }
+                    return entries
+                }
+            },
+        )
+    }
+
+    /**
+     * Prepares rewards, grants `badge.betatester` to every point holder and closes the test phase.
+     *
+     * @param dryRun `true` only computes.
+     * @return the participant report.
+     */
+    internal fun releaseReset(dryRun: Boolean): ReleaseReport {
+        val preparation = service.prepareRelease(dryRun)
+        var badges = 0
+        if (!dryRun) {
+            preparation.holders.forEach { holder ->
+                val name = holder.name.ifBlank { context.lastKnownName(holder.uuid) ?: return@forEach }
+                val result = runCatching {
+                    context.actions.invoke(ActionInvocation("perm.user.grant", listOf(name, PlayerRanks.BETA_TESTER_BADGE), ActionSource.ADDON))
+                }.getOrNull()
+                if (result?.success == true) badges++ else logger.warn("Beta badge for {} failed: {}", name, result?.lines)
+            }
+            publishSettings(service.settings())
+        }
+        return ReleaseReport(
+            addon = "feedback",
+            mode = if (dryRun) ReleaseReset.PLAN else ReleaseReset.RUN,
+            kept = mapOf(
+                "reports" to "bug reports, comments, attachments and points",
+                "rewards" to "pending rewards (paid out after the release)",
+            ),
+            notes = listOf(
+                "point holders: ${preparation.holders.size}",
+                "release reward parts: ${preparation.granted.size} (" +
+                    "${preparation.granted.count { ReleaseRewards.partOf(it.reward) == ReleaseRewards.PART_NETWORK }} network, " +
+                    "${preparation.granted.count { ReleaseRewards.partOf(it.reward) == ReleaseRewards.PART_CITYBUILD }} citybuild)",
+                "already prepared: ${preparation.alreadyPrepared}, below every tier: ${preparation.withoutTier}",
+                if (dryRun) "beta badge would be granted to ${preparation.holders.size} point holder(s)" else "beta badge granted: $badges",
+                "test phase: " + if (dryRun) "would be closed" else "closed",
+            ),
+        )
+    }
+
+    /**
+     * Pays a pending reward. Network parts pay crowns (`eco.api.deposit`, reason `release-reward`, ref = reward
+     * id) and grant permissions; CityBuild parts are only marked as delivered (the plugin gave the items). A failed
+     * payout reopens the reward.
+     */
+    private fun redeem(uuid: String, id: String, name: String): ActionResult {
+        val claimed = when (val outcome = service.claim(uuid, id)) {
+            is Outcome.Ok -> outcome.value
+            is Outcome.Fail -> return fail(outcome.code, outcome.detail)
+        }
+        if (ReleaseRewards.partOf(claimed.reward) == ReleaseRewards.PART_NETWORK) {
+            val kronen = (claimed.reward["kronen"] as? JsonPrimitive)?.longOrNull ?: 0L
+            if (kronen > 0) {
+                val paid = runCatching {
+                    context.actions.invoke(
+                        ActionInvocation("eco.api.deposit", listOf(uuid, kronen.toString(), "release-reward", id), ActionSource.ADDON),
+                    )
+                }.getOrNull()
+                if (paid?.success != true) {
+                    service.unclaim(uuid, id)
+                    return fail("payout_failed", paid?.lines?.joinToString(" ") ?: "economy unavailable")
+                }
+            }
+            (claimed.reward["permissions"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.forEach { node ->
+                runCatching { context.actions.invoke(ActionInvocation("perm.user.grant", listOf(name, node), ActionSource.ADDON)) }
+                    .onFailure { logger.warn("Reward permission {} for {} failed: {}", node, name, it.message) }
+            }
+        }
+        return ActionResult.ok(encode(PendingReward.serializer(), claimed))
+    }
+
+    /**
+     * Publishes the settings Paper components read (everything except the reward table) as bridge value
+     * `feedback.settings`.
+     */
+    private fun publishSettings(settings: FeedbackSettings) {
+        val full = json.encodeToJsonElement(FeedbackSettings.serializer(), settings) as JsonObject
+        runCatching { context.publishBridgeValue(SETTINGS_KEY, JsonObject(full - "rewards").toString()) }
+    }
+
+    /**
+     * Builds the caller. Bridge calls (Paper components) always act as the named player and never get staff rights:
+     * the payload name is not trusted for permissions. Dashboard calls are staff only when the signed-in player holds
+     * `feedback.staff` (or is a full admin, or uses the static admin token); everyone else – a tester in the
+     * dashboard – acts as themselves with player rights, and payload names are ignored ([panelPlayer]). Addons acting
+     * for a player (`asPlayer`, the Discord bot) get staff rights only when that player has `feedback.staff`; CLI and
+     * other addon calls are staff.
+     */
+    private fun viewer(inv: ActionInvocation, ref: PlayerRef?, asPlayer: Boolean = false): Viewer {
+        if (inv.source == ActionSource.BRIDGE) return bridgeViewer(ref)
+        panelPlayer(inv)?.let { return Viewer(it, false) }
+        // A signed-in team member acts under their own session name; actor/author names in the payload are ignored.
+        sessionPlayer(inv)?.let { return Viewer(it, true) }
+        if (!(asPlayer && ref != null)) {
+            return Viewer(ref ?: PlayerRef(null, inv.actor ?: "dashboard"), true)
+        }
+        val staff = ref.name.takeIf { it.isNotBlank() }?.let { runCatching { context.hasPermission(it, STAFF) }.getOrDefault(false) } ?: false
+        return Viewer(ref, staff)
+    }
+
+    /**
+     * The signed-in dashboard player of a non-staff REST call (identity from the session, uuid resolved by name),
+     * `null` for staff, the static admin token and every other source.
+     */
+    private fun panelPlayer(inv: ActionInvocation): PlayerRef? {
+        if (inv.source != ActionSource.REST) return null
+        val actor = inv.actor?.takeIf { it.isNotBlank() } ?: return null
+        if (staffActor(actor)) return null
+        return PlayerRef(runCatching { context.resolvePlayerUuid(actor) }.getOrNull(), actor)
+    }
+
+    /**
+     * The signed-in dashboard user of any REST call (team or not), identity from the session; `null` for the static
+     * admin token and every other source.
+     */
+    private fun sessionPlayer(inv: ActionInvocation): PlayerRef? {
+        if (inv.source != ActionSource.REST) return null
+        val actor = inv.actor?.takeIf { it.isNotBlank() } ?: return null
+        return PlayerRef(runCatching { context.resolvePlayerUuid(actor) }.getOrNull(), actor)
+    }
+
+    /**
+     * Who owns a chunked upload: a dashboard player (only they may finish it, a few at a time), the servers
+     * (bridge) or the team/system.
+     */
+    private fun uploadOwner(inv: ActionInvocation): String =
+        panelPlayer(inv)?.let { FeedbackService.PLAYER_OWNER_PREFIX + it.name.lowercase() }
+            ?: when (inv.source) {
+                ActionSource.BRIDGE -> "bridge"
+                ActionSource.REST -> "staff:" + (inv.actor?.lowercase() ?: "admin")
+                else -> FeedbackService.SYSTEM_OWNER
+            }
+
+    /** Whether a signed-in dashboard player works with staff rights (`feedback.staff` or full admin). */
+    private fun staffActor(name: String): Boolean =
+        runCatching { context.hasPermission(name, STAFF) || context.hasPermission(name, FULL_ADMIN) }.getOrDefault(false)
+
+    /** `asPlayer: true` lets an addon (the Discord bot) act with the rights and limits of the named player. */
+    private fun asPlayer(body: JsonObject): Boolean = (body["asPlayer"] as? JsonPrimitive)?.booleanOrNull == true
+
+    private fun ref(element: kotlinx.serialization.json.JsonElement?): PlayerRef? {
+        val obj = element as? JsonObject ?: return null
+        val uuid = obj.str("uuid")
+        val name = obj.str("name").orEmpty()
+        return if (uuid == null && name.isBlank()) null else PlayerRef(uuid, name)
+    }
+
+    private fun body(inv: ActionInvocation, index: Int): JsonObject? {
+        val raw = inv.arguments.drop(index).joinToString(" ")
+        if (raw.isBlank()) return null
+        return runCatching { json.parseToJsonElement(raw).jsonObject }.getOrNull()
+    }
+
+    private fun number(inv: ActionInvocation, index: Int): Long? = inv.arguments.getOrNull(index)?.removePrefix("#")?.toLongOrNull()
+
+    private fun decode(raw: String?): ByteArray? = raw?.let { runCatching { Base64.getDecoder().decode(it) }.getOrNull() }
+
+    private fun <T> encode(serializer: kotlinx.serialization.KSerializer<T>, value: T): String = json.encodeToString(serializer, value)
+
+    private fun <T> reply(outcome: Outcome<T>, render: (T) -> String): ActionResult = when (outcome) {
+        is Outcome.Ok -> ActionResult.ok(render(outcome.value))
+        is Outcome.Fail -> fail(outcome.code, outcome.detail)
+    }
+
+    private fun fail(code: String, detail: String) = ActionResult.error(code, detail)
+
+    private fun bad(usage: String) = ActionResult.error("usage", usage)
+
+    internal companion object {
+        /**
+         * The caller of a bridge call: always the named player, never staff.
+         *
+         * @param ref player from the payload.
+         * @return the viewer.
+         */
+        fun bridgeViewer(ref: PlayerRef?): Viewer = Viewer(ref, false)
+
+        /** Staff permission of the feedback workflow. */
+        const val STAFF = "feedback.staff"
+
+        /** Permission for settings and the reward table. */
+        const val ADMIN = "feedback.admin"
+
+        /** Reporting permission of testers; also gates the player-facing actions over the dashboard. */
+        const val REPORT = "feedback.report"
+
+        /** Full node admin: staff in the dashboard like the static token. */
+        const val FULL_ADMIN = "helix.admin"
+        /** Console lines requested from `service.logs`. */
+        const val LOG_TAIL = 2000
+        /** Bridge value carrying the public settings. */
+        const val SETTINGS_KEY = "feedback.settings"
+
+        /** Sidebar icon of the tab „Befehle“ (terminal prompt). */
+        const val GUIDE_ICON = "<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M7 9l3 3-3 3M12 15h5\"/>"
+
+        /** Sidebar icon of the tab „Bug melden“ (bug). */
+        const val BUGREPORT_ICON = "<rect x=\"8\" y=\"6\" width=\"8\" height=\"14\" rx=\"4\"/><path d=\"M12 6V3M8 11H4M20 11h-4M8 16H5M19 16h-3M9 4l1 2M15 4l-1 2\"/>"
+
+        /**
+         * Deep link into the dashboard tab „Befehle“.
+         *
+         * @param panelUrl public dashboard address.
+         * @return the link (`…/#view=testguide`).
+         */
+        fun guideLink(panelUrl: String): String = panelUrl.trimEnd('/') + "/#view=testguide"
+    }
+}

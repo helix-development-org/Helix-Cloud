@@ -3,15 +3,34 @@ package org.helix.addons.lobby.paper
 import de.tytoss.igui.IGui
 import de.tytoss.igui.awaitSharedIGui
 import de.tytoss.igui.gui.GuiDefinition
+import de.tytoss.igui.display.DisplayBuilder
+import de.tytoss.igui.layout.GuiArea
+import de.tytoss.igui.layout.GuiGrid
+import de.tytoss.igui.screen.LedgerEmpty
+import de.tytoss.igui.screen.LedgerPill
+import de.tytoss.igui.screen.LedgerRow
+import de.tytoss.igui.screen.LedgerScreen
+import de.tytoss.igui.screen.LedgerView
+import de.tytoss.igui.screen.PillColor
+import de.tytoss.igui.screen.ScreenFonts
+import de.tytoss.igui.screen.VillagerHeads
+import de.tytoss.igui.sound.NetworkSounds
+import de.tytoss.igui.sound.SoundPlayer
+import de.tytoss.igui.screen.TextAlign
+import de.tytoss.igui.screen.fit
+import de.tytoss.igui.screen.glyphAt
+import de.tytoss.igui.screen.textAt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import net.kyori.adventure.text.format.NamedTextColor
+import net.kyori.adventure.key.Key
+import net.kyori.adventure.text.format.TextColor
 import net.kyori.adventure.text.format.TextDecoration
 import net.kyori.adventure.text.minimessage.MiniMessage
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.Material
+import org.bukkit.NamespacedKey
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
@@ -22,14 +41,13 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * The built-in server selector, built on the shared Helix-GUIs IGui
- * instance. Opening it fetches the live joinable backends from the node,
- * groups them by task and shows one icon per task; clicking connects the
- * player to that task's least-loaded backend through the proxy's BungeeCord
- * plugin-message channel.
- *
- * The GUI is rebuilt whenever the configured rows change so an operator can
- * resize it from the dashboard.
+ * The navigator "Karte des Reichs" (design concept §14): a hand-drawn map (Blockbench art, [NavigatorGlyphs]) on the
+ * shared IGui instance. Opening it fetches the live joinable backends from the node and puts every game mode (task)
+ * on a place of the map – animated emblem on a plaque, name banner, the responsible villager's head beside it.
+ * Clicking a place connects the player to that mode's least-loaded backend through the proxy's BungeeCord
+ * plugin-message channel; full places show a red banner, places under maintenance a grey emblem and a fence.
+ * Modes with [NavigatorMode.pickInstance] (CityBuild „Kronstadt“) instead open the instance picker, a ledger listing
+ * every backend of the task with its load ([InstanceList]); a row connects, the back arrow returns to the map.
  *
  * @property plugin the owning plugin.
  * @property client fetches the joinable backends.
@@ -49,8 +67,13 @@ class ServerMenu(
     @Volatile private var menu: GuiDefinition? = null
     @Volatile private var settings: ServerMenuSettings = ServerMenuSettings()
 
-    /** Grouped entries currently shown to each viewer, index-aligned to slots. */
-    private val shown = ConcurrentHashMap<UUID, List<ServerGroup>>()
+    /** The places currently shown to each viewer. */
+    private val spots = ConcurrentHashMap<UUID, List<Spot>>()
+
+    /** The instance picker each viewer has open. */
+    private val pickers = ConcurrentHashMap<UUID, Picker>()
+
+    private val ledger = LedgerScreen()
 
     /**
      * Builds (or rebuilds) the selector for the given settings; safe to call
@@ -71,7 +94,8 @@ class ServerMenu(
     fun shutdown() {
         igui = null
         menu = null
-        shown.clear()
+        spots.clear()
+        pickers.clear()
     }
 
     /**
@@ -87,68 +111,244 @@ class ServerMenu(
         scope.launch { definition.open(player) }
     }
 
-    private suspend fun build(gui: IGui): GuiDefinition {
-        val rows = settings.rows.coerceIn(1, 6)
-        val titleText = plain.serialize(mini.deserialize(settings.title))
-        return gui.gui("lobby-servers") {
-            this.rows = rows
-            landingPage = "main"
-            page("main") {
-                cancelAllInteractions = true
-                title { _ -> centeredText(titleText, 0, color = NamedTextColor.DARK_GRAY) }
-                prepare { player -> refresh(player) }
-                for (index in 0 until rows * 9) {
-                    item(index) { ctx -> shown[ctx.player.uniqueId]?.getOrNull(index)?.let { groupItem(ctx.player, it) } }
-                    onClick(index) { ctx ->
-                        val group = shown[ctx.player.uniqueId]?.getOrNull(index) ?: return@onClick
-                        connect(ctx.player, group.bestServiceId)
-                        ctx.close()
+    private suspend fun build(gui: IGui): GuiDefinition = gui.gui("lobby-navigator") {
+        rows = 6
+        playerInventory = true
+        landingPage = "main"
+        onClose { ctx ->
+            ledger.forget(ctx.player)
+            pickers.remove(ctx.player.uniqueId)
+        }
+        page(PICKER_PAGE) {
+            prepare { player -> refreshPicker(player) }
+            ledger.install(
+                this,
+                onRow = { ctx, index -> pickRow(ctx, index) },
+                onPage = { ctx, step ->
+                    pickers.computeIfPresent(ctx.player.uniqueId) { _, picker -> picker.copy(page = picker.page + step) }
+                    refreshPicker(ctx.player)
+                    ctx.gui.refresh(ctx.player)
+                },
+                onBack = { ctx -> ctx.openPage("main") },
+            )
+        }
+        page("main") {
+            cancelAllInteractions = true
+            prepare { player -> refresh(player) }
+            title { ctx -> drawMap(ctx.player) }
+            val grid = GuiGrid(6, true)
+            NavigatorGlyphs.PLACES.forEachIndexed { index, place ->
+                val area = GuiArea(place.column, place.row, 2, 2)
+                val emblemSlot = grid.slot(place.column, place.row)
+                val headSlot = grid.slot(place.headColumn, place.headRow)
+                // the block's top-left cell carries the animated emblem, the others invisible tooltip items
+                area.slots().forEach { slot ->
+                    item(slot) { ctx ->
+                        val spot = spotAt(ctx.player, index) ?: return@item null
+                        if (slot == emblemSlot) emblemItem(ctx.player, spot) else tooltip(ctx.player, spot, NamespacedKey(NavigatorGlyphs.SPRITE_NAMESPACE, "empty"))
                     }
                 }
+                item(headSlot) { ctx ->
+                    val spot = spotAt(ctx.player, index) ?: return@item null
+                    VillagerHeads.item(spot.villager, tooltipLines(ctx.player, spot))
+                }
+                val click: suspend (de.tytoss.igui.gui.GuiClickContext) -> Unit = { ctx ->
+                    val spot = spotAt(ctx.player, index)
+                    val group = spot?.group
+                    if (group != null && spot.state != PlaceState.MAINTENANCE && group.pickInstance) {
+                        SoundPlayer.play(ctx.player, NetworkSounds.UI_PAGE)
+                        pickers[ctx.player.uniqueId] = Picker(group.task, group.name, spot.villager, group.maintenance)
+                        ctx.openPage(PICKER_PAGE)
+                    } else if (group != null && spot.state != PlaceState.MAINTENANCE) {
+                        SoundPlayer.play(ctx.player, NetworkSounds.UI_PAGE)
+                        connect(ctx.player, group.bestServiceId)
+                        ctx.close()
+                    } else {
+                        SoundPlayer.play(ctx.player, NetworkSounds.UI_ERROR)
+                    }
+                }
+                onClick(area) { ctx -> click(ctx) }
+                onClick(headSlot) { ctx -> click(ctx) }
             }
         }
+    }
+
+    /** The map, a plaque with banner per occupied place (emblems are items), the headline on the ribbon. */
+    private fun DisplayBuilder.drawMap(player: Player) {
+        val font = Key.key(NavigatorGlyphs.FONT)
+        ScreenFonts.tiles(NavigatorGlyphs.BG_W, NavigatorGlyphs.BG_H).forEachIndexed { i, tile ->
+            glyphAt(NavigatorGlyphs.BG_X + tile.x, font, NavigatorGlyphs.BG_TILE + i, tile.width + 1)
+        }
+        spots[player.uniqueId].orEmpty().forEach { spot ->
+            val place = spot.place
+            val i = NavigatorGlyphs.PLACES.indexOf(place)
+            if (spot.group != null) {
+                glyphAt(place.centerX - NavigatorGlyphs.PLAQUE_SIZE / 2, font, NavigatorGlyphs.PLAQUE + i, NavigatorGlyphs.PLAQUE_SIZE + 1)
+            }
+            if (spot.state == PlaceState.MAINTENANCE && spot.group != null) {
+                glyphAt(place.centerX + 10, font, NavigatorGlyphs.FENCE + i, NavigatorGlyphs.FENCE_SIZE + 1)
+            }
+            glyphAt(place.centerX - NavigatorGlyphs.BAND_W / 2, font, NavigatorGlyphs.BAND + i * 3 + spot.state.ordinal, NavigatorGlyphs.BAND_W + 1)
+            val color = when (spot.state) {
+                PlaceState.NORMAL -> INK
+                PlaceState.FULL -> WHITE
+                PlaceState.MAINTENANCE -> INK
+            }
+            textAt(fit(spot.name, NAME_WIDTH), place.centerX + 1, place.bandTop + 2, color, TextAlign.CENTER, if (spot.state == PlaceState.FULL) INK else null)
+        }
+        textAt(fit(settings.title, TITLE_WIDTH), NavigatorGlyphs.CENTER_X, NavigatorGlyphs.TITLE_TOP, GOLD, TextAlign.CENTER, INK)
+    }
+
+    private fun spotAt(player: Player, place: Int): Spot? =
+        spots[player.uniqueId]?.firstOrNull { it.place == NavigatorGlyphs.PLACES[place] }
+
+    private fun emblemItem(player: Player, spot: Spot): ItemStack? {
+        val group = spot.group ?: return tooltip(player, spot, NamespacedKey(NavigatorGlyphs.SPRITE_NAMESPACE, "empty"))
+        val emblem = NavigatorGlyphs.EMBLEMS.indexOf(group.emblem).coerceAtLeast(0)
+        val sprite = NavigatorGlyphs.emblemSprite(emblem, grey = spot.state == PlaceState.MAINTENANCE)
+        return tooltip(player, spot, NamespacedKey(NavigatorGlyphs.SPRITE_NAMESPACE, sprite.model))
+    }
+
+    private fun tooltip(player: Player, spot: Spot, model: NamespacedKey): ItemStack = ItemStack(Material.PAPER).apply {
+        val lines = tooltipLines(player, spot)
+        editMeta { meta ->
+            meta.setItemModel(model)
+            meta.displayName(lines.first())
+            meta.lore(lines.drop(1))
+        }
+    }
+
+    /** Tooltip per design concept §14: name in gold, player count, one line of lore, the action in gold. */
+    private fun tooltipLines(player: Player, spot: Spot): List<net.kyori.adventure.text.Component> {
+        val group = spot.group
+        val lines = mutableListOf(mini.deserialize("<#ffcf4a>${spot.name}").decoration(TextDecoration.ITALIC, false))
+        if (group != null) {
+            lines += render(player, "navigator.tooltip.players", "players" to group.players.toString(), "max" to group.maxPlayers.toString())
+        }
+        val lore = spot.lore.ifBlank { translations.text(player.name, player.locale().language, "navigator.lore.${spot.place.id}") }
+        if (lore.isNotBlank() && !lore.startsWith("navigator.")) {
+            lines += mini.deserialize("<#d8c08e>$lore").decoration(TextDecoration.ITALIC, false)
+        }
+        lines += when {
+            group == null -> render(player, "navigator.tooltip.soon")
+            spot.state == PlaceState.MAINTENANCE -> render(player, "navigator.tooltip.maintenance")
+            spot.state == PlaceState.FULL -> render(player, "navigator.tooltip.full")
+            else -> render(player, "navigator.tooltip.travel")
+        }
+        return lines
+    }
+
+    /**
+     * Puts every game mode on a place of the map: its configured place, else a place guessed from the task name,
+     * else the next free one. The fog place shows "coming soon" while it is free.
+     */
+    private fun layout(groups: List<ServerGroup>): List<Spot> {
+        val taken = mutableMapOf<NavigatorGlyphs.Place, ServerGroup>()
+        val places = NavigatorGlyphs.PLACES.associateBy { it.id }
+        groups.forEach { group ->
+            val wanted = listOfNotNull(places[group.place], places[NavigatorGuess.place(group.task)])
+            val place = wanted.firstOrNull { it !in taken } ?: NavigatorGuess.AUTO_ORDER.mapNotNull { places[it] }.firstOrNull { it !in taken }
+            if (place != null) taken[place] = group
+        }
+        val out = taken.map { (place, group) ->
+            val state = when {
+                group.maintenance || group.bestServiceId.isBlank() -> PlaceState.MAINTENANCE
+                group.maxPlayers > 0 && group.players >= group.maxPlayers -> PlaceState.FULL
+                else -> PlaceState.NORMAL
+            }
+            Spot(place, group, state, group.name, group.villager.ifBlank { place.villager }, group.lore)
+        }.toMutableList()
+        val fog = places.getValue(NavigatorGlyphs.FOG_PLACE)
+        if (fog !in taken) out += Spot(fog, null, PlaceState.MAINTENANCE, fog.name, fog.villager, "")
+        return out
+    }
+
+    /** Loads the live backends of the viewer's picked task and shows them as ledger rows. */
+    private suspend fun refreshPicker(player: Player) {
+        val picker = pickers[player.uniqueId] ?: return
+        val entries = withContext(Dispatchers.IO) { client.servers() }
+        val rows = InstanceList.rows(entries, picker.task, picker.maintenance)
+        val page = picker.page.coerceIn(0, InstanceList.pages(rows) - 1)
+        pickers[player.uniqueId] = picker.copy(page = page, rows = InstanceList.page(rows, page))
+        ledger.show(
+            player,
+            LedgerView(
+                title = picker.name,
+                subtitle = text(player, "navigator.instances.subtitle"),
+                rows = InstanceList.page(rows, page).map { row -> instanceRow(player, row) },
+                page = page,
+                pages = InstanceList.pages(rows),
+                back = true,
+                empty = LedgerEmpty(listOf(text(player, "navigator.instances.empty")), picker.villager),
+            ),
+        )
+    }
+
+    private fun instanceRow(player: Player, row: InstanceRow): LedgerRow {
+        val count = if (row.maxPlayers > 0) "${row.players}/${row.maxPlayers}" else "${row.players}"
+        val color = when (row.state) {
+            InstanceState.OPEN -> PillColor.GREEN
+            InstanceState.BUSY -> PillColor.GOLD
+            InstanceState.FULL -> PillColor.RED
+            InstanceState.MAINTENANCE -> PillColor.GREY
+        }
+        val stateKey = row.state.name.lowercase()
+        return LedgerRow(
+            label = row.id,
+            pill = LedgerPill(count, color),
+            tooltip = listOf(
+                mini.deserialize("<#ffcf4a>${row.id}").decoration(TextDecoration.ITALIC, false),
+                render(player, "navigator.tooltip.players", "players" to row.players.toString(), "max" to row.maxPlayers.toString()),
+                render(player, "navigator.instances.state.$stateKey"),
+                if (row.state.joinable) render(player, "navigator.tooltip.travel") else render(player, "navigator.instances.blocked"),
+            ),
+        )
+    }
+
+    /** A picker row was clicked: connect to that instance when it is joinable. */
+    private suspend fun pickRow(ctx: de.tytoss.igui.gui.GuiClickContext, index: Int) {
+        val row = pickers[ctx.player.uniqueId]?.rows?.getOrNull(index) ?: return
+        if (!row.state.joinable) {
+            SoundPlayer.play(ctx.player, NetworkSounds.UI_ERROR)
+            return
+        }
+        connect(ctx.player, row.id)
+        ctx.close()
     }
 
     private suspend fun refresh(player: Player) {
         val entries = withContext(Dispatchers.IO) { client.servers() }
-        shown[player.uniqueId] = group(entries)
+        spots[player.uniqueId] = layout(group(entries))
     }
 
     /**
-     * Collapses the per-service entries into one row per task, remembering
-     * the least-loaded service as the connect target.
+     * Collapses the per-service entries into one game mode per task (configured order first), remembering the
+     * least-loaded service as the connect target.
      */
-    private fun group(entries: List<ServerEntry>): List<ServerGroup> =
-        entries.groupBy { it.task }
-            .map { (task, services) ->
-                val best = services.minByOrNull { it.players } ?: services.first()
-                ServerGroup(
-                    task = task,
-                    players = services.sumOf { it.players },
-                    maxPlayers = services.sumOf { it.maxPlayers },
-                    bestServiceId = best.id,
-                )
-            }
-            .sortedBy { it.task }
-
-    private fun groupItem(player: Player, group: ServerGroup): ItemStack {
-        val material = Material.matchMaterial(settings.entryMaterial) ?: Material.PAPER
-        return ItemStack(material).apply {
-            editMeta { meta ->
-                meta.displayName(mini.deserialize("<white>${group.task}").decoration(TextDecoration.ITALIC, false))
-                meta.lore(
-                    listOf(
-                        render(
-                            player,
-                            "menu.entry.players",
-                            "players" to group.players.toString(),
-                            "max" to group.maxPlayers.toString(),
-                        ),
-                        render(player, "menu.entry.connect"),
-                    ),
-                )
-            }
-        }
+    private fun group(entries: List<ServerEntry>): List<ServerGroup> {
+        val configured = settings.modes.associateBy { it.task.lowercase() }
+        val order = settings.modes.map { it.task.lowercase() }
+        val running = entries.groupBy { it.task }
+        val tasks = (settings.modes.map { it.task } + running.keys).distinctBy { it.lowercase() }
+        return tasks.map { task ->
+            val services = running.entries.firstOrNull { it.key.equals(task, ignoreCase = true) }?.value.orEmpty()
+            val best = services.minByOrNull { it.players }
+            val mode = configured[task.lowercase()]
+            ServerGroup(
+                name = mode?.name?.ifBlank { null } ?: task,
+                emblem = mode?.emblem ?: NavigatorGuess.emblem(task),
+                players = services.sumOf { it.players },
+                maxPlayers = services.sumOf { it.maxPlayers },
+                bestServiceId = best?.id.orEmpty(),
+                order = order.indexOf(task.lowercase()).let { if (it < 0) Int.MAX_VALUE else it },
+                task = task,
+                place = mode?.place.orEmpty(),
+                villager = mode?.villager.orEmpty(),
+                lore = mode?.lore.orEmpty(),
+                maintenance = mode?.maintenance == true,
+                pickInstance = mode?.pickInstance ?: NavigatorGuess.pickInstance(task),
+            )
+        }.sortedWith(compareBy({ it.order }, { it.task }))
     }
 
     /**
@@ -176,6 +376,9 @@ class ServerMenu(
     private fun chat(player: Player, key: String, vararg params: Pair<String, String>) =
         render(player, key, *params)
 
+    private fun text(player: Player, key: String, vararg params: Pair<String, String>): String =
+        plain.serialize(render(player, key, *params))
+
     private fun render(player: Player, key: String, vararg params: Pair<String, String>) =
         mini.deserialize(translations.text(player.name, player.locale().language, key, *params))
             .decoration(TextDecoration.ITALIC, false)
@@ -183,20 +386,88 @@ class ServerMenu(
     /**
      * One task's aggregated selector row.
      *
-     * @property task the task name shown as the entry title.
+     * @property task the task name.
+     * @property name display name on the coat of arms.
+     * @property emblem emblem id.
      * @property players total players across the task's backends.
      * @property maxPlayers total capacity across the task's backends.
      * @property bestServiceId the least-loaded backend to connect to.
+     * @property order position from the configured modes (unconfigured last).
+     * @property place configured place id (empty: guessed).
+     * @property villager configured villager id (empty: the place's).
+     * @property lore configured tooltip lore (empty: the place's default text).
+     * @property maintenance whether the mode is marked as under maintenance.
+     * @property pickInstance whether a click opens the instance picker.
      */
     private data class ServerGroup(
         val task: String,
+        val name: String,
+        val emblem: String,
         val players: Int,
         val maxPlayers: Int,
         val bestServiceId: String,
+        val order: Int,
+        val place: String = "",
+        val villager: String = "",
+        val lore: String = "",
+        val maintenance: Boolean = false,
+        val pickInstance: Boolean = false,
+    )
+
+    /**
+     * The instance picker a viewer has open.
+     *
+     * @property task the task whose backends are listed.
+     * @property name the mode's display name (ledger title).
+     * @property villager villager of the empty state.
+     * @property maintenance whether the mode is under maintenance.
+     * @property page current page.
+     * @property rows the rows on the current page (click targets).
+     */
+    private data class Picker(
+        val task: String,
+        val name: String,
+        val villager: String,
+        val maintenance: Boolean,
+        val page: Int = 0,
+        val rows: List<InstanceRow> = emptyList(),
+    )
+
+    /** How a place is shown (banner glyph order). */
+    private enum class PlaceState { NORMAL, FULL, MAINTENANCE }
+
+    /**
+     * A place on the map with what stands there.
+     *
+     * @property place the place.
+     * @property group the game mode there, or null (fog place without a mode).
+     * @property state shown state.
+     * @property name shown name.
+     * @property villager villager id of the head beside it.
+     * @property lore configured lore line (empty: default).
+     */
+    private data class Spot(
+        val place: NavigatorGlyphs.Place,
+        val group: ServerGroup?,
+        val state: PlaceState,
+        val name: String,
+        val villager: String,
+        val lore: String,
     )
 
     private companion object {
         /** Bukkit alias for Velocity's `bungeecord:main` plugin-message channel. */
         const val BUNGEE_CHANNEL = "BungeeCord"
+
+        /** Page id of the instance picker. */
+        const val PICKER_PAGE = "instances"
+
+        const val NAME_WIDTH = 60
+        const val TITLE_WIDTH = 132
+
+        /** Ink on parchment, white on the red banner, gold on the ribbon (design tokens). */
+        val INK: TextColor = TextColor.color(0x2A160A)
+        val WHITE: TextColor = TextColor.color(0xFFFFFF)
+        val GOLD: TextColor = TextColor.color(0xFFCF4A)
     }
 }

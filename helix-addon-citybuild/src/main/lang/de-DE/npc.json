@@ -1,0 +1,6 @@
+{
+  "npc.speech": "<#ffcf4a>{name}:</#ffcf4a> <#f1e2c2>{text}",
+  "npc.admin.unknown": "<#ff5a4a>Unbekannter Villager <#ffcf4a>{id}</#ffcf4a>. /cbadmin npc list zeigt alle.",
+  "npc.admin.placed": "<#4ac85e>Villager <#ffcf4a>{id}</#ffcf4a> steht jetzt hier.",
+  "npc.admin.line": "<#f1e2c2><#ffcf4a>{id}</#ffcf4a> ({role}) – {where}"
+}

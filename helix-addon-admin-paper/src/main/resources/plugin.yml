@@ -1,0 +1,34 @@
+name: HelixAdmin
+version: '${version}'
+main: org.helix.addons.admin.paper.AdminPlugin
+api-version: '1.21'
+description: Paper side of the Helix Admin in-game panel (client mod channel helix:admin, in-game staff actions, presence).
+depend: [Helix-GUIs]
+permissions:
+  helix.staff.menu:
+    description: Open the in-game admin panel (Helix Admin mod, Right Shift).
+    default: op
+  helix.staff.self:
+    description: Own noclip, heal, fly, vanish, gamemode and teleport.
+    default: op
+  helix.staff.world:
+    description: Time, weather and clearing entities.
+    default: op
+  helix.staff.teleport:
+    description: Go to / bring players, also across servers.
+    default: op
+  helix.staff.spectate:
+    description: Spectate players.
+    default: op
+  helix.staff.freeze:
+    description: Freeze players.
+    default: op
+  helix.staff.heal:
+    description: Heal and feed players.
+    default: op
+  helix.staff.gamemode:
+    description: Change players' game mode.
+    default: op
+  helix.staff.inventory:
+    description: View and edit players' inventories.
+    default: op

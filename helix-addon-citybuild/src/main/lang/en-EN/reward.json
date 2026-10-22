@@ -1,0 +1,20 @@
+{
+  "reward.title": "Daily mail",
+  "reward.subtitle.open": "Day {day} is waiting for you",
+  "reward.subtitle.done": "Collected · streak {streak} days",
+  "reward.row": "Day {day}",
+  "reward.row.value": "{amount} crowns",
+  "reward.row.value.extra": "{amount} crowns + extra",
+  "reward.pill.claimed": "Collected",
+  "reward.pill.today": "Today",
+  "reward.pill.tomorrow": "Tomorrow",
+  "reward.note.1": "Once a day, the same in every city.",
+  "reward.note.2": "Missing a day restarts the streak.",
+  "reward.button.claim": "Collect",
+  "reward.button.done": "Tomorrow",
+  "reward.loading": "Paula is looking for your letter …",
+  "reward.empty": "Paula has no mail for you today.",
+  "reward.claimed": "<#ffcf4a>Paula Paket:</#ffcf4a> <#f1e2c2>Day {day}! <#ffcf4a>{amount} crowns</#ffcf4a> – sign here – no, no time!",
+  "reward.already": "<#ffb43a>Note: You already collected today's reward. New mail arrives tomorrow.",
+  "reward.hint": "<#ffcf4a>Paula Paket:</#ffcf4a> <#f1e2c2>Mail for you! Day {day} is waiting. <click:run_command:/belohnung><hover:show_text:'View reward'><#ffcf4a>[Collect]</#ffcf4a></hover></click>"
+}

@@ -7,6 +7,7 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
+import net.kyori.adventure.text.format.TextColor
 import net.kyori.adventure.text.minimessage.MiniMessage
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.entity.Player
@@ -57,6 +58,8 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
 
     @Volatile
     private var bridgeValues: Map<String, String> = emptyMap()
+    private val labyHud = LabyHud(this)
+    private var labyHudTask: org.bukkit.scheduler.BukkitTask? = null
 
     @Volatile
     private var tablist: TablistData? = null
@@ -94,6 +97,11 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         api = nodeApi
         nodeApi.start()
         server.pluginManager.registerEvents(this, this)
+        // HUD-Widgets des Helix-LabyMod-Addons (nur Spieler mit Addon bekommen Pakete)
+        labyHud.start()
+        labyHudTask = server.scheduler.runTaskTimer(this, Runnable {
+            labyHud.update(server.onlinePlayers) { bridgeValues["economy.balance.${it.name.lowercase()}"] ?: "" }
+        }, 40L, 40L)
         heartbeatTask = server.scheduler.runTaskTimerAsynchronously(
             this,
             Runnable { pulse(loaded, nodeApi) },
@@ -149,6 +157,8 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
      * packets twice.
      */
     override fun onDisable() {
+        labyHudTask?.cancel()
+        labyHudTask = null
         heartbeatTask?.cancel()
         heartbeatTask = null
         animationTask?.cancel()
@@ -218,6 +228,7 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
      */
     @EventHandler
     fun onQuit(event: org.bukkit.event.player.PlayerQuitEvent) {
+        labyHud.forget(event.player)
         displayProfiles.remove(event.player.name.lowercase())
         nickNames.remove(event.player.uniqueId)
         removeDisplayTeam(event.player.name)
@@ -372,12 +383,12 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         )
         val player = server.getPlayerExact(playerName) ?: return
         if (result == null) {
-            player.sendMessage(colored(prefixed("<red>This chat channel is currently unavailable.")))
+            player.sendMessage(colored(prefixed("<#ff5a4a>This chat channel is currently unavailable. Please try again later.")))
             return
         }
         result.lines.forEach { line -> player.sendMessage(colored(line)) }
         if (!result.success && result.lines.isEmpty()) {
-            player.sendMessage(colored(prefixed("<red>This chat channel is not available to you.")))
+            player.sendMessage(colored(prefixed("<#ff5a4a>This chat channel is not available to you. Write in the normal chat instead.")))
         }
     }
 
@@ -732,6 +743,8 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
             player.playerListName(composed)
             player.displayName(composed)
         }
+        // Tab list order (1.21.2+): higher ranks first; a cleared or disguised profile sorts as a player (0).
+        if (player.playerListOrder != profile.order) player.playerListOrder = profile.order
         if (previousNick != profile.name) {
             logger.info("Nick display for ${player.name}: '$previousNick' → '${profile.name}'")
             rescopePlayer(player)
@@ -817,12 +830,16 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         DISPLAY_TEAM_PREFIX + Integer.toHexString(playerName.lowercase().hashCode())
 
     /**
-     * Maps a legacy `&`-color code to a named colour for scoreboard teams.
+     * Maps a legacy `&`-color code (or a MiniMessage hex tag such as `<#ffb43a>`, mapped to the
+     * nearest named colour) to a named colour for scoreboard teams.
      *
-     * @param code a color string such as `&c`, or empty.
+     * @param code a color string such as `&c` or `<#ffb43a>`, or empty.
      * @return the matching colour, or `null` when none applies.
      */
     private fun namedColor(code: String): NamedTextColor? {
+        HEX_COLOR.find(code)?.let { match ->
+            return NamedTextColor.nearestTo(TextColor.color(match.groupValues[1].toInt(16)))
+        }
         val ch = code.trim().removePrefix("&").removePrefix("§").firstOrNull()?.lowercaseChar() ?: return null
         return when (ch) {
             '0' -> NamedTextColor.BLACK
@@ -863,6 +880,9 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         miniMessage.deserialize(LegacyToMini.translate(text))
 
     private companion object {
+        /** A `#rrggbb` hex colour inside a colour string (`<#ffb43a>`, `&#ffb43a`). */
+        val HEX_COLOR = Regex("#([0-9a-fA-F]{6})")
+
         /** Ticks before the first sync (1 second). */
         const val INITIAL_DELAY_TICKS = 20L
 

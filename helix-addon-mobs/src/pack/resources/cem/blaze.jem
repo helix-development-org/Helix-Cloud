@@ -1,0 +1,476 @@
+{
+ "textureSize": [
+  64,
+  32
+ ],
+ "models": [
+  {
+   "part": "head",
+   "id": "head",
+   "invertAxis": "xy",
+   "translate": [
+    0,
+    -24,
+    0
+   ],
+   "boxes": [
+    {
+     "coordinates": [
+      -4,
+      20,
+      -4,
+      8,
+      8,
+      8
+     ],
+     "textureOffset": [
+      0,
+      0
+     ],
+     "sizeAdd": 1.6
+    }
+   ],
+   "submodels": [
+    {
+     "id": "kl_eye_l",
+     "boxes": [
+      {
+       "coordinates": [
+        -3.12,
+        23.28,
+        -5.96,
+        2.4,
+        2.4,
+        0.3
+       ],
+       "uvNorth": [
+        24,
+        0,
+        28,
+        4
+       ]
+      },
+      {
+       "coordinates": [
+        -2.16,
+        23.64,
+        -6.08,
+        1.2,
+        1.2,
+        0.1
+       ],
+       "uvNorth": [
+        28,
+        0,
+        30,
+        2
+       ]
+      }
+     ]
+    },
+    {
+     "id": "kl_lid_l",
+     "boxes": [
+      {
+       "coordinates": [
+        -3.17,
+        23.23,
+        -6.16,
+        2.5,
+        2.5,
+        0.06
+       ],
+       "uvNorth": [
+        30,
+        0,
+        33,
+        3
+       ]
+      }
+     ]
+    },
+    {
+     "id": "kl_eye_r",
+     "boxes": [
+      {
+       "coordinates": [
+        0.72,
+        23.28,
+        -5.96,
+        2.4,
+        2.4,
+        0.3
+       ],
+       "uvNorth": [
+        24,
+        0,
+        28,
+        4
+       ]
+      },
+      {
+       "coordinates": [
+        0.96,
+        23.64,
+        -6.08,
+        1.2,
+        1.2,
+        0.1
+       ],
+       "uvNorth": [
+        28,
+        0,
+        30,
+        2
+       ]
+      }
+     ]
+    },
+    {
+     "id": "kl_lid_r",
+     "boxes": [
+      {
+       "coordinates": [
+        0.67,
+        23.23,
+        -6.16,
+        2.5,
+        2.5,
+        0.06
+       ],
+       "uvNorth": [
+        30,
+        0,
+        33,
+        3
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "part": "stick1",
+   "id": "stick1",
+   "invertAxis": "xy",
+   "translate": [
+    -7,
+    -26,
+    7
+   ],
+   "boxes": [
+    {
+     "coordinates": [
+      6,
+      18,
+      -8,
+      2,
+      8,
+      2
+     ],
+     "textureOffset": [
+      0,
+      16
+     ]
+    }
+   ]
+  },
+  {
+   "part": "stick2",
+   "id": "stick2",
+   "invertAxis": "xy",
+   "translate": [
+    7,
+    -26,
+    7
+   ],
+   "boxes": [
+    {
+     "coordinates": [
+      -8,
+      18,
+      -8,
+      2,
+      8,
+      2
+     ],
+     "textureOffset": [
+      0,
+      16
+     ]
+    }
+   ]
+  },
+  {
+   "part": "stick3",
+   "id": "stick3",
+   "invertAxis": "xy",
+   "translate": [
+    7,
+    -26,
+    -7
+   ],
+   "boxes": [
+    {
+     "coordinates": [
+      -8,
+      18,
+      6,
+      2,
+      8,
+      2
+     ],
+     "textureOffset": [
+      0,
+      16
+     ]
+    }
+   ]
+  },
+  {
+   "part": "stick4",
+   "id": "stick4",
+   "invertAxis": "xy",
+   "translate": [
+    -7,
+    -26,
+    -7
+   ],
+   "boxes": [
+    {
+     "coordinates": [
+      6,
+      18,
+      6,
+      2,
+      8,
+      2
+     ],
+     "textureOffset": [
+      0,
+      16
+     ]
+    }
+   ]
+  },
+  {
+   "part": "stick5",
+   "id": "stick5",
+   "invertAxis": "xy",
+   "translate": [
+    -5,
+    -22,
+    5
+   ],
+   "boxes": [
+    {
+     "coordinates": [
+      4,
+      14,
+      -6,
+      2,
+      8,
+      2
+     ],
+     "textureOffset": [
+      0,
+      16
+     ]
+    }
+   ]
+  },
+  {
+   "part": "stick6",
+   "id": "stick6",
+   "invertAxis": "xy",
+   "translate": [
+    5,
+    -22,
+    5
+   ],
+   "boxes": [
+    {
+     "coordinates": [
+      -6,
+      14,
+      -6,
+      2,
+      8,
+      2
+     ],
+     "textureOffset": [
+      0,
+      16
+     ]
+    }
+   ]
+  },
+  {
+   "part": "stick7",
+   "id": "stick7",
+   "invertAxis": "xy",
+   "translate": [
+    5,
+    -22,
+    -5
+   ],
+   "boxes": [
+    {
+     "coordinates": [
+      -6,
+      14,
+      4,
+      2,
+      8,
+      2
+     ],
+     "textureOffset": [
+      0,
+      16
+     ]
+    }
+   ]
+  },
+  {
+   "part": "stick8",
+   "id": "stick8",
+   "invertAxis": "xy",
+   "translate": [
+    -5,
+    -22,
+    -5
+   ],
+   "boxes": [
+    {
+     "coordinates": [
+      4,
+      14,
+      4,
+      2,
+      8,
+      2
+     ],
+     "textureOffset": [
+      0,
+      16
+     ]
+    }
+   ]
+  },
+  {
+   "part": "stick9",
+   "id": "stick9",
+   "invertAxis": "xy",
+   "translate": [
+    -3,
+    -14,
+    3
+   ],
+   "boxes": [
+    {
+     "coordinates": [
+      2,
+      6,
+      -4,
+      2,
+      8,
+      2
+     ],
+     "textureOffset": [
+      0,
+      16
+     ]
+    }
+   ]
+  },
+  {
+   "part": "stick10",
+   "id": "stick10",
+   "invertAxis": "xy",
+   "translate": [
+    3,
+    -14,
+    3
+   ],
+   "boxes": [
+    {
+     "coordinates": [
+      -4,
+      6,
+      -4,
+      2,
+      8,
+      2
+     ],
+     "textureOffset": [
+      0,
+      16
+     ]
+    }
+   ]
+  },
+  {
+   "part": "stick11",
+   "id": "stick11",
+   "invertAxis": "xy",
+   "translate": [
+    3,
+    -14,
+    -3
+   ],
+   "boxes": [
+    {
+     "coordinates": [
+      -4,
+      6,
+      2,
+      2,
+      8,
+      2
+     ],
+     "textureOffset": [
+      0,
+      16
+     ]
+    }
+   ]
+  },
+  {
+   "part": "stick12",
+   "id": "stick12",
+   "invertAxis": "xy",
+   "translate": [
+    -3,
+    -14,
+    -3
+   ],
+   "boxes": [
+    {
+     "coordinates": [
+      2,
+      6,
+      2,
+      2,
+      8,
+      2
+     ],
+     "textureOffset": [
+      0,
+      16
+     ]
+    }
+   ]
+  }
+ ],
+ "animations": [
+  {
+   "head.rz": "head.rz + sin(limb_swing * 0.6662) * min(limb_speed, 1) * 0.16 + sin((age + 41) * 0.045) * 0.05",
+   "head.rx": "head.rx + if(hurt_time > 0, -0.3 * hurt_time / 10, sin((age + 41) * 0.06) * 0.03)",
+   "head.sy": "1 + abs(sin(limb_swing * 0.6662) * min(limb_speed, 1)) * 0.06",
+   "head.sx": "1 - abs(sin(limb_swing * 0.6662) * min(limb_speed, 1)) * 0.03",
+   "kl_lid_l.visible": "frac((age + 287) / 81) > 0.955 || hurt_time > 0",
+   "kl_lid_r.visible": "frac((age + 287) / 81) > 0.955 || hurt_time > 0"
+  }
+ ],
+ "credit": "Kronland design concept \u00a713 (generated by tools/mobs/cem.py from the CEM templates)"
+}

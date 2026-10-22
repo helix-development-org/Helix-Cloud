@@ -12,15 +12,16 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class MotdConfig(
     val normal: MotdProfile = MotdProfile(
-        line1 = "<gradient:#8b5cf6:#38bdf8><bold>{network}</bold></gradient>",
-        line2 = "<gray>Welcome — <white>{online}<gray>/<white>{max}<gray> players online",
+        line1 = "<#ffcf4a><bold>{network}</bold></#ffcf4a> <#7a4a24>·</#7a4a24> <#f1e2c2>The kingdom awaits you",
+        line2 = "<#d8382e>»</#d8382e> <#f1e2c2>MineClash <#7a4a24>·</#7a4a24> <#f1e2c2>CityBuild <#7a4a24>·</#7a4a24> " +
+            "<#ffcf4a>kronland.de</#ffcf4a>",
     ),
     val maintenance: MotdProfile = MotdProfile(
-        line1 = "<red><bold>{network}</bold> <dark_gray>» <red>Maintenance",
-        line2 = "<gray>We are working on the network — check back soon.",
+        line1 = "<#ffcf4a><bold>{network}</bold></#ffcf4a> <#7a4a24>·</#7a4a24> <#5ab4ff>Geschlossene Testphase",
+        line2 = "<#d8382e>»</#d8382e> <#f1e2c2>Infos auf <#ffcf4a>kronland.de</#ffcf4a> <#7a4a24>·</#7a4a24> <#f1e2c2>Discord: <#ffcf4a>/discord",
         onlinePlayers = 0,
         maxPlayers = 0,
-        versionText = "&cMaintenance",
+        versionText = "&bTestphase",
     ),
 ) {
     /**

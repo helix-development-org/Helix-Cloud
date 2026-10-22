@@ -1,0 +1,22 @@
+{
+  "market.error.economy_unavailable": "<#ffb43a>Achtung: Die Schatzkammer antwortet gerade nicht. Versuch es gleich noch einmal.",
+  "market.error.insufficient_funds": "<#ff5a4a>Dafür fehlen dir Kronen.",
+  "market.error.invalid_amount": "<#ff5a4a>Diese Menge geht nicht.",
+  "market.error.invalid_duration": "<#ff5a4a>Diese Laufzeit gibt es nicht. Wähle 12h, 24h oder 48h.",
+  "market.error.invalid_item": "<#ff5a4a>Dieses Item lässt sich nicht einstellen.",
+  "market.error.invalid_price": "<#ff5a4a>Dieser Preis geht nicht. Wähle einen Preis zwischen 1 und 10.000.000 Kronen.",
+  "market.error.item_limit": "<#ff5a4a>Diese Ware nimmt der Krämer heute nicht mehr an. Morgen wieder!",
+  "market.error.limit": "<#ff5a4a>Das Limit ist erreicht.",
+  "market.error.not_available": "<#ff5a4a>Das ist nicht mehr zu haben. Jemand war schneller.",
+  "market.error.not_bought": "<#ff5a4a>Das kauft der Krämer nicht an.",
+  "market.error.not_for_sale": "<#ff5a4a>Das verkauft der Krämer nicht.",
+  "market.error.not_found": "<#ff5a4a>Das gibt es nicht mehr.",
+  "market.error.not_owner": "<#ff5a4a>Das gehört dir nicht.",
+  "market.error.other": "<#ff5a4a>Das hat nicht geklappt. Versuch es gleich noch einmal.",
+  "market.error.own_listing": "<#ff5a4a>Dein eigenes Angebot kannst du nicht kaufen.",
+  "market.error.sold_out": "<#ff5a4a>Ausverkauft – das Angebot ist weg oder dein Limit erreicht.",
+  "market.error.tier": "<#ff5a4a>Dafür brauchst du eine höhere Stufe.",
+  "market.error.unavailable": "<#ffb43a>Achtung: Die Stadtverwaltung antwortet gerade nicht.",
+  "market.error.wrong_shard": "<#ff5a4a>Das gehört zu einer anderen Stadt.",
+  "market.lore.category": "<#b8c0cc>{category}"
+}

@@ -1,0 +1,84 @@
+<div class="card">
+  <div class="card-head"><h2>MineClash — Settings</h2><span class="muted" id="version"></span></div>
+  <div class="card-body">
+    <div class="row"><input class="field" id="filter" placeholder="Filter (z. B. war.)" style="max-width:280px"></div>
+    <table><thead><tr><th>Key</th><th>Wert</th><th>Typ</th><th>Beschreibung</th><th></th></tr></thead><tbody id="settings"></tbody></table>
+  </div>
+</div>
+<div class="card">
+  <div class="card-head"><h2>Sammlungen</h2>
+    <select class="field" id="collection" style="max-width:220px"></select>
+  </div>
+  <div class="card-body">
+    <table><thead><tr><th>Id</th><th>Reihenfolge</th><th>Body</th><th></th></tr></thead><tbody id="docs"></tbody></table>
+    <div class="row" style="margin-top:12px">
+      <input class="field" id="newId" placeholder="id" style="max-width:160px">
+      <input class="field" id="newOrder" placeholder="sortOrder" style="max-width:110px">
+      <input class="field mono" id="newBody" placeholder='{"…":…}' style="flex:1">
+      <button class="btn" id="addDoc">Speichern</button>
+    </div>
+  </div>
+</div>
+<script>
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  let settings = [];
+  function renderSettings() {
+    const f = document.getElementById('filter').value.trim();
+    const body = document.getElementById('settings');
+    body.innerHTML = settings.filter((s) => s.key.startsWith(f)).map((s) => `
+      <tr><td class="mono">${esc(s.key)}</td>
+      <td><input class="field mono" value="${esc(s.value)}" data-key="${esc(s.key)}" style="min-width:140px"></td>
+      <td><span class="tag">${esc(s.type)}</span></td><td class="muted">${esc(s.description)}</td>
+      <td><button class="btn sm" data-save="${esc(s.key)}">Speichern</button> <button class="btn sm subtle" data-reset="${esc(s.key)}" title="Standard: ${esc(s.default)}">Reset</button></td></tr>`).join('');
+  }
+  async function loadSettings() {
+    const r = await Helix.action('mineclash.config.export');
+    settings = r.success ? JSON.parse(r.lines[0]) : [];
+    const v = await Helix.action('mineclash.config.version');
+    document.getElementById('version').textContent = v.success ? `Version ${v.lines[0]}` : '';
+    renderSettings();
+  }
+  async function loadCollections() {
+    const r = await Helix.action('mineclash.config.collections');
+    const names = r.success ? JSON.parse(r.lines[0]) : [];
+    const sel = document.getElementById('collection');
+    const current = sel.value;
+    sel.innerHTML = names.map((n) => `<option ${n === current ? 'selected' : ''}>${esc(n)}</option>`).join('');
+    await loadDocs();
+  }
+  async function loadDocs() {
+    const name = document.getElementById('collection').value;
+    if (!name) return;
+    const r = await Helix.action('mineclash.config.docs', name);
+    const docs = r.success ? JSON.parse(r.lines[0]) : [];
+    document.getElementById('docs').innerHTML = docs.map((d) => `
+      <tr><td class="mono">${esc(d.id)}</td><td>${d.sortOrder}</td>
+      <td><input class="field mono" value="${esc(JSON.stringify(d.body))}" data-doc="${esc(d.id)}" data-order="${d.sortOrder}" style="min-width:320px"></td>
+      <td><button class="btn sm" data-docsave="${esc(d.id)}">Speichern</button> <button class="btn sm danger" data-docdel="${esc(d.id)}">Löschen</button></td></tr>`).join('');
+  }
+  document.addEventListener('click', async (e) => {
+    const t = e.target;
+    if (t.dataset.save) {
+      const input = document.querySelector(`input[data-key="${t.dataset.save}"]`);
+      const r = await Helix.action('mineclash.config.set', t.dataset.save, input.value);
+      Helix.toast(r.lines[0] || (r.success ? 'gespeichert' : 'Fehler')); await loadSettings();
+    } else if (t.dataset.reset) {
+      const r = await Helix.action('mineclash.config.reset', t.dataset.reset);
+      Helix.toast(r.lines[0] || 'zurückgesetzt'); await loadSettings();
+    } else if (t.dataset.docsave) {
+      const input = document.querySelector(`input[data-doc="${t.dataset.docsave}"]`);
+      const r = await Helix.action('mineclash.config.doc.set', document.getElementById('collection').value, t.dataset.docsave, input.dataset.order, input.value);
+      Helix.toast(r.lines[0] || 'gespeichert'); await loadDocs(); await loadSettings();
+    } else if (t.dataset.docdel) {
+      const r = await Helix.action('mineclash.config.doc.remove', document.getElementById('collection').value, t.dataset.docdel);
+      Helix.toast(r.lines[0] || 'gelöscht'); await loadDocs(); await loadSettings();
+    } else if (t.id === 'addDoc') {
+      const r = await Helix.action('mineclash.config.doc.set', document.getElementById('collection').value,
+        document.getElementById('newId').value, document.getElementById('newOrder').value || '0', document.getElementById('newBody').value);
+      Helix.toast(r.lines[0] || 'gespeichert'); await loadDocs(); await loadSettings();
+    }
+  });
+  document.getElementById('filter').addEventListener('input', renderSettings);
+  document.getElementById('collection').addEventListener('change', loadDocs);
+  Helix.ready(async () => { await loadSettings(); await loadCollections(); });
+</script>

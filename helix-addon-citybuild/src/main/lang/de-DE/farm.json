@@ -1,0 +1,21 @@
+{
+  "farm.resetting": "<#ffb43a>Achtung: Die Farmwelt wird gerade neu erschaffen. Versuch es in einer Minute noch einmal.",
+  "farm.unavailable": "<#ff5a4a>Die Farmwelt ist gerade nicht geladen. Sag einem Teammitglied Bescheid.",
+  "farm.searching": "<#f1e2c2>Waldemar sucht dir ein ruhiges Fleckchen …",
+  "farm.no-spot": "<#ff5a4a>Kein sicherer Platz gefunden. Versuch es gleich noch einmal.",
+  "farm.arrived": "<#4ac85e>Willkommen in der Farmwelt. <#f1e2c2>Nächster Neuanfang: <#ffcf4a>{time}</#ffcf4a>.",
+  "farm.countdown.minutes": "<#ffb43a>Achtung: Die Farmwelt wird in <#ffcf4a>{minutes} Min.</#ffcf4a> neu erschaffen. Truhen dort gehen verloren, dein Inventar bleibt.",
+  "farm.countdown.seconds": "<#ffb43a>Achtung: Neuanfang der Farmwelt in <#ffcf4a>{seconds} s</#ffcf4a>!",
+  "farm.bossbar": "<#ffcf4a>Farmwelt-Neuanfang <#f1e2c2>in {time}",
+  "farm.reset.moved": "<#5ab4ff>Die Farmwelt ist neu entstanden – du bist am Spawn.",
+  "farm.reset.done": "<#4ac85e>Die Farmwelt ist neu entstanden! <#f1e2c2>Nächster Neuanfang: <#ffcf4a>{time}</#ffcf4a>.",
+  "farm.admin.now": "<#ffb43a>Achtung: Farmwelt-Reset startet in <#ffcf4a>{seconds} s</#ffcf4a>.",
+  "farm.admin.next": "<#f1e2c2>Nächster Farmwelt-Reset: <#ffcf4a>{time}</#ffcf4a>.",
+  "farm.book.title": "Waldemars Forsthaus",
+  "farm.book.subtitle": "Farmwelt, Nether, End",
+  "farm.book.line.1": "Hier wird abgebaut, gejagt und geangelt.",
+  "farm.book.line.2": "Sonntags um 4 Uhr wächst alles neu.",
+  "farm.book.next": "Nächster Neuanfang: {time}",
+  "farm.book.farm": "Farmwelt",
+  "farm.book.nether": "Nether"
+}

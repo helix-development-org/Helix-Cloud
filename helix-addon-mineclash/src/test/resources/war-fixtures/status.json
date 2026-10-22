@@ -1,0 +1,11 @@
+{
+  "bootId": "b-7f3c2a",
+  "capacity": 2,
+  "pool": {"ready": 2, "target": 2, "generating": true, "progress": 0.42},
+  "mspt": 21.4,
+  "wars": [
+    {"warId": "w-20261022-0001", "phase": "PREPARE", "phaseEndsAt": 1792700000000, "points": {"A": 0, "B": 0}, "present": {"A": 3, "B": 1}},
+    {"warId": "w-20261022-0002", "phase": "RUNNING", "points": {"A": 1250, "B": 900}, "present": {"A": 5, "B": 0}}
+  ],
+  "rejected": ["w-20261022-0003"]
+}

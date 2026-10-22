@@ -76,6 +76,8 @@ class ControlServerTest {
         logBuffer = logBuffer,
         eventLog = eventLog,
         networkPack = networkPack,
+        // in memory: the default stores jobs relative to the working directory
+        jobScheduler = org.helix.node.scheduler.JobScheduler(org.helix.api.storage.InMemoryAddonStorage(), registry),
     )
 
     init {
@@ -584,6 +586,46 @@ class ControlServerTest {
     }
 
     @Test
+    fun `viewing services does not allow console, control or logs and capabilities follow the grants`() = testApplication {
+        val client = apiClient()
+        dependencies.playerRegistry.handle(
+            org.helix.api.player.PlayerEvent("join", "Steve", "u", proxyServiceId = "Proxy-1"),
+        )
+        dependencies.nativePermissions.update("steve", listOf("helix.panel.login", "helix.panel.services"))
+        val token = client.loginAs("Steve")
+
+        assertEquals(HttpStatusCode.OK, client.get("/api/v1/services") { bearerAuth(token) }.status)
+        val console = client.post("/api/v1/services/Lobby-1/command") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(ServiceCommandRequest("op Steve"))
+        }
+        assertEquals(HttpStatusCode.Forbidden, console.status, "seeing services must not open the console")
+        assertEquals(HttpStatusCode.Forbidden, client.post("/api/v1/services/Lobby-1/stop") { bearerAuth(token) }.status)
+        assertEquals(HttpStatusCode.Forbidden, client.get("/api/v1/services/Lobby-1/logs") { bearerAuth(token) }.status)
+        assertEquals(HttpStatusCode.Forbidden, client.get("/api/v1/access/catalog") { bearerAuth(token) }.status)
+        val me: org.helix.node.control.auth.PanelIdentity = client.get("/api/v1/auth/me") { bearerAuth(token) }.body()
+        assertEquals(listOf("services"), me.capabilities)
+
+        dependencies.nativePermissions.update(
+            "steve",
+            listOf("helix.panel.login", "helix.panel.services", "helix.panel.services.console", "helix.panel.access"),
+        )
+        val allowed = client.post("/api/v1/services/Lobby-1/command") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(ServiceCommandRequest("say hi"))
+        }
+        assertEquals(HttpStatusCode.NotFound, allowed.status, "authorized now, the service just does not run")
+        val again: org.helix.node.control.auth.PanelIdentity = client.get("/api/v1/auth/me") { bearerAuth(token) }.body()
+        assertTrue("services.console" in again.capabilities && "access" in again.capabilities)
+        assertTrue("access" in again.views)
+        val catalog: org.helix.node.control.auth.AccessCatalog = client.get("/api/v1/access/catalog") { bearerAuth(token) }.body()
+        assertTrue(catalog.capabilities.any { it.id == "services.console" && it.node == "helix.panel.services.console" })
+        assertEquals("helix.panel.login", catalog.login)
+    }
+
+    @Test
     fun `post actions enforces the invoked action's declared permission`() = testApplication {
         val client = apiClient()
         registry.register(
@@ -611,6 +653,91 @@ class ControlServerTest {
             setBody(ActionInvocation("test.gated"))
         }.body()
         assertTrue(allowed.success)
+    }
+
+    @Test
+    fun `player commands are in-game only over rest unless the caller is a full admin`() = testApplication {
+        val client = apiClient()
+        var executor: String? = null
+        registry.register(
+            ActionDescriptor("test.cmd", "player command", "test.cmd", playerCommand = true, permission = "test.cmd.perm"),
+        ) { inv -> executor = inv.arguments.firstOrNull(); ActionResult.ok("ran") }
+        dependencies.playerRegistry.handle(org.helix.api.player.PlayerEvent("join", "Steve", "u", proxyServiceId = "Proxy-1"))
+        dependencies.nativePermissions.update("steve", listOf("helix.panel.login", "test.cmd.perm"))
+        val token = client.loginAs("Steve")
+
+        val denied = client.post("/api/v1/actions") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(ActionInvocation("test.cmd", listOf("Victim", "disband")))
+        }
+        assertEquals(HttpStatusCode.Forbidden, denied.status, "nobody may run a player command in someone else's name")
+        assertEquals(null, executor)
+
+        val admin: ActionResult = client.post("/api/v1/actions") {
+            bearerAuth("secret")
+            contentType(ContentType.Application.Json)
+            setBody(ActionInvocation("test.cmd", listOf("Steve")))
+        }.body()
+        assertTrue(admin.success)
+    }
+
+    @Test
+    fun `scheduling an action requires the action's own permission`() = testApplication {
+        val client = apiClient()
+        registry.register(ActionDescriptor("test.grant", "admin-only action", "test.grant")) { ActionResult.ok("ran") }
+        registry.register(
+            ActionDescriptor("test.say", "broadcast", "test.say", permission = "test.say.perm"),
+        ) { ActionResult.ok("said") }
+        dependencies.playerRegistry.handle(org.helix.api.player.PlayerEvent("join", "Steve", "u", proxyServiceId = "Proxy-1"))
+        dependencies.nativePermissions.update("steve", listOf("helix.panel.login", "helix.panel.schedules.edit", "test.say.perm"))
+        val token = client.loginAs("Steve")
+
+        val escalation = client.post("/api/v1/schedules") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(org.helix.node.scheduler.ScheduledJob("x", "test.grant", listOf("Steve", "helix.admin"), everyMinutes = 1))
+        }
+        assertEquals(HttpStatusCode.Forbidden, escalation.status, "jobs run with system rights")
+
+        val saved: org.helix.node.scheduler.ScheduledJob = client.post("/api/v1/schedules") {
+            bearerAuth(token)
+            contentType(ContentType.Application.Json)
+            setBody(org.helix.node.scheduler.ScheduledJob("hello", "test.say", listOf("hi"), everyMinutes = 5))
+        }.body()
+        assertEquals("Steve", saved.createdBy)
+    }
+
+    @Test
+    fun `the player lookup shows stored player data only to player managers`() = testApplication {
+        val client = apiClient()
+        dependencies.playerData.register(
+            "guard",
+            object : org.helix.api.addon.PlayerDataProvider {
+                override fun export(player: String) = """{"addressHash":"abc"}"""
+
+                override fun delete(player: String) = true
+            },
+        )
+        dependencies.playerRegistry.handle(org.helix.api.player.PlayerEvent("join", "Steve", "u", proxyServiceId = "Proxy-1"))
+        dependencies.nativePermissions.update("steve", listOf("helix.panel.login", "helix.panel.players"))
+        val token = client.loginAs("Steve")
+
+        val basic: PlayerLookupView = client.get("/api/v1/players/lookup?name=Steve") { bearerAuth(token) }.body()
+        assertTrue(basic.online)
+        assertTrue(basic.sources.isEmpty(), "viewing players is not the GDPR export")
+
+        dependencies.nativePermissions.update("steve", listOf("helix.panel.login", "helix.panel.players", "helix.panel.players.manage"))
+        val full: PlayerLookupView = client.get("/api/v1/players/lookup?name=Steve") { bearerAuth(token) }.body()
+        assertEquals(mapOf("guard" to """{"addressHash":"abc"}"""), full.sources)
+    }
+
+    @Test
+    fun `control nodes are known to the native fallback and admin-equivalent ones are marked`() {
+        val nodes = knownPermissionNodes(dependencies)
+        assertTrue("helix.panel.services.console" in nodes && "helix.panel.schedules.edit" in nodes)
+        val critical = org.helix.node.control.auth.PanelCapabilities.ALL.filter { it.critical }.map { it.id }.toSet()
+        assertEquals(setOf("tasks.edit", "services.console", "addons.manage", "schedules.edit", "files.edit", "access"), critical)
     }
 
     @Test

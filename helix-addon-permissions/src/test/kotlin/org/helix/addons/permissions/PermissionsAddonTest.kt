@@ -109,6 +109,17 @@ class PermissionsAddonTest {
     }
 
     @Test
+    fun `the team bug node implies the reporting node`() {
+        context.run("perm.group.create", "support", "weight=60")
+        context.run("perm.group.grant", "support", "feedback.staff")
+        context.run("perm.user.addgroup", "Steve", "support")
+
+        assertTrue(context.has("steve", "feedback.report"), "staff use the player-facing feedback actions too")
+        assertFalse(context.has("alex", "feedback.report"))
+        assertFalse(context.has("steve", "feedback.admin"), "implication is limited to the listed nodes")
+    }
+
+    @Test
     fun `default group applies to players without groups`() {
         context.run("perm.group.grant", "default", "helix.command.lobby")
 

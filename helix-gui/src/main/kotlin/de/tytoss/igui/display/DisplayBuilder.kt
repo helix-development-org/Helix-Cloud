@@ -281,6 +281,14 @@ class DisplayBuilder internal constructor(
     fun characterWidth(character: String, pixels: Int): Unit = widths.register(character, pixels)
 
     /**
+     * Measures text the way the cursor advances for it.
+     *
+     * @param value the text.
+     * @return its width in pixels.
+     */
+    fun measure(value: String): Int = widths.measure(value)
+
+    /**
      * Finishes building, capturing the assembled component and final cursor
      * position.
      *

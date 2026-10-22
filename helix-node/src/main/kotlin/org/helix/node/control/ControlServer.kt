@@ -43,6 +43,7 @@ import org.helix.api.bridge.HeartbeatReport
 import org.helix.api.bridge.NetworkPackInfo
 import org.helix.api.display.DisplayBulkRequest
 import org.helix.api.i18n.TranslationsSnapshot
+import org.helix.api.message.GlobalPlaceholders
 import org.helix.api.player.PlayerEvent
 import org.helix.api.player.PlayerLocaleReport
 import org.helix.api.player.PlayerPermissionsReport
@@ -55,9 +56,15 @@ import org.helix.api.proxy.ProxyPoll
 import org.helix.api.service.ServiceState
 import org.helix.api.task.TaskDefinition
 import org.helix.node.config.NodeConfig
+import org.helix.node.control.auth.AccessCatalog
 import org.helix.node.control.auth.LoginRequest
 import org.helix.node.control.auth.PanelAuthService
+import org.helix.node.control.auth.PanelCapabilities
 import org.helix.node.control.auth.PanelPrincipal
+import org.helix.node.control.auth.PanelTabCapability
+import org.helix.node.control.auth.TicketIssueRequest
+import org.helix.node.control.auth.TicketRequest
+import org.helix.node.control.auth.TicketResponse
 import org.helix.node.control.auth.VerifyRequest
 import org.helix.node.scheduler.ScheduledJob
 import org.slf4j.LoggerFactory
@@ -255,6 +262,8 @@ private suspend fun RoutingContext.requireBridge(dependencies: ControlDependenci
 internal fun knownPermissionNodes(dependencies: ControlDependencies): List<String> = buildList {
     add(dependencies.loginPermission)
     addAll(PanelAuthService.VIEW_NODES.values)
+    // control nodes too, so the native fallback (no permissions addon) can grant console, control and edit rights
+    addAll(PanelCapabilities.ALL.map { it.node })
     dependencies.dashboardPanels.list().forEach { add(PanelAuthService.panelNode(it.id)) }
     add("helix.maintenance.bypass")
     // permissions gating in-game commands (/helix, /bans, /permissions, …)
@@ -307,6 +316,25 @@ private const val STREAM_POLL_MS = 300L
 /** Stream polls between keep-alive comments (~15 s). */
 private const val STREAM_KEEPALIVE_POLLS = 50
 
+/** Stream polls between re-checks of the session and permission (~10 s). */
+private const val STREAM_RECHECK_POLLS = 33
+
+/**
+ * A check that the caller of a stream still holds [node]: re-authenticates the bearer token presented when the
+ * stream was opened (expired, signed-out or demoted sessions fail) and re-evaluates the permission.
+ *
+ * @param dependencies control API dependencies.
+ * @param node permission node the stream needs.
+ * @return the re-check for [sseLoop].
+ */
+private fun RoutingContext.streamAccess(dependencies: ControlDependencies, node: String): suspend () -> Boolean {
+    val presented = call.request.headers[HttpHeaders.Authorization].orEmpty().removePrefix("Bearer ").trim()
+    return {
+        val principal = if (presented.isEmpty()) null else dependencies.panelAuth.authenticate(presented)
+        principal != null && dependencies.panelAuth.grants(principal, node)
+    }
+}
+
 /**
  * Responds with a server-sent-event stream and runs the given block with an
  * emitter that writes one SSE event per log line.
@@ -341,9 +369,21 @@ private suspend fun emitLines(emit: suspend (String) -> Unit, lines: List<String
  * @param emit the raw event emitter, used for keep-alive comments.
  * @param step polls once; `true` when new lines were emitted.
  */
-private suspend fun sseLoop(emit: suspend (String) -> Unit, step: suspend () -> Boolean) {
+private suspend fun sseLoop(
+    emit: suspend (String) -> Unit,
+    stillAllowed: (suspend () -> Boolean)? = null,
+    step: suspend () -> Boolean,
+) {
     var idle = 0
+    var polls = 0
     while (true) {
+        polls++
+        // A stream outlives the request that opened it: re-check the session and the node regularly, so revoking
+        // the permission or signing the user out also ends an open log stream.
+        if (stillAllowed != null && polls % STREAM_RECHECK_POLLS == 0 && !stillAllowed()) {
+            emit("event: revoked\ndata: access revoked\n\n")
+            return
+        }
         val produced = step()
         idle = if (produced) 0 else idle + 1
         if (idle >= STREAM_KEEPALIVE_POLLS) {
@@ -406,6 +446,12 @@ private fun io.ktor.server.routing.Route.publicAuthRoutes(dependencies: ControlD
         val request = call.receive<VerifyRequest>()
         call.respond(dependencies.panelAuth.verify(request.name, request.code))
     }
+    // in-game admin panel: the client redeems the one-time ticket its Paper server obtained for it
+    post("/auth/ticket") {
+        if (!withinRateLimit(dependencies.authRateLimiter)) return@post
+        val request = call.receive<TicketRequest>()
+        call.respond(dependencies.panelAuth.redeemTicket(request.ticket))
+    }
 }
 
 private fun io.ktor.server.routing.Route.sessionRoutes(dependencies: ControlDependencies) {
@@ -453,10 +499,11 @@ private fun io.ktor.server.routing.Route.observabilityRoutes(dependencies: Contr
     }
     get("/logs/stream") {
         if (!authorize(dependencies, "helix.panel.logs")) return@get
+        val access = streamAccess(dependencies, "helix.panel.logs")
         streamSse { emit ->
             var offset = dependencies.logBuffer.offset()
             emitLines(emit, dependencies.logBuffer.tail(200))
-            sseLoop(emit) {
+            sseLoop(emit, access) {
                 val lines = dependencies.logBuffer.since(offset)
                 offset = dependencies.logBuffer.offset()
                 emitLines(emit, lines)
@@ -487,6 +534,11 @@ private fun io.ktor.server.routing.Route.panelRoutes(dependencies: ControlDepend
         }
         call.respond(visible)
     }
+    get("/access/catalog") {
+        if (!authorize(dependencies, PanelCapabilities.ACCESS)) return@get
+        val tabs = dependencies.dashboardPanels.list().map { PanelTabCapability(it.id, PanelAuthService.panelNode(it.id), it.title) }
+        call.respond(AccessCatalog(PanelCapabilities.ALL, tabs, dependencies.panelAuth.loginNode(), PanelAuthService.ADMIN_PERMISSION))
+    }
     get("/panels/{id}") {
         val id = call.parameters["id"].orEmpty()
         if (!authorize(dependencies, PanelAuthService.panelNode(id))) return@get
@@ -511,7 +563,7 @@ private fun io.ktor.server.routing.Route.translationRoutes(dependencies: Control
         )
     }
     post("/translations") {
-        if (!authorize(dependencies, "helix.panel.translations")) return@post
+        if (!authorize(dependencies, PanelCapabilities.TRANSLATIONS_EDIT)) return@post
         val update = call.receive<TranslationUpdate>()
         val ok = if (update.reset) {
             dependencies.messages.reset(update.key, update.language)
@@ -526,7 +578,7 @@ private fun io.ktor.server.routing.Route.translationRoutes(dependencies: Control
         }
     }
     delete("/translations/{key}") {
-        if (!authorize(dependencies, "helix.panel.translations")) return@delete
+        if (!authorize(dependencies, PanelCapabilities.TRANSLATIONS_EDIT)) return@delete
         val key = call.parameters["key"].orEmpty()
         if (dependencies.messages.deleteKey(key)) {
             dependencies.messages.ownerOf(key)?.let(dependencies.onMessagesChanged)
@@ -536,7 +588,7 @@ private fun io.ktor.server.routing.Route.translationRoutes(dependencies: Control
         }
     }
     post("/translations/languages") {
-        if (!authorize(dependencies, "helix.panel.translations")) return@post
+        if (!authorize(dependencies, PanelCapabilities.TRANSLATIONS_EDIT)) return@post
         val update = call.receive<LanguageUpdate>()
         val ok = if (update.default) {
             dependencies.languages.setDefaultLanguage(update.language)
@@ -550,7 +602,7 @@ private fun io.ktor.server.routing.Route.translationRoutes(dependencies: Control
         }
     }
     delete("/translations/languages/{language}") {
-        if (!authorize(dependencies, "helix.panel.translations")) return@delete
+        if (!authorize(dependencies, PanelCapabilities.TRANSLATIONS_EDIT)) return@delete
         val language = call.parameters["language"].orEmpty()
         if (dependencies.languages.removeLanguage(language)) {
             call.respond(MessageResponse("removed $language"))
@@ -593,7 +645,7 @@ private fun io.ktor.server.routing.Route.proxyRoutes(dependencies: ControlDepend
         call.respond(ProxyView(dependencies.routing.maintenance, proxies, backends))
     }
     post("/proxy/maintenance") {
-        if (!authorize(dependencies, "helix.panel.proxy")) return@post
+        if (!authorize(dependencies, PanelCapabilities.PROXY_CONTROL)) return@post
         val request = call.receive<MaintenanceRequest>()
         dependencies.routing.maintenance = request.enabled
         dependencies.proxyEvents.bumpRouting()
@@ -609,7 +661,7 @@ private fun io.ktor.server.routing.Route.proxyRoutes(dependencies: ControlDepend
         call.respond(WhitelistView(dependencies.whitelist.isEnabled(), dependencies.whitelist.all()))
     }
     post("/proxy/whitelist") {
-        if (!authorize(dependencies, "helix.panel.proxy")) return@post
+        if (!authorize(dependencies, PanelCapabilities.PROXY_CONTROL)) return@post
         val request = call.receive<WhitelistToggleRequest>()
         dependencies.whitelist.setEnabled(request.enabled)
         dependencies.eventLog.record(
@@ -620,7 +672,7 @@ private fun io.ktor.server.routing.Route.proxyRoutes(dependencies: ControlDepend
         call.respond(MessageResponse("whitelist ${if (request.enabled) "enabled" else "disabled"}"))
     }
     post("/proxy/whitelist/add") {
-        if (!authorize(dependencies, "helix.panel.proxy")) return@post
+        if (!authorize(dependencies, PanelCapabilities.PROXY_CONTROL)) return@post
         val request = call.receive<WhitelistEntryRequest>()
         if (dependencies.whitelist.add(request.player)) {
             call.respond(MessageResponse("added ${request.player}"))
@@ -629,7 +681,7 @@ private fun io.ktor.server.routing.Route.proxyRoutes(dependencies: ControlDepend
         }
     }
     post("/proxy/whitelist/remove") {
-        if (!authorize(dependencies, "helix.panel.proxy")) return@post
+        if (!authorize(dependencies, PanelCapabilities.PROXY_CONTROL)) return@post
         val request = call.receive<WhitelistEntryRequest>()
         if (dependencies.whitelist.remove(request.player)) {
             call.respond(MessageResponse("removed ${request.player}"))
@@ -654,14 +706,14 @@ private fun io.ktor.server.routing.Route.taskRoutes(dependencies: ControlDepende
         }
     }
     put("/tasks/{name}") {
-        if (!authorize(dependencies, "helix.panel.tasks")) return@put
+        if (!authorize(dependencies, PanelCapabilities.TASKS_EDIT)) return@put
         val task = call.receive<TaskDefinition>()
         require(task.name == call.parameters["name"]) { "task name must match the url" }
         dependencies.taskStore.save(task)
         call.respond(task)
     }
     delete("/tasks/{name}") {
-        if (!authorize(dependencies, "helix.panel.tasks")) return@delete
+        if (!authorize(dependencies, PanelCapabilities.TASKS_EDIT)) return@delete
         val name = call.parameters["name"].orEmpty()
         require(dependencies.manager.activeCount(name) == 0) { "task $name still has active services" }
         if (dependencies.taskStore.delete(name)) {
@@ -671,7 +723,7 @@ private fun io.ktor.server.routing.Route.taskRoutes(dependencies: ControlDepende
         }
     }
     post("/tasks/{name}/services") {
-        if (!authorize(dependencies, "helix.panel.tasks")) return@post
+        if (!authorize(dependencies, PanelCapabilities.SERVICES_CONTROL)) return@post
         val info = dependencies.manager.startService(call.parameters["name"].orEmpty())
         call.respond(HttpStatusCode.Created, info)
     }
@@ -692,7 +744,7 @@ private fun io.ktor.server.routing.Route.serviceRoutes(dependencies: ControlDepe
         }
     }
     post("/services/{id}/stop") {
-        if (!authorize(dependencies, "helix.panel.services")) return@post
+        if (!authorize(dependencies, PanelCapabilities.SERVICES_CONTROL)) return@post
         val id = call.parameters["id"].orEmpty()
         if (dependencies.manager.stopService(id)) {
             call.respond(MessageResponse("stopping $id"))
@@ -701,7 +753,7 @@ private fun io.ktor.server.routing.Route.serviceRoutes(dependencies: ControlDepe
         }
     }
     post("/services/{id}/kill") {
-        if (!authorize(dependencies, "helix.panel.services")) return@post
+        if (!authorize(dependencies, PanelCapabilities.SERVICES_CONTROL)) return@post
         val id = call.parameters["id"].orEmpty()
         if (dependencies.manager.killService(id)) {
             call.respond(MessageResponse("killed $id"))
@@ -710,17 +762,18 @@ private fun io.ktor.server.routing.Route.serviceRoutes(dependencies: ControlDepe
         }
     }
     get("/services/{id}/logs") {
-        if (!authorize(dependencies, "helix.panel.services")) return@get
+        if (!authorize(dependencies, PanelCapabilities.SERVICES_LOGS)) return@get
         val tail = call.request.queryParameters["tail"]?.toIntOrNull() ?: 50
         call.respond(LogsResponse(dependencies.manager.logs(call.parameters["id"].orEmpty(), tail)))
     }
     get("/services/{id}/logs/stream") {
-        if (!authorize(dependencies, "helix.panel.services")) return@get
+        if (!authorize(dependencies, PanelCapabilities.SERVICES_LOGS)) return@get
         val id = call.parameters["id"].orEmpty()
+        val access = streamAccess(dependencies, PanelCapabilities.SERVICES_LOGS)
         streamSse { emit ->
             var last: List<String> = dependencies.manager.logs(id, STREAM_TAIL)
             emitLines(emit, last)
-            sseLoop(emit) {
+            sseLoop(emit, access) {
                 val current = dependencies.manager.logs(id, STREAM_TAIL)
                 val fresh = newLines(last, current)
                 last = current
@@ -730,7 +783,7 @@ private fun io.ktor.server.routing.Route.serviceRoutes(dependencies: ControlDepe
         }
     }
     post("/services/{id}/command") {
-        if (!authorize(dependencies, "helix.panel.services")) return@post
+        if (!authorize(dependencies, PanelCapabilities.SERVICES_CONSOLE)) return@post
         val id = call.parameters["id"].orEmpty()
         val command = call.receive<ServiceCommandRequest>().command
         require(command.isNotBlank()) { "command must not be empty" }
@@ -756,16 +809,19 @@ private fun io.ktor.server.routing.Route.scheduleRoutes(dependencies: ControlDep
         call.respond(dependencies.jobScheduler.all())
     }
     post("/schedules") {
-        if (!authorize(dependencies, "helix.panel.schedules")) return@post
-        val job = call.receive<ScheduledJob>()
-        require(job.id.isNotBlank()) { "job id must not be empty" }
-        require(job.action.isNotBlank()) { "job action must not be empty" }
-        require(job.everyMinutes > 0 || job.dailyAt != null) { "set everyMinutes or dailyAt" }
+        if (!authorize(dependencies, PanelCapabilities.SCHEDULES_EDIT)) return@post
+        val received = call.receive<ScheduledJob>()
+        require(received.id.isNotBlank()) { "job id must not be empty" }
+        require(received.action.isNotBlank()) { "job action must not be empty" }
+        require(received.everyMinutes > 0 || received.dailyAt != null) { "set everyMinutes or dailyAt" }
+        // Jobs run with system rights: only schedule what you may run yourself.
+        if (!mayInvoke(dependencies, received.action)) return@post
+        val job = received.copy(createdBy = restActor() ?: "admin")
         dependencies.jobScheduler.save(job)
         call.respond(job)
     }
     delete("/schedules/{id}") {
-        if (!authorize(dependencies, "helix.panel.schedules")) return@delete
+        if (!authorize(dependencies, PanelCapabilities.SCHEDULES_EDIT)) return@delete
         val id = call.parameters["id"].orEmpty()
         if (dependencies.jobScheduler.delete(id)) {
             call.respond(MessageResponse("deleted $id"))
@@ -774,8 +830,10 @@ private fun io.ktor.server.routing.Route.scheduleRoutes(dependencies: ControlDep
         }
     }
     post("/schedules/{id}/run") {
-        if (!authorize(dependencies, "helix.panel.schedules")) return@post
+        if (!authorize(dependencies, PanelCapabilities.SCHEDULES_EDIT)) return@post
         val id = call.parameters["id"].orEmpty()
+        val job = dependencies.jobScheduler.all().firstOrNull { it.id == id }
+        if (job != null && !mayInvoke(dependencies, job.action)) return@post
         if (dependencies.jobScheduler.runNow(id)) {
             call.respond(MessageResponse("ran $id"))
         } else {
@@ -795,7 +853,7 @@ private fun io.ktor.server.routing.Route.backupRoutes(dependencies: ControlDepen
         )
     }
     post("/services/{id}/backups") {
-        if (!authorize(dependencies, "helix.panel.backups")) return@post
+        if (!authorize(dependencies, PanelCapabilities.SERVICES_BACKUPS)) return@post
         val id = call.parameters["id"].orEmpty()
         val info = dependencies.backups.create(id)
         dependencies.audit.record(
@@ -806,7 +864,7 @@ private fun io.ktor.server.routing.Route.backupRoutes(dependencies: ControlDepen
         call.respond(HttpStatusCode.Created, info)
     }
     post("/backups/{serviceId}/{file}/restore") {
-        if (!authorize(dependencies, "helix.panel.backups")) return@post
+        if (!authorize(dependencies, PanelCapabilities.BACKUPS_RESTORE)) return@post
         val serviceId = call.parameters["serviceId"].orEmpty()
         val file = call.parameters["file"].orEmpty()
         dependencies.backups.restore(serviceId, file)
@@ -818,7 +876,7 @@ private fun io.ktor.server.routing.Route.backupRoutes(dependencies: ControlDepen
         call.respond(MessageResponse("restored $file into $serviceId"))
     }
     delete("/backups/{serviceId}/{file}") {
-        if (!authorize(dependencies, "helix.panel.backups")) return@delete
+        if (!authorize(dependencies, PanelCapabilities.BACKUPS_RESTORE)) return@delete
         val serviceId = call.parameters["serviceId"].orEmpty()
         val file = call.parameters["file"].orEmpty()
         if (dependencies.backups.delete(serviceId, file)) {
@@ -847,7 +905,7 @@ private fun io.ktor.server.routing.Route.fileRoutes(dependencies: ControlDepende
         call.respond(dependencies.files.read(root, path))
     }
     put("/files/content") {
-        if (!authorize(dependencies, "helix.panel.files")) return@put
+        if (!authorize(dependencies, PanelCapabilities.FILES_EDIT)) return@put
         val request = call.receive<org.helix.node.files.FileWriteRequest>()
         dependencies.files.write(request.root, request.path, request.content)
         dependencies.audit.record(
@@ -858,7 +916,7 @@ private fun io.ktor.server.routing.Route.fileRoutes(dependencies: ControlDepende
         call.respond(MessageResponse("saved ${request.path}"))
     }
     delete("/files") {
-        if (!authorize(dependencies, "helix.panel.files")) return@delete
+        if (!authorize(dependencies, PanelCapabilities.FILES_EDIT)) return@delete
         val root = call.request.queryParameters["root"].orEmpty()
         val path = call.request.queryParameters["path"].orEmpty()
         if (dependencies.files.delete(root, path)) {
@@ -887,6 +945,9 @@ private fun io.ktor.server.routing.Route.playerRoutes(dependencies: ControlDepen
             return@get
         }
         val online = dependencies.playerRegistry.find(name)
+        // The stored per-addon data (address hashes, histories …) is the GDPR export: only for player managers.
+        val principal = call.principal<PanelPrincipal>()
+        val full = principal != null && dependencies.panelAuth.grants(principal, PanelCapabilities.PLAYERS_MANAGE)
         call.respond(
             PlayerLookupView(
                 name = name,
@@ -894,25 +955,25 @@ private fun io.ktor.server.routing.Route.playerRoutes(dependencies: ControlDepen
                 uuid = online?.uuid,
                 proxyServiceId = online?.proxyServiceId,
                 joinedAtEpochMs = online?.joinedAtEpochMs,
-                sources = dependencies.playerData.export(name),
+                sources = if (full) dependencies.playerData.export(name) else emptyMap(),
             ),
         )
     }
     post("/players/{name}/message") {
-        if (!authorize(dependencies, "helix.panel.players")) return@post
+        if (!authorize(dependencies, PanelCapabilities.PLAYERS_MANAGE)) return@post
         val name = call.parameters["name"].orEmpty()
         val text = call.receive<PlayerActionRequest>().value
         require(text.isNotBlank()) { "message must not be empty" }
         call.respond(dependencies.registry.invoke(playerAction("player.message", name, text)))
     }
     post("/players/{name}/kick") {
-        if (!authorize(dependencies, "helix.panel.players")) return@post
+        if (!authorize(dependencies, PanelCapabilities.PLAYERS_MANAGE)) return@post
         val name = call.parameters["name"].orEmpty()
         val reason = call.receive<PlayerActionRequest>().value
         call.respond(dependencies.registry.invoke(playerAction("player.kick", name, reason)))
     }
     post("/players/{name}/ban") {
-        if (!authorize(dependencies, "helix.panel.players")) return@post
+        if (!authorize(dependencies, PanelCapabilities.PLAYERS_MANAGE)) return@post
         val name = call.parameters["name"].orEmpty()
         val request = call.receive<PlayerActionRequest>()
         val arguments = buildList {
@@ -966,6 +1027,27 @@ private fun RoutingContext.playerAction(action: String, player: String, value: S
 private fun RoutingContext.restActor(): String? =
     call.principal<PanelPrincipal>()?.takeUnless { it.viaStaticToken }?.name
 
+/**
+ * Whether the caller may invoke an action over REST (directly or through a scheduled job), else answers `403`.
+ *
+ * - An action with a declared permission needs that node; one without needs full admin.
+ * - Player commands (`/clan`, `/discord`, …) take the executing player as their first argument: over REST that
+ *   name would be the caller's choice, so only full admins may call them – for everyone else they are in-game only.
+ *
+ * @param dependencies control API dependencies.
+ * @param action action name.
+ * @return `true` if allowed; `false` after a `403` was written.
+ */
+private suspend fun RoutingContext.mayInvoke(dependencies: ControlDependencies, action: String): Boolean {
+    val descriptor = dependencies.registry.descriptors().firstOrNull { it.name == action }
+    if (descriptor?.playerCommand == true && call.principal<PanelPrincipal>()?.admin != true) {
+        call.respond(HttpStatusCode.Forbidden, ErrorResponse("player commands are in-game only: $action"))
+        return false
+    }
+    val required = descriptor?.permission
+    return if (required != null) authorize(dependencies, required) else requireAdmin(dependencies)
+}
+
 private fun io.ktor.server.routing.Route.actionRoutes(dependencies: ControlDependencies) {
     get("/actions") {
         // The full action catalog is admin-only: it enumerates every action name and usage,
@@ -977,10 +1059,7 @@ private fun io.ktor.server.routing.Route.actionRoutes(dependencies: ControlDepen
     post("/actions") {
         if (!withinRateLimit(dependencies.actionsRateLimiter)) return@post
         val invocation = call.receive<ActionInvocation>()
-        val descriptor = dependencies.registry.descriptors().firstOrNull { it.name == invocation.action }
-        val required = descriptor?.permission
-        val authorized = if (required != null) authorize(dependencies, required) else requireAdmin(dependencies)
-        if (!authorized) return@post
+        if (!mayInvoke(dependencies, invocation.action)) return@post
         call.respond(dependencies.registry.invoke(invocation.copy(source = ActionSource.REST, actor = restActor())))
     }
 }
@@ -1028,7 +1107,7 @@ private fun io.ktor.server.routing.Route.addonRoutes(dependencies: ControlDepend
         call.respond(dependencies.addonManager.addons())
     }
     post("/addons/{id}/enable") {
-        if (!authorize(dependencies, "helix.panel.addons")) return@post
+        if (!authorize(dependencies, PanelCapabilities.ADDONS_MANAGE)) return@post
         val id = call.parameters["id"].orEmpty()
         if (dependencies.addonManager.enable(id)) {
             call.respond(MessageResponse("enabled $id"))
@@ -1037,7 +1116,7 @@ private fun io.ktor.server.routing.Route.addonRoutes(dependencies: ControlDepend
         }
     }
     post("/addons/{id}/disable") {
-        if (!authorize(dependencies, "helix.panel.addons")) return@post
+        if (!authorize(dependencies, PanelCapabilities.ADDONS_MANAGE)) return@post
         val id = call.parameters["id"].orEmpty()
         if (dependencies.addonManager.disable(id)) {
             call.respond(MessageResponse("disabled $id"))
@@ -1076,6 +1155,13 @@ internal fun applyPlayerEvent(dependencies: ControlDependencies, event: PlayerEv
 }
 
 private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDependencies) {
+    // in-game admin panel: a Paper service asks for a one-time login ticket for a player it hosts
+    post("/internal/panel-ticket") {
+        if (!requireBridge(dependencies)) return@post
+        val request = call.receive<TicketIssueRequest>()
+        val ticket = dependencies.panelAuth.issueTicket(request.player)
+        call.respond(TicketResponse(ticket, PanelAuthService.TICKET_TTL_MS / 1000))
+    }
     post("/internal/heartbeat") {
         val report = call.receive<HeartbeatReport>()
         if (!requireBridge(dependencies, report.serviceId)) return@post
@@ -1237,7 +1323,8 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
     post("/internal/action") {
         if (!requireBridge(dependencies)) return@post
         val invocation = call.receive<ActionInvocation>()
-        call.respond(dependencies.bridgeActions.invoke(invocation))
+        val caller = call.principal<PanelPrincipal>()?.takeUnless { it.admin }?.serviceId
+        call.respond(dependencies.bridgeActions.invoke(invocation, caller))
     }
     post("/internal/display") {
         if (!requireBridge(dependencies)) return@post
@@ -1260,7 +1347,11 @@ private fun io.ktor.server.routing.Route.internalRoutes(dependencies: ControlDep
                 defaultLanguage = dependencies.languages.defaultLanguage(),
                 languages = languageList,
                 playerLanguages = dependencies.languages.playerLanguages().filterKeys { it in online },
-                values = dependencies.messages.effectiveTables(languageList),
+                // Global placeholders ({network}, {prefix}) are filled here, so backend plugins
+                // rendering straight from this snapshot show the configured network name.
+                values = dependencies.messages.effectiveTables(languageList).mapValues { (_, table) ->
+                    table.mapValues { (_, template) -> GlobalPlaceholders.apply(template) }
+                },
             ),
         )
     }

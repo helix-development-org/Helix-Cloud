@@ -3,7 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Helix Cloud</title>
+    <meta name="theme-color" content="#3b2617" />
+    <title>KronlandMC · Panel</title>
+    <link rel="icon" type="image/png" sizes="16x16" href="./brand/favicon-16.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./brand/favicon-32.png" />
+    <link rel="apple-touch-icon" href="./brand/logo-256.png" />
+    <script>
+      // Apply the stored colour mode before first paint (dark = wood is the default; see src/lib/theme.ts).
+      try { if (localStorage.getItem("panel.theme") === "light") document.documentElement.classList.remove("dark") } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

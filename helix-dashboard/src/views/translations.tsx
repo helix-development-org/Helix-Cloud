@@ -2,6 +2,7 @@ import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { usePoll } from "@/lib/use-poll"
+import { useCan } from "@/lib/access"
 import { minimessage } from "@/lib/cm-minimessage"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -34,6 +35,8 @@ export function TranslationsView() {
   const [filter, setFilter] = useState("")
   const [newLanguage, setNewLanguage] = useState("")
   const [newKey, setNewKey] = useState("")
+  const can = useCan()
+  const editable = can("translations.edit")
 
   const active = language ?? data?.defaultLanguage ?? "en"
   const entries = useMemo(() => {
@@ -88,7 +91,7 @@ export function TranslationsView() {
                 onClick={() => setLanguage(code)}>
                 {code}{code === data.defaultLanguage ? " ★" : ""}
               </Button>
-              {code !== data.defaultLanguage && code === active && (
+              {editable && code !== data.defaultLanguage && code === active && (
                 <>
                   <Button size="sm" variant="ghost" title="Make default" onClick={() => makeDefault(code)}>★</Button>
                   <Button size="sm" variant="ghost" title="Remove language" onClick={() => removeLanguage(code)}>×</Button>
@@ -96,24 +99,28 @@ export function TranslationsView() {
               )}
             </span>
           ))}
-          <div className="ml-auto flex items-center gap-2">
-            <Input className="w-24 font-mono text-xs" placeholder="fr" value={newLanguage}
-              onChange={(e) => setNewLanguage(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addLanguage()} />
-            <Button size="sm" variant="outline" onClick={addLanguage}>Add language</Button>
-          </div>
+          {editable && (
+            <div className="ml-auto flex items-center gap-2">
+              <Input className="w-24 font-mono text-xs" placeholder="fr" value={newLanguage}
+                onChange={(e) => setNewLanguage(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addLanguage()} />
+              <Button size="sm" variant="outline" onClick={addLanguage}>Add language</Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       <div className="flex items-center gap-3">
         <Input className="max-w-md" placeholder="Filter keys or text…" value={filter}
           onChange={(e) => setFilter(e.target.value)} />
-        <div className="ml-auto flex items-center gap-2">
-          <Input className="w-72 font-mono text-xs" placeholder={`${KEY_PREFIX}custom.my.key`} value={newKey}
-            onChange={(e) => setNewKey(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && createKey()} />
-          <Button size="sm" onClick={createKey}>Add key</Button>
-        </div>
+        {editable && (
+          <div className="ml-auto flex items-center gap-2">
+            <Input className="w-72 font-mono text-xs" placeholder={`${KEY_PREFIX}custom.my.key`} value={newKey}
+              onChange={(e) => setNewKey(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && createKey()} />
+            <Button size="sm" onClick={createKey}>Add key</Button>
+          </div>
+        )}
       </div>
 
       <Card>
@@ -129,7 +136,7 @@ export function TranslationsView() {
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {entries.map((entry) => (
-            <TranslationRow key={`${entry.key}:${active}`} entry={entry} language={active}
+            <TranslationRow key={`${entry.key}:${active}`} entry={entry} language={active} editable={editable}
               onSave={(v) => post({ key: entry.key, language: active, value: v }, `Saved ${entry.key}`)}
               onReset={() => post({ key: entry.key, language: active, reset: true }, `Reset ${entry.key}`)}
               onDelete={() => remove(entry.key)} />
@@ -141,9 +148,10 @@ export function TranslationsView() {
   )
 }
 
-function TranslationRow({ entry, language, onSave, onReset, onDelete }: {
+function TranslationRow({ entry, language, editable, onSave, onReset, onDelete }: {
   entry: TranslationEntry
   language: string
+  editable: boolean
   onSave: (value: string) => void
   onReset: () => void
   onDelete: () => void
@@ -162,31 +170,33 @@ function TranslationRow({ entry, language, onSave, onReset, onDelete }: {
       <div className="pt-2">
         <div className="break-all font-mono text-xs text-muted-foreground">{entry.key}</div>
         <div className="mt-1 flex gap-1">
-          {custom !== undefined && <Badge variant="secondary" className="text-[10px]">edited</Badge>}
+          {custom !== undefined && <Badge variant="secondary" className="text-xs">edited</Badge>}
           {custom === undefined && entry.defaults[language] === undefined && (
-            <Badge variant="outline" className="text-[10px]">no {language} value</Badge>
+            <Badge variant="outline" className="text-xs">no {language} value</Badge>
           )}
         </div>
       </div>
       <div className="flex flex-col gap-2">
-        {editing ? (
+        {editing && editable ? (
           <CodeEditor language={MINIMESSAGE} value={current} onChange={setCurrent} autoFocus />
         ) : (
           <button
             type="button"
-            onClick={() => setEditing(true)}
-            className="min-h-[2.25rem] w-full whitespace-pre-wrap break-words rounded-md border border-input bg-transparent px-3 py-2 text-left font-mono text-xs leading-relaxed hover:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
+            onClick={() => editable && setEditing(true)}
+            className="min-h-[2.25rem] w-full whitespace-pre-wrap break-words kl-field rounded-[12px] border border-border px-3 py-2 text-left font-mono text-xs leading-relaxed hover:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
           >
             {current || <span className="text-muted-foreground">Click to edit…</span>}
           </button>
         )}
         <MiniMessagePreview value={current} />
       </div>
-      <div className="flex gap-2">
-        <Button size="sm" onClick={() => onSave(current)}>Save</Button>
-        {custom !== undefined && <Button size="sm" variant="ghost" onClick={onReset}>Reset</Button>}
-        {deletable && <Button size="sm" variant="ghost" className="text-destructive" onClick={onDelete}>Delete</Button>}
-      </div>
+      {editable && (
+        <div className="flex gap-2">
+          <Button size="sm" onClick={() => onSave(current)}>Save</Button>
+          {custom !== undefined && <Button size="sm" variant="ghost" onClick={onReset}>Reset</Button>}
+          {deletable && <Button size="sm" variant="ghost" className="text-destructive" onClick={onDelete}>Delete</Button>}
+        </div>
+      )}
     </div>
   )
 }

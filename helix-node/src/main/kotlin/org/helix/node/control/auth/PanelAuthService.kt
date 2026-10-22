@@ -47,6 +47,7 @@ class PanelAuthService(
     private val pending = ConcurrentHashMap<String, PendingLogin>()
     private val sessions = ConcurrentHashMap<String, PanelSession>()
     private val lastCodeAt = ConcurrentHashMap<String, Long>()
+    private val tickets = ConcurrentHashMap<String, PendingTicket>()
 
     /**
      * Issues a login code for an online, permitted player and sends it in-game.
@@ -112,6 +113,46 @@ class PanelAuthService(
             throw IllegalArgumentException("incorrect code")
         }
         pending.remove(key)
+        val token = newToken()
+        val now = clock()
+        sessions[token] = PanelSession(record.name, record.uuid, now + sessionTtlMs, lastSeenAtMs = now)
+        val principal = PanelPrincipal(record.name, admin = grantsPermission(record.name, ADMIN_PERMISSION))
+        return SessionResponse(token, identity(principal))
+    }
+
+    /**
+     * Issues a one-time login ticket for an online player who holds the login permission — the
+     * in-game admin panel's sign-in: a trusted service (the player's Paper server) requests it after
+     * the player opened the panel, hands it to the player's client, and the client redeems it via
+     * [redeemTicket]. Tickets are random 256-bit values, single-use and valid for [TICKET_TTL_MS].
+     *
+     * @param rawName the player's Minecraft name.
+     * @return the ticket.
+     * @throws IllegalArgumentException if the player is offline or lacks the login permission.
+     */
+    @Synchronized
+    fun issueTicket(rawName: String): String {
+        val name = rawName.trim()
+        require(name.isNotEmpty()) { "name must not be empty" }
+        val player = players.find(name)
+        require(player != null && grantsPermission(player.name, loginPermission)) { LOGIN_CODE_DENIED_MESSAGE }
+        val now = clock()
+        tickets.entries.removeIf { now >= it.value.expiresAtMs }
+        val ticket = newToken()
+        tickets[ticket] = PendingTicket(player.name, player.uuid, now + TICKET_TTL_MS)
+        return ticket
+    }
+
+    /**
+     * Redeems a ticket from [issueTicket] and mints a session exactly like [verify].
+     *
+     * @param rawTicket the presented ticket.
+     * @return the session token and the caller's identity.
+     * @throws IllegalArgumentException if the ticket is unknown, already used or expired.
+     */
+    fun redeemTicket(rawTicket: String): SessionResponse {
+        val record = tickets.remove(rawTicket.trim())
+        require(record != null && clock() < record.expiresAtMs) { "the login ticket is invalid or expired" }
         val token = newToken()
         val now = clock()
         sessions[token] = PanelSession(record.name, record.uuid, now + sessionTtlMs, lastSeenAtMs = now)
@@ -206,10 +247,26 @@ class PanelAuthService(
      * Builds the identity payload for a caller.
      *
      * @param principal the authenticated caller.
-     * @return the caller's name, admin flag and allowed views.
+     * @return the caller's name, admin flag, allowed views and capabilities.
      */
     fun identity(principal: PanelPrincipal): PanelIdentity =
-        PanelIdentity(principal.name, principal.admin, allowedViews(principal))
+        PanelIdentity(principal.name, principal.admin, allowedViews(principal), allowedCapabilities(principal))
+
+    /**
+     * The permission node needed to sign in at all (configurable, default `helix.panel.login`).
+     *
+     * @return the login node.
+     */
+    fun loginNode(): String = loginPermission
+
+    /**
+     * The built-in capabilities a caller holds (see [PanelCapabilities]).
+     *
+     * @param principal the authenticated caller.
+     * @return ids of the granted capabilities.
+     */
+    fun allowedCapabilities(principal: PanelPrincipal): List<String> =
+        PanelCapabilities.ALL.filter { grants(principal, it.node) }.map { it.id }
 
     /**
      * Drops expired login codes and elapsed request cooldowns, called on
@@ -243,6 +300,9 @@ class PanelAuthService(
          *  without the login permission — keeps both indistinguishable. */
         const val LOGIN_CODE_DENIED_MESSAGE = "no login code could be issued for that name"
 
+        /** Lifetime of an in-game panel login ticket. */
+        const val TICKET_TTL_MS = 60_000L
+
         /** Default idle timeout: 2 hours without a request expires a session. */
         const val DEFAULT_IDLE_TTL_MS = 2 * 60 * 60 * 1000L
 
@@ -266,6 +326,7 @@ class PanelAuthService(
             "files" to "helix.panel.files",
             "translations" to "helix.panel.translations",
             "settings" to "helix.panel.settings",
+            "access" to PanelCapabilities.ACCESS,
         )
 
         /** Permission node prefix for an addon-contributed dashboard panel. */

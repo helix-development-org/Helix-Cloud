@@ -156,6 +156,9 @@ class HelixNodeStore(
         return enqueueAction("guard.store.punishment", listOf(payload.toString()))
     }
 
+    override fun enqueueAlertPreference(playerName: String, enabled: Boolean): Boolean =
+        enqueueAction("guard.store.alerts", listOf(playerName.lowercase(), enabled.toString()))
+
     /** Queues a network-wide ban on the node (guard.store.ban; 0 hours = permanent). Node kicks + gates. */
     fun submitBan(playerId: UUID, playerName: String, hours: Int, reason: String, actor: String): Boolean {
         val payload = buildJsonObject {
@@ -376,7 +379,8 @@ class HelixNodeStore(
     private fun incidentJson(record: IncidentRecord): String = buildJsonObject {
         put("id", record.incidentId.toString())
         put("serverId", record.serverId)
-        put("world", org.bukkit.Bukkit.getPlayer(record.playerId)?.world?.uid?.toString() ?: "")
+        // Off the main thread (worker/writer): the world comes from the sampled snapshot, never Bukkit.
+        put("world", record.worldId?.toString() ?: "")
         put("uuid", record.playerId.toString())
         put("name", record.playerName.lowercase())
         put("check", record.families.joinToString(",") { it.name })

@@ -3,10 +3,19 @@ package org.helix.addons.bettermsgs.paper
 import de.tytoss.igui.IGui
 import de.tytoss.igui.awaitSharedIGui
 import de.tytoss.igui.gui.GuiDefinition
-import de.tytoss.igui.texture.GuiTextureDefinition
-import de.tytoss.igui.slot.chestSlot
-import de.tytoss.igui.slot.rectTo
-import de.tytoss.igui.pagination.paginate
+import de.tytoss.igui.screen.ButtonStyle
+import de.tytoss.igui.screen.LedgerBadge
+import de.tytoss.igui.screen.LedgerButton
+import de.tytoss.igui.screen.LedgerEmpty
+import de.tytoss.igui.screen.LedgerLayout
+import de.tytoss.igui.screen.LedgerLine
+import de.tytoss.igui.screen.LedgerPill
+import de.tytoss.igui.screen.LedgerRow
+import de.tytoss.igui.screen.LedgerScreen
+import de.tytoss.igui.screen.LedgerView
+import de.tytoss.igui.screen.LifeSign
+import de.tytoss.igui.screen.PillColor
+import de.tytoss.igui.screen.Villagers
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -21,9 +30,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.format.NamedTextColor
+import net.kyori.adventure.text.format.TextColor
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.command.Command
@@ -31,7 +40,6 @@ import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
-import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.inventory.ItemStack
@@ -59,7 +67,7 @@ data class ChatMessage(val from: String, val text: String, val epochMs: Long)
 data class HistoryWindow(val total: Int = 0, val offset: Int = 0, val messages: List<ChatMessage> = emptyList())
 
 /**
- * One contact of the phone home screen.
+ * One contact of the letters list.
  *
  * @property name peer name (lowercase).
  * @property lastEpochMs time of the newest message.
@@ -89,8 +97,9 @@ class ChatState(val peer: String) {
 }
 
 /**
- * BetterMSGs Paper component: a phone-style `/msg` GUI with a Discord-like
- * chat per conversation, rendered with IGui font textures. Conversations
+ * BetterMSGs Paper component: `/msg` opens a medieval letters ledger (the
+ * shared [LedgerScreen]) — the contact list, and per contact the
+ * correspondence with paging and a "write" button. Conversations
  * live on the Helix node (`helix.bettermsgs` addon actions), so messaging
  * works across every server of the network.
  */
@@ -99,12 +108,13 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
     private val chats = ConcurrentHashMap<UUID, ChatState>()
     private val pendingInput = ConcurrentHashMap<UUID, String>()
     private var igui: IGui? = null
-    private var phoneGui: GuiDefinition? = null
-    private var chatGui: GuiDefinition? = null
+    private var lettersGui: GuiDefinition? = null
+    private val ledger = LedgerScreen()
+    private val contacts = ConcurrentHashMap<UUID, List<Contact>>()
+    private val contactPages = ConcurrentHashMap<UUID, Int>()
     private var client: NodeClient? = null
     private lateinit var translations: Translations
     private lateinit var takeover: InventoryTakeover
-    private val skins = SkinPixels()
     private lateinit var scope: CoroutineScope
 
     /** Dispatcher running coroutines on the Bukkit main thread. */
@@ -119,7 +129,7 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
     }
 
     /**
-     * Boots the GUI runtime: IGui install, texture registration, listeners,
+     * Boots the GUI runtime: IGui install, listeners,
      * schedulers and the `/msg` command wiring.
      */
     override fun onEnable() {
@@ -136,17 +146,8 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
         server.pluginManager.registerEvents(this, this)
         scope.launch {
             val installed = awaitSharedIGui()
-            val guiFont = Key.key("bettermsgs", "gui")
-            installed.saveTexture(GuiTextureDefinition("bettermsgs.home", "\ue000", guiFont, 176, 222))
-            installed.saveTexture(GuiTextureDefinition("bettermsgs.chat", "\ue001", guiFont, 176, 222))
-            for (index in 0..7) {
-                installed.saveTexture(
-                    GuiTextureDefinition("bettermsgs.thumb$index", "${'\ue010' + index}", guiFont, 4, 20),
-                )
-            }
             igui = installed
-            phoneGui = buildPhoneGui(installed)
-            chatGui = buildChatGui(installed)
+            lettersGui = buildLettersGui(installed)
             logger.info("BetterMSGs GUIs ready")
         }
         server.scheduler.runTaskTimerAsynchronously(this, Runnable { translations.sync() }, 20L, 100L)
@@ -154,7 +155,7 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
     }
 
     /**
-     * Restores every borrowed inventory and cancels this plugin's coroutine
+     * Restores borrowed inventories of older versions and cancels this plugin's coroutine
      * scope. Does not shut IGui itself down — it is the shared instance
      * every addon's menu uses, and only the owning Helix-GUIs plugin may do
      * that (on its own, later, onDisable).
@@ -183,14 +184,17 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
         val player = sender as? Player ?: return true
         when {
-            args.isEmpty() -> scope.launch { phoneGui?.open(player) }
+            args.isEmpty() -> {
+                chats.remove(player.uniqueId)
+                scope.launch { lettersGui?.open(player) }
+            }
             args.size == 1 -> openChat(player, args[0])
             else -> scope.launch(Dispatchers.IO) {
                 val text = args.drop(1).joinToString(" ")
                 client?.action("bettermsgs.send", player.name, args[0], text)
                 withContext(mainDispatcher) {
                     player.sendMessage(
-                        translations.chatComponent(player, "sent", "<gray>To <white>{target}</white>: {text}",
+                        translations.chatComponent(player, "sent", "<#f1e2c2>To <#ffcf4a>{target}</#ffcf4a><#7a4a24>:</#7a4a24> {text}",
                             "target" to args[0], "text" to text),
                     )
                 }
@@ -200,9 +204,8 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
     }
 
     /**
-     * Restores crash snapshots of borrowed inventories. The GUI textures
-     * arrive with the network resource pack, which the node merges from all
-     * addon packs and the Velocity bridge applies on proxy join.
+     * Restores crash snapshots of inventories borrowed by older versions
+     * (the chat used to take the player inventory over).
      *
      * @param event the join event.
      */
@@ -220,30 +223,11 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
     fun onQuit(event: PlayerQuitEvent) {
         chats.remove(event.player.uniqueId)
         pendingInput.remove(event.player.uniqueId)
+        ledger.forget(event.player)
+        contacts.remove(event.player.uniqueId)
+        contactPages.remove(event.player.uniqueId)
         takeover.restore(event.player)
         clearFocus(event.player.name)
-    }
-
-    /**
-     * Routes clicks in the borrowed player inventory (hotbar controls) —
-     * IGui only owns the top chest inventory.
-     *
-     * @param event the click event (already cancelled by IGui).
-     */
-    @EventHandler
-    fun onLowerClick(event: InventoryClickEvent) {
-        val player = event.whoClicked as? Player ?: return
-        val state = chats[player.uniqueId] ?: return
-        if (event.rawSlot < 54 + 27) {
-            return
-        }
-        when (event.rawSlot - 54 - 27) {
-            0 -> scope.launch { phoneGui?.open(player) }
-            3 -> scroll(player, state, ChatMath.WINDOW)
-            4 -> startInput(player, state)
-            5 -> scroll(player, state, -ChatMath.WINDOW)
-            8 -> scope.launch { chatGui?.close(player) }
-        }
     }
 
     /**
@@ -272,30 +256,19 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
      * @param peer conversation partner name.
      */
     fun openChat(player: Player, peer: String) {
-        val state = ChatState(peer.lowercase())
-        chats[player.uniqueId] = state
-        scope.launch { chatGui?.open(player) }
-    }
-
-    private fun scroll(player: Player, state: ChatState, delta: Int) {
-        state.offset = ChatMath.clampOffset(state.offset + delta, state.total)
-        scope.launch { refreshChat(player) }
-    }
-
-    private suspend fun refreshChat(player: Player) {
-        chatGui?.refresh(player)
-        chats[player.uniqueId]?.let { renderLowerInventory(player, it) }
+        chats[player.uniqueId] = ChatState(peer.lowercase())
+        scope.launch { lettersGui?.open(player) }
     }
 
     private fun startInput(player: Player, state: ChatState) {
         pendingInput[player.uniqueId] = state.peer
         scope.launch {
-            chatGui?.close(player)
+            lettersGui?.close(player)
             player.sendMessage(
                 translations.chatComponent(
                     player,
                     "prompt.message",
-                    "<gray>Type your message in chat (or <white>cancel</white>):",
+                    "<#f1e2c2>Type your message in chat (or <#ffcf4a>cancel</#ffcf4a>):",
                 ),
             )
         }
@@ -307,7 +280,7 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
             val player = Bukkit.getPlayer(uuid) ?: return@forEach
             val window = fetchHistory(nodeClient, player.name, state.peer, state.offset) ?: return@forEach
             if (window.total != state.total) {
-                scope.launch { refreshChat(player) }
+                scope.launch { lettersGui?.refresh(player) }
             }
         }
     }
@@ -331,195 +304,213 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
         scope.launch(Dispatchers.IO) { client?.action("bettermsgs.focus", playerName, "-") }
     }
 
-    // ------------------------------------------------------------- phone --
+    // ------------------------------------------------------------ letters --
 
-    private suspend fun buildPhoneGui(installed: IGui): GuiDefinition = installed.gui("bettermsgs.phone") {
+    private suspend fun buildLettersGui(installed: IGui): GuiDefinition = installed.gui("bettermsgs.letters") {
         rows = 6
-        landingPage = "home"
-        page("home") {
-            title { _ ->
-                moveTo(0)
-                texture(installed.cachedTexture("bettermsgs.home"))
-                toStart()
-            }
-            paginate<Contact>(chestSlot(2, 2) rectTo chestSlot(5, 8)) {
-                previousSlot = chestSlot(6, 1)
-                nextSlot = chestSlot(6, 9)
-                source { player -> withContext(Dispatchers.IO) { client?.let { fetchContacts(it, player) } ?: emptyList() } }
-                render { context, contact -> contactItem(context.player, contact) }
-                onClick { context, contact -> openChat(context.player, contact.name) }
-            }
-            onClick(chestSlot(6, 5)) { context -> context.close() }
-        }
-    }
-
-    private fun contactItem(viewer: Player, contact: Contact): ItemStack {
-        val head = ItemStack(Material.PLAYER_HEAD, contact.unread.coerceIn(1, 64))
-        head.editMeta(SkullMeta::class.java) { meta ->
-            meta.owningPlayer = Bukkit.getOfflinePlayer(contact.name)
-            val color = if (contact.online) "<aqua>" else "<gray>"
-            meta.displayName(translations.render("$color${contact.name}"))
-            val status = if (contact.online) {
-                translations.text(viewer, "note.online", "<green>online")
-            } else {
-                translations.text(viewer, "note.offline", "<dark_gray>offline")
-            }
-            val lore = mutableListOf(translations.render(status))
-            if (contact.unread > 0) {
-                lore += translations.render("<yellow>✉ ${contact.unread}")
-            }
-            meta.lore(lore)
-        }
-        return head
-    }
-
-    // -------------------------------------------------------------- chat --
-
-    private suspend fun buildChatGui(installed: IGui): GuiDefinition = installed.gui("bettermsgs.chat") {
-        rows = 6
-        landingPage = "chat"
-        page("chat") {
-            prepare { player ->
-                val state = chats[player.uniqueId] ?: return@prepare
-                withContext(Dispatchers.IO) {
-                    client?.let { nodeClient ->
-                        fetchHistory(nodeClient, player.name, state.peer, state.offset)?.let { window ->
-                            state.total = window.total
-                            state.offset = ChatMath.clampOffset(state.offset, window.total)
-                            state.messages = window.messages
-                        }
-                        nodeClient.action("bettermsgs.focus", player.name, state.peer)
-                        skins.fetch(player.name)
-                        skins.fetch(state.peer)
-                        state.messages.map { it.from }.distinct().forEach(skins::fetch)
+        playerInventory = true
+        landingPage = "main"
+        page("main") {
+            prepare { player -> showLedger(player) }
+            ledger.install(
+                this,
+                onRow = { ctx, row ->
+                    if (chats.containsKey(ctx.player.uniqueId)) return@install
+                    val index = (contactPages[ctx.player.uniqueId] ?: 0) * LedgerLayout.ROWS + row
+                    val contact = contacts[ctx.player.uniqueId]?.getOrNull(index) ?: return@install
+                    chats[ctx.player.uniqueId] = ChatState(contact.name)
+                    ctx.gui.refresh(ctx.player)
+                },
+                onButton = { ctx, button ->
+                    val state = chats[ctx.player.uniqueId] ?: return@install
+                    if (button == 1) startInput(ctx.player, state)
+                },
+                onPage = { ctx, step ->
+                    val state = chats[ctx.player.uniqueId]
+                    if (state == null) {
+                        contactPages.merge(ctx.player.uniqueId, step, Int::plus)
+                    } else {
+                        // left = older letters (further back), right = newer
+                        state.offset = ChatMath.clampOffset(state.offset - step * ChatMath.WINDOW, state.total)
                     }
-                }
-            }
-            title { context ->
-                moveTo(0)
-                texture(installed.cachedTexture("bettermsgs.chat"))
-                toStart()
-                val state = chats[context.player.uniqueId]
-                if (state != null) {
-                    moveTo(169)
-                    texture(installed.cachedTexture("bettermsgs.thumb${ChatMath.thumbIndex(state.offset, state.total)}"))
-                    toStart()
-                    moveTo(28)
-                    text(state.peer, 0, NamedTextColor.WHITE, rowFont(0))
-                    toStart()
-                    drawHead(this, state.peer, headRow = 0, x = 8)
-                    if (state.messages.isEmpty()) {
-                        centeredText(
-                            translations.text(context.player, "note.empty", "No messages yet - say hi!"),
-                            0,
-                            88,
-                            NamedTextColor.GRAY,
-                            rowFont(4),
-                        )
+                    ctx.gui.refresh(ctx.player)
+                },
+                onBack = { ctx ->
+                    if (chats.remove(ctx.player.uniqueId) != null) {
+                        clearFocus(ctx.player.name)
+                        ctx.gui.refresh(ctx.player)
                     }
-                    val padding = ChatMath.WINDOW - state.messages.size
-                    state.messages.forEachIndexed { index, message ->
-                        val row = padding + index + 1
-                        val own = message.from.equals(context.player.name, ignoreCase = true)
-                        val time = timeOf(message.epochMs)
-                        val line = "[$time] ${ChatMath.ellipsize(message.text, 24)}"
-                        if (own) {
-                            endText(line, 0, 146, NamedTextColor.AQUA, rowFont(row))
-                            drawHead(this, message.from, headRow = row, x = 150)
-                        } else {
-                            moveTo(28)
-                            text(line, 0, NamedTextColor.WHITE, rowFont(row))
-                            toStart()
-                            drawHead(this, message.from, headRow = row, x = 8)
-                        }
-                    }
-                }
-            }
-            // header: back, peer head, scroll older
-            onClick(chestSlot(1, 1)) { context ->
-                chats.remove(context.player.uniqueId)
-                phoneGui?.open(context.player)
-            }
-            onClick(chestSlot(1, 9)) { context ->
-                chats[context.player.uniqueId]?.let { scroll(context.player, it, ChatMath.WINDOW) }
-            }
-            onOpen { player ->
-                chats[player.uniqueId]?.let { state ->
-                    takeover.begin(player)
-                    renderLowerInventory(player, state)
-                }
-            }
+                },
+            )
         }
-        onClose { context ->
-            takeover.restore(context.player)
-            chats.remove(context.player.uniqueId)
+        onClose { ctx ->
+            ledger.forget(ctx.player)
+            contacts.remove(ctx.player.uniqueId)
+            contactPages.remove(ctx.player.uniqueId)
+            chats.remove(ctx.player.uniqueId)
             // keep the pending-input flow alive: the GUI closes for typing
-            if (!pendingInput.containsKey(context.player.uniqueId)) {
-                clearFocus(context.player.name)
+            if (!pendingInput.containsKey(ctx.player.uniqueId)) {
+                clearFocus(ctx.player.name)
             }
         }
     }
+
+    /** Fetches what the player looks at (contacts or one correspondence) and puts it into the ledger. */
+    private suspend fun showLedger(player: Player) {
+        val nodeClient = client ?: return
+        val state = chats[player.uniqueId]
+        if (state == null) {
+            val list = withContext(Dispatchers.IO) { fetchContacts(nodeClient, player) }
+            contacts[player.uniqueId] = list
+            ledger.show(player, contactsView(player, list))
+        } else {
+            withContext(Dispatchers.IO) {
+                fetchHistory(nodeClient, player.name, state.peer, state.offset)?.let { window ->
+                    state.total = window.total
+                    state.offset = ChatMath.clampOffset(state.offset, window.total)
+                    state.messages = window.messages
+                }
+                nodeClient.action("bettermsgs.focus", player.name, state.peer)
+            }
+            ledger.show(player, chatView(player, state))
+        }
+    }
+
+    /** The contact list: unread contacts with a red pill and a seal, others with their online status. */
+    private fun contactsView(player: Player, list: List<Contact>): LedgerView {
+        val pageCount = maxOf(1, (list.size + LedgerLayout.ROWS - 1) / LedgerLayout.ROWS)
+        val page = (contactPages[player.uniqueId] ?: 0).coerceIn(0, pageCount - 1)
+            .also { contactPages[player.uniqueId] = it }
+        val rows = list.drop(page * LedgerLayout.ROWS).take(LedgerLayout.ROWS).map { contact ->
+            val status = screen(player, if (contact.online) "note.online" else "note.offline")
+            val pill = when {
+                contact.unread > 0 -> LedgerPill(screen(player, "screen.unread", "count" to contact.unread.toString()), PillColor.RED)
+                contact.online -> LedgerPill(status, PillColor.GREEN)
+                else -> LedgerPill(status, PillColor.GREY)
+            }
+            LedgerRow(
+                label = contact.name,
+                icon = head(contact.name),
+                badge = if (contact.unread > 0) LedgerBadge.SEAL else null,
+                pill = pill,
+                tooltip = listOfNotNull(
+                    Component.text(contact.name, GOLD),
+                    Component.text(screen(player, "screen.kind.contact"), GREY),
+                    Component.text(status, if (contact.online) GREEN else GREY),
+                    contact.unread.takeIf { it > 0 }
+                        ?.let { Component.text(screen(player, "screen.unread", "count" to it.toString()), ERROR) },
+                    contact.lastEpochMs.takeIf { it > 0 }
+                        ?.let { Component.text(screen(player, "screen.last", "time" to dateOf(it)), PARCHMENT) },
+                    Component.text(screen(player, "screen.hint.open"), GOLD),
+                ),
+            )
+        }
+        val unread = list.sumOf { it.unread }
+        return LedgerView(
+            title = screen(player, "screen.title"),
+            subtitle = screen(player, "screen.contacts.subtitle"),
+            rows = rows,
+            page = page,
+            pages = pageCount,
+            detail = buildList {
+                add(LedgerLine(screen(player, "screen.post"), LedgerScreen.RED))
+                add(LedgerLine(""))
+                add(LedgerLine(player.name))
+                add(LedgerLine(screen(player, "screen.contacts.count", "count" to list.size.toString()), LedgerScreen.FADED))
+                add(
+                    LedgerLine(
+                        screen(player, "screen.unread.total", "count" to unread.toString()),
+                        if (unread > 0) LedgerScreen.RED else LedgerScreen.FADED,
+                    ),
+                )
+                if (list.isNotEmpty()) {
+                    add(LedgerLine(""))
+                    addAll(help(player, "contacts", 3))
+                }
+            },
+            lifeSign = LifeSign.QUILL,
+            empty = LedgerEmpty(listOf(screen(player, "screen.empty.contacts")), Villagers.NARRATOR),
+        )
+    }
+
+    /** One correspondence: eight letters per page (arrows scroll older/newer), back to the contacts, write a letter. */
+    private fun chatView(player: Player, state: ChatState): LedgerView {
+        val rows = state.messages.takeLast(LedgerLayout.ROWS).map { message ->
+            val own = message.from.equals(player.name, ignoreCase = true)
+            LedgerRow(
+                label = message.text,
+                value = timeOf(message.epochMs),
+                labelColor = if (own) OWN_INK else LedgerScreen.INK,
+                valueColor = LedgerScreen.FADED,
+                icon = head(message.from),
+                tooltip = buildList {
+                    add(Component.text(message.from, GOLD))
+                    add(Component.text(screen(player, "screen.kind.letter", "time" to dateOf(message.epochMs)), GREY))
+                    ChatMath.wrap(message.text).forEach { add(Component.text(it, PARCHMENT)) }
+                },
+            )
+        }
+        val (page, pages) = ChatMath.pages(state.offset, state.total)
+        val online = Bukkit.getPlayerExact(state.peer) != null ||
+            contacts[player.uniqueId]?.firstOrNull { it.name == state.peer }?.online == true
+        return LedgerView(
+            title = state.peer,
+            subtitle = screen(player, "screen.chat.subtitle", "peer" to state.peer),
+            rows = rows,
+            page = page,
+            pages = pages,
+            detail = buildList {
+                add(LedgerLine(screen(player, "screen.post"), LedgerScreen.RED))
+                add(LedgerLine(""))
+                add(LedgerLine(state.peer))
+                add(LedgerLine(screen(player, if (online) "note.online" else "note.offline"), if (online) LedgerScreen.GREEN else LedgerScreen.FADED))
+                add(LedgerLine(screen(player, "screen.letters", "count" to state.total.toString()), LedgerScreen.FADED))
+                add(LedgerLine(""))
+                addAll(help(player, "chat", 4))
+            },
+            back = true,
+            rightButton = LedgerButton(screen(player, "screen.write"), ButtonStyle.PRIMARY),
+            lifeSign = LifeSign.QUILL,
+            empty = LedgerEmpty(listOf(screen(player, "screen.empty.chat")), Villagers.NARRATOR),
+        )
+    }
+
+    private fun help(player: Player, mode: String, lines: Int): List<LedgerLine> =
+        (1..lines).map { LedgerLine(screen(player, "screen.help.$mode.$it")) }
+
+    private fun head(name: String): ItemStack = ItemStack(Material.PLAYER_HEAD).apply {
+        editMeta(SkullMeta::class.java) { it.owningPlayer = Bukkit.getOfflinePlayer(name) }
+    }
+
+    /** Prefix-free text in the player's language, without formatting (the ledger colours it). */
+    private fun screen(player: Player, key: String, vararg params: Pair<String, String>): String =
+        PlainTextComponentSerializer.plainText().serialize(translations.render(translations.text(player, key, key, *params)))
 
     private fun timeOf(epochMs: Long): String = DateTimeFormatter.ofPattern("HH:mm")
         .withZone(ZoneId.systemDefault())
         .format(Instant.ofEpochMilli(epochMs))
 
-    /**
-     * Draws a player's face as 8x8 colored pixel glyphs at a text row.
-     *
-     * @param display the title builder.
-     * @param name skin owner.
-     * @param headRow head anchor row (0 = header, 1..8 = message rows).
-     * @param x left edge in GUI pixels.
-     */
-    private fun drawHead(display: de.tytoss.igui.display.DisplayBuilder, name: String, headRow: Int, x: Int) {
-        val pixels = skins.cached(name) ?: return
-        val font = Key.key("bettermsgs", "pixels")
-        for (sub in 0..7) {
-            val glyph = (0xE100 + headRow * 8 + sub).toChar().toString()
-            // bitmap glyphs advance imageWidth + 1 (shadow column) — track 3,
-            // then pull back 1 so the pixels sit seamlessly at 2 px
-            display.characterWidth(glyph, 3)
-            display.moveTo(x)
-            for (px in 0..7) {
-                val argb = pixels[sub * 8 + px]
-                if (argb ushr 24 < 0x80) {
-                    display.space(2)
-                } else {
-                    display.text(glyph, 0, net.kyori.adventure.text.format.TextColor.color(argb and 0xFFFFFF), font)
-                    display.space(-1)
-                }
-            }
-            display.toStart()
-        }
-    }
+    private fun dateOf(epochMs: Long): String = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+        .withZone(ZoneId.systemDefault())
+        .format(Instant.ofEpochMilli(epochMs))
 
-    private fun rowFont(row: Int): Key = Key.key("bettermsgs", "text_row_$row")
+    /** Ink of the viewer's own letters and the tooltip token colours. */
+    private companion object {
+        val OWN_INK: TextColor = TextColor.color(0x1F3F6B)
 
-    /**
-     * Fills the borrowed player inventory: window rows 5..7 as message rows
-     * plus the hotbar control bar.
-     *
-     * @param player the viewer.
-     * @param state the open chat.
-     */
-    private fun renderLowerInventory(player: Player, state: ChatState) {
-        if (!takeover.active(player)) {
-            return
-        }
-        // the chat is fully drawn — the borrowed inventory just stays empty
-        player.inventory.clear()
-    }
+        /** Tooltip names and actions (`gold` base). */
+        val GOLD: TextColor = TextColor.color(0xFFCF4A)
 
-    private fun namedItem(material: Material, name: String): ItemStack {
-        val item = ItemStack(material)
-        item.editMeta { meta -> meta.displayName(translations.render(name)) }
-        return item
-    }
+        /** Tooltip categories and offline (`disabled` base). */
+        val GREY: TextColor = TextColor.color(0xA89A84)
 
-    private fun namedItem(material: Material, name: Component): ItemStack {
-        val item = ItemStack(material)
-        item.editMeta { meta -> meta.displayName(name) }
-        return item
+        /** Tooltip values (`parchment` base). */
+        val PARCHMENT: TextColor = TextColor.color(0xF1E2C2)
+
+        /** Online (`success` base). */
+        val GREEN: TextColor = TextColor.color(0x4AC85E)
+
+        /** Unread count (`error` base). */
+        val ERROR: TextColor = TextColor.color(0xFF5A4A)
     }
 }

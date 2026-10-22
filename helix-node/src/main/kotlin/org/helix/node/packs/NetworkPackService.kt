@@ -244,9 +244,15 @@ class NetworkPackService(private val directory: Path) {
     private fun readInt(file: Path, fallback: Int): Int =
         runCatching { file.readText().trim().toInt() }.getOrDefault(fallback)
 
+    /**
+     * Since 1.21.9 the client reads `min_format`/`max_format` and rejects a pack that declares support above format
+     * 64 without them (`Pack declares support for version newer than 64, but is missing mandatory fields …`) – the
+     * whole network pack would silently not load. Older clients (1.21.4–1.21.8) still read `pack_format` and
+     * `supported_formats`, so both forms are written.
+     */
     private fun packMcMeta(): String =
         """{"pack":{"pack_format":$PACK_FORMAT,"supported_formats":[$MIN_FORMAT,$MAX_FORMAT],""" +
-            """"description":"Helix network pack"}}"""
+            """"min_format":$MIN_FORMAT,"max_format":$MAX_FORMAT,"description":"Helix network pack"}}"""
 
     private companion object {
         /** File name of the merged network pack. */
@@ -270,8 +276,8 @@ class NetworkPackService(private val directory: Path) {
         /** Declared `pack_format` of the generated `pack.mcmeta`. */
         const val PACK_FORMAT = 46
 
-        /** Lower bound of the declared `supported_formats` range. */
-        const val MIN_FORMAT = 34
+        /** Lower bound of the declared format range (1.21.4: item model definitions). */
+        const val MIN_FORMAT = 46
 
         /** Upper bound of the declared `supported_formats` range. */
         const val MAX_FORMAT = 999

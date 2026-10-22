@@ -1,0 +1,2104 @@
+{
+ "version": 1,
+ "entries": [
+  {
+   "id": "net-lobby",
+   "mode": "Netzwerk",
+   "command": "/lobby",
+   "summary": "Bringt dich von jedem Server zurück in die Lobby.",
+   "expected": "Du landest am Lobby-Spawn. Ohne laufende Lobby kommt die Meldung „Keine Lobby verfügbar“.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-hub",
+   "mode": "Netzwerk",
+   "command": "/hub",
+   "summary": "Kurzform von /lobby: bringt dich von jedem Server zurück in die Lobby.",
+   "expected": "Wie /lobby – du landest am Lobby-Spawn.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-server",
+   "mode": "Netzwerk",
+   "command": "/server <Name>",
+   "summary": "Wechselt direkt auf einen Server, z. B. CityBuild-1.",
+   "expected": "Du wirst verbunden. Unbekannter Name → Fehlermeldung; Server in Wartung → Hinweis (außer mit Wartungs-Bypass).",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-servers",
+   "mode": "Netzwerk",
+   "command": "/servers",
+   "summary": "Listet alle erreichbaren Server.",
+   "expected": "Liste mit Servernamen; Server in Wartung fehlen, solange du keinen Bypass hast.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-language",
+   "mode": "Netzwerk",
+   "command": "/helix language [Sprache]",
+   "summary": "Zeigt deine Sprache bzw. stellt sie um (z. B. de, en).",
+   "expected": "Ohne Angabe: aktuelle und verfügbare Sprachen. Mit Angabe: Bestätigung, ab dann kommen Texte in der neuen Sprache.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-friend-add",
+   "mode": "Netzwerk",
+   "command": "/friend add <Spieler>",
+   "summary": "Schickt eine Freundschaftsanfrage.",
+   "expected": "Der andere Spieler bekommt die Anfrage; dir wird bestätigt, dass sie raus ist.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-friend-accept",
+   "mode": "Netzwerk",
+   "command": "/friend accept <Spieler>",
+   "summary": "Nimmt eine Freundschaftsanfrage an.",
+   "expected": "Ihr seid befreundet und seht euch in /friend list; beim Join des Freundes kommt eine Nachricht.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-friend-deny",
+   "mode": "Netzwerk",
+   "command": "/friend deny <Spieler>",
+   "summary": "Lehnt eine Freundschaftsanfrage ab.",
+   "expected": "Die Anfrage verschwindet aus /friend requests.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-friend-remove",
+   "mode": "Netzwerk",
+   "command": "/friend remove <Spieler>",
+   "summary": "Beendet eine Freundschaft.",
+   "expected": "Der Spieler steht nicht mehr in deiner Freundesliste.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-friend-list",
+   "mode": "Netzwerk",
+   "command": "/friend list",
+   "summary": "Zeigt deine Freunde (online/offline).",
+   "expected": "Liste deiner Freunde mit Online-Status.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-friend-requests",
+   "mode": "Netzwerk",
+   "command": "/friend requests",
+   "summary": "Zeigt offene Freundschaftsanfragen.",
+   "expected": "Liste der Anfragen, die du noch annehmen oder ablehnen kannst.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-party-create",
+   "mode": "Netzwerk",
+   "command": "/party create",
+   "summary": "Gründet eine Party mit dir als Leiter.",
+   "expected": "Bestätigung; du bist Leiter einer Party mit einem Mitglied.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-party-invite",
+   "mode": "Netzwerk",
+   "command": "/party invite <Spieler>",
+   "summary": "Lädt einen Spieler in deine Party ein.",
+   "expected": "Der Spieler bekommt die Einladung, du eine Bestätigung.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-party-accept",
+   "mode": "Netzwerk",
+   "command": "/party accept <Spieler>",
+   "summary": "Tritt der Party des einladenden Spielers bei.",
+   "expected": "Du bist Mitglied; die Party wird z. B. für 2v2-Matches in MineClash gemeinsam vermittelt.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-party-leave",
+   "mode": "Netzwerk",
+   "command": "/party leave",
+   "summary": "Verlässt deine Party.",
+   "expected": "Du bist in keiner Party mehr; die anderen werden informiert.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-party-kick",
+   "mode": "Netzwerk",
+   "command": "/party kick <Spieler>",
+   "summary": "Wirft ein Mitglied aus der Party (nur Leiter).",
+   "expected": "Das Mitglied ist raus; Nicht-Leiter bekommen eine Fehlermeldung.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-party-list",
+   "mode": "Netzwerk",
+   "command": "/party list",
+   "summary": "Zeigt die Mitglieder deiner Party.",
+   "expected": "Liste mit Leiter und Mitgliedern.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-clan-create",
+   "mode": "Netzwerk",
+   "command": "/clan create <Tag> <Name>",
+   "summary": "Gründet einen Clan. Tag: 2–5 Buchstaben/Ziffern, Name: 3–24 Zeichen.",
+   "expected": "Der Clan existiert, du bist Owner. Falsches Format, belegter Tag oder schon in einem Clan → Fehlermeldung.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-clan-info",
+   "mode": "Netzwerk",
+   "command": "/clan info [Clan]",
+   "summary": "Zeigt Infos zu deinem oder einem anderen Clan.",
+   "expected": "Name, Tag, Owner, Mitglieder mit Rang und Clankasse.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-clan-invite",
+   "mode": "Netzwerk",
+   "command": "/clan invite <Spieler>",
+   "summary": "Lädt einen Spieler ein (Owner oder Offizier).",
+   "expected": "Der Spieler bekommt eine Nachricht mit klickbarem [Annehmen]; Mitglieder ohne Rang bekommen eine Fehlermeldung.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-clan-accept",
+   "mode": "Netzwerk",
+   "command": "/clan accept <Clan>",
+   "summary": "Nimmt eine Clan-Einladung an (auch /clan join <Clan>).",
+   "expected": "Du bist Mitglied; alle Online-Mitglieder werden benachrichtigt.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-clan-deny",
+   "mode": "Netzwerk",
+   "command": "/clan deny <Clan>",
+   "summary": "Lehnt eine Clan-Einladung ab.",
+   "expected": "Die Einladung ist weg.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-clan-leave",
+   "mode": "Netzwerk",
+   "command": "/clan leave",
+   "summary": "Verlässt deinen Clan.",
+   "expected": "Du bist clanlos. Der Owner kann nicht austreten (erst Clan übergeben oder auflösen).",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-clan-kick",
+   "mode": "Netzwerk",
+   "command": "/clan kick <Spieler>",
+   "summary": "Wirft ein Mitglied mit niedrigerem Rang raus (Owner oder Offizier).",
+   "expected": "Das Mitglied ist raus; gleich- oder höherrangige kannst du nicht kicken.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-clan-promote",
+   "mode": "Netzwerk",
+   "command": "/clan promote <Spieler>",
+   "summary": "Befördert ein Mitglied zum Offizier (nur Owner).",
+   "expected": "Der Spieler ist Offizier; ist er es schon → Hinweis.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-clan-demote",
+   "mode": "Netzwerk",
+   "command": "/clan demote <Spieler>",
+   "summary": "Stuft einen Offizier zum Mitglied zurück (nur Owner).",
+   "expected": "Der Spieler ist wieder normales Mitglied.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-clan-disband",
+   "mode": "Netzwerk",
+   "command": "/clan disband",
+   "summary": "Löst deinen Clan auf (nur Owner).",
+   "expected": "Der Clan ist weg, alle Mitglieder sind clanlos.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-clan-setowner",
+   "mode": "Netzwerk",
+   "command": "/clan setowner <Spieler>",
+   "summary": "Übergibt den Clan an ein Mitglied (nur Owner).",
+   "expected": "Der Spieler ist Owner, du wirst Offizier.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-clan-tag",
+   "mode": "Netzwerk",
+   "command": "/clan tag <TAG>",
+   "summary": "Ändert den Clan-Tag (nur Owner).",
+   "expected": "Neuer Tag erscheint in /clan info; belegter oder ungültiger Tag → Fehlermeldung.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-clan-bank",
+   "mode": "Netzwerk",
+   "command": "/clan bank",
+   "summary": "Zeigt den Stand der Clankasse.",
+   "expected": "Aktueller Kronen-Betrag der Clankasse.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-clan-deposit",
+   "mode": "Netzwerk",
+   "command": "/clan bank deposit <Betrag>",
+   "summary": "Zahlt Kronen von deinem Konto in die Clankasse ein.",
+   "expected": "Dein Kontostand sinkt, die Clankasse steigt um den Betrag; zu wenig Kronen → Fehlermeldung.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-clan-withdraw",
+   "mode": "Netzwerk",
+   "command": "/clan bank withdraw <Betrag>",
+   "summary": "Holt Kronen aus der Clankasse (Owner oder Offizier).",
+   "expected": "Dein Kontostand steigt; mehr als in der Kasse → Fehlermeldung.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-clan-list",
+   "mode": "Netzwerk",
+   "command": "/clan list",
+   "summary": "Listet alle Clans.",
+   "expected": "Liste mit Name, Tag und Mitgliederzahl.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-clan-chat",
+   "mode": "Netzwerk",
+   "command": "/cc <Nachricht>",
+   "summary": "Schreibt in den Clan-Chat.",
+   "expected": "Nur Online-Mitglieder deines Clans sehen die Nachricht, egal auf welchem Server.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-clan-chat-prefix",
+   "mode": "Netzwerk",
+   "command": "@clan <Nachricht>",
+   "summary": "Clan-Chat direkt aus dem normalen Chat (Nachricht mit @clan beginnen).",
+   "expected": "Die Nachricht landet im Clan-Chat, nicht im öffentlichen Chat.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-kronen",
+   "mode": "Netzwerk",
+   "command": "/kronen",
+   "summary": "Zeigt deinen Kronen-Kontostand (auch /balance).",
+   "expected": "Dein netzwerkweiter Kontostand.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-kronen-history",
+   "mode": "Netzwerk",
+   "command": "/kronen verlauf",
+   "summary": "Zeigt deine letzten Kronen-Buchungen.",
+   "expected": "Liste der letzten Ein- und Auszahlungen mit Grund.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-balance",
+   "mode": "Netzwerk",
+   "command": "/balance",
+   "summary": "Zeigt deinen Kronen-Kontostand.",
+   "expected": "Gleicher Wert wie /kronen.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-pay",
+   "mode": "Netzwerk",
+   "command": "/pay <Spieler> <Betrag>",
+   "summary": "Überweist Kronen an einen anderen Spieler.",
+   "expected": "Dein Konto sinkt, seins steigt um den Betrag. An dich selbst oder ohne Deckung → Fehlermeldung.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-msg",
+   "mode": "Netzwerk",
+   "command": "/msg [Spieler] [Nachricht]",
+   "summary": "Öffnet das BetterMSGs-Handy bzw. schreibt einem Spieler privat.",
+   "expected": "Ohne Angabe öffnet sich das Handy; mit Spieler und Text bekommt er die Nachricht.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-profile",
+   "mode": "Netzwerk",
+   "command": "/profile",
+   "summary": "Zeigt dein Profil im Chat.",
+   "expected": "Profil-Infos aller Modi (z. B. Bug-Punkte, Plots) und deine Einstellungen.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-profile-set",
+   "mode": "Netzwerk",
+   "command": "/profile set <Schlüssel> <Wert>",
+   "summary": "Ändert eine Profil-Einstellung.",
+   "expected": "Bestätigung; unbekannter Schlüssel → Fehlermeldung mit Hinweis.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-profilemenu",
+   "mode": "Netzwerk",
+   "command": "/profilemenu",
+   "summary": "Öffnet dein Profil als Menü (auch /pmenu).",
+   "expected": "Ein Profil-Menü öffnet sich.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-stats",
+   "mode": "Netzwerk",
+   "command": "/stats <Stat> [Spieler]",
+   "summary": "Zeigt einen Statistikwert, z. B. /stats mineclash.wins.",
+   "expected": "Dein (oder des Spielers) Wert der Statistik.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-stats-top",
+   "mode": "Netzwerk",
+   "command": "/stats top <Stat> [Anzahl]",
+   "summary": "Zeigt die Rangliste einer Statistik.",
+   "expected": "Top-Liste, z. B. für mineclash.wins, mineclash.matches, mineclash.roses.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-discord",
+   "mode": "Netzwerk",
+   "command": "/discord",
+   "summary": "Erzeugt einen Code, um deinen Account mit Discord zu verknüpfen.",
+   "expected": "Code im Chat; auf Discord mit /helix link einlösen, danach Bestätigung.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-discord-code",
+   "mode": "Netzwerk",
+   "command": "/discord <Code>",
+   "summary": "Verknüpft mit einem Code, den du auf Discord bekommen hast.",
+   "expected": "Bestätigung „mit Discord-Account … verknüpft“; falscher/abgelaufener Code → Fehlermeldung.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-discord-unlink",
+   "mode": "Netzwerk",
+   "command": "/discord unlink",
+   "summary": "Entfernt deine Discord-Verknüpfung.",
+   "expected": "Bestätigung; ohne Verknüpfung → Hinweis.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "net-team-chat",
+   "mode": "Netzwerk",
+   "command": "/tc <Nachricht>",
+   "summary": "Schreibt in den Team-Chat.",
+   "expected": "Alle Online-Teammitglieder sehen die Nachricht.",
+   "audience": "Team",
+   "permission": "helix.team.member"
+  },
+  {
+   "id": "net-team-chat-prefix",
+   "mode": "Netzwerk",
+   "command": "@team <Nachricht>",
+   "summary": "Team-Chat direkt aus dem normalen Chat.",
+   "expected": "Die Nachricht geht nur ans Team.",
+   "audience": "Team",
+   "permission": "helix.team.member"
+  },
+  {
+   "id": "net-team-list",
+   "mode": "Netzwerk",
+   "command": "/team",
+   "summary": "Zeigt alle Teammitglieder, die online sind.",
+   "expected": "Liste der Online-Teammitglieder.",
+   "audience": "Team",
+   "permission": "helix.team.member"
+  },
+  {
+   "id": "net-kick",
+   "mode": "Netzwerk",
+   "command": "/kick <Spieler> [Grund]",
+   "summary": "Wirft einen Spieler vom Netzwerk.",
+   "expected": "Der Spieler wird mit dem Grund getrennt.",
+   "audience": "Team",
+   "permission": "helix.mod.kick"
+  },
+  {
+   "id": "net-warn",
+   "mode": "Netzwerk",
+   "command": "/warn <Spieler> <Grund>",
+   "summary": "Verwarnt einen Spieler.",
+   "expected": "Der Spieler bekommt die Verwarnung; sie steht in /warns.",
+   "audience": "Team",
+   "permission": "helix.mod.warn"
+  },
+  {
+   "id": "net-warns",
+   "mode": "Netzwerk",
+   "command": "/warns <Spieler>",
+   "summary": "Zeigt die Verwarnungen eines Spielers.",
+   "expected": "Liste mit Datum, Grund und Teammitglied.",
+   "audience": "Team",
+   "permission": "helix.mod.warn"
+  },
+  {
+   "id": "net-announce",
+   "mode": "Netzwerk",
+   "command": "/announce <Text>",
+   "summary": "Sendet eine Ankündigung an das ganze Netzwerk.",
+   "expected": "Alle Spieler auf allen Servern sehen die Ankündigung.",
+   "audience": "Team",
+   "permission": "helix.mod.broadcast"
+  },
+  {
+   "id": "net-tempban",
+   "mode": "Netzwerk",
+   "command": "/tempban <Spieler> <Dauer> [Grund]",
+   "summary": "Bannt einen Spieler auf Zeit (z. B. 30m, 12h, 7d).",
+   "expected": "Der Spieler wird getrennt und kommt bis zum Ablauf nicht rein.",
+   "audience": "Team",
+   "permission": "helix.mod.ban"
+  },
+  {
+   "id": "net-mute",
+   "mode": "Netzwerk",
+   "command": "/mute <Spieler> [Dauer] [Grund]",
+   "summary": "Schaltet einen Spieler im Chat stumm, optional befristet.",
+   "expected": "Der Spieler kann nicht mehr schreiben (auch nicht in Team-/Clan-Chat).",
+   "audience": "Team",
+   "permission": "helix.mod.mute"
+  },
+  {
+   "id": "net-unmute",
+   "mode": "Netzwerk",
+   "command": "/unmute <Spieler>",
+   "summary": "Hebt eine Stummschaltung auf.",
+   "expected": "Der Spieler kann wieder schreiben.",
+   "audience": "Team",
+   "permission": "helix.mod.mute"
+  },
+  {
+   "id": "net-mutes",
+   "mode": "Netzwerk",
+   "command": "/mutes",
+   "summary": "Listet alle aktiven Stummschaltungen.",
+   "expected": "Liste mit Spieler, Ablauf und Grund.",
+   "audience": "Team",
+   "permission": "helix.mod.mute"
+  },
+  {
+   "id": "net-blocklist",
+   "mode": "Netzwerk",
+   "command": "/blocklist <add|remove|list> [Wort]",
+   "summary": "Verwaltet den Wortfilter des Chats.",
+   "expected": "Nachrichten mit gesperrten Wörtern werden blockiert, der Absender bekommt einen Hinweis.",
+   "audience": "Team",
+   "permission": "helix.mod.blocklist"
+  },
+  {
+   "id": "net-modlookup",
+   "mode": "Netzwerk",
+   "command": "/modlookup <Spieler>",
+   "summary": "Zeigt Bann-, Mute-, Warn- und IGuard-Status eines Spielers.",
+   "expected": "Übersicht in einer Nachricht.",
+   "audience": "Team",
+   "permission": "helix.mod.lookup"
+  },
+  {
+   "id": "net-bans-set",
+   "mode": "Netzwerk",
+   "command": "/bans set <Spieler> [Dauer] [Grund]",
+   "summary": "Bannt einen Spieler (ohne Dauer dauerhaft).",
+   "expected": "Der Spieler wird getrennt; der Bann steht in /bans list.",
+   "audience": "Team",
+   "permission": "helix.bans"
+  },
+  {
+   "id": "net-bans-pardon",
+   "mode": "Netzwerk",
+   "command": "/bans pardon <Spieler>",
+   "summary": "Hebt einen Bann auf.",
+   "expected": "Der Spieler kann wieder joinen.",
+   "audience": "Team",
+   "permission": "helix.bans"
+  },
+  {
+   "id": "net-bans-check",
+   "mode": "Netzwerk",
+   "command": "/bans check <Spieler>",
+   "summary": "Prüft, ob ein Spieler gebannt ist.",
+   "expected": "Status mit Grund und Ablauf.",
+   "audience": "Team",
+   "permission": "helix.bans"
+  },
+  {
+   "id": "net-bans-list",
+   "mode": "Netzwerk",
+   "command": "/bans list",
+   "summary": "Listet aktive Banns.",
+   "expected": "Liste der Banns.",
+   "audience": "Team",
+   "permission": "helix.bans"
+  },
+  {
+   "id": "net-bans-history",
+   "mode": "Netzwerk",
+   "command": "/bans history <Spieler>",
+   "summary": "Zeigt die Bann-Historie eines Spielers.",
+   "expected": "Alle früheren Banns.",
+   "audience": "Team",
+   "permission": "helix.bans"
+  },
+  {
+   "id": "net-permissions-group",
+   "mode": "Netzwerk",
+   "command": "/permissions group <Unterbefehl> …",
+   "summary": "Verwaltet Rechte-Gruppen (z. B. create, grant, revoke, prefix, info, list).",
+   "expected": "Antwort der jeweiligen perm.group-Aktion.",
+   "audience": "Team",
+   "permission": "helix.permissions"
+  },
+  {
+   "id": "net-permissions-user",
+   "mode": "Netzwerk",
+   "command": "/permissions user <Unterbefehl> …",
+   "summary": "Verwaltet Spieler-Rechte (z. B. addgroup, removegroup, grant, revoke, info).",
+   "expected": "Antwort der jeweiligen perm.user-Aktion; Rang-Prefix ändert sich nach kurzer Zeit.",
+   "audience": "Team",
+   "permission": "helix.permissions"
+  },
+  {
+   "id": "net-permissions-check",
+   "mode": "Netzwerk",
+   "command": "/permissions check <Spieler> <Recht>",
+   "summary": "Prüft, ob ein Spieler ein Recht hat.",
+   "expected": "true/false mit Herkunft.",
+   "audience": "Team",
+   "permission": "helix.permissions"
+  },
+  {
+   "id": "net-nick",
+   "mode": "Netzwerk",
+   "command": "/nick <Name>",
+   "summary": "Tarnt dich unter einem anderen Namen (Spieler-Rang, ohne Clan-Tag). Freischaltung: erspielbar oder über einen Premium-Rang.",
+   "expected": "Name, Tablist und Chat zeigen den Nick mit Spieler-Prefix; dein Rang bleibt unsichtbar, auch in der Tab-Reihenfolge. Ohne Freischaltung kommt ein Hinweis, dass dir das Recht fehlt.",
+   "audience": "Spieler",
+   "permission": "helix.nick"
+  },
+  {
+   "id": "net-nick-off",
+   "mode": "Netzwerk",
+   "command": "/nick off",
+   "summary": "Entfernt deinen Nick (gleiche Freischaltung wie /nick).",
+   "expected": "Dein echter Name und Rang sind wieder sichtbar.",
+   "audience": "Spieler",
+   "permission": "helix.nick"
+  },
+  {
+   "id": "net-helix-addons",
+   "mode": "Netzwerk",
+   "command": "/helix addons",
+   "summary": "Listet die Addons des Netzwerks (nur Admin).",
+   "expected": "Liste mit Status.",
+   "audience": "Team",
+   "permission": "helix.admin"
+  },
+  {
+   "id": "net-helix-addon-toggle",
+   "mode": "Netzwerk",
+   "command": "/helix <enable|disable|reload> <Addon>",
+   "summary": "Schaltet ein Addon ein/aus oder lädt es neu (nur Admin).",
+   "expected": "Bestätigung; das Addon läuft bzw. ruht danach.",
+   "audience": "Team",
+   "permission": "helix.admin"
+  },
+  {
+   "id": "net-helix-restart",
+   "mode": "Netzwerk",
+   "command": "/helix <backend|launcher> restart",
+   "summary": "Startet Backend bzw. Launcher neu (nur Admin).",
+   "expected": "Neustart-Meldung; Server verbinden sich danach neu.",
+   "audience": "Team",
+   "permission": "helix.admin"
+  },
+  {
+   "id": "net-translationsmenu",
+   "mode": "Netzwerk",
+   "command": "/translationsmenu",
+   "summary": "Öffnet den Übersetzungs-Editor im Spiel (auch /tmenu).",
+   "expected": "Menü mit allen Texten; Änderungen gelten netzwerkweit.",
+   "audience": "Team",
+   "permission": "helix.admin"
+  },
+  {
+   "id": "net-iguard-alerts",
+   "mode": "Netzwerk",
+   "command": "/iguard alerts",
+   "summary": "Schaltet IGuard-Alarme im Chat an/aus.",
+   "expected": "Bestätigung; danach erscheinen bzw. verschwinden Anticheat-Meldungen.",
+   "audience": "Team",
+   "permission": "iguard.*"
+  },
+  {
+   "id": "net-iguard-panel",
+   "mode": "Netzwerk",
+   "command": "/iguard panel [Spieler]",
+   "summary": "Öffnet das IGuard-Menü (Fälle, Spieler).",
+   "expected": "Ein Menü öffnet sich.",
+   "audience": "Team",
+   "permission": "iguard.*"
+  },
+  {
+   "id": "net-iguard-info",
+   "mode": "Netzwerk",
+   "command": "/iguard info <Spieler>",
+   "summary": "Zeigt Client, Version und Verstoß-Werte eines Spielers.",
+   "expected": "Live-Werte (VL je Check) im Chat.",
+   "audience": "Team",
+   "permission": "iguard.*"
+  },
+  {
+   "id": "net-iguard-history",
+   "mode": "Netzwerk",
+   "command": "/iguard history <Spieler> [Seite] [Server|all]",
+   "summary": "Zeigt die Verstoß-Historie.",
+   "expected": "Seitenweise Liste der Meldungen.",
+   "audience": "Team",
+   "permission": "iguard.*"
+  },
+  {
+   "id": "net-iguard-cases",
+   "mode": "Netzwerk",
+   "command": "/iguard cases <Spieler> [Seite] [Server|all]",
+   "summary": "Listet die Fälle eines Spielers.",
+   "expected": "Liste mit Fall-IDs zum Anklicken.",
+   "audience": "Team",
+   "permission": "iguard.*"
+  },
+  {
+   "id": "net-iguard-case",
+   "mode": "Netzwerk",
+   "command": "/iguard case <uuid>",
+   "summary": "Zeigt einen Fall im Detail.",
+   "expected": "Fall mit Belegen und Zeitpunkten.",
+   "audience": "Team",
+   "permission": "iguard.*"
+  },
+  {
+   "id": "net-iguard-replay",
+   "mode": "Netzwerk",
+   "command": "/iguard replay <Fall-UUID> [Tempo]",
+   "summary": "Spielt die Bewegung eines Falls als Replay ab (pause, speed <n>, follow, trail, stop).",
+   "expected": "Ein Replay startet an der Fall-Position.",
+   "audience": "Team",
+   "permission": "iguard.*"
+  },
+  {
+   "id": "net-iguard-confidence",
+   "mode": "Netzwerk",
+   "command": "/iguard confidence <Spieler>",
+   "summary": "Zeigt die Cheat-Einschätzung eines Spielers.",
+   "expected": "Wert mit Begründung je Check-Familie.",
+   "audience": "Team",
+   "permission": "iguard.*"
+  },
+  {
+   "id": "net-iguard-clients",
+   "mode": "Netzwerk",
+   "command": "/iguard clients",
+   "summary": "Zeigt die Clients aller Spieler (Marke, Version).",
+   "expected": "Liste der Online-Spieler mit Client.",
+   "audience": "Team",
+   "permission": "iguard.*"
+  },
+  {
+   "id": "net-iguard-spectate",
+   "mode": "Netzwerk",
+   "command": "/iguard spectate <Spieler>",
+   "summary": "Beobachtet einen Spieler unsichtbar (/iguard unspectate beendet).",
+   "expected": "Du schaust dem Spieler zu, er sieht dich nicht.",
+   "audience": "Team",
+   "permission": "iguard.*"
+  },
+  {
+   "id": "net-iguard-ban",
+   "mode": "Netzwerk",
+   "command": "/iguard ban <Spieler> [Stunden] [Grund]",
+   "summary": "Bannt über IGuard (mit Protokoll).",
+   "expected": "Der Spieler wird gebannt; /iguard bans listet ihn.",
+   "audience": "Team",
+   "permission": "iguard.*"
+  },
+  {
+   "id": "net-iguard-unban",
+   "mode": "Netzwerk",
+   "command": "/iguard unban <Spieler>",
+   "summary": "Hebt einen IGuard-Bann auf.",
+   "expected": "Bestätigung.",
+   "audience": "Team",
+   "permission": "iguard.*"
+  },
+  {
+   "id": "net-iguard-bans",
+   "mode": "Netzwerk",
+   "command": "/iguard bans",
+   "summary": "Listet IGuard-Banns (/iguard banhistory <Spieler> für die Historie).",
+   "expected": "Liste der Banns.",
+   "audience": "Team",
+   "permission": "iguard.*"
+  },
+  {
+   "id": "net-iguard-debug",
+   "mode": "Netzwerk",
+   "command": "/iguard debug <Spieler> [Check|all] [on|off]",
+   "summary": "Zeigt jede Auffälligkeit eines Spielers live, auch unter der Alarmgrenze.",
+   "expected": "Laufende Chat-Zeilen mit Check, VL und Beleg.",
+   "audience": "Team",
+   "permission": "iguard.*"
+  },
+  {
+   "id": "net-iguard-trace",
+   "mode": "Netzwerk",
+   "command": "/iguard trace start <Spieler> <Label>",
+   "summary": "Zeichnet die Pakete eines Spielers für die Fehlersuche auf (stop, marker, list).",
+   "expected": "Aufnahme läuft; nach stop liegt eine Datei unter plugins/IGuard/traces.",
+   "audience": "Team",
+   "permission": "iguard.*"
+  },
+  {
+   "id": "net-iguard-status",
+   "mode": "Netzwerk",
+   "command": "/iguard status",
+   "summary": "Zeigt den Zustand von IGuard (Modus, Last).",
+   "expected": "Status-Übersicht; /iguard reload lädt die Konfiguration neu.",
+   "audience": "Team",
+   "permission": "iguard.*"
+  },
+  {
+   "id": "net-npc-create",
+   "mode": "Netzwerk",
+   "command": "/npc create <id> [skin|self]",
+   "summary": "Erstellt einen netzwerkweiten NPC an deiner Position.",
+   "expected": "Der NPC steht da und taucht in /npc list auf.",
+   "audience": "Team",
+   "permission": "helix.npc.admin"
+  },
+  {
+   "id": "net-npc-delete",
+   "mode": "Netzwerk",
+   "command": "/npc delete <id>",
+   "summary": "Löscht einen NPC.",
+   "expected": "Der NPC verschwindet.",
+   "audience": "Team",
+   "permission": "helix.npc.admin"
+  },
+  {
+   "id": "net-npc-list",
+   "mode": "Netzwerk",
+   "command": "/npc list",
+   "summary": "Listet alle NPCs.",
+   "expected": "Liste mit Id, Skin und Blickmodus.",
+   "audience": "Team",
+   "permission": "helix.npc.admin"
+  },
+  {
+   "id": "net-npc-tp",
+   "mode": "Netzwerk",
+   "command": "/npc tp <id>",
+   "summary": "Teleportiert dich zu einem NPC.",
+   "expected": "Du stehst beim NPC.",
+   "audience": "Team",
+   "permission": "helix.npc.admin"
+  },
+  {
+   "id": "net-npc-skin",
+   "mode": "Netzwerk",
+   "command": "/npc skin <id> <name|self>",
+   "summary": "Ändert den Skin eines NPCs.",
+   "expected": "Der NPC trägt den neuen Skin.",
+   "audience": "Team",
+   "permission": "helix.npc.admin"
+  },
+  {
+   "id": "net-npc-look",
+   "mode": "Netzwerk",
+   "command": "/npc look <id> <none|nearest|player>",
+   "summary": "Stellt ein, wohin der NPC schaut.",
+   "expected": "Der NPC dreht den Kopf entsprechend.",
+   "audience": "Team",
+   "permission": "helix.npc.admin"
+  },
+  {
+   "id": "net-npc-hologram",
+   "mode": "Netzwerk",
+   "command": "/npc hologram <id> <Zeile…|->",
+   "summary": "Setzt den Text über dem NPC (| trennt Zeilen, - entfernt).",
+   "expected": "Die Zeilen schweben über dem NPC.",
+   "audience": "Team",
+   "permission": "helix.npc.admin"
+  },
+  {
+   "id": "net-npc-interact",
+   "mode": "Netzwerk",
+   "command": "/npc interact <id> <Befehl…|->",
+   "summary": "Legt fest, was ein Rechtsklick auf den NPC ausführt.",
+   "expected": "Rechtsklick führt den Befehl aus.",
+   "audience": "Team",
+   "permission": "helix.npc.admin"
+  },
+  {
+   "id": "net-npc-villager",
+   "mode": "Netzwerk",
+   "command": "/npc villager <id> <villager|none>",
+   "summary": "Gibt dem NPC ein Villager-Modell aus dem Ressourcenpaket.",
+   "expected": "Der NPC erscheint als animierter Villager.",
+   "audience": "Team",
+   "permission": "helix.npc.admin"
+  },
+  {
+   "id": "net-npc-say",
+   "mode": "Netzwerk",
+   "command": "/npc say <id> <Text…>",
+   "summary": "Lässt einen NPC etwas sagen.",
+   "expected": "Sprechblase bzw. Chat-Zeile des NPCs.",
+   "audience": "Team",
+   "permission": "helix.npc.admin"
+  },
+  {
+   "id": "net-npc-reload",
+   "mode": "Netzwerk",
+   "command": "/npc reload",
+   "summary": "Lädt alle NPCs neu.",
+   "expected": "NPCs werden neu gespawnt.",
+   "audience": "Team",
+   "permission": "helix.npc.admin"
+  },
+  {
+   "id": "lobby-setspawn",
+   "mode": "Lobby",
+   "command": "/setlobbyspawn",
+   "summary": "Setzt den Lobby-Spawn auf deine Position (gilt für alle Lobbys, übersteht Neustarts).",
+   "expected": "Bestätigung; neue Spieler, Respawns und der Fall ins Leere landen dort.",
+   "audience": "Team",
+   "permission": "helix.lobby.admin"
+  },
+  {
+   "id": "mc-balance",
+   "mode": "MineClash",
+   "command": "/mc balance",
+   "summary": "Zeigt Smaragde, Diamanten und Rosen.",
+   "expected": "Deine MineClash-Währungen im Chat.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "mc-cards",
+   "mode": "MineClash",
+   "command": "/mc cards",
+   "summary": "Zeigt deine Kartensammlung.",
+   "expected": "Liste deiner Karten mit Level und Kopien.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "mc-chests",
+   "mode": "MineClash",
+   "command": "/mc chests",
+   "summary": "Zeigt deine Truhen und ihre Öffnungszeit.",
+   "expected": "Liste mit Seltenheit und Restzeit.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "mc-openchest",
+   "mode": "MineClash",
+   "command": "/mc openchest",
+   "summary": "Holt die erste fertige Truhe ab bzw. startet die nächste.",
+   "expected": "Belohnung (Karten/Währung) oder Hinweis zur Restzeit.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "mc-openchest-now",
+   "mode": "MineClash",
+   "command": "/mc openchest now",
+   "summary": "Öffnet die erste Truhe sofort gegen Diamanten.",
+   "expected": "Diamanten werden abgezogen, die Belohnung kommt sofort; zu wenig Diamanten → Fehlermeldung.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "mc-upgrade",
+   "mode": "MineClash",
+   "command": "/mc upgrade",
+   "summary": "Zeigt die Gebäude deines Dorfs mit Ausbaukosten.",
+   "expected": "Übersicht mit Nummern; gebaut wird am Gebäude (Shift + Rechtsklick).",
+   "audience": "Spieler"
+  },
+  {
+   "id": "mc-upgrade-nr",
+   "mode": "MineClash",
+   "command": "/mc upgrade <Nr>",
+   "summary": "Baut ein Gebäude aus (Nr. aus der Übersicht).",
+   "expected": "Smaragde werden abgezogen und das Gebäude wächst; zu wenig → Fehlermeldung.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "mc-mine",
+   "mode": "MineClash",
+   "command": "/mc mine",
+   "summary": "Holt die Erträge deiner Mine ab.",
+   "expected": "Smaragde (und ab Stufe 3 Diamanten) werden gutgeschrieben.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "mc-deck",
+   "mode": "MineClash",
+   "command": "/mc deck",
+   "summary": "Öffnet den Kartentisch zum Zusammenstellen deines Decks.",
+   "expected": "Ein Menü mit Deck (4–8 Karten) und Reserve öffnet sich.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "mc-village",
+   "mode": "MineClash",
+   "command": "/mc village",
+   "summary": "Bringt dich in dein Dorf.",
+   "expected": "Du landest in deinem Dorf; ein neues Dorf wird beim ersten Mal gebaut.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "mc-tutorial",
+   "mode": "MineClash",
+   "command": "/mc tutorial",
+   "summary": "Zeigt das Tutorial bzw. deinen Fortschritt.",
+   "expected": "Tutorial-Hinweis mit aktuellem Schritt.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "mc-tutorial-skip",
+   "mode": "MineClash",
+   "command": "/mc tutorial skip",
+   "summary": "Überspringt das Tutorial.",
+   "expected": "Das Tutorial ist beendet.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "mc-tutorial-reset",
+   "mode": "MineClash",
+   "command": "/mc tutorial reset",
+   "summary": "Startet das Tutorial neu.",
+   "expected": "Das Tutorial beginnt von vorn.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "mc-war",
+   "mode": "MineClash",
+   "command": "/mc war",
+   "summary": "Kurzform für /clanwar join.",
+   "expected": "Wie /clanwar join.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "mc-clanwar-challenge",
+   "mode": "MineClash",
+   "command": "/clanwar challenge <Tag>",
+   "summary": "Fordert einen anderen Clan zum Krieg heraus (Owner oder Offizier).",
+   "expected": "Owner/Offiziere des anderen Clans bekommen [Annehmen]/[Ablehnen], gültig 5 Minuten. Ist dort niemand mit Rang online, wird sofort abgelehnt.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "mc-clanwar-accept",
+   "mode": "MineClash",
+   "command": "/clanwar accept <Tag>",
+   "summary": "Nimmt eine Kriegs-Herausforderung an (Owner oder Offizier).",
+   "expected": "Beide Clans werden benachrichtigt; eine fertige Kriegswelt wird zugeteilt, dann kommt [Zum Krieg]. Andere offene Herausforderungen beider Clans verfallen.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "mc-clanwar-deny",
+   "mode": "MineClash",
+   "command": "/clanwar deny <Tag>",
+   "summary": "Lehnt eine Herausforderung ab (Owner oder Offizier).",
+   "expected": "Der herausfordernde Clan wird informiert.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "mc-clanwar-cancel",
+   "mode": "MineClash",
+   "command": "/clanwar cancel",
+   "summary": "Zieht deine Herausforderung zurück oder bricht den Krieg vor dem Start ab (Owner oder Offizier).",
+   "expected": "Ohne Belohnung beendet; während der Krieg läuft → Hinweis, dass Abbrechen nicht mehr geht.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "mc-clanwar-join",
+   "mode": "MineClash",
+   "command": "/clanwar join",
+   "summary": "Bringt dich in die Kriegswelt deines Clans (max. 10 pro Clan, später einsteigen geht).",
+   "expected": "Du wirst auf den Kriegs-Server verbunden und landest in deiner Basis; ist der Kader voll → Hinweis.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "mc-clanwar-status",
+   "mode": "MineClash",
+   "command": "/clanwar status",
+   "summary": "Zeigt Herausforderungen, laufenden Krieg, Warteschlange und Reservewelten.",
+   "expected": "Gegner, Phase (Vorbereitung 2 Min., Krieg), Punkte bzw. Wartezeit.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "mc-test-cardtable",
+   "mode": "MineClash",
+   "command": "/test cardtable",
+   "summary": "Gibt das Kartentisch-Item ohne Crafting.",
+   "expected": "Das Item liegt im Inventar.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-spawn",
+   "mode": "MineClash",
+   "command": "/test spawn <Karte> <Team>",
+   "summary": "Spawnt eine Karte als Truppe für ein Team.",
+   "expected": "Die Truppe erscheint an deiner Position.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-play",
+   "mode": "MineClash",
+   "command": "/test play <Karte>",
+   "summary": "Spawnt eine Karte auf deinem Match-Team.",
+   "expected": "Die Truppe erscheint für dein Team.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-tower",
+   "mode": "MineClash",
+   "command": "/test tower",
+   "summary": "Setzt einen Nebenturm (Team 2).",
+   "expected": "Ein Turm steht an deiner Position.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-primary",
+   "mode": "MineClash",
+   "command": "/test primary",
+   "summary": "Setzt einen Hauptturm (Team 2).",
+   "expected": "Ein Hauptturm steht an deiner Position.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-match",
+   "mode": "MineClash",
+   "command": "/test match",
+   "summary": "Startet ein Test-Match mit normalen Zeiten.",
+   "expected": "Ein Arena-Match beginnt.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-matchfast",
+   "mode": "MineClash",
+   "command": "/test matchfast",
+   "summary": "Startet ein Test-Match mit sehr kurzen Zeiten.",
+   "expected": "Das Match läuft im Schnelldurchlauf bis zum Ende.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-matchsolo",
+   "mode": "MineClash",
+   "command": "/test matchsolo",
+   "summary": "Startet ein Match allein (Team 2 leer).",
+   "expected": "Ein Solo-Match beginnt.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-matchstop",
+   "mode": "MineClash",
+   "command": "/test matchstop",
+   "summary": "Beendet dein laufendes Match.",
+   "expected": "Das Match endet; ohne Match → Hinweis.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-nukeprimary",
+   "mode": "MineClash",
+   "command": "/test nukeprimary",
+   "summary": "Zerstört den gegnerischen Hauptturm.",
+   "expected": "Das Match endet mit deinem Sieg.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-hand",
+   "mode": "MineClash",
+   "command": "/test hand",
+   "summary": "Zeigt deine aktuellen Handkarten.",
+   "expected": "Liste der Karten-IDs.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-playhand",
+   "mode": "MineClash",
+   "command": "/test playhand <Index>",
+   "summary": "Spielt eine Handkarte per Index.",
+   "expected": "Die Karte wird gespielt.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-matchinfo",
+   "mode": "MineClash",
+   "command": "/test matchinfo",
+   "summary": "Zeigt Debug-Infos des eigenen Matches.",
+   "expected": "Slot, Truppen- und Turmzahlen.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-give",
+   "mode": "MineClash",
+   "command": "/test give <smaragde|diamanten|rosen> <Anzahl>",
+   "summary": "Gibt dir MineClash-Währung.",
+   "expected": "Der Betrag ist gutgeschrieben.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-chesttimer",
+   "mode": "MineClash",
+   "command": "/test chesttimer <Sekunden>",
+   "summary": "Verkürzt die Öffnungsdauer von Truhen zum Testen.",
+   "expected": "Neue Truhen öffnen sich in der angegebenen Zeit.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-addchest",
+   "mode": "MineClash",
+   "command": "/test addchest [NORMAL|SPECIAL|ELITE|TITAN|BOSS]",
+   "summary": "Gibt dir eine Truhe (ohne Angabe zufällig).",
+   "expected": "Die Truhe steht in /mc chests.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-gamemode",
+   "mode": "MineClash",
+   "command": "/test gamemode <survival|creative|spectator|adventure>",
+   "summary": "Wechselt deinen Spielmodus.",
+   "expected": "Dein Spielmodus ist geändert.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-war-arenas",
+   "mode": "MineClash",
+   "command": "/test war arenas",
+   "summary": "Listet die Arenen des Kriegs mit Koordinaten.",
+   "expected": "Liste der Arenen.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-war-tp",
+   "mode": "MineClash",
+   "command": "/test war tp <Nr>",
+   "summary": "Teleportiert dich zu einer Arena.",
+   "expected": "Du stehst an der Arena.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-war-base",
+   "mode": "MineClash",
+   "command": "/test war base",
+   "summary": "Teleportiert dich zu deiner Basis.",
+   "expected": "Du stehst in der Basis.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-war-deck",
+   "mode": "MineClash",
+   "command": "/test war deck",
+   "summary": "Zeigt dein Kriegs-Deck.",
+   "expected": "Karten im Chat.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-war-zone",
+   "mode": "MineClash",
+   "command": "/test war zone <Radius>",
+   "summary": "Zeigt 60 s eine Test-Kugel an deiner Position.",
+   "expected": "Eine blaue Kugel ist sichtbar.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-war-podest",
+   "mode": "MineClash",
+   "command": "/test war podest",
+   "summary": "Gibt ein Podest-Item.",
+   "expected": "Das Item liegt im Inventar.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-war-points",
+   "mode": "MineClash",
+   "command": "/test war points <Anzahl>",
+   "summary": "Gibt deinem Team Kriegspunkte.",
+   "expected": "Die Punkte steigen; ab dem Ziel gewinnt das Team.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-war-pool",
+   "mode": "MineClash",
+   "command": "/test war pool",
+   "summary": "Zeigt den Zustand der Reservewelten auf dem Kriegs-Server.",
+   "expected": "Anzahl fertiger und entstehender Welten mit Fortschritt.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-warstart",
+   "mode": "MineClash",
+   "command": "/test warstart",
+   "summary": "Startet einen Testkrieg mit allen Online-Spielern (abwechselnd Team A/B).",
+   "expected": "Ein Krieg startet in einer Reservewelt; allein spielst du gegen dich selbst.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-warcard",
+   "mode": "MineClash",
+   "command": "/test warcard <Karte>",
+   "summary": "Legt eine Karte ins Kriegs-Deck.",
+   "expected": "Die Karte ist im Kriegs-Deck.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-resetvillage",
+   "mode": "MineClash",
+   "command": "/test resetvillage",
+   "summary": "Baut dein Dorf mit dem aktuellen Generator neu (Spielerdaten bleiben).",
+   "expected": "Dein Dorf wird neu erzeugt.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-shop",
+   "mode": "MineClash",
+   "command": "/test shop",
+   "summary": "Öffnet den Dorf-Shop direkt.",
+   "expected": "Der Shop öffnet sich.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-givecard",
+   "mode": "MineClash",
+   "command": "/test givecard <Karte>",
+   "summary": "Gibt dir eine Karte für die Sammlung.",
+   "expected": "Die Karte steht in /mc cards.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-killtroops",
+   "mode": "MineClash",
+   "command": "/test killtroops",
+   "summary": "Entfernt alle Truppen.",
+   "expected": "Alle Truppen sind weg.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-plan",
+   "mode": "MineClash",
+   "command": "/test plan",
+   "summary": "Gibt das Dorf-Layout aus.",
+   "expected": "Layout im Chat.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-count",
+   "mode": "MineClash",
+   "command": "/test count",
+   "summary": "Zählt Wesen und Truppen in deiner Welt.",
+   "expected": "Zahlen pro Typ im Chat.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "mc-test-steps",
+   "mode": "MineClash",
+   "command": "/test steps",
+   "summary": "Testet die XP-Leiste.",
+   "expected": "XP-Fortschritt steigt um 10 %.",
+   "audience": "Team",
+   "permission": "mineclash.admin"
+  },
+  {
+   "id": "cb-gs",
+   "mode": "CityBuild",
+   "command": "/gs",
+   "summary": "Öffnet dein Grundbuch (auch /grundbuch): Grundstücke, Merge, Leeren, Biom.",
+   "expected": "Pergament-Buch mit deinen Plots und Preisen.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-p-auto",
+   "mode": "CityBuild",
+   "command": "/p auto",
+   "summary": "Kauft das nächste freie Grundstück.",
+   "expected": "Kronen werden abgezogen, du stehst auf deinem neuen Plot; über dem Plot-Limit → Hinweis.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-p-claim",
+   "mode": "CityBuild",
+   "command": "/p claim",
+   "summary": "Kauft das Grundstück, auf dem du stehst.",
+   "expected": "Kronen werden abgezogen; besetzt oder Limit erreicht → Hinweis, keine Abbuchung.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-p-home",
+   "mode": "CityBuild",
+   "command": "/p home [Nr]",
+   "summary": "Teleportiert dich zu deinem Grundstück.",
+   "expected": "Du stehst auf deinem Plot.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-p-visit",
+   "mode": "CityBuild",
+   "command": "/p visit <Spieler>",
+   "summary": "Besucht das Grundstück eines Spielers.",
+   "expected": "Du stehst auf seinem Plot (bauen kannst du dort nicht).",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-p-info",
+   "mode": "CityBuild",
+   "command": "/p info",
+   "summary": "Zeigt Infos zum Grundstück unter dir.",
+   "expected": "Besitzer, Helfer, Flags.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-p-add",
+   "mode": "CityBuild",
+   "command": "/p add <Spieler>",
+   "summary": "Erlaubt einem Spieler, auf deinem Plot zu bauen, solange du online bist.",
+   "expected": "Er kann bauen, wenn du online bist.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-p-trust",
+   "mode": "CityBuild",
+   "command": "/p trust <Spieler>",
+   "summary": "Erlaubt einem Spieler dauerhaft zu bauen.",
+   "expected": "Er kann immer bauen; Shops auf vertrauten Plots sind möglich.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-p-remove",
+   "mode": "CityBuild",
+   "command": "/p remove <Spieler>",
+   "summary": "Nimmt einem Spieler die Rechte auf deinem Plot.",
+   "expected": "Er kann nicht mehr bauen.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-p-deny",
+   "mode": "CityBuild",
+   "command": "/p deny <Spieler>",
+   "summary": "Sperrt einen Spieler von deinem Plot aus.",
+   "expected": "Er wird vom Plot geworfen und kommt nicht mehr drauf.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-p-merge",
+   "mode": "CityBuild",
+   "command": "/p merge",
+   "summary": "Verbindet dein Grundstück mit einem angrenzenden eigenen Plot (kostet Kronen).",
+   "expected": "Kronen werden abgezogen, die Plots sind verbunden; klappt es nicht → Erstattung.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-plotmarkt",
+   "mode": "CityBuild",
+   "command": "/plotmarkt",
+   "summary": "Öffnet den Plot-Markt zum Kaufen und Verkaufen von Grundstücken.",
+   "expected": "Menü mit Angeboten; Kauf überträgt Plot und Kronen.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-instanz",
+   "mode": "CityBuild",
+   "command": "/instanz",
+   "summary": "Zeigt alle CityBuild-Städte und wechselt dorthin (auch /stadt).",
+   "expected": "Buch mit Städten; Klick verbindet. Items bleiben in der jeweiligen Stadt, Kronen sind überall gleich.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-spawn",
+   "mode": "CityBuild",
+   "command": "/spawn",
+   "summary": "Bringt dich zum Spawn der Stadt (mit kurzer Wartezeit).",
+   "expected": "Nach dem Warmup stehst du am Spawn; Bewegen bricht ab.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-tutorial",
+   "mode": "CityBuild",
+   "command": "/tutorial",
+   "summary": "Zeigt das Stadt-Tutorial mit Lotte Laterne.",
+   "expected": "Bossbar „Schritt n/6“ mit Aufgabe.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-tutorial-neu",
+   "mode": "CityBuild",
+   "command": "/tutorial neu",
+   "summary": "Startet das Tutorial neu.",
+   "expected": "Schritt 1 beginnt.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-tutorial-skip",
+   "mode": "CityBuild",
+   "command": "/tutorial überspringen",
+   "summary": "Überspringt das Tutorial.",
+   "expected": "Das Tutorial ist beendet (ohne Bonus).",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-farmwelt",
+   "mode": "CityBuild",
+   "command": "/farmwelt",
+   "summary": "Teleportiert dich zufällig in die Farmwelt (auch /farm).",
+   "expected": "Du landest an einem sicheren Ort der Farmwelt; die Welt wird wöchentlich zurückgesetzt.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-farmwelt-nether",
+   "mode": "CityBuild",
+   "command": "/farmwelt nether",
+   "summary": "Teleportiert dich in den Farm-Nether.",
+   "expected": "Du landest im Nether der Farmwelt.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-sethome",
+   "mode": "CityBuild",
+   "command": "/sethome [Name]",
+   "summary": "Setzt ein Zuhause an deiner Position (Anzahl nach Stufe).",
+   "expected": "Bestätigung; über dem Limit oder in gesperrter Welt → Hinweis.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-home",
+   "mode": "CityBuild",
+   "command": "/home [Name]",
+   "summary": "Teleportiert dich zu einem Zuhause (auch /h).",
+   "expected": "Nach dem Warmup stehst du dort.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-delhome",
+   "mode": "CityBuild",
+   "command": "/delhome <Name>",
+   "summary": "Löscht ein Zuhause.",
+   "expected": "Das Zuhause ist weg.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-homes",
+   "mode": "CityBuild",
+   "command": "/homes",
+   "summary": "Zeigt alle deine Zuhause als Menü.",
+   "expected": "Menü; Klick teleportiert.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-warp",
+   "mode": "CityBuild",
+   "command": "/warp <Name>",
+   "summary": "Teleportiert dich zu einem Warp.",
+   "expected": "Nach dem Warmup stehst du am Warp.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-warps",
+   "mode": "CityBuild",
+   "command": "/warps",
+   "summary": "Zeigt alle Warps als Menü.",
+   "expected": "Menü; Klick teleportiert.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-back",
+   "mode": "CityBuild",
+   "command": "/back",
+   "summary": "Bringt dich zum Todesort bzw. Ort vor dem letzten Teleport (ab Stufe 1).",
+   "expected": "Du stehst am letzten Ort; ohne Stufe → Hinweis.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-tpa",
+   "mode": "CityBuild",
+   "command": "/tpa <Spieler>",
+   "summary": "Bittet, dich zu einem Spieler teleportieren zu dürfen.",
+   "expected": "Er bekommt eine Anfrage (60 s gültig).",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-tpahere",
+   "mode": "CityBuild",
+   "command": "/tpahere <Spieler>",
+   "summary": "Bittet einen Spieler, zu dir zu kommen.",
+   "expected": "Er bekommt eine Anfrage (60 s gültig).",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-tpaccept",
+   "mode": "CityBuild",
+   "command": "/tpaccept [Spieler]",
+   "summary": "Nimmt eine Teleport-Anfrage an.",
+   "expected": "Der Teleport läuft nach dem Warmup.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-tpdeny",
+   "mode": "CityBuild",
+   "command": "/tpdeny [Spieler]",
+   "summary": "Lehnt eine Teleport-Anfrage ab.",
+   "expected": "Der andere wird informiert.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-tptoggle",
+   "mode": "CityBuild",
+   "command": "/tptoggle",
+   "summary": "Schaltet Teleport-Anfragen an dich an oder aus.",
+   "expected": "Bestätigung; danach kommen keine bzw. wieder Anfragen an.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-kit",
+   "mode": "CityBuild",
+   "command": "/kit",
+   "summary": "Öffnet die Kits (auch /kits).",
+   "expected": "Menü mit Kits, Cooldown und benötigter Stufe.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-kit-name",
+   "mode": "CityBuild",
+   "command": "/kit <Name>",
+   "summary": "Holt ein Kit direkt ab.",
+   "expected": "Items kommen ins Inventar (Überlauf in die Abholkiste); Cooldown oder Stufe fehlt → Hinweis.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-belohnung",
+   "mode": "CityBuild",
+   "command": "/belohnung",
+   "summary": "Holt die tägliche Belohnung ab (auch /daily).",
+   "expected": "Buch mit deiner Serie; heute noch nicht abgeholt → Kronen/Items kommen.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-jobs",
+   "mode": "CityBuild",
+   "command": "/jobs",
+   "summary": "Öffnet das Jobbrett (Holzfäller, Miner, Gräber, Farmer, Jäger, Fischer).",
+   "expected": "Menü zum Annehmen/Verlassen; Arbeit zahlt alle 30 s Kronen aus.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-ah",
+   "mode": "CityBuild",
+   "command": "/ah",
+   "summary": "Öffnet das Auktionshaus dieser Stadt.",
+   "expected": "Menü mit Angeboten anderer Spieler.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-ah-sell",
+   "mode": "CityBuild",
+   "command": "/ah sell <Preis> [12h|24h|48h]",
+   "summary": "Stellt das Item in deiner Hand ins Auktionshaus.",
+   "expected": "Das Angebot erscheint im /ah; unverkauft geht es nach Ablauf in die Abholkiste.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-ah-meine",
+   "mode": "CityBuild",
+   "command": "/ah meine",
+   "summary": "Zeigt deine Angebote im Auktionshaus.",
+   "expected": "Liste deiner laufenden Angebote.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-ah-abholen",
+   "mode": "CityBuild",
+   "command": "/ah abholen",
+   "summary": "Öffnet die Abholkiste mit Erlösen und abgelaufenen Angeboten.",
+   "expected": "Menü zum Abholen.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-abholkiste",
+   "mode": "CityBuild",
+   "command": "/abholkiste",
+   "summary": "Öffnet deine Abholkiste (auch /abholen).",
+   "expected": "Alles, was auf dich wartet (Auktion, Kits, Belohnungen).",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-trade",
+   "mode": "CityBuild",
+   "command": "/trade <Spieler>",
+   "summary": "Schickt eine Handelsanfrage an einen Spieler in der Nähe (auch /handel).",
+   "expected": "Er bekommt [Annehmen]; zu weit weg oder beschäftigt → Hinweis.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-trade-accept",
+   "mode": "CityBuild",
+   "command": "/trade annehmen <Spieler>",
+   "summary": "Nimmt eine Handelsanfrage an.",
+   "expected": "Ein gemeinsames Fenster mit je 12 Plätzen und Kronen-Feld öffnet sich; „Bereit“ + Countdown tauscht.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-trade-deny",
+   "mode": "CityBuild",
+   "command": "/trade ablehnen <Spieler>",
+   "summary": "Lehnt eine Handelsanfrage ab.",
+   "expected": "Der andere wird informiert.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-shops",
+   "mode": "CityBuild",
+   "command": "/shops",
+   "summary": "Zeigt alle Spieler-Shops dieser Stadt (auch /laden).",
+   "expected": "Liste mit Shops; Klick teleportiert.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-shops-suche",
+   "mode": "CityBuild",
+   "command": "/shops suche <Text>",
+   "summary": "Sucht Shops nach Item oder Besitzer.",
+   "expected": "Gefilterte Liste.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-kraemer",
+   "mode": "CityBuild",
+   "command": "/kraemer",
+   "summary": "Öffnet den Krämer Fritz Feilbiet (auch /adminshop).",
+   "expected": "Shop-Menü mit Kategorien, Preisen und Tageslimits.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-kraemer-angebote",
+   "mode": "CityBuild",
+   "command": "/kraemer angebote",
+   "summary": "Öffnet die Sonderangebote des Krämers.",
+   "expected": "Menü mit zeitlich begrenzten Angeboten.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-kisten",
+   "mode": "CityBuild",
+   "command": "/kisten",
+   "summary": "Zeigt die Schatzkisten und deine Schlüssel (auch /crates).",
+   "expected": "Übersicht; geöffnet wird an den Kisten-Blöcken mit Rechtsklick.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-garage",
+   "mode": "CityBuild",
+   "command": "/garage",
+   "summary": "Öffnet deine Fahrzeug-Garage (auch /fahrzeuge).",
+   "expected": "Menü; ein Fahrzeug holen lässt es neben dir erscheinen.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-haustier",
+   "mode": "CityBuild",
+   "command": "/haustier",
+   "summary": "Öffnet das Haustier-Menü (auch /pet).",
+   "expected": "Menü mit deinen Haustieren zum Rufen und Pflegen.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-stellmacher",
+   "mode": "CityBuild",
+   "command": "/stellmacher",
+   "summary": "Öffnet den Fahrzeughändler Kuno Kurbel.",
+   "expected": "Katalog mit Fahrzeugscheinen.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-moebel",
+   "mode": "CityBuild",
+   "command": "/moebel",
+   "summary": "Öffnet die Möbelhändlerin Tilda Tapete.",
+   "expected": "Katalog mit Möbeln.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-tierhandel",
+   "mode": "CityBuild",
+   "command": "/tierhandel",
+   "summary": "Öffnet die Tierhändlerin Frieda Feder.",
+   "expected": "Katalog mit Haustier-Pfeifen.",
+   "audience": "Spieler"
+  },
+  {
+   "id": "cb-setwarp",
+   "mode": "CityBuild",
+   "command": "/setwarp <Name> [Icon] [Beschreibung]",
+   "summary": "Legt einen Warp an deiner Position an.",
+   "expected": "Der Warp erscheint in /warps.",
+   "audience": "Team",
+   "permission": "citybuild.admin"
+  },
+  {
+   "id": "cb-delwarp",
+   "mode": "CityBuild",
+   "command": "/delwarp <Name>",
+   "summary": "Löscht einen Warp.",
+   "expected": "Der Warp ist weg.",
+   "audience": "Team",
+   "permission": "citybuild.admin"
+  },
+  {
+   "id": "cb-schmiede",
+   "mode": "CityBuild",
+   "command": "/schmiede",
+   "summary": "Öffnet die Admin-Schmiede (Werkbank für Spezial-Items).",
+   "expected": "Werkbank-Menü mit Vorlagen.",
+   "audience": "Team",
+   "permission": "citybuild.admin.forge"
+  },
+  {
+   "id": "cb-schmiede-katalog",
+   "mode": "CityBuild",
+   "command": "/schmiede katalog",
+   "summary": "Öffnet den Katalog der Schmiede-Vorlagen.",
+   "expected": "Liste aller Vorlagen.",
+   "audience": "Team",
+   "permission": "citybuild.admin.forge"
+  },
+  {
+   "id": "cb-cbadmin",
+   "mode": "CityBuild",
+   "command": "/cbadmin",
+   "summary": "Öffnet den Admin-Hub von CityBuild.",
+   "expected": "Menü mit Kacheln (Shop, Kits, Kisten, Bahnen …).",
+   "audience": "Team",
+   "permission": "citybuild.admin"
+  },
+  {
+   "id": "cb-cbadmin-reload",
+   "mode": "CityBuild",
+   "command": "/cbadmin reload",
+   "summary": "Lädt die CityBuild-Konfiguration neu.",
+   "expected": "Bestätigung.",
+   "audience": "Team",
+   "permission": "citybuild.admin.config"
+  },
+  {
+   "id": "cb-cbadmin-log",
+   "mode": "CityBuild",
+   "command": "/cbadmin log <Spieler>",
+   "summary": "Zeigt das Aktionsprotokoll eines Spielers.",
+   "expected": "Liste der letzten Aktionen.",
+   "audience": "Team",
+   "permission": "citybuild.admin.logs"
+  },
+  {
+   "id": "cb-cbadmin-journal",
+   "mode": "CityBuild",
+   "command": "/cbadmin journal [liste|pruefen|ok <id>|zurueck <id>]",
+   "summary": "Zeigt und klärt offene Buchungen nach Node-Ausfällen.",
+   "expected": "Liste offener Einträge bzw. Bestätigung.",
+   "audience": "Team",
+   "permission": "citybuild.admin.logs"
+  },
+  {
+   "id": "cb-cbadmin-farmreset",
+   "mode": "CityBuild",
+   "command": "/cbadmin farmreset [now]",
+   "summary": "Setzt die Farmwelt zurück (mit Countdown oder sofort).",
+   "expected": "Countdown bzw. sofortiger Reset; Spieler werden zum Spawn gebracht.",
+   "audience": "Team",
+   "permission": "citybuild.admin"
+  },
+  {
+   "id": "cb-cbadmin-kisten",
+   "mode": "CityBuild",
+   "command": "/cbadmin kisten",
+   "summary": "Verwaltet die Schatzkisten.",
+   "expected": "Menü mit Kisten und Gewinnen.",
+   "audience": "Team",
+   "permission": "citybuild.admin.crates"
+  },
+  {
+   "id": "cb-cbadmin-kiste",
+   "mode": "CityBuild",
+   "command": "/cbadmin kiste setzen <id> | entfernen",
+   "summary": "Macht den angeschauten Block zur Schatzkiste bzw. entfernt sie.",
+   "expected": "Der Block ist (k)eine Kiste mehr.",
+   "audience": "Team",
+   "permission": "citybuild.admin.crates"
+  },
+  {
+   "id": "cb-cbadmin-item-give",
+   "mode": "CityBuild",
+   "command": "/cbadmin item give <Spieler> <Vorlage> [Menge]",
+   "summary": "Gibt ein Schmiede-Item aus.",
+   "expected": "Der Spieler bekommt das Item.",
+   "audience": "Team",
+   "permission": "citybuild.admin.forge"
+  },
+  {
+   "id": "cb-cbadmin-item-track",
+   "mode": "CityBuild",
+   "command": "/cbadmin item track <Serial>",
+   "summary": "Verfolgt ein Schmiede-Item über seine Seriennummer.",
+   "expected": "Besitzer und Verlauf.",
+   "audience": "Team",
+   "permission": "citybuild.admin.forge"
+  },
+  {
+   "id": "cb-cbadmin-arena",
+   "mode": "CityBuild",
+   "command": "/cbadmin arena <pos1|pos2|eingang|info>",
+   "summary": "Legt den PvP-Arena-Bereich fest.",
+   "expected": "Bestätigung bzw. Infos.",
+   "audience": "Team",
+   "permission": "citybuild.admin"
+  },
+  {
+   "id": "cb-cbadmin-npc",
+   "mode": "CityBuild",
+   "command": "/cbadmin npc <place|list> [id]",
+   "summary": "Setzt CityBuild-Villager.",
+   "expected": "Der Villager steht an deiner Position.",
+   "audience": "Team",
+   "permission": "citybuild.admin"
+  },
+  {
+   "id": "cb-cbadmin-setspawn",
+   "mode": "CityBuild",
+   "command": "/cbadmin setspawn",
+   "summary": "Setzt den Stadt-Spawn.",
+   "expected": "Neue Spieler und /spawn landen dort.",
+   "audience": "Team",
+   "permission": "citybuild.admin.config"
+  },
+  {
+   "id": "cb-cbadmin-boss",
+   "mode": "CityBuild",
+   "command": "/cbadmin boss [rufen|weg|status]",
+   "summary": "Steuert den Boss der Farmwelt.",
+   "expected": "Der Boss erscheint/verschwindet bzw. Status.",
+   "audience": "Team",
+   "permission": "citybuild.admin.config"
+  },
+  {
+   "id": "cb-cbadmin-plotmarket",
+   "mode": "CityBuild",
+   "command": "/cbadmin plotmarket remove <id>",
+   "summary": "Entfernt ein Angebot vom Plot-Markt.",
+   "expected": "Das Angebot ist weg.",
+   "audience": "Team",
+   "permission": "citybuild.admin"
+  },
+  {
+   "id": "tp-bug",
+   "mode": "Testphase",
+   "command": "/bug",
+   "summary": "Öffnet das Formular für eine Bug-Meldung (auch /fehler).",
+   "expected": "Formular mit Kategorie, Schwere, Titel, Beschreibung und Screenshot (mit Helix-LabyMod-Addon); nach dem Absenden kommt eine Nummer #… zurück.",
+   "audience": "Tester",
+   "permission": "feedback.report"
+  },
+  {
+   "id": "tp-bugs",
+   "mode": "Testphase",
+   "command": "/bugs",
+   "summary": "Zeigt deine Meldungen mit Status und Team-Antworten (auch /meinebugs).",
+   "expected": "Liste deiner Meldungen; Klick öffnet die Details.",
+   "audience": "Tester",
+   "permission": "feedback.report"
+  },
+  {
+   "id": "tp-bugs-top",
+   "mode": "Testphase",
+   "command": "/bugs top",
+   "summary": "Zeigt die Tester-Rangliste nach Bug-Punkten.",
+   "expected": "Rangliste mit Punkten.",
+   "audience": "Tester",
+   "permission": "feedback.report"
+  },
+  {
+   "id": "tp-befehle",
+   "mode": "Testphase",
+   "command": "/befehle",
+   "summary": "Zeigt den Link zu dieser Befehls-Übersicht im Panel.",
+   "expected": "Klickbarer Link zum Panel; ohne eingetragene Panel-Adresse ein Hinweis zum Login.",
+   "audience": "Tester",
+   "permission": "feedback.report"
+  },
+  {
+   "id": "tp-testtools",
+   "mode": "Testphase",
+   "command": "/testtools",
+   "summary": "Öffnet die Test-Werkzeuge (auch /tt): Zeit, Wetter, Fliegen, Test-Kronen, Testpunkte.",
+   "expected": "Menü; alles wirkt nur für dich und wird protokolliert. Nur während der Testphase.",
+   "audience": "Tester",
+   "permission": "tester.tools"
+  },
+  {
+   "id": "tp-agreement",
+   "mode": "Testphase",
+   "command": "/testervereinbarung",
+   "summary": "Zeigt die Tester-Vereinbarung.",
+   "expected": "Buch mit den Regeln und Annehmen/Ablehnen.",
+   "audience": "Tester"
+  },
+  {
+   "id": "tp-agreement-accept",
+   "mode": "Testphase",
+   "command": "/testervereinbarung annehmen",
+   "summary": "Nimmt die Tester-Vereinbarung an.",
+   "expected": "Du kannst dich wieder bewegen und spielen.",
+   "audience": "Tester"
+  },
+  {
+   "id": "tp-agreement-decline",
+   "mode": "Testphase",
+   "command": "/testervereinbarung ablehnen",
+   "summary": "Lehnt die Tester-Vereinbarung ab.",
+   "expected": "Du wirst mit einem Hinweis getrennt.",
+   "audience": "Tester"
+  },
+  {
+   "id": "tp-testtools-point-set",
+   "mode": "Testphase",
+   "command": "/testtools punkt setzen <Name>",
+   "summary": "Legt einen Testpunkt an deiner Position an.",
+   "expected": "Der Punkt erscheint in /testtools für alle Tester.",
+   "audience": "Team",
+   "permission": "feedback.admin"
+  },
+  {
+   "id": "tp-testtools-point-delete",
+   "mode": "Testphase",
+   "command": "/testtools punkt loeschen <Name>",
+   "summary": "Löscht einen Testpunkt.",
+   "expected": "Der Punkt ist weg.",
+   "audience": "Team",
+   "permission": "feedback.admin"
+  },
+  {
+   "id": "tp-tester-add",
+   "mode": "Testphase",
+   "command": "/tester add <Spieler> [Dauer]",
+   "summary": "Macht einen Spieler zum Tester, optional befristet.",
+   "expected": "Er bekommt den Tester-Rang und kommt trotz Wartung rein.",
+   "audience": "Team",
+   "permission": "tester.manage"
+  },
+  {
+   "id": "tp-tester-remove",
+   "mode": "Testphase",
+   "command": "/tester remove <Spieler>",
+   "summary": "Entfernt den Tester-Rang.",
+   "expected": "Er kommt während der Wartung nicht mehr rein.",
+   "audience": "Team",
+   "permission": "tester.manage"
+  },
+  {
+   "id": "tp-tester-info",
+   "mode": "Testphase",
+   "command": "/tester info <Spieler>",
+   "summary": "Zeigt den Tester-Status eines Spielers.",
+   "expected": "Rang, Ablauf, Vereinbarung.",
+   "audience": "Team",
+   "permission": "tester.manage"
+  },
+  {
+   "id": "tp-tester-list",
+   "mode": "Testphase",
+   "command": "/tester list",
+   "summary": "Listet alle Tester.",
+   "expected": "Liste mit Ablaufdaten.",
+   "audience": "Team",
+   "permission": "tester.manage"
+  },
+  {
+   "id": "tp-guardlab-run",
+   "mode": "Testphase",
+   "command": "/guardlab run <Suite> [Spieler]",
+   "summary": "Startet einen GuardLab-Testlauf (nur auf dem IGuard-Testserver).",
+   "expected": "Die Suite läuft; der Bericht landet in plugins/GuardLab/reports.",
+   "audience": "Team",
+   "permission": "guardlab.admin"
+  },
+  {
+   "id": "tp-guardlab-stop",
+   "mode": "Testphase",
+   "command": "/guardlab stop",
+   "summary": "Bricht den laufenden GuardLab-Lauf ab.",
+   "expected": "Der Lauf endet, ein Teilbericht wird geschrieben.",
+   "audience": "Team",
+   "permission": "guardlab.admin"
+  },
+  {
+   "id": "tp-guardlab-status",
+   "mode": "Testphase",
+   "command": "/guardlab status",
+   "summary": "Zeigt den Stand von GuardLab.",
+   "expected": "Laufende Suite, Clients, Token.",
+   "audience": "Team",
+   "permission": "guardlab.admin"
+  },
+  {
+   "id": "tp-guardlab-suites",
+   "mode": "Testphase",
+   "command": "/guardlab suites",
+   "summary": "Listet die verfügbaren Test-Suiten.",
+   "expected": "Liste mit Anzahl der Szenarien.",
+   "audience": "Team",
+   "permission": "guardlab.admin"
+  },
+  {
+   "id": "tp-guardlab-rebuild",
+   "mode": "Testphase",
+   "command": "/guardlab rebuild",
+   "summary": "Baut die Testwelt neu.",
+   "expected": "Die Stationen werden neu gebaut.",
+   "audience": "Team",
+   "permission": "guardlab.admin"
+  }
+ ]
+}

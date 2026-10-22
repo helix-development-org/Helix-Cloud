@@ -315,26 +315,42 @@ Referenz-Implementierungen in diesem Repo:
   Passagier-Trick, um echtes Reiten nicht zu stören).
 - `helix-addon-cosmetics` (+ `helix-addon-cosmetics-paper`) — anziehbare
   Flügel und Kopfbedeckungen (je 6, rang-/permission-gated), gewählt über
-  das Profile-System als zwei Choice-Settings (`wings`/`headwear`). Jedes
-  Cosmetic ist ein `CustomModelData`-getaggter `PAPER`-Carrier mit eigenem
-  handgeschriebenen Item-Modell (Flügel: zwei flache Panels; Kronen: Band
-  + vier Ecken-Zacken; Halos: flacher quadratischer Ring) und
-  Java2D-gezeichneter Textur, zur Build-Zeit generiert
-  (`:helix-addon-cosmetics-paper:generatePack`) — genau wie bei BetterMSGs,
-  nur mit echten Item-Modellen statt Font-Glyphen. Paper-seitig rendert
-  eine Item-Display-Entity pro Slot, jeden Tick neu positioniert/rotiert
-  nach Spieler-Blickrichtung — kein Rüstungs-/Elytra-Slot wird belegt,
-  also keine Kollision mit echter Ausrüstung. `CustomModelData`-Werte sind
-  bewusst als fester Katalog im Code hinterlegt (nicht zur Laufzeit
-  konfigurierbar), da die Modelle selbst zur Build-Zeit im Resource-Pack
-  gebacken werden. Der Carrier definiert sein Modell **zweifach**:
-  `assets/minecraft/models/item/paper.json` (klassisches Overrides-Array,
-  für ältere/ViaVersion-gebrückte Clients) UND
-  `assets/minecraft/items/paper.json` (moderner `range_dispatch` über
-  `minecraft:custom_model_data`, seit dem Item-Components-Rework nötig,
-  da neuere Clients sonst ihr eingebautes Item-Modell statt des
-  Overrides-Arrays verwenden und der Carrier als schlichtes Papier
-  rendert).
+  das Profile-System als zwei Choice-Settings (`wings`/`headwear`). Modelle
+  und Texturen sind Blockbench-Projekte in
+  `helix-addon-cosmetics-paper/src/pack/resources/cosmetics` (`models`,
+  `textures`, `blockbench`); `:helix-addon-cosmetics-paper:generatePack`
+  baut daraus das Pack. Darstellung ohne Versatz zum Spieler:
+  - **Kopfschmuck** als Fake-Helm (`sendEquipmentChange`, nur Pakete): das
+    Item-Modell sitzt per `head`-Display-Transform auf dem Kopf.
+  - **Flügel** als zwei Item-Displays, die **nur clientseitig** per
+    gefälschtem `SET_PASSENGERS` (packetevents) auf dem Spieler reiten – der
+    Client positioniert sie selbst; serverseitig sind sie keine Passagiere
+    (Paper verweigert Weltwechsel-Teleports von Spielern mit Passagieren)
+    und stehen am Sitzplatz. Körperdrehung nach Client-Logik (`BodyYaw`),
+    sanftes Flattern. Ohne packetevents: Fallback auf die Elytra-Ebene
+    (`equippable`-Asset, HD-Textur aus der Blockbench-Grafik).
+  Ein aktives Cosmetic gewinnt optisch gegen echte Rüstung im selben Slot
+  (gedacht für Lobbys).
+- `helix-addon-cinematic` (+ `helix-addon-cinematic-paper` = Plugin
+  `HelixCinematic`, + Library `helix-library-cinematic`) — **AFK**: nach
+  `afkSeconds` (Standard 30) ohne Eingabe zeigt Modus `screen` (Standard)
+  den **AFK-Bildschirm**: abgedunkeltes Bild (halbtransparente
+  Vollbild-Glyphe `helix_cinematic:afk` als Titel) mit „Du bist AFK“ und
+  „Klicke oder bewege dich, um weiterzuspielen“ (Texte `afkTitle`/
+  `afkSubtitle`, MiniMessage), bis zur ersten Eingabe. Modus `cinematic`
+  stattdessen: der Spieler wird zur
+  unsichtbaren Kamera (Spectator, Bildschirm komplett leer: kein HUD, Chat,
+  Scoreboard, Bossbars), an seiner Stelle steht ein Doppelgänger-NPC mit
+  Skin, Rüstung, Name mit Rang, Untertitel und Cosmetics; die Kamera fliegt
+  in wechselnden Perspektiven gerade auf ihn zu, dreht sich dabei leicht,
+  mal schneller, mal langsamer, mit Schwarzblenden dazwischen. Andere sehen
+  „AFK“ über dem NPC. Jede Eingabe beendet es und stellt Spielmodus,
+  Position und HUD wieder her. Einstellungen
+  (`cinematic.config`, `cinematic.set <mode|tasks|afkSeconds|afkTitle|afkSubtitle|afkTag|shotSeconds|fade|nameCard> <wert>`,
+  Recht `helix.cinematic.admin`, Dashboard-Panel „AFK“), Standard
+  nur auf dem Task `Lobby`; Spieler schalten es im Profil ab (`cinematic`).
+  `HelixCinematic` installiert und teilt die **Cinematic-Library** für alle
+  Plugins (wie Helix-GUIs für IGui) – siehe `helix-library-cinematic/README.md`.
 - `helix-addon-lobby` (+ `helix-addon-lobby-paper`) — macht ausgewählte
   Tasks zu Lobbys. Welche Tasks Lobbys sind, wählt man im Dashboard-Panel
   **Lobby**; die Paper-Komponente aktiviert sich nur, wenn ihr `HELIX_TASK`
@@ -352,21 +368,21 @@ Referenz-Implementierungen in diesem Repo:
   `lobby.config`-Bridge-Value verteilt, das die Paper-Seite pollt — so
   greifen Dashboard-Änderungen ohne Neustart. Referenz für ein per-Task
   aktives Paper-Addon mit geteiltem GUI und Bridge-Value-Config.
-- `helix-addon-phone` (+ `helix-addon-phone-paper`) — ein In-Game-Handy als
-  zentrale Oberfläche. Das Gehäuse ist eine 176×222-Titel-Glyphe, die (wie bei
-  BetterMSGs) über das **gesamte** Inventar liegt; das echte Inventar wird per
-  `InventoryTakeover` ausgeliehen. Apps liegen als Icon-Glyphen auf einem
-  4×5-Grid; ein Tap führt einen Command aus (`COMMAND`) oder öffnet einen
-  nativen Screen (`NATIVE`: Navigator = Server-Auswahl, Messages = BetterMSGs).
-  App-Icons sind **hochgeladene PNGs**: das Panel legt Apps an und lädt Logos
-  hoch, die zur Laufzeit ins Netzwerk-Pack injiziert werden (neue
-  `AddonContext.contributePackAsset`/`rebuildNetworkPack`; `NetworkPackService`
-  merged Laufzeit-Beiträge + führt eine Pack-Generation). Sichtbarkeit ist pro
-  Join versioniert: das Handy führt eine **Epoch**, stempelt Spieler beim Join
-  und zeigt eine App nur bei `sinceEpoch ≤ Spieler-Epoch` — neue Apps/Icons
-  erreichen nur Spieler, die nach dem Rebuild neu joinen (kein Mid-Session-Swap,
-  keine kaputten Glyphen). Kann per Lobby-**Phone-Modus** als einziges
-  Hotbar-Item ausgegeben werden.
+
+- `helix-addon-mineclash` — Node-Seite von **MineClash** (Clash-Royale-artiges
+  Kartenkampfspiel, Paper-Plugin mit NMS aus dem eigenen Repository). Hält die
+  komplette Spielkonfiguration als typisierte Settings + Dokument-Sammlungen
+  (`cards`, `chests`, `buildings`, `perks`, `servers`) im Addon-Storage — Panel
+  **MineClash** zum Editieren, `mineclash.config.bundle`/`.version` als
+  bridge-invocable Machine-API für die Spielserver (Poll auf Versionsänderung,
+  Reload ohne Neustart). Spielerprofile und Match-Historie im zentralen
+  PostgreSQL (Schema `mineclash`, Repository-Interface mit Dokument-Store-
+  Fallback), Matchmaking in der Node (`mineclash.queue.*`: Services pollen
+  Matches, die sie hosten, und Spieler, die sie per BungeeCord-Connect
+  weiterschicken), Clan-Zugehörigkeit über `clan.list`/`clan.detail`
+  (`mineclash.clan.of`). Referenz für ein Addon, dessen Paper-Komponente
+  ausschließlich über `POST /internal/action` mit der Node spricht und dessen
+  `paper.jar`/`pack.zip` aus einem fremden Build in `libs/` vendored werden.
 
 ## Lifecycle
 
@@ -590,6 +606,36 @@ korrekt (Mojang-mapped Runtime). Da das Jar mit JVM-24-Bytecode ausgeliefert
 wird, müssen die Paper-Server auf **Java 24+** laufen (Helix-Node-Toolchain 24,
 Deployment hier Java 25). Andere Addons können denselben Weg gehen und INpc so
 als geteiltes Framework nutzen.
+
+## In-Game-Admin-Panel (`helix.admin` + Helix-Admin-Mod)
+
+Teammitglieder mit der Fabric-Mod **Helix Admin** (`helix-admin-mod/`, eigener Gradle-Build) öffnen mit
+**Rechts-Shift** ein Panel im Spiel – ein kompaktes Schnellmenü wie bei txAdmin, gerendert per eingebettetem
+Chromium (MCEF Modern). „Open dashboard“ öffnet im selben Overlay das volle Dashboard.
+
+- **Ablauf:** Mod → `hello` auf Kanal `helix:admin` → Paper-Teil antwortet `welcome` (nur mit `helix.staff.menu`).
+  Taste → `open` → Paper holt `POST /internal/panel-ticket` → Mod lädt `<panel-url>/#ticket=…&ingame=1` →
+  Dashboard löst `/auth/ticket` ein (Session wie beim Code-Login, Rechte `helix.panel.*` gelten weiter).
+- **Bedienung:** Das Schnellmenü liegt als HUD-Ebene über dem Spiel (Laufen/Umschauen bleibt möglich);
+  Pfeiltasten/Enter/Backspace kommen als `helix-nav`-Events auf der Seite an, Moduswechsel als `helix-mode`
+  (`hud`/`mouse`/`closed`). Rechts-Alt, Eingabefelder und das volle Dashboard schalten per Bridge-Op `interact`
+  in den Maus-Modus, Esc bzw. `hud` zurück.
+- **Panel-URL:** `admin.panelurl <host|url|->` (öffentlich erreichbare Dashboard-Adresse). Der Host reicht:
+  ohne Schema wird `http://` ergänzt, `http://` ohne Port bekommt den Control-Port der Node, `https://` ohne
+  Port bleibt (Reverse-Proxy). Ohne Angabe nutzt der Server die Adresse, mit der der Spieler verbunden ist,
+  und den Control-Port.
+- **Schnellmenü:** Main (NoClip, Heilen, Füttern, Fliegen, Vanish, Spielmodus, Teleport zu Koordinaten, Spawn,
+  Zeit, Wetter, Gebiet leeren, Ankündigung), Players (alle Spieler netzwerkweit mit Server, Position, Leben,
+  Ping; Hingehen, Herholen, Zuschauen, Einfrieren, Heilen, Spielmodus, Inventar, Nachricht, Verwarnen, Kicken,
+  Bannen), Server (dieser Server: TPS, Speicher, Spieler; alle Server mit Neustart).
+- **Server-übergreifend:** Der Paper-Teil meldet seine Spieler (`admin.presence`), Aktionen für Spieler auf
+  anderen Servern laufen über die Warteschlange `admin.job`/`admin.jobs` (z. B. hinwechseln und auf Ankunft
+  teleportieren).
+- **Rechte** (Präfix `helix.staff.*`, bewusst nicht `helix.admin.*` – dessen Platzhalter würde den Node-Admin
+  `helix.admin` mitvergeben): `menu`, `self`, `world`, `teleport`, `spectate`, `freeze`, `heal`, `gamemode`,
+  `inventory`, `kick`, `warn`, `ban`, `message`, `announce`, `server`.
+- **Mod installieren:** Fabric Loader, Fabric API, Fabric Language Kotlin, MCEF Modern und `helix-admin-*.jar`
+  in den `mods`-Ordner. Chromium lädt MCEF beim ersten Start einmalig herunter. Ohne Mod gibt es das Panel nicht.
 
 ## Eigene Dashboard-Seite beisteuern
 

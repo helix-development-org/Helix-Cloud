@@ -7,8 +7,8 @@ import com.velocitypowered.api.proxy.ProxyServer
 import net.kyori.adventure.text.Component
 
 /**
- * Registers the player-facing proxy commands `/lobby`, `/server` and
- * `/servers`.
+ * Registers the player-facing proxy commands `/lobby` (alias `/hub`), `/server`
+ * and `/servers`.
  *
  * Every message is a translation key under
  * `helix.translations.velocity.command.*`, rendered in the player's
@@ -34,7 +34,7 @@ class ProxyCommands(
      */
     fun register(plugin: Any) {
         val manager = proxy.commandManager
-        manager.register(manager.metaBuilder("lobby").plugin(plugin).build(), lobbyCommand())
+        manager.register(manager.metaBuilder("lobby").aliases("hub").plugin(plugin).build(), lobbyCommand())
         manager.register(manager.metaBuilder("server").plugin(plugin).build(), serverCommand())
         manager.register(manager.metaBuilder("servers").plugin(plugin).build(), serversCommand())
     }

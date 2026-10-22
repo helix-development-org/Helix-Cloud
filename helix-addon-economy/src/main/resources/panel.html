@@ -23,12 +23,12 @@ async function load() {
   const rows = Object.entries(bal);
   const box = document.getElementById("list");
   box.innerHTML = rows.length ? `<table><thead><tr><th>Player</th><th>Balance</th><th></th></tr></thead><tbody>${
-    rows.map(([n, v]) => `<tr><td><strong>${esc(n)}</strong></td><td class="mono">${v} coins</td>
+    rows.map(([n, v]) => `<tr><td><strong>${esc(n)}</strong></td><td class="mono">${Number(v).toLocaleString("de-DE")} Kronen</td>
       <td style="text-align:right">
         <button class="btn sm subtle" data-q="give|${esc(n)}">+</button>
         <button class="btn sm subtle" data-q="take|${esc(n)}">−</button>
         <button class="btn sm subtle" data-q="set|${esc(n)}">set</button></td></tr>`).join("")
-  }</tbody></table>` : '<div class="empty">No balances yet</div>';
+  }</tbody></table>` : '<div class="empty">No accounts yet</div>';
   box.querySelectorAll("[data-q]").forEach(b => b.onclick = async () => {
     const [op, name] = b.dataset.q.split("|");
     const amt = prompt(`${op} amount for ${name}?`, "100"); if (amt == null) return;

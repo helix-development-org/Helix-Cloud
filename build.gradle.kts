@@ -90,9 +90,15 @@ val addonModules = listOf(
     "helix-addon-profile",
     "helix-addon-subtitles",
     "helix-addon-cosmetics",
+    "helix-addon-cinematic",
     "helix-addon-translations",
+    "helix-addon-admin",
     "helix-addon-lobby",
-    "helix-addon-phone",
+    "helix-addon-mineclash",
+    "helix-addon-citybuild",
+    "helix-addon-feedback",
+    "helix-addon-mobs",
+    "helix-addon-guardlab",
 )
 
 tasks.register("releaseBundle") {

@@ -52,6 +52,15 @@ sampler:
   max-players-per-tick: 256
   # Hard main-thread safety cap: the sampler yields the tick once it has spent this many nanos.
   max-nanos-per-tick: 2000000
+# Trace recorder (/iguard trace, IGuardApi.startTrace): JSONL files under plugins/IGuard/traces/.
+# A recording stops itself at whichever limit it reaches first.
+trace:
+  max-bytes: 67108864
+  max-seconds: 900
+  queue-capacity: 50000
+# /iguard debug: minimum gap between two debug lines of the same viewer, player and check.
+debug:
+  rate-limit-millis: 200
 detection:
   incident-gap-millis: 30000
   replay-pre-millis: 10000
@@ -76,159 +85,177 @@ confidence:
   single-family-cap: 0.79
   multi-family-cap: 0.95
   deterministic: 0.85
+# Per-check thresholds. alert-vl also gates incident confidence: below it a check only contributes
+# proportionally (VL / alert-vl) and never opens an incident on its own. decay-per-second is how much
+# the violation level drops per second while the check passes.
 checks:
   client.identity.a:
     enabled: true
     alert-vl: 1.0
     setback-vl: -1.0
-    decay: 0.0
+    decay-per-second: 0.0
   client.brand_spoof.a:
     enabled: true
     alert-vl: 1.0
     setback-vl: -1.0
-    decay: 0.0
+    decay-per-second: 0.0
   protocol.badpackets.a:
     enabled: true
     alert-vl: 1.0
     setback-vl: -1.0
-    decay: 0.0
+    decay-per-second: 0.0
   movement.fly.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: 7.0
-    decay: 0.2
+    decay-per-second: 4.0
   movement.speed.a:
     enabled: true
     alert-vl: 5.0
     setback-vl: 9.0
-    decay: 0.2
+    decay-per-second: 4.0
   movement.nofall.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.25
+    decay-per-second: 5.0
   movement.timer.a:
     enabled: true
     alert-vl: 3.0
     setback-vl: -1.0
-    decay: 0.1
+    decay-per-second: 2.0
   movement.phase.a:
     enabled: true
     alert-vl: 3.0
     setback-vl: -1.0
-    decay: 0.15
+    decay-per-second: 3.0
   movement.step.a:
     enabled: true
     alert-vl: 3.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 4.0
   movement.spider.a:
     enabled: true
     alert-vl: 3.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 4.0
   movement.jesus.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 4.0
   movement.velocity.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.1
+    decay-per-second: 1.0
   combat.reach.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.25
+    decay-per-second: 2.5
   combat.rotation.a:
     enabled: true
     alert-vl: 5.0
     setback-vl: -1.0
-    decay: 0.25
+    decay-per-second: 2.5
   combat.multitarget.a:
     enabled: true
     alert-vl: 3.0
     setback-vl: -1.0
-    decay: 0.25
+    decay-per-second: 2.5
   combat.autoclicker.a:
     enabled: true
     alert-vl: 5.0
     setback-vl: -1.0
-    decay: 0.1
+    decay-per-second: 1.0
+    # Machine-regular clicking: from min-cps on, intervals whose coefficient of variation stays below
+    # max-deviation flag; judged once min-samples attacks fall into 3 seconds (spanning at least 2).
+    min-cps: 9.5
+    max-deviation: 0.035
+    min-samples: 25
   combat.inventory.a:
     enabled: true
     alert-vl: 3.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 2.0
   world.interactionreach.a:
     enabled: true
     alert-vl: 3.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 2.0
   world.scaffold.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 2.0
   world.fastplace.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 2.0
   world.fastbreak.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 2.0
+    # A dig must take at least min-ratio of the vanilla break time (block hardness, tool, enchantments,
+    # effects, attributes, water/air - measured by the server while digging). Clients without tick-end
+    # packets are timed in milliseconds with tolerance-millis plus a quarter of the ping as jitter allowance.
+    min-ratio: 0.7
+    tolerance-millis: 60
   world.nuker.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 2.0
   inventory.impossible.a:
     enabled: true
     alert-vl: 1.0
     setback-vl: -1.0
-    decay: 0.0
+    decay-per-second: 0.0
   inventory.move.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 2.0
   movement.airjump.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 4.0
   movement.sprintbackwards.a:
     enabled: true
     alert-vl: 5.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 4.0
   combat.noswing.a:
     enabled: true
     alert-vl: 5.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 2.0
   combat.snapaim.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.25
+    decay-per-second: 2.5
   world.nofacing.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 2.0
   movement.fastladder.a:
     enabled: true
     alert-vl: 5.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 4.0
   movement.highjump.a:
     enabled: true
     alert-vl: 4.0
     setback-vl: -1.0
-    decay: 0.2
+    decay-per-second: 4.0
+  movement.elytrafly.a:
+    enabled: true
+    alert-vl: 4.0
+    setback-vl: -1.0
+    decay-per-second: 4.0

@@ -24,11 +24,17 @@ data class NodeConfig(
     /**
      * Network-wide display settings.
      *
-     * @property name display name used in disconnect screens (`{network}`).
+     * @property name display name of the network (`{network}`): prefix, disconnect screens, MOTD, tablist.
      */
     data class NetworkSettings(
-        val name: String = "our network",
-    )
+        val name: String = DEFAULT_NAME,
+    ) {
+        /** Defaults of the network settings. */
+        companion object {
+            /** Release name of the network ("KronlandMC", realm "Kronland" in the lore); the one place to change the default. */
+            const val DEFAULT_NAME: String = "KronlandMC"
+        }
+    }
 
     /**
      * Control API settings.
@@ -81,11 +87,24 @@ data class NodeConfig(
      *  files a service writes into its bind-mounted workspace stay
      *  manageable by the node — a root-run container otherwise leaves
      *  root-owned files the next workspace preparation cannot touch.
+     * @property controlHost host name service containers use to reach the
+     *  node's control API and wire port. The default `host.docker.internal`
+     *  fits a node running directly on the docker host; a node that runs in a
+     *  container itself sets its container name on the shared [network]
+     *  (for example `kronland-node`).
+     * @property publishBackends whether Paper backend ports are published to
+     *  the docker host as well (not only the proxy port). Backends still
+     *  refuse direct joins without the proxy's forwarding secret.
+     * @property publishAddress host interface published ports bind to
+     *  (`0.0.0.0` = all interfaces).
      */
     data class DockerSettings(
         val network: String = "helix",
         val image: String = "eclipse-temurin:24-jre",
         val user: String = "",
+        val controlHost: String = "host.docker.internal",
+        val publishBackends: Boolean = false,
+        val publishAddress: String = "0.0.0.0",
     )
 
     /**
