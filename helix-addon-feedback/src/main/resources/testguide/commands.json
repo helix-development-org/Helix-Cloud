@@ -578,18 +578,18 @@
    "id": "net-nick",
    "mode": "Netzwerk",
    "command": "/nick <Name>",
-   "summary": "Tarnt dich unter einem anderen Namen (Spieler-Rang, ohne Clan-Tag).",
-   "expected": "Name, Tablist und Chat zeigen den Nick mit Spieler-Prefix; dein Rang bleibt unsichtbar, auch in der Tab-Reihenfolge.",
-   "audience": "Team",
+   "summary": "Tarnt dich unter einem anderen Namen (Spieler-Rang, ohne Clan-Tag). Freischaltung: erspielbar oder über einen Premium-Rang.",
+   "expected": "Name, Tablist und Chat zeigen den Nick mit Spieler-Prefix; dein Rang bleibt unsichtbar, auch in der Tab-Reihenfolge. Ohne Freischaltung kommt ein Hinweis, dass dir das Recht fehlt.",
+   "audience": "Spieler",
    "permission": "helix.nick"
   },
   {
    "id": "net-nick-off",
    "mode": "Netzwerk",
    "command": "/nick off",
-   "summary": "Entfernt deinen Nick.",
+   "summary": "Entfernt deinen Nick (gleiche Freischaltung wie /nick).",
    "expected": "Dein echter Name und Rang sind wieder sichtbar.",
-   "audience": "Team",
+   "audience": "Spieler",
    "permission": "helix.nick"
   },
   {
