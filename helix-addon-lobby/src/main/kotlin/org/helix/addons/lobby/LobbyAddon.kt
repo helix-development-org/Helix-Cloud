@@ -55,6 +55,8 @@ class LobbyAddon : AddonBase() {
             "Stores the lobby spawn (team command /setlobbyspawn of the paper component).",
             "lobby.spawn.set <player> <json {x,y,z,yaw,pitch}>",
             bridgeInvocable = true,
+            // Only lobby servers may move the spawn (fixed at enable; a changed lobby task list needs a node restart).
+            bridgeTasks = config.lobbyTasks.toSet().ifEmpty { setOf(DEFAULT_LOBBY_TASK) },
         ) { invocation -> setSpawn(invocation.arguments) }
         action(
             "lobby.spawn.clear",
@@ -84,7 +86,8 @@ class LobbyAddon : AddonBase() {
 
     /**
      * Stores the lobby spawn sent by `/setlobbyspawn`. The bridge call carries no session, so the named player must
-     * hold [ADMIN_PERMISSION] on the node.
+     * hold [ADMIN_PERMISSION] on the node and be online on the network (the action is limited to lobby servers; which
+     * lobby the player stands on is not part of a bridge call).
      *
      * @param arguments `<player> <json…>`.
      * @return ok with the stored point, or an error (`usage`, `forbidden`, `invalid spawn`).
@@ -93,6 +96,9 @@ class LobbyAddon : AddonBase() {
         val player = arguments.firstOrNull()?.takeIf { it.isNotBlank() }
             ?: return ActionResult.error("usage", "lobby.spawn.set <player> <json>")
         if (!context.hasPermission(player, ADMIN_PERMISSION)) return ActionResult.error("forbidden")
+        if (context.onlinePlayers().none { it.name.equals(player, ignoreCase = true) }) {
+            return ActionResult.error("forbidden", "$player is not online")
+        }
         val spawn = runCatching { compact.decodeFromString(LobbySpawn.serializer(), arguments.drop(1).joinToString(" ")) }
             .getOrNull()?.takeIf { it.isValid() }
             ?: return ActionResult.error("invalid spawn")
@@ -203,5 +209,8 @@ class LobbyAddon : AddonBase() {
 
         /** Permission to set or clear the lobby spawn. */
         const val ADMIN_PERMISSION: String = "helix.lobby.admin"
+
+        /** Lobby task assumed when the configuration names none (the deploy bundle's `Lobby`). */
+        const val DEFAULT_LOBBY_TASK: String = "Lobby"
     }
 }

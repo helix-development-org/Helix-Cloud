@@ -13,6 +13,10 @@ class LobbyAddonTest {
     private val context = org.helix.addon.sdk.testing.RecordingAddonContext(directory)
     private val addon = LobbyAddon().also { it.onEnable(context) }
 
+    init {
+        context.online += org.helix.api.player.OnlinePlayer("Tytoss", "uuid-tytoss", "Proxy-1")
+    }
+
     private fun published(): LobbyConfig =
         json.decodeFromString(LobbyConfig.serializer(), context.bridgeValues.getValue("lobby.config"))
 
@@ -88,6 +92,14 @@ class LobbyAddonTest {
         assertTrue(context.run("lobby.spawn.set", "Tytoss", spawn).success)
 
         assertEquals(LobbySpawn(0.5, 4.0, -2.5, 90f, 0f), published().spawn)
+    }
+
+    @Test
+    fun `only lobby servers may set the spawn, for a staff member who is online`() {
+        val descriptor = context.handlers.getValue("lobby.spawn.set").first
+        assertEquals(setOf(LobbyAddon.DEFAULT_LOBBY_TASK), descriptor.bridgeTasks)
+        context.permissionCheck = { _, node -> node == LobbyAddon.ADMIN_PERMISSION }
+        assertFalse(context.run("lobby.spawn.set", "Offline", """{"x":1,"y":5,"z":1}""").success, "staff name of someone not online")
     }
 
     @Test
