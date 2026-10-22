@@ -48,11 +48,16 @@ data class AccessMatrix(val groups: List<AccessGroup>, val extras: List<AccessEx
  * `helix.panel.*` family plus the few [EXTRAS]. Groups holding a wildcard ([isWildcardGroup]) are locked – the
  * owner and manager ranks keep everything and cannot be narrowed from the matrix.
  *
- * [presetsOnce] gives the standard team groups and testers a sensible starting set once per installation, and only
- * to groups that have no dashboard node yet, so a choice made in the matrix is never overwritten.
+ * Changing the matrix is reserved for full admins ([EDIT_PERMISSION]): several dashboard nodes are admin-equivalent
+ * ([CRITICAL]), so whoever may hand them out could make themselves an admin. Holders of `helix.panel.access` may only
+ * look at it.
+ *
+ * [presetsOnce] gives each standard team group and the testers a starting set exactly once (one marker per group),
+ * and only when the group has no dashboard node yet – a negated `-helix.panel.*` node counts too –, so a choice made
+ * in the matrix is never overwritten or re-granted. Presets never contain [CRITICAL] nodes.
  *
  * @property store the permission store.
- * @property storage addon storage holding the preset version.
+ * @property storage addon storage holding the preset markers.
  */
 class PanelAccess(private val store: PermissionStore, private val storage: AddonStorage) {
     /**
@@ -88,54 +93,96 @@ class PanelAccess(private val store: PermissionStore, private val storage: Addon
         if (isWildcardGroup(store.expand(group).flatMap { it.permissions })) {
             return "Die Gruppe ${group.name} hat alle Rechte (Wildcard) und ist gesperrt"
         }
-        val permissions = if (grant) (group.permissions + node).distinct() else group.permissions - node
+        // Team members working on bugs also use the player-facing feedback actions (get, comment, attach), which
+        // require feedback.report: granting the team node brings the reporting node along.
+        val added = if (node == FEEDBACK_STAFF) listOf(node, FEEDBACK_REPORT) else listOf(node)
+        val permissions = if (grant) (group.permissions + added).distinct() else group.permissions - node
         if (permissions != group.permissions) store.saveGroup(group.copy(permissions = permissions))
         return null
     }
 
     /**
-     * Applies [PRESETS] once per installation (tracked as [VERSION] under [VERSION_KEY]).
+     * Applies [PRESETS] to every preset group that was never handled before (marker per group under
+     * [HANDLED_KEY]). A handled group is never touched again, whatever happens to its nodes later.
      *
      * @return names of the groups that received their preset.
      */
     fun presetsOnce(): List<String> {
-        val done = storage.read(VERSION_KEY)?.trim()?.toIntOrNull() ?: 0
-        if (done >= VERSION) return emptyList()
-        val changed = applyPresets()
-        storage.write(VERSION_KEY, VERSION.toString())
+        val handled = handledGroups().toMutableSet()
+        // Installations that ran the first preset version (one global marker) count every preset group as handled.
+        if (storage.read(VERSION_KEY) != null) handled += PRESETS.keys
+        val changed = mutableListOf<String>()
+        PRESETS.forEach { (name, nodes) ->
+            if (name in handled) return@forEach
+            val group = store.group(name) ?: return@forEach
+            if (give(group, nodes)) changed += group.name
+            handled += name
+        }
+        storage.write(HANDLED_KEY, handled.sorted().joinToString("\n"))
         return changed
     }
 
     /**
-     * Gives every existing preset group without any dashboard node its preset nodes (additive, keeps all other
-     * permissions). Wildcard groups are left alone.
+     * Gives the named preset groups (or, without names, every preset group never handled before) their preset when
+     * they have no dashboard node at all (additive, keeps all other permissions). Wildcard groups are left alone.
      *
+     * @param names groups to apply to; empty = only groups that were never handled.
      * @return names of the changed groups.
      */
-    fun applyPresets(): List<String> {
+    fun applyPresets(names: List<String> = emptyList()): List<String> {
+        val handled = handledGroups().toMutableSet()
+        val targets = if (names.isEmpty()) PRESETS.keys.filter { it !in handled } else names.map { it.lowercase() }
         val changed = mutableListOf<String>()
-        PRESETS.forEach { (name, nodes) ->
+        targets.forEach { name ->
+            val nodes = PRESETS[name] ?: return@forEach
             val group = store.group(name) ?: return@forEach
-            if (isWildcardGroup(group.permissions) || group.permissions.any { it.startsWith(PANEL_PREFIX) }) return@forEach
-            store.saveGroup(group.copy(permissions = (group.permissions + nodes).distinct()))
-            changed += group.name
+            if (give(group, nodes)) changed += group.name
+            handled += name
         }
+        storage.write(HANDLED_KEY, handled.sorted().joinToString("\n"))
         return changed
     }
+
+    private fun give(group: PermissionGroup, nodes: List<String>): Boolean {
+        if (isWildcardGroup(group.permissions) || isConfigured(group.permissions)) return false
+        store.saveGroup(group.copy(permissions = (group.permissions + nodes).distinct()))
+        return true
+    }
+
+    private fun handledGroups(): Set<String> =
+        storage.read(HANDLED_KEY)?.lines()?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet().orEmpty()
 
     /** Presets, matrix node rules and storage keys. */
     companion object {
         /** Prefix of every dashboard permission. */
         const val PANEL_PREFIX: String = "helix.panel."
 
-        /** Permission of `perm.access.matrix` and `perm.access.set` (same node as the dashboard view). */
+        /** Permission of `perm.access.matrix` (read; same node as the dashboard view). */
         const val PERMISSION: String = "helix.panel.access"
 
-        /** Addon-storage key of the applied preset version. */
+        /** Permission to change the matrix and apply presets: full admin only. */
+        const val EDIT_PERMISSION: String = "helix.admin"
+
+        /** Addon-storage key of the first preset version (one global marker; read for upgrades only). */
         const val VERSION_KEY: String = "panel-presets-version"
 
-        /** Current preset version (bump to give groups without dashboard nodes the presets again). */
-        const val VERSION: Int = 1
+        /** Addon-storage key of the preset groups already handled (one name per line). */
+        const val HANDLED_KEY: String = "panel-presets-groups"
+
+        /** Team node of the bug workflow. */
+        const val FEEDBACK_STAFF: String = "feedback.staff"
+
+        /** Reporting node, needed by the player-facing feedback actions the team tab uses too. */
+        const val FEEDBACK_REPORT: String = "feedback.report"
+
+        /**
+         * Admin-equivalent dashboard nodes (console, file writes, task edits, addon switches, scheduled actions, the
+         * matrix itself): presets never grant them, the dashboard marks them with a warning.
+         */
+        val CRITICAL: Set<String> = setOf(
+            "helix.panel.services.console", "helix.panel.files.edit", "helix.panel.tasks.edit",
+            "helix.panel.addons.manage", "helix.panel.schedules.edit", "helix.panel.access",
+        )
 
         /** Team nodes besides `helix.panel.*` that the matrix may grant. */
         val EXTRAS: List<AccessExtra> = listOf(
@@ -175,10 +222,11 @@ class PanelAccess(private val store: PermissionStore, private val storage: Addon
             "helix.panel.addon.profile", "helix.panel.addon.mineclash", "helix.panel.addon.cinematic",
             "helix.panel.addon.labymod",
         )
+        // No admin-equivalent node in any preset ([CRITICAL]): console, file edits, task edits, addon switches and
+        // scheduled jobs are granted deliberately in the matrix by an admin.
         private val DEVELOPER = ADMIN + listOf(
-            "helix.panel.services.console", "helix.panel.services.backups", "helix.panel.files", "helix.panel.files.edit",
-            "helix.panel.tasks.edit", "helix.panel.addons.manage", "helix.panel.logs", "helix.panel.schedules.edit",
-            "helix.panel.backups.restore", "helix.panel.addon.guardlab", "helix.panel.addon.discord",
+            "helix.panel.services.backups", "helix.panel.files", "helix.panel.logs", "helix.panel.backups.restore",
+            "helix.panel.addon.guardlab", "helix.panel.addon.discord",
         )
 
         /** Tester panel nodes: sign in, the command guide and bug reporting – nothing of the team dashboard. */
@@ -211,5 +259,14 @@ class PanelAccess(private val store: PermissionStore, private val storage: Addon
          */
         fun isWildcardGroup(permissions: List<String>): Boolean =
             permissions.any { it == "*" || it == "helix.*" || it == "helix.panel.*" || it == "helix.admin" }
+
+        /**
+         * Whether a group's dashboard access was already decided: it holds or negates at least one dashboard node.
+         *
+         * @param permissions the group's own permissions.
+         * @return `true` when a `helix.panel.*` or `-helix.panel.*` node is present.
+         */
+        fun isConfigured(permissions: List<String>): Boolean =
+            permissions.any { it.removePrefix("-").startsWith(PANEL_PREFIX) }
     }
 }

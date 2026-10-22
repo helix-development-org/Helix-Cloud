@@ -44,7 +44,12 @@ class PermissionsAddon : AddonBase() {
         badges.upgradeOnce()
         access = PanelAccess(store, context.storage())
         access.presetsOnce()
-        context.registerPermissionResolver { request -> store.has(request.name, request.permission, request.uuid) }
+        // Implied nodes: holding the left-hand node's partner (for example the team node feedback.staff) also grants
+        // it, so a team group never needs both nodes just to open the reports it works on.
+        context.registerPermissionResolver { request ->
+            store.has(request.name, request.permission, request.uuid) ||
+                IMPLIED_BY[request.permission].orEmpty().any { store.has(request.name, it, request.uuid) }
+        }
         // Group prefixes are DISPLAY state, deliberately decoupled from permission nodes: the
         // player's highest-weight group with a prefix wins, so a `*` grant never changes looks.
         // Its weight sorts the tab list (higher ranks first).
@@ -226,7 +231,7 @@ class PermissionsAddon : AddonBase() {
             "perm.access.set",
             "Grants or revokes one dashboard node (helix.panel.* or a listed team node) on a group; wildcard groups are locked.",
             "perm.access.set <group> <node> <on|off>",
-            permission = PanelAccess.PERMISSION,
+            permission = PanelAccess.EDIT_PERMISSION,
         ) { inv ->
             val group = inv.arguments.getOrNull(0)
             val node = inv.arguments.getOrNull(1)
@@ -243,11 +248,11 @@ class PermissionsAddon : AddonBase() {
         }
         action(
             "perm.access.presets",
-            "Gives every standard team group and the testers without dashboard nodes their preset nodes again.",
-            "perm.access.presets",
-            permission = PanelAccess.PERMISSION,
-        ) {
-            val changed = access.applyPresets()
+            "Gives the named preset groups (default: those never handled) their preset if they have no dashboard node.",
+            "perm.access.presets [group ...]",
+            permission = PanelAccess.EDIT_PERMISSION,
+        ) { inv ->
+            val changed = access.applyPresets(inv.arguments.filter { it.isNotBlank() })
             if (changed.isEmpty()) ActionResult.ok("no group changed") else ActionResult.ok("presets applied to: ${changed.joinToString()}")
         }
         action("perm.export", "Exports all groups and users as JSON (used by the dashboard).", "perm.export") {
@@ -271,6 +276,12 @@ class PermissionsAddon : AddonBase() {
     }
 
     private companion object {
+        /**
+         * Node → nodes that imply it. `feedback.report` gates the player-facing feedback actions the team tab Bugs
+         * uses too (get, comment, attach), so the team node `feedback.staff` includes it.
+         */
+        val IMPLIED_BY: Map<String, List<String>> = mapOf("feedback.report" to listOf("feedback.staff"))
+
         /** Sidebar icon for the permissions panel. */
         const val PANEL_ICON = "<path d=\"M9 12l2 2 4-4\"/><path d=\"M12 3l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V7z\"/>"
     }
