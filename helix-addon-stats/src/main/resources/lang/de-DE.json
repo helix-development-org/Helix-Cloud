@@ -1,7 +1,7 @@
 {
-  "value": "<#f1e2c2>{stat}: <#ffcf4a>{value}</#ffcf4a>",
-  "value.other": "<#f1e2c2><#ffcf4a>{player}</#ffcf4a>s {stat}: <#ffcf4a>{value}</#ffcf4a>",
-  "top.empty": "<#f1e2c2>Für <#ffcf4a>{stat}</#ffcf4a> sind noch keine Werte erfasst.",
-  "top.entry": "<#ffcf4a>#{rank}</#ffcf4a> <#f1e2c2>{player}</#f1e2c2> <#7a4a24>—</#7a4a24> <#ffcf4a>{value}</#ffcf4a>",
-  "usage": "<#f1e2c2>Verwendung: <#ffcf4a>/stats \\<stat> [player]</#ffcf4a> <#7a4a24>|</#7a4a24> <#ffcf4a>/stats top \\<stat> [limit]</#ffcf4a>"
+  "value": "<tc:text>{stat}: <tc:accent>{value}</tc:accent>",
+  "value.other": "<tc:text><tc:accent>{player}</tc:accent>s {stat}: <tc:accent>{value}</tc:accent>",
+  "top.empty": "<tc:text>Für <tc:accent>{stat}</tc:accent> sind noch keine Werte erfasst.",
+  "top.entry": "<tc:accent>#{rank}</tc:accent> <tc:text>{player}</tc:text> <tc:muted>—</tc:muted> <tc:accent>{value}</tc:accent>",
+  "usage": "<tc:text>Verwendung: <tc:accent>/stats \\<stat> [player]</tc:accent> <tc:muted>|</tc:muted> <tc:accent>/stats top \\<stat> [limit]</tc:accent>"
 }

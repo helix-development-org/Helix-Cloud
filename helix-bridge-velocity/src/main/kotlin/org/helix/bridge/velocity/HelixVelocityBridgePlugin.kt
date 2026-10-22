@@ -500,7 +500,7 @@ class HelixVelocityBridgePlugin @Inject constructor(
             // No MOTD addon installed — keep the previous minimal behaviour.
             if (maintenance.get()) {
                 event.ping = event.ping.asBuilder()
-                    .description(translate(null, "helix.translations.velocity.motd.maintenance", "<#ffb43a>Maintenance"))
+                    .description(translate(null, "helix.translations.velocity.motd.maintenance", "<tc:warn>Maintenance"))
                     .build()
             }
             return

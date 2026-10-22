@@ -1,3 +1,3 @@
 {
-  "hint": "<#f1e2c2>Für die neuen Mob-Modelle brauchst du <#ffcf4a>OptiFine</#ffcf4a> oder <#ffcf4a>Fabric mit Entity Model Features</#ffcf4a>. <click:open_url:'https://modrinth.com/mod/entity-model-features'><hover:show_text:'<#f1e2c2>Entity Model Features auf <#ffcf4a>Modrinth</#ffcf4a> öffnen'><#ffcf4a>[Download]</#ffcf4a></hover></click>"
+  "hint": "<tc:text>Für die neuen Mob-Modelle brauchst du <tc:accent>OptiFine</tc:accent> oder <tc:accent>Fabric mit Entity Model Features</tc:accent>. <click:open_url:'https://modrinth.com/mod/entity-model-features'><hover:show_text:'<tc:text>Entity Model Features auf <tc:accent>Modrinth</tc:accent> öffnen'><tc:accent>[Download]</tc:accent></hover></click>"
 }

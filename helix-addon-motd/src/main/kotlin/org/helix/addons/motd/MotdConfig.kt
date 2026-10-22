@@ -12,13 +12,13 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class MotdConfig(
     val normal: MotdProfile = MotdProfile(
-        line1 = "<#ffcf4a><bold>{network}</bold></#ffcf4a> <#7a4a24>·</#7a4a24> <#f1e2c2>The kingdom awaits you",
-        line2 = "<#d8382e>»</#d8382e> <#f1e2c2>MineClash <#7a4a24>·</#7a4a24> <#f1e2c2>CityBuild <#7a4a24>·</#7a4a24> " +
-            "<#ffcf4a>kronland.de</#ffcf4a>",
+        line1 = "<tc:accent><bold>{network}</bold></tc:accent> <tc:muted>·</tc:muted> <tc:text>The kingdom awaits you",
+        line2 = "<tc:primary>»</tc:primary> <tc:text>MineClash <tc:muted>·</tc:muted> <tc:text>CityBuild <tc:muted>·</tc:muted> " +
+            "<tc:accent>kronland.de</tc:accent>",
     ),
     val maintenance: MotdProfile = MotdProfile(
-        line1 = "<#ffcf4a><bold>{network}</bold></#ffcf4a> <#7a4a24>·</#7a4a24> <#5ab4ff>Geschlossene Testphase",
-        line2 = "<#d8382e>»</#d8382e> <#f1e2c2>Infos auf <#ffcf4a>kronland.de</#ffcf4a> <#7a4a24>·</#7a4a24> <#f1e2c2>Discord: <#ffcf4a>/discord",
+        line1 = "<tc:accent><bold>{network}</bold></tc:accent> <tc:muted>·</tc:muted> <tc:info>Geschlossene Testphase",
+        line2 = "<tc:primary>»</tc:primary> <tc:text>Infos auf <tc:accent>kronland.de</tc:accent> <tc:muted>·</tc:muted> <tc:text>Discord: <tc:accent>/discord",
         onlinePlayers = 0,
         maxPlayers = 0,
         versionText = "&bTestphase",

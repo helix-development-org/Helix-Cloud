@@ -1,8 +1,8 @@
 {
-  "usage": "<#ff5a4a>Usage: <#ffcf4a>/nick <name></#ffcf4a> <#f1e2c2>or <#ffcf4a>/nick off</#ffcf4a>",
-  "set.ok": "<#4ac85e>You are now displayed as <#ffcf4a>{nick}</#ffcf4a>.",
-  "off.ok": "<#4ac85e>Your real name is shown again.",
-  "off.none": "<#ff5a4a>You have no nick set. Set one with <#ffcf4a>/nick <name></#ffcf4a>.",
-  "error.format": "<#ff5a4a>Nicks are 3-16 characters: letters, digits and underscores.",
-  "error.taken": "<#ff5a4a>That name is already in use. Choose another one."
+  "usage": "<tc:error>Usage: <tc:accent>/nick <name></tc:accent> <tc:text>or <tc:accent>/nick off</tc:accent>",
+  "set.ok": "<tc:success>You are now displayed as <tc:accent>{nick}</tc:accent>.",
+  "off.ok": "<tc:success>Your real name is shown again.",
+  "off.none": "<tc:error>You have no nick set. Set one with <tc:accent>/nick <name></tc:accent>.",
+  "error.format": "<tc:error>Nicks are 3-16 characters: letters, digits and underscores.",
+  "error.taken": "<tc:error>That name is already in use. Choose another one."
 }

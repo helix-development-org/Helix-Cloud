@@ -350,8 +350,8 @@ class ModerationAddon : AddonBase() {
             "moderation.muteMessage",
             json.encodeToString(
                 mapOf(
-                    "en" to "<#ff5a4a>You are muted and cannot chat. Wait until your mute expires.",
-                    "de" to "<#ff5a4a>Du bist stummgeschaltet und kannst nicht schreiben. Warte, bis die Stummschaltung abläuft.",
+                    "en" to "<tc:error>You are muted and cannot chat. Wait until your mute expires.",
+                    "de" to "<tc:error>Du bist stummgeschaltet und kannst nicht schreiben. Warte, bis die Stummschaltung abläuft.",
                 ),
             ),
         )
@@ -359,8 +359,8 @@ class ModerationAddon : AddonBase() {
             "moderation.blockedMessage",
             json.encodeToString(
                 mapOf(
-                    "en" to "<#ff5a4a>Your message was blocked: it contains a banned word. Rephrase it and try again.",
-                    "de" to "<#ff5a4a>Deine Nachricht wurde blockiert: sie enthält ein gesperrtes Wort. Formuliere sie um.",
+                    "en" to "<tc:error>Your message was blocked: it contains a banned word. Rephrase it and try again.",
+                    "de" to "<tc:error>Deine Nachricht wurde blockiert: sie enthält ein gesperrtes Wort. Formuliere sie um.",
                 ),
             ),
         )

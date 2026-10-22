@@ -1,9 +1,9 @@
 {
-  "chat": "<#d8382e>[Team]</#d8382e> <#ffcf4a>{sender}</#ffcf4a> <#7a4a24>»</#7a4a24> <#f1e2c2>{message}",
-  "empty": "<#f1e2c2>No team members online.",
-  "list": "<#f1e2c2>Online team: <#ffcf4a>{members}</#ffcf4a>",
-  "notify": "<#d8382e>[Team]</#d8382e> <#f1e2c2>{text}",
-  "join": "<#d8382e>[Team]</#d8382e> <#ffcf4a>{player}</#ffcf4a> <#f1e2c2>is now <#4ac85e>online<#f1e2c2>.",
-  "leave": "<#d8382e>[Team]</#d8382e> <#ffcf4a>{player}</#ffcf4a> <#f1e2c2>is now <#a89a84>offline<#f1e2c2>.",
-  "usage.tc": "<#ff5a4a>Usage: <#ffcf4a>/tc <message...></#ffcf4a> <#7a4a24>—</#7a4a24> <#f1e2c2>or write <#ffcf4a>@team <message></#ffcf4a> <#f1e2c2>in chat"
+  "chat": "<tc:primary>[Team]</tc:primary> <tc:accent>{sender}</tc:accent> <tc:muted>»</tc:muted> <tc:text>{message}",
+  "empty": "<tc:text>No team members online.",
+  "list": "<tc:text>Online team: <tc:accent>{members}</tc:accent>",
+  "notify": "<tc:primary>[Team]</tc:primary> <tc:text>{text}",
+  "join": "<tc:primary>[Team]</tc:primary> <tc:accent>{player}</tc:accent> <tc:text>is now <tc:success>online<tc:text>.",
+  "leave": "<tc:primary>[Team]</tc:primary> <tc:accent>{player}</tc:accent> <tc:text>is now <tc:disabled>offline<tc:text>.",
+  "usage.tc": "<tc:error>Usage: <tc:accent>/tc <message...></tc:accent> <tc:muted>—</tc:muted> <tc:text>or write <tc:accent>@team <message></tc:accent> <tc:text>in chat"
 }

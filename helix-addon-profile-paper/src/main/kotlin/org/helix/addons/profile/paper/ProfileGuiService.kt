@@ -197,7 +197,7 @@ class ProfileGuiService(
             client.set(ctx.player.name, setting.owner, setting.descriptor.key, value)
         }
         if (rejection != null) {
-            ctx.player.sendMessage(render("<#ff5a4a>$rejection"))
+            ctx.player.sendMessage(render("<tc:error>$rejection"))
         }
         refreshView(ctx.player)
         ctx.gui.refresh(ctx.player)

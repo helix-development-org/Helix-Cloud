@@ -10,5 +10,5 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class ChatConfig(
-    val format: String = "{prefix}{color}{name}{suffix} <#7a4a24>»</#7a4a24> <#f1e2c2>{message}",
+    val format: String = "{prefix}{color}{name}{suffix} <tc:muted>»</tc:muted> <tc:text>{message}",
 )

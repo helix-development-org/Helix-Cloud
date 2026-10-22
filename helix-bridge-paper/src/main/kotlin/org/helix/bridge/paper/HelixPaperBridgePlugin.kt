@@ -383,12 +383,12 @@ class HelixPaperBridgePlugin : JavaPlugin(), Listener {
         )
         val player = server.getPlayerExact(playerName) ?: return
         if (result == null) {
-            player.sendMessage(colored(prefixed("<#ff5a4a>This chat channel is currently unavailable. Please try again later.")))
+            player.sendMessage(colored(prefixed("<tc:error>This chat channel is currently unavailable. Please try again later.")))
             return
         }
         result.lines.forEach { line -> player.sendMessage(colored(line)) }
         if (!result.success && result.lines.isEmpty()) {
-            player.sendMessage(colored(prefixed("<#ff5a4a>This chat channel is not available to you. Write in the normal chat instead.")))
+            player.sendMessage(colored(prefixed("<tc:error>This chat channel is not available to you. Write in the normal chat instead.")))
         }
     }
 

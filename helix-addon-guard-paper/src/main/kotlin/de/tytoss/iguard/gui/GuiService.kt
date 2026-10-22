@@ -452,7 +452,7 @@ class GuiService(
 
     private fun alertTooltip(player: Player, snap: IncidentSnapshot): List<Component> {
         val confPct = (snap.confidence * 100).toInt()
-        val colorTag = if (confPct >= 80) "<#ff5a4a>" else if (confPct >= 50) "<#ffb43a>" else "<#ffcf4a>"
+        val colorTag = if (confPct >= 80) "<tc:error>" else if (confPct >= 50) "<tc:warn>" else "<tc:accent>"
         return listOf(
             plain(snap.playerName, TextColor.color(0xFFCF4A)),
             plain(flat(player, "panel.kind.alert"), GREY),

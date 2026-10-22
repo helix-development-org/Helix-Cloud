@@ -161,13 +161,13 @@ class RestartCoordinator(
         const val WARN_KEY = "helix.translations.network.restart.warn"
 
         /** Fallback template of the countdown warning. */
-        const val WARN_FALLBACK = "{prefix} <#ffb43a>Warning: <#ffcf4a>{target}</#ffcf4a> restarts in <#ffcf4a>{seconds}s</#ffcf4a>."
+        const val WARN_FALLBACK = "{prefix} <tc:warn>Warning: <tc:accent>{target}</tc:accent> restarts in <tc:accent>{seconds}s</tc:accent>."
 
         /** Translation key of the restart-now announcement. */
         const val NOW_KEY = "helix.translations.network.restart.now"
 
         /** Fallback template of the restart-now announcement. */
-        const val NOW_FALLBACK = "{prefix} <#ffb43a>Warning: <#ffcf4a>{target}</#ffcf4a> is restarting now."
+        const val NOW_FALLBACK = "{prefix} <tc:warn>Warning: <tc:accent>{target}</tc:accent> is restarting now."
 
         /** Maximum milliseconds to wait for a service to stop. */
         const val STOP_WAIT_MILLIS = 30_000L

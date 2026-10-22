@@ -478,7 +478,7 @@ class FeedbackPlugin : JavaPlugin(), Listener, PluginMessageListener {
      */
     fun chat(player: Player, key: String, vararg params: Pair<String, String>): Component {
         val resolved = translations?.text(player.name, player.locale().language, key, *params)
-        val raw = if (resolved == null || resolved.endsWith(key)) "<#ffcf4a>KronlandMC</#ffcf4a> <#7a4a24>»</#7a4a24> " + local(key, params) else resolved
+        val raw = if (resolved == null || resolved.endsWith(key)) "<tc:accent>KronlandMC</tc:accent> <tc:muted>»</tc:muted> " + local(key, params) else resolved
         return render(raw)
     }
 

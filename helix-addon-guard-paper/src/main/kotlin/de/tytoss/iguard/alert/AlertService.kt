@@ -92,9 +92,9 @@ class AlertService(
     private fun richAlert(recipient: Player, record: ViolationRecord, count: Int): Component {
         val confPct = (record.confidence * 100.0).toInt()
         val confTag = when {
-            confPct >= 80 -> "<#ff5a4a>"
-            confPct >= 50 -> "<#ffb43a>"
-            else -> "<#ffcf4a>"
+            confPct >= 80 -> "<tc:error>"
+            confPct >= 50 -> "<tc:warn>"
+            else -> "<tc:accent>"
         }
         val actionLine = record.shadowAction?.let {
             screen(recipient, "alert.hover.action", "action" to it)
@@ -114,7 +114,7 @@ class AlertService(
                 ),
             ),
         )
-        val countTag = if (count > 1) "<#a89a84> x$count</#a89a84>" else ""
+        val countTag = if (count > 1) "<tc:disabled> x$count</tc:disabled>" else ""
         val prefix = render(screen(recipient, "alert.prefix"))
         val head = Component.text(record.playerName, TextColor.color(0xFFCF4A))
             .hoverEvent(hover)

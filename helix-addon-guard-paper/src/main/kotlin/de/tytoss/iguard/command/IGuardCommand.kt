@@ -490,7 +490,7 @@ class IGuardCommand(
                     if (list.isEmpty()) sender.sendMessage(chat(sender, "cmd.banhistory.empty"))
                     list.forEach { p ->
                         val dur = p.hours?.let { " ${it}h" } ?: ""
-                        val colorTag = if (p.type == "UNBAN") "<#4ac85e>" else "<#ff5a4a>"
+                        val colorTag = if (p.type == "UNBAN") "<tc:success>" else "<tc:error>"
                         sender.sendMessage(
                             chat(
                                 sender, "cmd.banhistory.entry",

@@ -194,7 +194,7 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                 client?.action("bettermsgs.send", player.name, args[0], text)
                 withContext(mainDispatcher) {
                     player.sendMessage(
-                        translations.chatComponent(player, "sent", "<#f1e2c2>To <#ffcf4a>{target}</#ffcf4a><#7a4a24>:</#7a4a24> {text}",
+                        translations.chatComponent(player, "sent", "<tc:text>To <tc:accent>{target}</tc:accent><tc:muted>:</tc:muted> {text}",
                             "target" to args[0], "text" to text),
                     )
                 }
@@ -268,7 +268,7 @@ class BetterMsgsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
                 translations.chatComponent(
                     player,
                     "prompt.message",
-                    "<#f1e2c2>Type your message in chat (or <#ffcf4a>cancel</#ffcf4a>):",
+                    "<tc:text>Type your message in chat (or <tc:accent>cancel</tc:accent>):",
                 ),
             )
         }

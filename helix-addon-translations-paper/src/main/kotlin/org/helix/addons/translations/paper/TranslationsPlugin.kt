@@ -174,13 +174,13 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
             return true
         }
         if (!player.hasPermission("helix.admin")) {
-            player.sendMessage(MiniPreview.render("<#ff5a4a>You do not have permission to edit translations."))
+            player.sendMessage(MiniPreview.render("<tc:error>You do not have permission to edit translations."))
             return true
         }
         restoreBook(player) // recover a stray book from an aborted edit
         bookEditing.remove(player.uniqueId)
         val ready = gui ?: run {
-            player.sendMessage(MiniPreview.render("<#ffb43a>Warning: The translations editor is still starting up — try again in a moment."))
+            player.sendMessage(MiniPreview.render("<tc:warn>Warning: The translations editor is still starting up — try again in a moment."))
             return true
         }
         scope.launch {
@@ -348,7 +348,7 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
             tooltip = listOf(
                 Component.text(entry.key.removePrefix("helix.translations."), GOLD),
                 Component.text("Key · $status (${s.language})", GREY),
-                MiniPreview.render(if (effective.isEmpty()) "<#a89a84>(empty)" else effective),
+                MiniPreview.render(if (effective.isEmpty()) "<tc:disabled>(empty)" else effective),
                 Component.text("Click: Open", GOLD),
             ),
         )
@@ -605,7 +605,7 @@ class TranslationsPlugin : org.bukkit.plugin.java.JavaPlugin(), Listener {
     }
 
     private fun feedback(player: Player, ok: Boolean, success: String, failure: String) {
-        player.sendMessage(MiniPreview.render(if (ok) "<#4ac85e>$success" else "<#ff5a4a>$failure"))
+        player.sendMessage(MiniPreview.render(if (ok) "<tc:success>$success" else "<tc:error>$failure"))
     }
 
     private fun ellipsize(text: String, max: Int): String =

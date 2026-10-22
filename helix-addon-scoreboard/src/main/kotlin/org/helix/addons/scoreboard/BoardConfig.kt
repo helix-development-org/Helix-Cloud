@@ -25,9 +25,9 @@ data class BoardConfig(
     val title: String = "{wordmark}",
     val lines: List<String> = listOf(
         "",
-        "<#7a4a24>Player » <#f1e2c2>{player}",
-        "<#7a4a24>Server » <#f1e2c2>{server}",
-        "<#7a4a24>Online » <#f1e2c2>{online}",
+        "<tc:muted>Player » <tc:text>{player}",
+        "<tc:muted>Server » <tc:text>{server}",
+        "<tc:muted>Online » <tc:text>{online}",
         "",
     ),
     val enabled: Boolean = true,

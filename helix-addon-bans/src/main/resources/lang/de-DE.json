@@ -1,12 +1,12 @@
 {
-  "banned": "<#ff5a4a><bold>Du bist gebannt</bold>\n<#f1e2c2>von <#ffcf4a>{network}</#ffcf4a>\n \n<#f1e2c2>Grund: <#ffcf4a>{reason}",
-  "banned.temp": "<#ff5a4a><bold>Du bist vorübergehend gebannt</bold>\n<#f1e2c2>von <#ffcf4a>{network}</#ffcf4a>\n \n<#f1e2c2>Grund: <#ffcf4a>{reason}\n<#f1e2c2>Verbleibende Zeit: <#ffcf4a>{remaining}\n<#f1e2c2>Läuft ab: <#ffcf4a>{expiry}",
-  "notify.set": "<#ffcf4a>{player}</#ffcf4a> <#f1e2c2>wurde gebannt: {reason} <#7a4a24>({expiry})</#7a4a24>",
-  "notify.pardon": "<#ffcf4a>{player}</#ffcf4a> <#4ac85e>wurde entbannt.",
-  "help.header": "<#ffcf4a><bold>Ban-Befehle:</bold></#ffcf4a>",
-  "help.set": "<#ffcf4a>/bans set <player> [duration] [reason...]</#ffcf4a> <#7a4a24>—</#7a4a24> <#f1e2c2>30m, 12h, 7d oder permanent",
-  "help.pardon": "<#ffcf4a>/bans pardon <player></#ffcf4a>",
-  "help.check": "<#ffcf4a>/bans check <player></#ffcf4a>",
-  "help.list": "<#ffcf4a>/bans list</#ffcf4a>",
-  "help.history": "<#ffcf4a>/bans history <player></#ffcf4a>"
+  "banned": "<tc:error><bold>Du bist gebannt</bold>\n<tc:text>von <tc:accent>{network}</tc:accent>\n \n<tc:text>Grund: <tc:accent>{reason}",
+  "banned.temp": "<tc:error><bold>Du bist vorübergehend gebannt</bold>\n<tc:text>von <tc:accent>{network}</tc:accent>\n \n<tc:text>Grund: <tc:accent>{reason}\n<tc:text>Verbleibende Zeit: <tc:accent>{remaining}\n<tc:text>Läuft ab: <tc:accent>{expiry}",
+  "notify.set": "<tc:accent>{player}</tc:accent> <tc:text>wurde gebannt: {reason} <tc:muted>({expiry})</tc:muted>",
+  "notify.pardon": "<tc:accent>{player}</tc:accent> <tc:success>wurde entbannt.",
+  "help.header": "<tc:accent><bold>Ban-Befehle:</bold></tc:accent>",
+  "help.set": "<tc:accent>/bans set <player> [duration] [reason...]</tc:accent> <tc:muted>—</tc:muted> <tc:text>30m, 12h, 7d oder permanent",
+  "help.pardon": "<tc:accent>/bans pardon <player></tc:accent>",
+  "help.check": "<tc:accent>/bans check <player></tc:accent>",
+  "help.list": "<tc:accent>/bans list</tc:accent>",
+  "help.history": "<tc:accent>/bans history <player></tc:accent>"
 }
