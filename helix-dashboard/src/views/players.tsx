@@ -2,6 +2,7 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { api, type ActionResult, type OnlinePlayer, type PlayerLookupView } from "@/lib/api"
 import { usePoll } from "@/lib/use-poll"
+import { useCan } from "@/lib/access"
 import { uptime } from "@/lib/format"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,6 +22,7 @@ export function PlayersView() {
   const [query, setQuery] = useState("")
   const [lookup, setLookup] = useState<PlayerLookupView | null>(null)
   const [searching, setSearching] = useState(false)
+  const can = useCan()
 
   const act = async (name: string, op: "message" | "kick" | "ban") => {
     let body: Record<string, unknown> = {}
@@ -68,11 +70,13 @@ export function PlayersView() {
                   <TableCell className="font-mono text-xs text-muted-foreground">{p.proxyServiceId || "—"}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{uptime(p.joinedAtEpochMs)}</TableCell>
                   <TableCell>
-                    <div className="flex justify-end gap-2">
-                      <Button size="sm" variant="outline" onClick={() => act(p.name, "message")}>Message</Button>
-                      <Button size="sm" variant="secondary" onClick={() => act(p.name, "kick")}>Kick</Button>
-                      <Button size="sm" variant="destructive" onClick={() => act(p.name, "ban")}>Ban</Button>
-                    </div>
+                    {can("players.manage") && (
+                      <div className="flex justify-end gap-2">
+                        <Button size="sm" variant="outline" onClick={() => act(p.name, "message")}>Message</Button>
+                        <Button size="sm" variant="secondary" onClick={() => act(p.name, "kick")}>Kick</Button>
+                        <Button size="sm" variant="destructive" onClick={() => act(p.name, "ban")}>Ban</Button>
+                      </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

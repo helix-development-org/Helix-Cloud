@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { animate } from "animejs"
 import {
-  Archive, Blocks, Clock, ClipboardList, FolderTree, Languages, LayoutDashboard, ListChecks, LogOut, Moon, Network,
-  Puzzle, ScrollText, Server, Settings, ShieldCheck, Sun, Users, Zap,
+  Archive, Blocks, Clock, ClipboardList, FolderTree, KeyRound, Languages, LayoutDashboard, ListChecks, LogOut, Moon,
+  Network, Puzzle, ScrollText, Server, Settings, ShieldCheck, Sun, Users, Zap,
 } from "lucide-react"
 import type { Identity, PanelInfo } from "@/lib/api"
 import { cn } from "@/lib/utils"
@@ -34,6 +34,7 @@ const NAV: NavItem[] = [
   { id: "files", label: "Files", icon: FolderTree, group: "System" },
   { id: "translations", label: "Translations", icon: Languages, group: "System" },
   { id: "settings", label: "Settings", icon: Settings, group: "System" },
+  { id: "access", label: "Zugriff", icon: KeyRound, group: "System" },
 ]
 
 /** Sidebar + topbar chrome around the active view. */

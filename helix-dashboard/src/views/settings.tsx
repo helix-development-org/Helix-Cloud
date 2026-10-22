@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { useCan } from "@/lib/access"
 
 /** Session info, the global network prefix and the current bearer token. */
 export function SettingsView({ identity, version }: { identity: Identity; version: string }) {
@@ -48,6 +49,7 @@ function NetworkPrefixCard() {
       .catch(() => setValues(null))
   }, [])
 
+  const editable = useCan()("translations.edit")
   if (values === null) return null
 
   const save = async (key: "name" | "prefix") => {
@@ -78,7 +80,7 @@ function NetworkPrefixCard() {
           <Input className="font-mono text-xs" value={values.name}
             onChange={(e) => setValues({ ...values, name: e.target.value })}
             onKeyDown={(e) => e.key === "Enter" && save("name")} placeholder="MythicMC" />
-          <Button size="sm" onClick={() => save("name")}>Save</Button>
+          {editable && <Button size="sm" onClick={() => save("name")}>Save</Button>}
         </div>
         <div className="flex items-center gap-3">
           <span className="w-16 shrink-0 text-xs text-muted-foreground">Prefix</span>
@@ -86,7 +88,7 @@ function NetworkPrefixCard() {
             onChange={(e) => setValues({ ...values, prefix: e.target.value })}
             onKeyDown={(e) => e.key === "Enter" && save("prefix")}
             placeholder={`<gradient:#ffcf4a:#d8382e><bold>${NETWORK_NAME}</bold></gradient> »`} />
-          <Button size="sm" onClick={() => save("prefix")}>Save</Button>
+          {editable && <Button size="sm" onClick={() => save("prefix")}>Save</Button>}
         </div>
       </CardContent>
     </Card>

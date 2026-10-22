@@ -3,6 +3,7 @@ import { File, Folder, FolderOpen } from "lucide-react"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { ago } from "@/lib/format"
+import { useCan } from "@/lib/access"
 import { languageForFile, languageLabel } from "@/lib/cm-language"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -30,6 +31,8 @@ export function FilesView() {
   const [path, setPath] = useState("")
   const [entries, setEntries] = useState<Entry[]>([])
   const [editing, setEditing] = useState<{ path: string; content: string } | null>(null)
+  const can = useCan()
+  const writable = can("files.edit")
 
   useEffect(() => {
     api<string[]>("/files/roots").then((r) => { setRoots(r); if (r.length && !root) setRoot(r[0]) }).catch((e) => toast.error(e.message))
@@ -108,7 +111,7 @@ export function FilesView() {
                   <TableCell className="text-sm text-muted-foreground">{e.directory ? "—" : size(e.sizeBytes)}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{ago(e.modifiedAtEpochMs)}</TableCell>
                   <TableCell onClick={(ev) => ev.stopPropagation()}>
-                    <div className="flex justify-end"><Button size="sm" variant="destructive" onClick={() => del(e)}>Delete</Button></div>
+                    {writable && <div className="flex justify-end"><Button size="sm" variant="destructive" onClick={() => del(e)}>Delete</Button></div>}
                   </TableCell>
                 </TableRow>
               ))}
@@ -130,10 +133,10 @@ export function FilesView() {
               </span>
               <div className="flex gap-2">
                 <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>Close</Button>
-                <Button size="sm" onClick={save}>Save</Button>
+                {writable && <Button size="sm" onClick={save}>Save</Button>}
               </div>
             </div>
-            <CodeEditor className="min-h-[45vh]" language={language} value={editing.content}
+            <CodeEditor className="min-h-[45vh]" language={language} value={editing.content} readOnly={!writable}
               onChange={(content) => setEditing((cur) => (cur ? { ...cur, content } : cur))} />
           </CardContent>
         </Card>

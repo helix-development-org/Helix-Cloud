@@ -50,6 +50,24 @@ export interface Identity {
   name: string
   admin: boolean
   views: string[]
+  /** Granted dashboard capabilities (`services.console` …: the permission node without `helix.panel.`). */
+  capabilities?: string[]
+}
+/** One built-in dashboard capability in the access catalog. */
+export interface PanelCapability {
+  id: string
+  node: string
+  label: string
+  description: string
+  group: string
+  view: string
+}
+/** `GET /access/catalog`: everything the access matrix can grant to a group. */
+export interface AccessCatalog {
+  capabilities: PanelCapability[]
+  panels: { id: string; node: string; label: string }[]
+  login: string
+  admin: string
 }
 export interface Overview {
   version: string

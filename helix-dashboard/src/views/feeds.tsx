@@ -3,6 +3,7 @@ import { api, type ActionResult, type AuditEntry, type EventEntry } from "@/lib/
 import { streamLines } from "@/lib/sse"
 import { usePoll } from "@/lib/use-poll"
 import { ago } from "@/lib/format"
+import { useCan } from "@/lib/access"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -32,6 +33,8 @@ export function LogsView() {
   const [input, setInput] = useState("")
   const [busy, setBusy] = useState(false)
   const history = useRef<string[]>([])
+  // The action prompt writes to the network: only for those who may write to consoles.
+  const canRun = useCan()("services.console")
   const historyIndex = useRef(-1)
   const box = useRef<HTMLDivElement>(null)
 
@@ -95,7 +98,7 @@ export function LogsView() {
           <div key={i} className={l.startsWith("> ") ? "text-foreground" : l.includes("ERROR") ? "text-destructive" : l.includes("WARN") ? "text-[var(--warning)]" : "text-muted-foreground"}>{l}</div>
         ))}
       </div>
-      <form
+      {canRun && <form
         className="kl-console flex items-center gap-2 rounded-b-[17px] border-t-[3px] border-border p-2 pb-3"
         onSubmit={(e) => { e.preventDefault(); run() }}
       >
@@ -107,7 +110,7 @@ export function LogsView() {
           placeholder={busy ? "running…" : "action ausführen — z. B. service.list, task.pause Lobby stop, actions.list"}
           className="h-8 border-0 bg-transparent font-mono text-xs text-[var(--parchment)] shadow-none focus-visible:ring-0"
         />
-      </form>
+      </form>}
     </CardContent></Card>
   )
 }

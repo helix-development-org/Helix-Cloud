@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { api, type ServiceInfo } from "@/lib/api"
+import { useCan } from "@/lib/access"
 import { streamLines } from "@/lib/sse"
 import { usePoll } from "@/lib/use-poll"
 import { stateVariant, uptime } from "@/lib/format"
@@ -16,6 +17,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 export function ServicesView() {
   const { data, reload } = usePoll(() => api<ServiceInfo[]>("/services"), 3000)
   const [console, setConsole] = useState<string | null>(null)
+  const can = useCan()
+  const consoleAllowed = can("services.logs") || can("services.console")
 
   const act = async (id: string, op: string) => {
     try { await api(`/services/${id}/${op}`, { method: "POST" }); toast.success(`${op} ${id}`); reload() }
@@ -55,9 +58,9 @@ export function ServicesView() {
                 <TableCell className="text-sm text-muted-foreground">{uptime(s.startedAtEpochMs)}</TableCell>
                 <TableCell>
                   <div className="flex justify-end gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setConsole(s.id)}>Console</Button>
-                    <Button size="sm" variant="secondary" onClick={() => act(s.id, "stop")}>Stop</Button>
-                    <Button size="sm" variant="destructive" onClick={() => act(s.id, "kill")}>Kill</Button>
+                    {consoleAllowed && <Button size="sm" variant="outline" onClick={() => setConsole(s.id)}>Console</Button>}
+                    {can("services.control") && <Button size="sm" variant="secondary" onClick={() => act(s.id, "stop")}>Stop</Button>}
+                    {can("services.control") && <Button size="sm" variant="destructive" onClick={() => act(s.id, "kill")}>Kill</Button>}
                   </div>
                 </TableCell>
               </TableRow>
@@ -87,11 +90,16 @@ function ConsoleDialog({ id, onClose }: { id: string; onClose: () => void }) {
   const [lines, setLines] = useState<string[]>([])
   const [cmd, setCmd] = useState("")
   const boxRef = useRef<HTMLDivElement>(null)
+  const can = useCan()
+  const canRead = can("services.logs")
+  const canWrite = can("services.console")
 
   const load = async () => {
+    if (!canRead) return
     try { const r = await api<{ lines: string[] }>(`/services/${id}/logs?tail=300`); setLines(r.lines) } catch { /* ignore */ }
   }
   useEffect(() => {
+    if (!canRead) return
     // live SSE stream; falls back to 2s polling if streaming fails
     const abort = new AbortController()
     let poll: ReturnType<typeof setInterval> | null = null
@@ -118,16 +126,19 @@ function ConsoleDialog({ id, onClose }: { id: string; onClose: () => void }) {
       <DialogContent className="max-w-3xl">
         <DialogHeader><DialogTitle>Console — {id}</DialogTitle></DialogHeader>
         <div ref={boxRef} className="kl-console h-[55vh] overflow-y-auto rounded-[14px] border border-border p-3 font-mono text-xs leading-relaxed">
-          {lines.length ? lines.map((l, i) => (
+          {!canRead ? <div className="text-muted-foreground">(Keine Berechtigung, die Konsole zu lesen)</div>
+            : lines.length ? lines.map((l, i) => (
             <div key={i} className={l.includes("ERROR") ? "text-destructive" : l.includes("WARN") ? "text-[var(--warning)]" : "text-muted-foreground"}>{l}</div>
           )) : <div className="text-muted-foreground">(no output)</div>}
         </div>
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-success">&gt;</span>
-          <Input className="font-mono" value={cmd} autoFocus placeholder="say hello, list, …"
-            onChange={(e) => setCmd(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} />
-          <Button size="sm" onClick={send}>Send</Button>
-        </div>
+        {canWrite && (
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-success">&gt;</span>
+            <Input className="font-mono" value={cmd} autoFocus placeholder="say hello, list, …"
+              onChange={(e) => setCmd(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} />
+            <Button size="sm" onClick={send}>Send</Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )

@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import { api, type ActionResult, type AddonAction, type AddonInfo } from "@/lib/api"
 import { usePoll } from "@/lib/use-poll"
 import { stateVariant } from "@/lib/format"
+import { useCan } from "@/lib/access"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -14,6 +15,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 export function AddonsView() {
   const { data, reload } = usePoll(() => api<AddonInfo[]>("/addons"), 6000)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const can = useCan()
+  const manage = can("addons.manage")
 
   const toggle = async (id: string, enabled: boolean) => {
     try { await api(`/addons/${id}/${enabled ? "disable" : "enable"}`, { method: "POST" }); toast.success(id); reload() }
@@ -29,13 +32,14 @@ export function AddonsView() {
       <CardContent className="p-0">
         <div className="flex items-center justify-between p-4">
           <div className="text-sm text-muted-foreground">{data?.length ?? 0} addons</div>
-          <Button size="sm" variant="outline" onClick={reloadNew}><RefreshCw className="size-4" /> Load new</Button>
+          {manage && <Button size="sm" variant="outline" onClick={reloadNew}><RefreshCw className="size-4" /> Load new</Button>}
         </div>
         <Table>
           <TableHeader><TableRow><TableHead className="w-8" /><TableHead>ID</TableHead><TableHead>Name</TableHead><TableHead>Version</TableHead><TableHead>State</TableHead><TableHead /></TableRow></TableHeader>
           <TableBody>
             {(data ?? []).map((a) => {
-              const runnable = (a.actions ?? []).filter((ac) => !ac.playerCommand)
+              // The action runner is a management tool: only for those who may manage addons.
+              const runnable = manage ? (a.actions ?? []).filter((ac) => !ac.playerCommand) : []
               const open = expanded === a.manifest.id
               return (
                 <Fragment key={a.manifest.id}>
@@ -54,7 +58,7 @@ export function AddonsView() {
                       )}
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
-                      <div className="flex justify-end"><Button size="sm" variant={a.state === "ENABLED" ? "secondary" : "default"} onClick={() => toggle(a.manifest.id, a.state === "ENABLED")}>{a.state === "ENABLED" ? "Disable" : "Enable"}</Button></div>
+                      {manage && <div className="flex justify-end"><Button size="sm" variant={a.state === "ENABLED" ? "secondary" : "default"} onClick={() => toggle(a.manifest.id, a.state === "ENABLED")}>{a.state === "ENABLED" ? "Disable" : "Enable"}</Button></div>}
                     </TableCell>
                   </TableRow>
                   {open && (

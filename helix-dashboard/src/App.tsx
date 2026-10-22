@@ -19,6 +19,8 @@ import { FilesView } from "@/views/files"
 import { TranslationsView } from "@/views/translations"
 import { SettingsView } from "@/views/settings"
 import { AddonPanelView } from "@/views/addon-panel"
+import { AccessView } from "@/views/access"
+import { AccessProvider } from "@/lib/access"
 import { IngameMenuView } from "@/views/ingame-menu"
 import { isIngame, onModeChange, reportExpired, requestHud, requestMouse, takeTicketFromUrl } from "@/lib/ingame"
 
@@ -26,6 +28,7 @@ const TITLES: Record<string, string> = {
   overview: "Overview", tasks: "Tasks", services: "Services", players: "Players", proxy: "Proxy",
   events: "Events", logs: "Konsole", audit: "Logs", "audit-log": "Audit", addons: "Addons",
   schedules: "Schedules", backups: "Backups", files: "Files", translations: "Translations", settings: "Settings",
+  access: "Zugriff",
 }
 
 export function App() {
@@ -96,7 +99,7 @@ export function App() {
   const title = current.startsWith("panel:") ? panels.find((p) => p.id === current.slice(6))?.title ?? "Extension" : TITLES[current] ?? NETWORK_NAME
 
   return (
-    <>
+    <AccessProvider identity={identity}>
       <AppShell identity={identity} panels={panels} view={current} title={title} version={version}
         onNavigate={setView} onLogout={logout}>
         <ViewTransition viewKey={current}>
@@ -115,6 +118,7 @@ export function App() {
         {current === "files" && <FilesView />}
         {current === "translations" && <TranslationsView />}
         {current === "settings" && <SettingsView identity={identity} version={version} />}
+        {current === "access" && <AccessView />}
         {current.startsWith("panel:") && <AddonPanelView panelId={current.slice(6)} />}
         </ViewTransition>
       </AppShell>
@@ -125,7 +129,7 @@ export function App() {
         </button>
       )}
       <Toaster />
-    </>
+    </AccessProvider>
   )
 }
 
