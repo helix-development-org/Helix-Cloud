@@ -16,6 +16,7 @@ data class LobbyConfig(
     val layouts: Map<String, LobbyLayout> = emptyMap(),
     val protection: ProtectionSettings = ProtectionSettings(),
     val serverMenu: ServerMenuSettings = ServerMenuSettings(),
+    val spawn: LobbySpawn? = null,
 ) {
     /** The layout a lobby task should use: its own, else the `*` fallback, else empty. */
     fun layoutFor(task: String): LobbyLayout = layouts[task] ?: layouts["*"] ?: LobbyLayout()
@@ -23,6 +24,24 @@ data class LobbyConfig(
     /** Whether a task's backends should behave as lobbies. */
     fun isLobbyTask(task: String): Boolean = task in lobbyTasks
 }
+
+/**
+ * The lobby spawn point in the lobby's main world (`null` in [LobbyConfig.spawn] = the world's own spawn).
+ *
+ * @property x block x (with fraction).
+ * @property y height.
+ * @property z block z (with fraction).
+ * @property yaw view direction.
+ * @property pitch view pitch.
+ */
+@Serializable
+data class LobbySpawn(
+    val x: Double,
+    val y: Double,
+    val z: Double,
+    val yaw: Float = 0f,
+    val pitch: Float = 0f,
+)
 
 /** One task's hotbar layout. */
 @Serializable

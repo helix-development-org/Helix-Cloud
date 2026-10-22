@@ -17,6 +17,8 @@ import kotlinx.serialization.Serializable
  *   fallback used by any lobby task without its own layout.
  * @property protection the lobby protection rules, each toggleable.
  * @property serverMenu the built-in server selector's appearance.
+ * @property spawn where players appear in the lobby's main world; `null` keeps the world's own spawn. Lobby
+ *   services are temporary, so a spawn set in the world file would be lost on every restart – it lives here.
  */
 @Serializable
 data class LobbyConfig(
@@ -24,6 +26,7 @@ data class LobbyConfig(
     val layouts: Map<String, LobbyLayout> = mapOf("*" to LobbyLayout.DEFAULT),
     val protection: ProtectionSettings = ProtectionSettings(),
     val serverMenu: ServerMenuSettings = ServerMenuSettings(),
+    val spawn: LobbySpawn? = null,
 ) {
     /**
      * Resolves the layout a lobby task should use: its own if present,
@@ -149,6 +152,45 @@ data class ProtectionSettings(
     val voidTeleport: Boolean = true,
     val voidTeleportY: Int = 0,
 )
+
+/**
+ * The lobby spawn point in the lobby's main world.
+ *
+ * @property x block x (with fraction).
+ * @property y height.
+ * @property z block z (with fraction).
+ * @property yaw view direction.
+ * @property pitch view pitch.
+ */
+@Serializable
+data class LobbySpawn(
+    val x: Double,
+    val y: Double,
+    val z: Double,
+    val yaw: Float = 0f,
+    val pitch: Float = 0f,
+) {
+    /**
+     * Whether the point can be used: finite numbers inside the world height and a sane horizontal range.
+     *
+     * @return `true` when valid.
+     */
+    fun isValid(): Boolean =
+        listOf(x, y, z).all { it.isFinite() } && yaw.isFinite() && pitch.isFinite() &&
+            y in MIN_Y..MAX_Y && kotlin.math.abs(x) <= MAX_XZ && kotlin.math.abs(z) <= MAX_XZ && pitch in -90f..90f
+
+    /** Limits of a valid spawn point. */
+    companion object {
+        /** Lowest allowed height (world bottom). */
+        const val MIN_Y: Double = -64.0
+
+        /** Highest allowed height (build limit). */
+        const val MAX_Y: Double = 320.0
+
+        /** Largest allowed |x| and |z|. */
+        const val MAX_XZ: Double = 29_999_984.0
+    }
+}
 
 /**
  * The navigator (server selector): a full-screen medieval board with one coat of arms per game mode.

@@ -78,4 +78,35 @@ class LobbyAddonTest {
         assertTrue(modes.first { it.task == "CityBuild" }.pickInstance)
         assertFalse(modes.first { it.task == "MineClash-Game" }.pickInstance)
     }
+
+    @Test
+    fun `spawn set needs the admin permission and is published`() {
+        val spawn = """{"x":0.5,"y":4.0,"z":-2.5,"yaw":90.0,"pitch":0.0}"""
+        assertFalse(context.run("lobby.spawn.set", "Guest", spawn).success)
+
+        context.permissionCheck = { player, node -> player == "Tytoss" && node == LobbyAddon.ADMIN_PERMISSION }
+        assertTrue(context.run("lobby.spawn.set", "Tytoss", spawn).success)
+
+        assertEquals(LobbySpawn(0.5, 4.0, -2.5, 90f, 0f), published().spawn)
+    }
+
+    @Test
+    fun `invalid spawns are rejected`() {
+        context.permissionCheck = { _, _ -> true }
+        assertFalse(context.run("lobby.spawn.set", "Tytoss", """{"x":0,"y":900,"z":0}""").success)
+        assertFalse(context.run("lobby.spawn.set", "Tytoss", "{nope").success)
+        assertEquals(null, published().spawn)
+    }
+
+    @Test
+    fun `a panel save without spawn keeps it and clear removes it`() {
+        context.permissionCheck = { _, _ -> true }
+        assertTrue(context.run("lobby.spawn.set", "Tytoss", """{"x":1,"y":5,"z":1}""").success)
+
+        assertTrue(context.run("lobby.set", """{"lobbyTasks":["Lobby"]}""").success)
+        assertEquals(LobbySpawn(1.0, 5.0, 1.0), published().spawn)
+
+        assertTrue(context.run("lobby.spawn.clear").success)
+        assertEquals(null, published().spawn)
+    }
 }

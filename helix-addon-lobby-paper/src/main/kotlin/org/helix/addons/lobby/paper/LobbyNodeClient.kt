@@ -10,10 +10,10 @@ import org.slf4j.LoggerFactory
  * Node client for the lobby paper component, over the shared
  * [ServiceNodeApi] transport (Helix-Wire when up, HTTP otherwise).
  *
- * It only ever reads: the live configuration comes from the `lobby.config`
- * bridge value the node publishes, and the server selector's list from the
- * bridge-invocable `lobby.servers` action. The paper side never writes
- * config — that is the dashboard's job.
+ * It reads the live configuration from the `lobby.config` bridge value the
+ * node publishes and the server selector's list from the bridge-invocable
+ * `lobby.servers` action. The only write is the team's `/setlobbyspawn`
+ * ([saveSpawn]); everything else in the config is the dashboard's job.
  *
  * @param controlUrl the primary control url (`helix://` or `http://`).
  * @param token per-service bearer token.
@@ -52,6 +52,19 @@ class LobbyNodeClient(controlUrl: String, token: String) {
         if (!result.success) return emptyList()
         val raw = result.lines.firstOrNull() ?: return emptyList()
         return runCatching { json.decodeFromString(SERVER_LIST, raw) }.getOrNull() ?: emptyList()
+    }
+
+    /**
+     * Stores the lobby spawn on the node (`lobby.spawn.set`), on behalf of a team member.
+     *
+     * @param player the player who ran `/setlobbyspawn` (the node checks `helix.lobby.admin` by name).
+     * @param spawn the new spawn point.
+     * @return `null` on success, otherwise a short reason (node error line or `unreachable`).
+     */
+    fun saveSpawn(player: String, spawn: LobbySpawn): String? {
+        val payload = json.encodeToString(LobbySpawn.serializer(), spawn)
+        val result = api.action(ActionInvocation("lobby.spawn.set", listOf(player, payload))) ?: return "unreachable"
+        return if (result.success) null else result.lines.firstOrNull() ?: "error"
     }
 
     /** Closes the underlying transport. */

@@ -23,5 +23,10 @@
   "navigator.instances.state.busy": "<#ffcf4a>Fast voll",
   "navigator.instances.state.full": "<#ff5a4a>Voll",
   "navigator.instances.state.maintenance": "<#ffb43a>Achtung: Hier wird gerade gebaut.",
-  "navigator.instances.blocked": "<#ff5a4a>Gerade nicht betretbar. Wähle eine andere Instanz."
+  "navigator.instances.blocked": "<#ff5a4a>Gerade nicht betretbar. Wähle eine andere Instanz.",
+  "spawn.saved": "<#4ac85e>Lobby-Spawn gesetzt: <#ffcf4a>{x} {y} {z}</#ffcf4a>. Gilt ab sofort für alle Lobbys.",
+  "spawn.failed": "<#ff5a4a>Der Lobby-Spawn konnte nicht gespeichert werden ({reason}).",
+  "spawn.not-lobby": "<#ffb43a>Das geht nur auf einem Lobby-Server.",
+  "spawn.wrong-world": "<#ffb43a>Stell dich in die Hauptwelt der Lobby.",
+  "spawn.players-only": "Nur Spieler können den Lobby-Spawn setzen."
 }

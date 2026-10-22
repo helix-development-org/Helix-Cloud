@@ -14,9 +14,11 @@ import org.helix.api.action.ActionResult
  * in addon storage and republished as the `lobby.config` bridge value so
  * every lobby backend applies it live.
  *
- * The paper component reaches the node through two bridge-invocable actions:
- * it never writes config (that is dashboard/CLI only), it only reads the
- * live joinable backends for the server selector via [serversAction].
+ * The paper component reaches the node through bridge-invocable actions: it
+ * reads the live joinable backends for the server selector via
+ * [serversAction], and the team's `/setlobbyspawn` stores the lobby spawn via
+ * `lobby.spawn.set` (checked against [ADMIN_PERMISSION] by player name, since
+ * a bridge call carries no session). Everything else is dashboard/CLI only.
  */
 class LobbyAddon : AddonBase() {
     private val json = Json { prettyPrint = true; encodeDefaults = true; ignoreUnknownKeys = true }
@@ -45,7 +47,25 @@ class LobbyAddon : AddonBase() {
                 "lobby tasks: ${config.lobbyTasks.joinToString(", ").ifBlank { "(none)" }}",
                 "layouts: ${config.layouts.keys.joinToString(", ")}",
                 "protection: ${describeProtection()}",
+                "spawn: ${config.spawn?.let { "%.1f %.1f %.1f".format(java.util.Locale.ROOT, it.x, it.y, it.z) } ?: "(world spawn)"}",
             )
+        }
+        action(
+            "lobby.spawn.set",
+            "Stores the lobby spawn (team command /setlobbyspawn of the paper component).",
+            "lobby.spawn.set <player> <json {x,y,z,yaw,pitch}>",
+            bridgeInvocable = true,
+        ) { invocation -> setSpawn(invocation.arguments) }
+        action(
+            "lobby.spawn.clear",
+            "Removes the stored lobby spawn; lobbies fall back to the world's own spawn.",
+            "lobby.spawn.clear",
+            permission = ADMIN_PERMISSION,
+        ) {
+            config = config.copy(spawn = null)
+            save()
+            publish()
+            ActionResult.ok("lobby spawn cleared")
         }
         action(
             "lobby.servers",
@@ -63,6 +83,26 @@ class LobbyAddon : AddonBase() {
     }
 
     /**
+     * Stores the lobby spawn sent by `/setlobbyspawn`. The bridge call carries no session, so the named player must
+     * hold [ADMIN_PERMISSION] on the node.
+     *
+     * @param arguments `<player> <json…>`.
+     * @return ok with the stored point, or an error (`usage`, `forbidden`, `invalid spawn`).
+     */
+    private fun setSpawn(arguments: List<String>): ActionResult {
+        val player = arguments.firstOrNull()?.takeIf { it.isNotBlank() }
+            ?: return ActionResult.error("usage", "lobby.spawn.set <player> <json>")
+        if (!context.hasPermission(player, ADMIN_PERMISSION)) return ActionResult.error("forbidden")
+        val spawn = runCatching { compact.decodeFromString(LobbySpawn.serializer(), arguments.drop(1).joinToString(" ")) }
+            .getOrNull()?.takeIf { it.isValid() }
+            ?: return ActionResult.error("invalid spawn")
+        config = config.copy(spawn = spawn)
+        save()
+        publish()
+        return ActionResult.ok(compact.encodeToString(LobbySpawn.serializer(), spawn))
+    }
+
+    /**
      * Validates and stores a replacement configuration, then republishes it.
      *
      * @param raw the configuration JSON.
@@ -72,7 +112,9 @@ class LobbyAddon : AddonBase() {
     private fun setConfig(raw: String): ActionResult {
         val imported = runCatching { json.decodeFromString(LobbyConfig.serializer(), raw) }.getOrNull()
             ?: return ActionResult.error("invalid lobby JSON")
-        config = sanitize(imported)
+        // The panel edits a copy loaded earlier: an import without a spawn keeps the one set in game
+        // (clear it explicitly with lobby.spawn.clear).
+        config = sanitize(imported).let { if (it.spawn == null) it.copy(spawn = config.spawn) else it }
         save()
         publish()
         return ActionResult.ok(
@@ -88,6 +130,7 @@ class LobbyAddon : AddonBase() {
      * @return the sanitized config.
      */
     private fun sanitize(raw: LobbyConfig): LobbyConfig = raw.copy(
+        spawn = raw.spawn?.takeIf { it.isValid() },
         lobbyTasks = raw.lobbyTasks.map { it.trim() }.filter { it.isNotEmpty() }.distinct(),
         layouts = raw.layouts.mapValues { (_, layout) ->
             layout.copy(items = layout.items.filter { it.slot in 0..8 })
@@ -154,7 +197,11 @@ class LobbyAddon : AddonBase() {
         context.storage().write("lobby", compact.encodeToString(LobbyConfig.serializer(), config))
     }
 
-    private companion object {
+    /** Shared constants of the lobby addon. */
+    companion object {
         private val SERVER_LIST = kotlinx.serialization.builtins.ListSerializer(ServerEntry.serializer())
+
+        /** Permission to set or clear the lobby spawn. */
+        const val ADMIN_PERMISSION: String = "helix.lobby.admin"
     }
 }

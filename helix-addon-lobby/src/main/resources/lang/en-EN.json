@@ -23,5 +23,10 @@
   "navigator.instances.state.busy": "<#ffcf4a>Almost full",
   "navigator.instances.state.full": "<#ff5a4a>Full",
   "navigator.instances.state.maintenance": "<#ffb43a>Warning: under construction.",
-  "navigator.instances.blocked": "<#ff5a4a>Not joinable right now. Pick another instance."
+  "navigator.instances.blocked": "<#ff5a4a>Not joinable right now. Pick another instance.",
+  "spawn.saved": "<#4ac85e>Lobby spawn set: <#ffcf4a>{x} {y} {z}</#ffcf4a>. Applies to every lobby right away.",
+  "spawn.failed": "<#ff5a4a>The lobby spawn could not be saved ({reason}).",
+  "spawn.not-lobby": "<#ffb43a>This only works on a lobby server.",
+  "spawn.wrong-world": "<#ffb43a>Stand in the lobby's main world.",
+  "spawn.players-only": "Only players can set the lobby spawn."
 }
