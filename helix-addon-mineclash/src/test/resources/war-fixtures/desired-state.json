@@ -1,0 +1,19 @@
+{
+  "returnTo": "MineClash-Game-1",
+  "wars": [
+    {
+      "warId": "w-20261022-0001",
+      "prepareSeconds": 120,
+      "maxPlayersPerClan": 10,
+      "abandonMinutes": 15,
+      "teams": [
+        {"id": "A", "clanId": "kronritter", "name": "Kronritter", "tag": "KRON", "members": [
+          {"uuid": "6f1b2c3d-1111-4a2b-9c3d-000000000001", "name": "Tytoss"},
+          {"uuid": "6f1b2c3d-1111-4a2b-9c3d-000000000002", "name": "Alice"}
+        ]},
+        {"id": "B", "clanId": "zulus", "name": "Zulus", "tag": "ZULU", "members": []}
+      ]
+    }
+  ],
+  "cancel": [{"warId": "w-20261021-0009", "reason": "SERVER_LOST"}]
+}

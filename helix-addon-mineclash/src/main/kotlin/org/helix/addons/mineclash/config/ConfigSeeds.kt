@@ -98,7 +98,7 @@ object ConfigSeeds {
         int("tutorial.startEmeralds", 100, "Tutorial start emeralds")
         int("tutorial.matchReward", 300, "Reward for the first match")
         int("tutorial.finishReward", 200, "Reward for finishing the tutorial")
-        int("war.worldSize", 2000, "Edge length of the war world")
+        int("war.worldSize", 500, "Edge length of the war world (blocks)")
         int("war.maxPlayersPerClan", 10, "Players per clan in a war")
         int("war.timeLimitMinutes", 0, "Time limit in minutes (0 = points/base only)")
         int("war.pointsWin", 5000, "Points needed to win")
@@ -106,36 +106,56 @@ object ConfigSeeds {
         int("war.pointsCapture", 300, "Points per arena capture")
         int("war.pointsHold", 20, "Points per hold interval per arena")
         int("war.holdIntervalSeconds", 60, "Hold interval in seconds")
-        int("war.arenaCount", 6, "Number of arenas")
+        int("war.arenaCount", 4, "Number of arenas")
         int("war.arenaHp", 100000, "Health of an arena crystal")
         int("war.baseHp", 500000, "Health of the base crystal")
         int("war.towerHp", 50000, "Health of encounter towers")
         dbl("war.cardMobChance", 0.20, "Share of natural spawns that are card mobs")
         int("war.spectateSeconds", 10, "Spectator time after death")
-        int("war.baseLoadedRadius", 100, "Force-load radius around bases")
+        int("war.baseLoadedRadius", 32, "Radius around bases kept loaded by plugin tickets during a war (blocks)")
         int("war.startPodests", 3, "Defense pedestals per base at start")
         int("war.podestRespawnSeconds", 120, "Seconds until fallen pedestal guardians return with the same card")
         dbl("war.troopPlayerDamageFactor", 0.5, "Multiplier on card damage when troops hit players")
         bool("war.keepCards", false, "Keep cards earned in the war")
         int("war.arenaDefenseSlots", 3, "Defense slots per arena")
         int("war.arenaDefenseCooldownSeconds", 30, "Arena defense cooldown")
-        int("war.encounterRadius", 100, "Radius of an encounter zone")
+        int("war.encounterRadius", 48, "Radius of an encounter zone")
         int("war.encounterTowerDistance", 30, "Tower distance from the zone center")
         int("war.encounterTriggerDistance", 25, "Distance at which enemies trigger a zone")
         int("war.maxDeckCards", 8, "Maximum cards in a war deck")
         int("war.baseZoneRadius", 50, "Radius of the base zone sphere (combat zone, defender patrol area)")
         int("war.baseZoneRevealDistance", 5, "The base sphere is only visible within this distance of its surface (0 = always)")
         int("war.arenaZoneRadius", 12, "Visible sphere around arena crystals")
-        int("war.baseMinDistance", 1000, "Minimum distance between the two bases (blocks)")
-        int("war.baseBorderMargin", 150, "Minimum distance of bases from the world border")
+        int("war.baseMinDistance", 300, "Minimum distance between the two bases (blocks)")
+        int("war.baseBorderMargin", 50, "Minimum distance of bases from the world border")
         str("war.biomeMode", "CHUNK", "Biome layout: CHUNK = every chunk a random biome, ZONES = regions of war.biomeCellSize")
-        int("war.biomeCellSize", 280, "Size of one biome zone in ZONES mode; every land biome gets at least one")
-        int("war.endBorder", 400, "World border edge length of the war End")
+        int("war.biomeCellSize", 120, "Size of one biome zone in ZONES mode; every land biome gets at least one")
+        int("war.endBorder", 200, "World border edge length of the war End")
         bool("war.stronghold", true, "Place a stronghold with an End portal in every war world")
-        int("war.strongholdMinBaseDistance", 350, "Minimum distance of the stronghold from both bases")
+        int("war.strongholdMinBaseDistance", 120, "Minimum distance of the stronghold from both bases")
         int("war.customSpawnIntervalSeconds", 10, "Interval of the rule-based card mob spawner")
         dbl("war.customSpawnChance", 0.5, "Chance per player and interval to attempt a rule-based card mob")
         int("war.customSpawnMaxPerPlayer", 4, "Maximum rule-based card mobs near one player")
+        // Clan-war challenges, lifecycle and the world pool (docs: Mineclash/docs/CLANWAR-CONTRACT.md).
+        int("war.prepareSeconds", 120, "Preparation phase after a war world is ready: joining allowed, bases protected, no PvP/points")
+        int("war.abandonMinutes", 15, "A clan absent from its war this long loses (both absent: decided by points)")
+        int("war.challengeExpirySeconds", 300, "Seconds an open clan-war challenge stays valid")
+        int("war.queueTimeoutMinutes", 10, "An accepted war waiting this long for a war world is cancelled")
+        int("war.serverLostSeconds", 60, "A war server silent this long loses its wars (cancelled, no rewards)")
+        int("war.maxWarsPerServer", 3, "Upper limit of concurrent wars per war server (memory may lower it)")
+        int("war.poolSize", 2, "Spare war worlds every war server keeps fully pregenerated")
+        int("war.netherBorder", 128, "World border edge length of the war Nether")
+        int("war.viewDistance", 6, "View distance of war worlds (chunks)")
+        int("war.simulationDistance", 4, "Simulation distance of war worlds (chunks)")
+        int("war.pregenMarginChunks", 6, "Chunks pregenerated beyond the border (players see past it)")
+        int("war.pregenMaxInFlight", 6, "Concurrent chunk loads while pregenerating with no war active (2 while wars run)")
+        int("war.arenaBaseDistance", 80, "Minimum distance of arenas from both bases")
+        int("war.arenaMinSpread", 50, "Minimum distance between two arenas")
+        int("war.strongholdBorderMargin", 40, "Minimum distance of the stronghold portal room from the border")
+        int("war.portalSearchRadius", 32, "Portal search radius in war worlds (vanilla 128 loads too much)")
+        bool("war.fixedSpawnGenerator", true, "War worlds use a generator with a fixed spawn (no synchronous spawn search)")
+        int("kronen.perWar", 30, "Crowns for every rostered player of a finished clan war")
+        int("kronen.perWarWin", 120, "Extra crowns for every rostered player of the winning clan")
     }
 
     /** Collections (name → documents) with their seed content. */
@@ -146,6 +166,16 @@ object ConfigSeeds {
      */
     val supersededDefaults: Map<String, Set<String>> = mapOf(
         "war.baseZoneRadius" to setOf("20"),
+        // War worlds shrank from 2000 to 500 blocks (clan-war pool, 2026-10).
+        "war.worldSize" to setOf("2000"),
+        "war.baseMinDistance" to setOf("1000"),
+        "war.baseBorderMargin" to setOf("150"),
+        "war.arenaCount" to setOf("6"),
+        "war.baseLoadedRadius" to setOf("100"),
+        "war.encounterRadius" to setOf("100"),
+        "war.endBorder" to setOf("400"),
+        "war.strongholdMinBaseDistance" to setOf("350"),
+        "war.biomeCellSize" to setOf("280"),
     )
 
     val collections: Map<String, List<ConfigDocument>> by lazy {

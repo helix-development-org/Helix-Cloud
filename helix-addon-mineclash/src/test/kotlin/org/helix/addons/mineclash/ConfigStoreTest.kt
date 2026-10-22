@@ -27,7 +27,9 @@ class ConfigStoreTest {
         assertEquals(listOf("buildings", "cards", "chests", "perks", "servers", "warSpawns"), store.collectionNames())
         assertEquals(7, store.documents("warSpawns").size)
         assertEquals("NETHER", store.document("warSpawns", "blaze")?.body?.get("dimension")?.jsonPrimitive?.content)
-        assertEquals("1000", store.setting("war.baseMinDistance"))
+        assertEquals("300", store.setting("war.baseMinDistance"))
+        assertEquals("500", store.setting("war.worldSize"))
+        assertEquals("2", store.setting("war.poolSize"))
 
         store.setSetting("war.pointsWin", "7000")
         val reloaded = ConfigStore(storage)
@@ -44,6 +46,11 @@ class ConfigStoreTest {
         assertEquals("50", ConfigStore(storage).setting("war.baseZoneRadius"), "old default 20 becomes 50")
         ConfigStore(storage).setSetting("war.baseZoneRadius", "35")
         assertEquals("35", ConfigStore(storage).setting("war.baseZoneRadius"), "custom value stays")
+        // War worlds shrank to 500×500: the old 2000 default is lifted, a custom size stays.
+        ConfigStore(storage).setSetting("war.worldSize", "2000")
+        assertEquals("500", ConfigStore(storage).setting("war.worldSize"), "old default 2000 becomes 500")
+        ConfigStore(storage).setSetting("war.worldSize", "800")
+        assertEquals("800", ConfigStore(storage).setting("war.worldSize"), "custom size stays")
     }
 
     @Test
