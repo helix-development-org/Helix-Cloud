@@ -255,98 +255,10 @@ class HelixNode(
      * `velocity` bundle, so the keys appear on the dashboard as
      * `helix.translations.velocity.*`.
      */
-    val velocityMessages: MessageBundle = bundle(
-        "velocity",
-        mapOf(
-            "en" to linkedMapOf(
-                "screen.maintenance" to "<#5ab4ff><bold>Closed test phase</bold>\n" +
-                    "<#f1e2c2><#ffcf4a>{network}</#ffcf4a> is in its closed test phase.\n" +
-                    "<#f1e2c2>Updates and release news on <#ffcf4a>kronland.de</#ffcf4a>.",
-                "screen.server_full" to "<#ff5a4a><bold>Network full</bold>\n" +
-                    "<#f1e2c2><#ffcf4a>{network}</#ffcf4a> is full right now " +
-                    "<#7a4a24>(</#7a4a24><#ffcf4a>{online}</#ffcf4a><#7a4a24>/</#7a4a24><#ffcf4a>{max}</#ffcf4a><#7a4a24>)</#7a4a24>\n" +
-                    "<#f1e2c2>Please try again in a moment.",
-                "command.lobby.none" to "{prefix} <#ff5a4a>No lobby is available. Please try again in a moment.",
-                "command.server.usage" to "{prefix} <#f1e2c2>Usage: <#ffcf4a>/server \\<name>",
-                "command.server.unknown" to "{prefix} <#ff5a4a>Unknown server: <#ffcf4a>{server}</#ffcf4a>. " +
-                    "Use <#ffcf4a>/servers</#ffcf4a> to see all servers.",
-                "command.servers.none" to "{prefix} <#f1e2c2>No servers registered.",
-                "command.servers.header" to "{prefix} <#f1e2c2>Servers <#7a4a24>(</#7a4a24><#ffcf4a>{count}</#ffcf4a><#7a4a24>)</#7a4a24>:",
-                "command.servers.entry" to "<#7a4a24> · </#7a4a24><click:run_command:'/server {server}'>" +
-                    "<hover:show_text:'<#f1e2c2>Click: connect to <#ffcf4a>{server}'><#ffcf4a>{server}</#ffcf4a></hover></click>",
-                "command.sent" to "{prefix} <#4ac85e>Sent to <#ffcf4a>{server}</#ffcf4a>.",
-                "command.unavailable" to "{prefix} <#ff5a4a>This command is currently unavailable. Please try again later.",
-                "command.error" to "{prefix} <#ff5a4a>That command could not be completed. Please try again.",
-                "kick.default" to "{prefix} <#ff5a4a>You were kicked from the network.",
-                "join.denied" to "<#ff5a4a>You may not join this network.",
-                "motd.maintenance" to "<#ffb43a>Maintenance",
-            ),
-            "de" to linkedMapOf(
-                "screen.maintenance" to "<#5ab4ff><bold>Geschlossene Testphase</bold>\n" +
-                    "<#f1e2c2><#ffcf4a>{network}</#ffcf4a> ist in der geschlossenen Testphase.\n" +
-                    "<#f1e2c2>Infos und Release-News auf <#ffcf4a>kronland.de</#ffcf4a>.",
-                "screen.server_full" to "<#ff5a4a><bold>Netzwerk voll</bold>\n" +
-                    "<#f1e2c2><#ffcf4a>{network}</#ffcf4a> ist gerade voll " +
-                    "<#7a4a24>(</#7a4a24><#ffcf4a>{online}</#ffcf4a><#7a4a24>/</#7a4a24><#ffcf4a>{max}</#ffcf4a><#7a4a24>)</#7a4a24>\n" +
-                    "<#f1e2c2>Versuch es gleich noch einmal.",
-                "command.lobby.none" to "{prefix} <#ff5a4a>Gerade ist keine Lobby verfügbar. Versuch es gleich noch einmal.",
-                "command.server.usage" to "{prefix} <#f1e2c2>Benutzung: <#ffcf4a>/server \\<name>",
-                "command.server.unknown" to "{prefix} <#ff5a4a>Unbekannter Server: <#ffcf4a>{server}</#ffcf4a>. " +
-                    "Mit <#ffcf4a>/servers</#ffcf4a> siehst du alle Server.",
-                "command.servers.none" to "{prefix} <#f1e2c2>Keine Server registriert.",
-                "command.servers.header" to "{prefix} <#f1e2c2>Server <#7a4a24>(</#7a4a24><#ffcf4a>{count}</#ffcf4a><#7a4a24>)</#7a4a24>:",
-                "command.servers.entry" to "<#7a4a24> · </#7a4a24><click:run_command:'/server {server}'>" +
-                    "<hover:show_text:'<#f1e2c2>Klick: zu <#ffcf4a>{server}</#ffcf4a> verbinden'><#ffcf4a>{server}</#ffcf4a></hover></click>",
-                "command.sent" to "{prefix} <#4ac85e>Weitergeleitet zu <#ffcf4a>{server}</#ffcf4a>.",
-                "command.unavailable" to "{prefix} <#ff5a4a>Der Befehl ist gerade nicht verfügbar. Versuch es später noch einmal.",
-                "command.error" to "{prefix} <#ff5a4a>Der Befehl konnte nicht ausgeführt werden. Versuch es noch einmal.",
-                "kick.default" to "{prefix} <#ff5a4a>Du wurdest vom Netzwerk geworfen.",
-                "join.denied" to "<#ff5a4a>Du darfst dieses Netzwerk nicht betreten.",
-                "motd.maintenance" to "<#ffb43a>Wartungsarbeiten",
-            ),
-        ),
-    )
+    val velocityMessages: MessageBundle = bundle("velocity", defaultBundle("velocity"))
 
     /** Texts of the built-in `/helix` player command. */
-    val helixMessages: MessageBundle = bundle(
-        "helix",
-        mapOf(
-            "en" to linkedMapOf(
-                "usage" to "{prefix} <#f1e2c2>Usage: <#ffcf4a>/helix " +
-                    "\\<language|addons|enable|disable|reload|backend restart|launcher restart>",
-                "no_permission" to "{prefix} <#ff5a4a>You do not have permission to do that.",
-                "restart.backend" to "{prefix} <#4ac85e>Backend restart initiated <#7a4a24>—</#7a4a24> services keep running.",
-                "restart.launcher" to "{prefix} <#4ac85e>Launcher restart initiated <#7a4a24>—</#7a4a24> services stop and " +
-                    "a fresh launcher starts.",
-                "restart.unavailable" to "{prefix} <#ff5a4a>Restart unavailable (not running from Launcher.jar). " +
-                    "Restart the node manually.",
-                "language.current" to "{prefix} <#f1e2c2>Your language: <#ffcf4a>{language}</#ffcf4a>. " +
-                    "Available: <#ffcf4a>{languages}</#ffcf4a>. Change it with " +
-                    "<click:suggest_command:'/helix language '><hover:show_text:'<#f1e2c2>Click: choose a language'>" +
-                    "<#ffcf4a>/helix language \\<code></#ffcf4a></hover></click>.",
-                "language.set" to "{prefix} <#4ac85e>Language changed to <#ffcf4a>{language}</#ffcf4a>.",
-                "language.unknown" to "{prefix} <#ff5a4a>Unknown language <#ffcf4a>{language}</#ffcf4a>. " +
-                    "Pick one of: <#ffcf4a>{languages}",
-            ),
-            "de" to linkedMapOf(
-                "usage" to "{prefix} <#f1e2c2>Benutzung: <#ffcf4a>/helix " +
-                    "\\<language|addons|enable|disable|reload|backend restart|launcher restart>",
-                "no_permission" to "{prefix} <#ff5a4a>Dafür hast du keine Berechtigung.",
-                "restart.backend" to "{prefix} <#4ac85e>Backend-Neustart gestartet <#7a4a24>—</#7a4a24> die Services laufen weiter.",
-                "restart.launcher" to "{prefix} <#4ac85e>Launcher-Neustart gestartet <#7a4a24>—</#7a4a24> Services stoppen und " +
-                    "ein frischer Launcher startet.",
-                "restart.unavailable" to "{prefix} <#ff5a4a>Neustart nicht verfügbar (läuft nicht aus einer Launcher.jar). " +
-                    "Starte die Node von Hand neu.",
-                "language.current" to "{prefix} <#f1e2c2>Deine Sprache: <#ffcf4a>{language}</#ffcf4a>. " +
-                    "Verfügbar: <#ffcf4a>{languages}</#ffcf4a>. Ändern mit " +
-                    "<click:suggest_command:'/helix language '><hover:show_text:'<#f1e2c2>Klick: Sprache wählen'>" +
-                    "<#ffcf4a>/helix language \\<code></#ffcf4a></hover></click>.",
-                "language.set" to "{prefix} <#4ac85e>Sprache geändert zu <#ffcf4a>{language}</#ffcf4a>.",
-                "language.unknown" to "{prefix} <#ff5a4a>Unbekannte Sprache <#ffcf4a>{language}</#ffcf4a>. " +
-                    "Wähle eine davon: <#ffcf4a>{languages}",
-            ),
-        ),
-    )
+    val helixMessages: MessageBundle = bundle("helix", defaultBundle("helix"))
 
     /**
      * Free-form translations created on the dashboard, under
@@ -360,31 +272,23 @@ class HelixNode(
      */
     val networkMessages: MessageBundle = bundle(
         "network",
-        mapOf(
-            // The restart.* templates keep a literal {prefix}: they are rendered by the
-            // VELOCITY BRIDGE from the raw translation tables (flat key + ctx substitution),
-            // never by MessageBundle.formatFor — the automatic chat prefix does not apply
-            // on that path, the bridge fills {prefix} itself.
-            "en" to linkedMapOf(
-                "prefix" to "<#ffcf4a>{network}</#ffcf4a> <#7a4a24>»</#7a4a24>",
-                "name" to config.network.name,
-                "restart.warn" to "{prefix} <#ffb43a>Warning: <#ffcf4a>{target}</#ffcf4a> restarts in " +
-                    "<#ffcf4a>{seconds}s</#ffcf4a>.",
-                "restart.now" to "{prefix} <#ffb43a>Warning: <#ffcf4a>{target}</#ffcf4a> is restarting now.",
-                "restart.backend.start" to "{prefix} <#5ab4ff>The game servers are restarting <#7a4a24>—</#7a4a24> " +
-                    "you may notice brief lag.",
-                "restart.backend.done" to "{prefix} <#4ac85e>Game servers restarted.",
-            ),
-            "de" to linkedMapOf(
-                "restart.warn" to "{prefix} <#ffb43a>Achtung: <#ffcf4a>{target}</#ffcf4a> startet in " +
-                    "<#ffcf4a>{seconds}s</#ffcf4a> neu.",
-                "restart.now" to "{prefix} <#ffb43a>Achtung: <#ffcf4a>{target}</#ffcf4a> startet jetzt neu.",
-                "restart.backend.start" to "{prefix} <#5ab4ff>Die Spielserver starten neu <#7a4a24>—</#7a4a24> " +
-                    "es kann kurz zu Lags kommen.",
-                "restart.backend.done" to "{prefix} <#4ac85e>Spielserver neu gestartet.",
-            ),
-        ),
+        // The restart.* templates keep a literal {prefix}: they are rendered by the
+        // VELOCITY BRIDGE from the raw translation tables (flat key + ctx substitution),
+        // never by MessageBundle.formatFor — the automatic chat prefix does not apply
+        // on that path, the bridge fills {prefix} itself. The network name comes from node.toml.
+        defaultBundle("network").let { bundles ->
+            bundles + ("en" to (bundles["en"].orEmpty() + ("name" to config.network.name)))
+        },
     )
+
+    /**
+     * Default templates of a node-owned bundle, bundled as `lang/<directory>/<locale>.json`.
+     *
+     * @param directory bundle directory below `lang/` (`velocity`, `helix`, `network`).
+     * @return language code to (key to template).
+     */
+    private fun defaultBundle(directory: String): Map<String, Map<String, String>> =
+        org.helix.api.message.LangResources.load(HelixNode::class.java, directory)
 
     /**
      * Creates and registers a language-aware message bundle of an owner.

@@ -1,0 +1,10 @@
+{
+  "usage": "{prefix} <tc:text>Benutzung: <tc:accent>/helix \\<language|addons|enable|disable|reload|backend restart|launcher restart>",
+  "no_permission": "{prefix} <tc:error>Dafür hast du keine Berechtigung.",
+  "restart.backend": "{prefix} <tc:success>Backend-Neustart gestartet <tc:muted>—</tc:muted> die Services laufen weiter.",
+  "restart.launcher": "{prefix} <tc:success>Launcher-Neustart gestartet <tc:muted>—</tc:muted> Services stoppen und ein frischer Launcher startet.",
+  "restart.unavailable": "{prefix} <tc:error>Neustart nicht verfügbar (läuft nicht aus einer Launcher.jar). Starte die Node von Hand neu.",
+  "language.current": "{prefix} <tc:text>Deine Sprache: <tc:accent>{language}</tc:accent>. Verfügbar: <tc:accent>{languages}</tc:accent>. Ändern mit <click:suggest_command:'/helix language '><hover:show_text:'<tc:text>Klick: Sprache wählen'><tc:accent>/helix language \\<code></tc:accent></hover></click>.",
+  "language.set": "{prefix} <tc:success>Sprache geändert zu <tc:accent>{language}</tc:accent>.",
+  "language.unknown": "{prefix} <tc:error>Unbekannte Sprache <tc:accent>{language}</tc:accent>. Wähle eine davon: <tc:accent>{languages}"
+}

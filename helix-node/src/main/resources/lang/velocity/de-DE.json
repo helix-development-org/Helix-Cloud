@@ -1,0 +1,16 @@
+{
+  "screen.maintenance": "<tc:info><bold>Geschlossene Testphase</bold>\n<tc:text><tc:accent>{network}</tc:accent> ist in der geschlossenen Testphase.\n<tc:text>Infos und Release-News auf <tc:accent>kronland.de</tc:accent>.",
+  "screen.server_full": "<tc:error><bold>Netzwerk voll</bold>\n<tc:text><tc:accent>{network}</tc:accent> ist gerade voll <tc:muted>(</tc:muted><tc:accent>{online}</tc:accent><tc:muted>/</tc:muted><tc:accent>{max}</tc:accent><tc:muted>)</tc:muted>\n<tc:text>Versuch es gleich noch einmal.",
+  "command.lobby.none": "{prefix} <tc:error>Gerade ist keine Lobby verfügbar. Versuch es gleich noch einmal.",
+  "command.server.usage": "{prefix} <tc:text>Benutzung: <tc:accent>/server \\<name>",
+  "command.server.unknown": "{prefix} <tc:error>Unbekannter Server: <tc:accent>{server}</tc:accent>. Mit <tc:accent>/servers</tc:accent> siehst du alle Server.",
+  "command.servers.none": "{prefix} <tc:text>Keine Server registriert.",
+  "command.servers.header": "{prefix} <tc:text>Server <tc:muted>(</tc:muted><tc:accent>{count}</tc:accent><tc:muted>)</tc:muted>:",
+  "command.servers.entry": "<tc:muted> · </tc:muted><click:run_command:'/server {server}'><hover:show_text:'<tc:text>Klick: zu <tc:accent>{server}</tc:accent> verbinden'><tc:accent>{server}</tc:accent></hover></click>",
+  "command.sent": "{prefix} <tc:success>Weitergeleitet zu <tc:accent>{server}</tc:accent>.",
+  "command.unavailable": "{prefix} <tc:error>Der Befehl ist gerade nicht verfügbar. Versuch es später noch einmal.",
+  "command.error": "{prefix} <tc:error>Der Befehl konnte nicht ausgeführt werden. Versuch es noch einmal.",
+  "kick.default": "{prefix} <tc:error>Du wurdest vom Netzwerk geworfen.",
+  "join.denied": "<tc:error>Du darfst dieses Netzwerk nicht betreten.",
+  "motd.maintenance": "<tc:warn>Wartungsarbeiten"
+}

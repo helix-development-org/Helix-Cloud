@@ -1,0 +1,7 @@
+{
+  "prefix": "<tc:accent>{network}</tc:accent> <tc:muted>»</tc:muted>",
+  "restart.warn": "{prefix} <tc:warn>Warning: <tc:accent>{target}</tc:accent> restarts in <tc:accent>{seconds}s</tc:accent>.",
+  "restart.now": "{prefix} <tc:warn>Warning: <tc:accent>{target}</tc:accent> is restarting now.",
+  "restart.backend.start": "{prefix} <tc:info>The game servers are restarting <tc:muted>—</tc:muted> you may notice brief lag.",
+  "restart.backend.done": "{prefix} <tc:success>Game servers restarted."
+}

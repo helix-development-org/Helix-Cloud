@@ -1,0 +1,6 @@
+{
+  "restart.warn": "{prefix} <tc:warn>Achtung: <tc:accent>{target}</tc:accent> startet in <tc:accent>{seconds}s</tc:accent> neu.",
+  "restart.now": "{prefix} <tc:warn>Achtung: <tc:accent>{target}</tc:accent> startet jetzt neu.",
+  "restart.backend.start": "{prefix} <tc:info>Die Spielserver starten neu <tc:muted>—</tc:muted> es kann kurz zu Lags kommen.",
+  "restart.backend.done": "{prefix} <tc:success>Spielserver neu gestartet."
+}
