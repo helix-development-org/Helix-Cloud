@@ -27,6 +27,7 @@ class PermissionsAddon : AddonBase() {
     private lateinit var catalog: PermissionCatalog
     private lateinit var tester: TesterAccess
     private lateinit var badges: RankBadgeUpgrade
+    private lateinit var access: PanelAccess
 
     /**
      * Registers the resolver and all `perm.*` actions.
@@ -41,6 +42,8 @@ class PermissionsAddon : AddonBase() {
         tester.seedGroup()
         badges = RankBadgeUpgrade(store, context.storage())
         badges.upgradeOnce()
+        access = PanelAccess(store, context.storage())
+        access.presetsOnce()
         context.registerPermissionResolver { request -> store.has(request.name, request.permission, request.uuid) }
         // Group prefixes are DISPLAY state, deliberately decoupled from permission nodes: the
         // player's highest-weight group with a prefix wins, so a `*` grant never changes looks.
@@ -210,6 +213,42 @@ class PermissionsAddon : AddonBase() {
         ) { inv ->
             val changed = badges.apply(force = "--force" in inv.arguments)
             if (changed.isEmpty()) ActionResult.ok("no group prefix changed") else ActionResult.ok("badge prefix set for: ${changed.joinToString()}")
+        }
+        action(
+            "perm.access.matrix",
+            "Dashboard access matrix: every group with its dashboard nodes (JSON, used by the dashboard view Zugriff).",
+            "perm.access.matrix",
+            permission = PanelAccess.PERMISSION,
+        ) {
+            ActionResult.ok(json.encodeToString(access.matrix()))
+        }
+        action(
+            "perm.access.set",
+            "Grants or revokes one dashboard node (helix.panel.* or a listed team node) on a group; wildcard groups are locked.",
+            "perm.access.set <group> <node> <on|off>",
+            permission = PanelAccess.PERMISSION,
+        ) { inv ->
+            val group = inv.arguments.getOrNull(0)
+            val node = inv.arguments.getOrNull(1)
+            val grant = when (inv.arguments.getOrNull(2)?.lowercase()) {
+                "on", "true", "grant" -> true
+                "off", "false", "revoke" -> false
+                else -> null
+            }
+            if (group == null || node == null || grant == null) {
+                return@action ActionResult.error("usage: perm.access.set <group> <node> <on|off>")
+            }
+            access.set(group, node, grant)?.let { return@action ActionResult.error(it) }
+            ActionResult.ok("${if (grant) "granted" else "revoked"} $node ${if (grant) "to" else "from"} $group")
+        }
+        action(
+            "perm.access.presets",
+            "Gives every standard team group and the testers without dashboard nodes their preset nodes again.",
+            "perm.access.presets",
+            permission = PanelAccess.PERMISSION,
+        ) {
+            val changed = access.applyPresets()
+            if (changed.isEmpty()) ActionResult.ok("no group changed") else ActionResult.ok("presets applied to: ${changed.joinToString()}")
         }
         action("perm.export", "Exports all groups and users as JSON (used by the dashboard).", "perm.export") {
             ActionResult.ok(json.encodeToString(store.document()))

@@ -230,6 +230,6 @@ class TesterAccess(
             "feedback.report",
             "feedback.tester",
             "tester.tools",
-        )
+        ) + PanelAccess.TESTER
     }
 }
