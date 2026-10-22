@@ -11,6 +11,8 @@ import kotlinx.serialization.Serializable
  * @property description German one-line explanation of what it allows.
  * @property group `Dashboard-Bereiche` (seeing a view) or `Steuerung` (changing things).
  * @property view the dashboard view it belongs to.
+ * @property critical admin-equivalent: whoever holds it can reach full control of the node (console, files, tasks,
+ *   addons, scheduled actions, the access matrix itself) – the matrix shows a warning and presets never grant it.
  */
 @Serializable
 data class PanelCapability(
@@ -20,6 +22,7 @@ data class PanelCapability(
     val description: String,
     val group: String,
     val view: String,
+    val critical: Boolean = false,
 )
 
 /**
@@ -147,6 +150,12 @@ object PanelCapabilities {
     /** The access matrix: who may see and change what. */
     const val ACCESS = "helix.panel.access"
 
+    /**
+     * Admin-equivalent nodes: console commands, file writes, task edits, addon switches and scheduled actions can each
+     * be turned into full control of the node, and the access matrix hands out every node.
+     */
+    val CRITICAL: Set<String> = setOf(TASKS_EDIT, SERVICES_CONSOLE, ADDONS_MANAGE, SCHEDULES_EDIT, FILES_EDIT, ACCESS)
+
     /** Every built-in capability, grouped by view (view first, then its controls). */
     val ALL: List<PanelCapability> = listOf(
         area(OVERVIEW, "Übersicht", "Startseite mit Auslastung, Metriken und Zustand.", "overview"),
@@ -179,8 +188,8 @@ object PanelCapabilities {
     )
 
     private fun area(node: String, label: String, description: String, view: String) =
-        PanelCapability(node.removePrefix(PREFIX), node, label, description, AREAS, view)
+        PanelCapability(node.removePrefix(PREFIX), node, label, description, AREAS, view, node in CRITICAL)
 
     private fun control(node: String, label: String, description: String, view: String) =
-        PanelCapability(node.removePrefix(PREFIX), node, label, description, CONTROL, view)
+        PanelCapability(node.removePrefix(PREFIX), node, label, description, CONTROL, view, node in CRITICAL)
 }

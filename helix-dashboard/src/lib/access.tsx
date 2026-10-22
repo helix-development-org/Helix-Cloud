@@ -17,3 +17,9 @@ export function useCan(): (capability: string) => boolean {
   const identity = useContext(IdentityContext)
   return (capability) => !!identity && (identity.admin || (identity.capabilities ?? []).includes(capability))
 }
+
+/** Whether the signed-in user is a full admin (only admins may change the access matrix). */
+export function useIsAdmin(): boolean {
+  const identity = useContext(IdentityContext)
+  return !!identity?.admin
+}

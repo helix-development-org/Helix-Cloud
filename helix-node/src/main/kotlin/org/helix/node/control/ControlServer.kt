@@ -262,6 +262,8 @@ private suspend fun RoutingContext.requireBridge(dependencies: ControlDependenci
 internal fun knownPermissionNodes(dependencies: ControlDependencies): List<String> = buildList {
     add(dependencies.loginPermission)
     addAll(PanelAuthService.VIEW_NODES.values)
+    // control nodes too, so the native fallback (no permissions addon) can grant console, control and edit rights
+    addAll(PanelCapabilities.ALL.map { it.node })
     dependencies.dashboardPanels.list().forEach { add(PanelAuthService.panelNode(it.id)) }
     add("helix.maintenance.bypass")
     // permissions gating in-game commands (/helix, /bans, /permissions, …)
@@ -314,6 +316,25 @@ private const val STREAM_POLL_MS = 300L
 /** Stream polls between keep-alive comments (~15 s). */
 private const val STREAM_KEEPALIVE_POLLS = 50
 
+/** Stream polls between re-checks of the session and permission (~10 s). */
+private const val STREAM_RECHECK_POLLS = 33
+
+/**
+ * A check that the caller of a stream still holds [node]: re-authenticates the bearer token presented when the
+ * stream was opened (expired, signed-out or demoted sessions fail) and re-evaluates the permission.
+ *
+ * @param dependencies control API dependencies.
+ * @param node permission node the stream needs.
+ * @return the re-check for [sseLoop].
+ */
+private fun RoutingContext.streamAccess(dependencies: ControlDependencies, node: String): suspend () -> Boolean {
+    val presented = call.request.headers[HttpHeaders.Authorization].orEmpty().removePrefix("Bearer ").trim()
+    return {
+        val principal = if (presented.isEmpty()) null else dependencies.panelAuth.authenticate(presented)
+        principal != null && dependencies.panelAuth.grants(principal, node)
+    }
+}
+
 /**
  * Responds with a server-sent-event stream and runs the given block with an
  * emitter that writes one SSE event per log line.
@@ -348,9 +369,21 @@ private suspend fun emitLines(emit: suspend (String) -> Unit, lines: List<String
  * @param emit the raw event emitter, used for keep-alive comments.
  * @param step polls once; `true` when new lines were emitted.
  */
-private suspend fun sseLoop(emit: suspend (String) -> Unit, step: suspend () -> Boolean) {
+private suspend fun sseLoop(
+    emit: suspend (String) -> Unit,
+    stillAllowed: (suspend () -> Boolean)? = null,
+    step: suspend () -> Boolean,
+) {
     var idle = 0
+    var polls = 0
     while (true) {
+        polls++
+        // A stream outlives the request that opened it: re-check the session and the node regularly, so revoking
+        // the permission or signing the user out also ends an open log stream.
+        if (stillAllowed != null && polls % STREAM_RECHECK_POLLS == 0 && !stillAllowed()) {
+            emit("event: revoked\ndata: access revoked\n\n")
+            return
+        }
         val produced = step()
         idle = if (produced) 0 else idle + 1
         if (idle >= STREAM_KEEPALIVE_POLLS) {
@@ -466,10 +499,11 @@ private fun io.ktor.server.routing.Route.observabilityRoutes(dependencies: Contr
     }
     get("/logs/stream") {
         if (!authorize(dependencies, "helix.panel.logs")) return@get
+        val access = streamAccess(dependencies, "helix.panel.logs")
         streamSse { emit ->
             var offset = dependencies.logBuffer.offset()
             emitLines(emit, dependencies.logBuffer.tail(200))
-            sseLoop(emit) {
+            sseLoop(emit, access) {
                 val lines = dependencies.logBuffer.since(offset)
                 offset = dependencies.logBuffer.offset()
                 emitLines(emit, lines)
@@ -735,10 +769,11 @@ private fun io.ktor.server.routing.Route.serviceRoutes(dependencies: ControlDepe
     get("/services/{id}/logs/stream") {
         if (!authorize(dependencies, PanelCapabilities.SERVICES_LOGS)) return@get
         val id = call.parameters["id"].orEmpty()
+        val access = streamAccess(dependencies, PanelCapabilities.SERVICES_LOGS)
         streamSse { emit ->
             var last: List<String> = dependencies.manager.logs(id, STREAM_TAIL)
             emitLines(emit, last)
-            sseLoop(emit) {
+            sseLoop(emit, access) {
                 val current = dependencies.manager.logs(id, STREAM_TAIL)
                 val fresh = newLines(last, current)
                 last = current
@@ -775,10 +810,13 @@ private fun io.ktor.server.routing.Route.scheduleRoutes(dependencies: ControlDep
     }
     post("/schedules") {
         if (!authorize(dependencies, PanelCapabilities.SCHEDULES_EDIT)) return@post
-        val job = call.receive<ScheduledJob>()
-        require(job.id.isNotBlank()) { "job id must not be empty" }
-        require(job.action.isNotBlank()) { "job action must not be empty" }
-        require(job.everyMinutes > 0 || job.dailyAt != null) { "set everyMinutes or dailyAt" }
+        val received = call.receive<ScheduledJob>()
+        require(received.id.isNotBlank()) { "job id must not be empty" }
+        require(received.action.isNotBlank()) { "job action must not be empty" }
+        require(received.everyMinutes > 0 || received.dailyAt != null) { "set everyMinutes or dailyAt" }
+        // Jobs run with system rights: only schedule what you may run yourself.
+        if (!mayInvoke(dependencies, received.action)) return@post
+        val job = received.copy(createdBy = restActor() ?: "admin")
         dependencies.jobScheduler.save(job)
         call.respond(job)
     }
@@ -794,6 +832,8 @@ private fun io.ktor.server.routing.Route.scheduleRoutes(dependencies: ControlDep
     post("/schedules/{id}/run") {
         if (!authorize(dependencies, PanelCapabilities.SCHEDULES_EDIT)) return@post
         val id = call.parameters["id"].orEmpty()
+        val job = dependencies.jobScheduler.all().firstOrNull { it.id == id }
+        if (job != null && !mayInvoke(dependencies, job.action)) return@post
         if (dependencies.jobScheduler.runNow(id)) {
             call.respond(MessageResponse("ran $id"))
         } else {
@@ -905,6 +945,9 @@ private fun io.ktor.server.routing.Route.playerRoutes(dependencies: ControlDepen
             return@get
         }
         val online = dependencies.playerRegistry.find(name)
+        // The stored per-addon data (address hashes, histories …) is the GDPR export: only for player managers.
+        val principal = call.principal<PanelPrincipal>()
+        val full = principal != null && dependencies.panelAuth.grants(principal, PanelCapabilities.PLAYERS_MANAGE)
         call.respond(
             PlayerLookupView(
                 name = name,
@@ -912,7 +955,7 @@ private fun io.ktor.server.routing.Route.playerRoutes(dependencies: ControlDepen
                 uuid = online?.uuid,
                 proxyServiceId = online?.proxyServiceId,
                 joinedAtEpochMs = online?.joinedAtEpochMs,
-                sources = dependencies.playerData.export(name),
+                sources = if (full) dependencies.playerData.export(name) else emptyMap(),
             ),
         )
     }
@@ -984,6 +1027,27 @@ private fun RoutingContext.playerAction(action: String, player: String, value: S
 private fun RoutingContext.restActor(): String? =
     call.principal<PanelPrincipal>()?.takeUnless { it.viaStaticToken }?.name
 
+/**
+ * Whether the caller may invoke an action over REST (directly or through a scheduled job), else answers `403`.
+ *
+ * - An action with a declared permission needs that node; one without needs full admin.
+ * - Player commands (`/clan`, `/discord`, …) take the executing player as their first argument: over REST that
+ *   name would be the caller's choice, so only full admins may call them – for everyone else they are in-game only.
+ *
+ * @param dependencies control API dependencies.
+ * @param action action name.
+ * @return `true` if allowed; `false` after a `403` was written.
+ */
+private suspend fun RoutingContext.mayInvoke(dependencies: ControlDependencies, action: String): Boolean {
+    val descriptor = dependencies.registry.descriptors().firstOrNull { it.name == action }
+    if (descriptor?.playerCommand == true && call.principal<PanelPrincipal>()?.admin != true) {
+        call.respond(HttpStatusCode.Forbidden, ErrorResponse("player commands are in-game only: $action"))
+        return false
+    }
+    val required = descriptor?.permission
+    return if (required != null) authorize(dependencies, required) else requireAdmin(dependencies)
+}
+
 private fun io.ktor.server.routing.Route.actionRoutes(dependencies: ControlDependencies) {
     get("/actions") {
         // The full action catalog is admin-only: it enumerates every action name and usage,
@@ -995,10 +1059,7 @@ private fun io.ktor.server.routing.Route.actionRoutes(dependencies: ControlDepen
     post("/actions") {
         if (!withinRateLimit(dependencies.actionsRateLimiter)) return@post
         val invocation = call.receive<ActionInvocation>()
-        val descriptor = dependencies.registry.descriptors().firstOrNull { it.name == invocation.action }
-        val required = descriptor?.permission
-        val authorized = if (required != null) authorize(dependencies, required) else requireAdmin(dependencies)
-        if (!authorized) return@post
+        if (!mayInvoke(dependencies, invocation.action)) return@post
         call.respond(dependencies.registry.invoke(invocation.copy(source = ActionSource.REST, actor = restActor())))
     }
 }

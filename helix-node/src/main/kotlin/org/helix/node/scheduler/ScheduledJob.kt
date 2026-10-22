@@ -14,6 +14,8 @@ import kotlinx.serialization.Serializable
  * @property everyMinutes run every N minutes; `0` disables the interval schedule.
  * @property dailyAt run once per day at `HH:mm`; `null` disables the daily schedule.
  * @property enabled whether the job runs.
+ * @property createdBy dashboard user who saved the job (`admin` for the static token), `null` for jobs from the
+ *   CLI or older versions; the job still runs with system rights, so saving one requires the action's own permission.
  */
 @Serializable
 data class ScheduledJob(
@@ -23,4 +25,5 @@ data class ScheduledJob(
     val everyMinutes: Int = 0,
     val dailyAt: String? = null,
     val enabled: Boolean = true,
+    val createdBy: String? = null,
 )

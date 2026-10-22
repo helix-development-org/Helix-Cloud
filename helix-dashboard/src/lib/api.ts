@@ -61,6 +61,8 @@ export interface PanelCapability {
   description: string
   group: string
   view: string
+  /** Admin-equivalent: whoever holds it can reach full control of the node. */
+  critical?: boolean
 }
 /** `GET /access/catalog`: everything the access matrix can grant to a group. */
 export interface AccessCatalog {
